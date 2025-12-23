@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import AppNavigator from './navigation/AppNavigator';
 import DatabaseService from './services/database';
+import { WorkoutProvider } from './contexts/WorkoutContext';
+import { ExerciseProvider } from './contexts/ExerciseContext';
+import { HistoryProvider } from './contexts/HistoryContext';
 
 export default function App() {
   const [isDbReady, setIsDbReady] = useState(false);
@@ -26,5 +29,13 @@ export default function App() {
     );
   }
 
-  return <AppNavigator />;
+  return (
+    <WorkoutProvider>
+      <ExerciseProvider>
+        <HistoryProvider>
+          <AppNavigator />
+        </HistoryProvider>
+      </ExerciseProvider>
+    </WorkoutProvider>
+  );
 }
