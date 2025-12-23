@@ -2,6 +2,11 @@ name: Expo Preview
 
 on:
   pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   preview:
@@ -18,37 +23,20 @@ jobs:
           cache: 'npm'
           cache-dependency-path: workout-logger/package-lock.json
 
-      - name: Set up Expo
+      - name: Set up Expo and EAS
         uses: expo/expo-github-action@v8
         with:
+          eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-          packager: npm
 
       - name: Install dependencies
         run: npm install
         working-directory: ./workout-logger
 
       - name: Create preview
-        id: preview
-        uses: expo/expo-preview-action@v1
+        uses: expo/expo-github-action/preview@v8
         with:
-          channel: pr-${{ github.event.number }}
-          project-flavor: 'expo-go'
-        working-directory: ./workout-logger
-
-      - name: Add comment to PR
-        uses: unsplash/comment-on-pr@v1
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ github.event.number }}
-          message: |
-            A preview of this pull request is available.
-
-            **Project Page:** [Open](${{ steps.preview.outputs.EXPO_PROJECT_URL }})
-            **Manifest URL:** `${{ steps.preview.outputs.EXPO_MANIFEST_URL }}`
-
-            Scan the QR code below with the Expo Go app to view the preview:
-            <a href="${{ steps.preview.outputs.EXPO_PROJECT_URL }}"><img src="${{ steps.preview.outputs.EXPO_QR_CODE_URL }}" width="250px" height="250px" /></a>
-
-            ---
-            *Note: You will need to create an `EXPO_TOKEN` secret in your repository settings for this workflow to succeed.*
+          command: eas update --auto --branch=pr-${{ github.event.number }}
+          working-directory: ./workout-logger
+          comment: true
+          comment-id: expo-preview
