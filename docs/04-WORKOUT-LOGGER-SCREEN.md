@@ -33,6 +33,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useWorkout } from '../contexts/WorkoutContext';
 import { useExercise } from '../contexts/ExerciseContext';
 
+// Note: Alert.alert is used as a placeholder for error handling.
+// It should be replaced with Toast notifications in a future UI polish step.
+
 const ExerciseCard = ({ exercise, onAddSet, onUpdateSet, onDeleteSet, onRemove }) => {
   return (
     <View style={styles.card}>
@@ -626,34 +629,3 @@ const styles = StyleSheet.create({
 });
 
 export default WorkoutLoggerScreen;
-```
-
-### Key Features Implemented
-
-1. **Auto-start Workout**: Automatically starts a workout when screen loads
-2. **Real-time Stats**: Timer, volume, and completed sets update live
-3. **Add Exercises**: Modal with search and filter functionality
-4. **Add/Remove Sets**: Dynamic set management with auto-numbering
-5. **Update Set Data**: Input fields update database immediately
-6. **Complete Sets**: Checkbox to mark sets as complete
-7. **Remove Exercise**: Long-press or button to remove
-8. **Finish Workout**: Saves duration and navigates to history
-9. **Cancel Workout**: Deletes workout if user cancels
-
-### Files to Modify
-- `workout-logger/screens/WorkoutLoggerScreen.js` - Complete rewrite
-
-### Testing Checklist
-- [ ] Workout starts automatically on screen load
-- [ ] Can add exercises from modal
-- [ ] Can add sets to exercises
-- [ ] Input fields update set values in database
-- [ ] Checkbox marks sets as complete
-- [ ] Volume calculation updates in real-time
-- [ ] Timer updates every second
-- [ ] Finish button saves and navigates to history
-- [ ] Cancel button prompts confirmation and deletes workout
-
-### Next Steps
-- Fix #5: Update WorkoutHistoryScreen
-- Fix #6: Update ExerciseLibraryScreen
