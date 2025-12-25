@@ -81,6 +81,7 @@ class ExerciseRepository {
 
   /**
    * Get exercise history (previous performances)
+   * Modified to include all sets, even incomplete ones, as long as they have data
    */
   async getExerciseHistory(exerciseId, limit = 10) {
     return await DatabaseService.db.getAllAsync(`
@@ -94,7 +95,8 @@ class ExerciseRepository {
       FROM workout_exercises we
       JOIN workouts w ON we.workout_id = w.id
       JOIN sets s ON we.id = s.workout_exercise_id
-      WHERE we.exercise_id = ? AND s.is_completed = 1
+      WHERE we.exercise_id = ?
+        AND (s.weight_lbs IS NOT NULL OR s.reps IS NOT NULL)
       ORDER BY w.date DESC, s.set_number
       LIMIT ?
     `, [exerciseId, limit]);
