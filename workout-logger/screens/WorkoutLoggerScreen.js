@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useWorkout } from '../contexts/WorkoutContext';
 import { useExercise } from '../contexts/ExerciseContext';
 import { useFocusEffect } from '@react-navigation/native';
+import PredictionsRepository from '../repositories/PredictionsRepository';
 
 // Note: Alert.alert is used as a placeholder for error handling.
 // It should be replaced with Toast notifications in a future UI polish step.
@@ -85,7 +86,7 @@ const SetRow = ({ set, onUpdateSet, onDeleteSet }) => {
   );
 };
 
-const ExerciseCard = ({ exercise, onAddSet, onUpdateSet, onDeleteSet, onRemove }) => {
+const ExerciseCard = ({ exercise, onAddSet, onUpdateSet, onDeleteSet, onRemove, recommendation }) => {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -99,6 +100,16 @@ const ExerciseCard = ({ exercise, onAddSet, onUpdateSet, onDeleteSet, onRemove }
           <MaterialCommunityIcons name="delete-outline" size={24} color="#929bc9" />
         </TouchableOpacity>
       </View>
+
+      {recommendation && recommendation.hasHistory && (
+        <View style={styles.recommendationBanner}>
+          <MaterialCommunityIcons name="lightbulb" size={16} color="#f9a825" />
+          <Text style={styles.recommendationText}>
+            Suggested: {recommendation.recommendation.recommendedWeight} lbs × {' '}
+            {recommendation.recommendation.recommendedReps} reps
+          </Text>
+        </View>
+      )}
 
       <View style={styles.setsContainer}>
         <View style={styles.setsHeader}>
@@ -221,6 +232,26 @@ const WorkoutLoggerScreen = ({ navigation }) => {
 
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [stats, setStats] = useState({ totalVolume: 0, completedSets: 0, duration: 0 });
+  const [recommendations, setRecommendations] = useState({});
+
+  // Load recommendations for exercises
+  useEffect(() => {
+    if (activeWorkout && activeWorkout.exercises) {
+      activeWorkout.exercises.forEach(async (exercise) => {
+        if (!recommendations[exercise.exercise_id]) {
+          try {
+            const rec = await PredictionsRepository.getExerciseRecommendation(exercise.exercise_id);
+            setRecommendations(prev => ({
+              ...prev,
+              [exercise.exercise_id]: rec,
+            }));
+          } catch (error) {
+            console.log('Failed to load recommendation', error);
+          }
+        }
+      });
+    }
+  }, [activeWorkout]);
 
   // Update stats every second
   useEffect(() => {
@@ -408,6 +439,7 @@ const WorkoutLoggerScreen = ({ navigation }) => {
             <ExerciseCard
               key={exercise.workout_exercise_id}
               exercise={exercise}
+              recommendation={recommendations[exercise.exercise_id]}
               onAddSet={handleAddSet}
               onUpdateSet={handleUpdateSet}
               onDeleteSet={handleDeleteSet}
@@ -660,6 +692,24 @@ const styles = StyleSheet.create({
   exerciseDetails: {
     color: '#929bc9',
     fontSize: 12,
+  },
+  recommendationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(249, 168, 37, 0.15)',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginHorizontal: 15,
+    marginTop: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(249, 168, 37, 0.3)',
+  },
+  recommendationText: {
+    color: '#f9a825',
+    marginLeft: 8,
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
 

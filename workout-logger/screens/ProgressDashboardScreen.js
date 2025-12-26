@@ -11,6 +11,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { useHistory } from '../contexts/HistoryContext';
 import AnalyticsRepository from '../repositories/AnalyticsRepository';
+import PredictionsRepository from '../repositories/PredictionsRepository';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -73,64 +74,15 @@ const ProgressDashboardScreen = () => {
       const frequency = await getWorkoutFrequency(12);
       setFrequencyData(frequency);
 
-      // Generate recommendations based on data
-      generateRecommendations(volume, frequency);
+      // Get predictions/insights
+      const insights = await PredictionsRepository.getWorkoutInsights();
+      setRecommendations(insights);
 
     } catch (error) {
       console.error('Failed to load analytics:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const generateRecommendations = (volumeData, frequencyData) => {
-    const recommendations = [];
-
-    // Calculate total volume
-    const totalVolume = volumeData.reduce((sum, item) => sum + item.total_volume, 0);
-
-    // Check for muscle imbalances
-    if (volumeData.length > 0) {
-      const maxVolume = Math.max(...volumeData.map(v => v.total_volume));
-      const imbalanced = volumeData.filter(v => v.total_volume < maxVolume * 0.3);
-
-      if (imbalanced.length > 0) {
-        recommendations.push({
-          type: 'warning',
-          title: 'Muscle Imbalance Detected',
-          message: `Your ${imbalanced[0].muscle_group} volume is significantly lower. Consider adding more exercises for this muscle group.`,
-        });
-      }
-    }
-
-    // Check workout consistency
-    const recentFrequency = frequencyData.slice(0, 4);
-    const avgFrequency = recentFrequency.length > 0
-      ? recentFrequency.reduce((sum, item) => sum + item.workout_count, 0) / recentFrequency.length
-      : 0;
-
-    if (avgFrequency < 2) {
-      recommendations.push({
-        type: 'info',
-        title: 'Increase Frequency',
-        message: `You're averaging ${avgFrequency.toFixed(1)} workouts per week. Aim for 3-5 weekly sessions for optimal progress.`,
-      });
-    } else if (avgFrequency > 6) {
-      recommendations.push({
-        type: 'warning',
-        title: 'Recovery Warning',
-        message: `You're training very frequently. Ensure you're getting adequate rest and recovery.`,
-      });
-    }
-
-    // Progressive overload recommendation
-    recommendations.push({
-      type: 'success',
-      title: 'Keep Building',
-      message: 'Track your weights and reps. Aim to increase volume by 5-10% each week for progressive overload.',
-    });
-
-    setRecommendations(recommendations);
   };
 
   // Calculate percentages for muscle split
