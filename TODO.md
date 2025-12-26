@@ -1,5 +1,6 @@
 # TODO
 
+- [x] Step 7: Progress Dashboard (Metrics, Charts, Recommendations)
 - [ ] Replace `workout-logger/assets/placeholder.png` with a proper exercise placeholder image (e.g. from via.placeholder.com or a designed asset).
 - [ ] Implement image uploading/selection for custom exercises.
 - [ ] Add more default exercises to the database seed.

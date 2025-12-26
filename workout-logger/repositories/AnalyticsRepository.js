@@ -14,7 +14,7 @@ class AnalyticsRepository {
       JOIN workout_exercises we ON s.workout_exercise_id = we.id
       JOIN workouts w ON we.workout_id = w.id
       JOIN exercises e ON we.exercise_id = e.id
-      WHERE w.date BETWEEN ? AND ? AND s.is_completed = 1
+      WHERE w.date BETWEEN ? AND ? AND (s.is_completed = 1 OR (s.weight_lbs > 0 AND s.reps > 0))
       GROUP BY e.muscle_group
       ORDER BY total_volume DESC
     `, [startDate, endDate]);
@@ -34,7 +34,7 @@ class AnalyticsRepository {
       FROM sets s
       JOIN workout_exercises we ON s.workout_exercise_id = we.id
       JOIN workouts w ON we.workout_id = w.id
-      WHERE we.exercise_id = ? AND s.is_completed = 1
+      WHERE we.exercise_id = ? AND (s.is_completed = 1 OR (s.weight_lbs > 0 AND s.reps > 0))
       GROUP BY w.date
       ORDER BY w.date DESC
       LIMIT ?
@@ -71,7 +71,7 @@ class AnalyticsRepository {
       JOIN workout_exercises we ON s.workout_exercise_id = we.id
       JOIN exercises e ON we.exercise_id = e.id
       JOIN workouts w ON we.workout_id = w.id
-      WHERE s.is_completed = 1
+      WHERE (s.is_completed = 1 OR (s.weight_lbs > 0 AND s.reps > 0))
       GROUP BY e.id
       HAVING s.weight_lbs = MAX(s.weight_lbs)
     `);
@@ -90,7 +90,7 @@ class AnalyticsRepository {
       JOIN workouts w ON we.workout_id = w.id
       JOIN exercises e ON we.exercise_id = e.id
       WHERE e.muscle_group = ?
-        AND s.is_completed = 1
+        AND (s.is_completed = 1 OR (s.weight_lbs > 0 AND s.reps > 0))
         AND w.date >= date('now', '-${weeks} weeks')
       GROUP BY week
       ORDER BY week ASC
