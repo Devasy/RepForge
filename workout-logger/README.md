@@ -1,16 +1,60 @@
-# workout_logger
+# RepForge 🏋️
 
-A new Flutter project.
+**RepForge** - Your personal workout companion to forge strength and track progress.
 
-## Getting Started
+## 📱 App Information
 
-This project is a starting point for a Flutter application.
+- **App Name:** RepForge
+- **Package ID:** com.devasy.repforge
+- **Version:** 1.0.0+1
+- **Developer:** Devasy Patel
+- **Contact:** patel.devasy.23@gmail.com
 
-A few resources to get you started if this is your first Flutter project:
+## 🎨 Features
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+RepForge is a comprehensive workout logging application built with Flutter that helps you:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- 📊 Track your workouts with detailed analytics
+- 💪 Monitor your progress over time
+- 🎯 Set and achieve fitness goals
+- 📈 Visualize your performance with beautiful charts
+- 🤖 Get AI-powered insights using ML services
+- 🎨 Enjoy a modern, beautiful interface with custom theming
+
+## 🛠️ Built With
+
+- **Flutter** - Cross-platform mobile framework
+- **Hive** - Local database for offline storage
+- **Provider** - State management
+- **FL Chart** - Beautiful data visualization
+- **Machine Learning** - AI-powered workout insights
+
+## 📦 Installation
+
+The release APK is available at:
+```
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+Simply transfer this APK to your Android device and install it.
+
+## 🏗️ Building from Source
+
+1. Ensure you have Flutter installed
+2. Clone this repository
+3. Run `flutter pub get` to install dependencies
+4. Run `flutter build apk --release` to build the production APK
+
+## 📄 License
+
+This project is a personal workout tracking application.
+
+## 👨‍💻 Developer
+
+Created with ❤️ by Devasy Patel
+
+For any queries or support, reach out at: patel.devasy.23@gmail.com
+
+---
+
+**RepForge** - Forge your strength, track your progress, achieve your goals! 💪
