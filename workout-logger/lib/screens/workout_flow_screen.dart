@@ -40,7 +40,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeWorkout();
+    // Defer initialization until after the first frame to avoid
+    // calling notifyListeners() during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeWorkout();
+    });
   }
 
   void _initializeWorkout() {
