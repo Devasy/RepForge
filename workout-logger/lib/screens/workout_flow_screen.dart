@@ -76,6 +76,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       setState(() {
         _currentWeight = lastSet.weight;
         _currentReps = lastSet.reps;
+        // Sync controllers with state (single source of truth)
+        _mainWeightController.text = _currentWeight.toString();
+        _mainRepsController.text = _currentReps.toString();
       });
     }
   }
@@ -517,16 +520,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   }
 
   Widget _buildMainSetEntry() {
-    // Initialize controllers with current values if not already set
-    if (_mainWeightController.text.isEmpty || 
-        _mainWeightController.text != _currentWeight.toString()) {
-      _mainWeightController.text = _currentWeight.toString();
-    }
-    if (_mainRepsController.text.isEmpty || 
-        _mainRepsController.text != _currentReps.toString()) {
-      _mainRepsController.text = _currentReps.toString();
-    }
-    
+    // Controllers are initialized in _loadLastSessionData and updated via onChanged
+    // No controller.text assignments in build to avoid cursor jumps
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
@@ -550,7 +545,10 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                     keyboardType: TextInputType.number,
                     onChanged: (val) {
                       final parsed = double.tryParse(val);
-                      if (parsed != null) setState(() => _currentWeight = parsed);
+                      if (parsed != null) {
+                        _currentWeight = parsed;
+                        // Don't call setState here - controller is the source of truth during input
+                      }
                     },
                   ),
                 ),
@@ -566,7 +564,10 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                     keyboardType: TextInputType.number,
                     onChanged: (val) {
                       final parsed = int.tryParse(val);
-                      if (parsed != null) setState(() => _currentReps = parsed);
+                      if (parsed != null) {
+                        _currentReps = parsed;
+                        // Don't call setState here - controller is the source of truth during input
+                      }
                     },
                   ),
                 ),
@@ -580,23 +581,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   }
 
   Widget _buildDropEntry(int index) {
-    final drop = _drops[index];
-    
-    // Ensure we have controllers for this index
-    while (_dropWeightControllers.length <= index) {
-      _dropWeightControllers.add(TextEditingController());
-    }
-    while (_dropRepsControllers.length <= index) {
-      _dropRepsControllers.add(TextEditingController());
-    }
-    
-    // Sync controller values with drop data
-    if (_dropWeightControllers[index].text != drop.weight.toString()) {
-      _dropWeightControllers[index].text = drop.weight.toString();
-    }
-    if (_dropRepsControllers[index].text != drop.reps.toString()) {
-      _dropRepsControllers[index].text = drop.reps.toString();
-    }
+    // Controllers are created and initialized in _addDrop()
+    // Build method only READS from controllers, never creates or modifies them
+    // This prevents cursor jumps and duplicate controller creation
     
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -620,12 +607,14 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (val) {
-                      setState(() {
+                      final parsed = double.tryParse(val);
+                      if (parsed != null) {
+                        // Update drop data, controller is source of truth during input
                         _drops[index] = DropsetEntry(
-                          weight: double.tryParse(val) ?? drop.weight,
-                          reps: drop.reps,
+                          weight: parsed,
+                          reps: _drops[index].reps,
                         );
-                      });
+                      }
                     },
                   ),
                 ),
@@ -640,12 +629,14 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (val) {
-                      setState(() {
+                      final parsed = int.tryParse(val);
+                      if (parsed != null) {
+                        // Update drop data, controller is source of truth during input
                         _drops[index] = DropsetEntry(
-                          weight: drop.weight,
-                          reps: int.tryParse(val) ?? drop.reps,
+                          weight: _drops[index].weight,
+                          reps: parsed,
                         );
-                      });
+                      }
                     },
                   ),
                 ),
@@ -1019,9 +1010,18 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     provider.addSet(set);
     HapticFeedback.heavyImpact();
 
-    // Reset dropset state
+    // Reset dropset state and dispose controllers to prevent memory leaks
     setState(() {
       _isDropset = false;
+      // Dispose all drop controllers before clearing
+      for (var controller in _dropWeightControllers) {
+        controller.dispose();
+      }
+      for (var controller in _dropRepsControllers) {
+        controller.dispose();
+      }
+      _dropWeightControllers.clear();
+      _dropRepsControllers.clear();
       _drops.clear();
     });
 
