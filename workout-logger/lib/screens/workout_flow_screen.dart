@@ -36,6 +36,12 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   int _currentReps = 10;
   bool _isDropset = false;
   List<DropsetEntry> _drops = [];
+  
+  // TextEditingControllers for dropset fields (following Flutter best practices)
+  final TextEditingController _mainWeightController = TextEditingController();
+  final TextEditingController _mainRepsController = TextEditingController();
+  final List<TextEditingController> _dropWeightControllers = [];
+  final List<TextEditingController> _dropRepsControllers = [];
 
   @override
   void initState() {
@@ -77,6 +83,15 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   @override
   void dispose() {
     _restTimer?.cancel();
+    // Dispose TextEditingControllers to prevent memory leaks (Flutter best practice)
+    _mainWeightController.dispose();
+    _mainRepsController.dispose();
+    for (var controller in _dropWeightControllers) {
+      controller.dispose();
+    }
+    for (var controller in _dropRepsControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -468,7 +483,18 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 onChanged: (val) {
                   setState(() {
                     _isDropset = val;
-                    if (!val) _drops.clear();
+                    if (!val) {
+                      // Dispose all drop controllers when turning off dropset mode
+                      for (var controller in _dropWeightControllers) {
+                        controller.dispose();
+                      }
+                      for (var controller in _dropRepsControllers) {
+                        controller.dispose();
+                      }
+                      _dropWeightControllers.clear();
+                      _dropRepsControllers.clear();
+                      _drops.clear();
+                    }
                   });
                 },
                 activeColor: AppTheme.warning,
@@ -491,6 +517,16 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   }
 
   Widget _buildMainSetEntry() {
+    // Initialize controllers with current values if not already set
+    if (_mainWeightController.text.isEmpty || 
+        _mainWeightController.text != _currentWeight.toString()) {
+      _mainWeightController.text = _currentWeight.toString();
+    }
+    if (_mainRepsController.text.isEmpty || 
+        _mainRepsController.text != _currentReps.toString()) {
+      _mainRepsController.text = _currentReps.toString();
+    }
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
@@ -506,7 +542,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 SizedBox(
                   width: 60,
                   child: TextFormField(
-                    initialValue: _currentWeight.toString(),
+                    controller: _mainWeightController,
                     decoration: const InputDecoration(
                       hintText: 'kg',
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -522,7 +558,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 SizedBox(
                   width: 50,
                   child: TextFormField(
-                    initialValue: _currentReps.toString(),
+                    controller: _mainRepsController,
                     decoration: const InputDecoration(
                       hintText: 'reps',
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -545,6 +581,23 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   Widget _buildDropEntry(int index) {
     final drop = _drops[index];
+    
+    // Ensure we have controllers for this index
+    while (_dropWeightControllers.length <= index) {
+      _dropWeightControllers.add(TextEditingController());
+    }
+    while (_dropRepsControllers.length <= index) {
+      _dropRepsControllers.add(TextEditingController());
+    }
+    
+    // Sync controller values with drop data
+    if (_dropWeightControllers[index].text != drop.weight.toString()) {
+      _dropWeightControllers[index].text = drop.weight.toString();
+    }
+    if (_dropRepsControllers[index].text != drop.reps.toString()) {
+      _dropRepsControllers[index].text = drop.reps.toString();
+    }
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
@@ -559,7 +612,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               children: [
                 SizedBox(
                   width: 60,
-                  child: TextField(
+                  child: TextFormField(
+                    controller: _dropWeightControllers[index],
                     decoration: const InputDecoration(
                       hintText: 'kg',
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -578,7 +632,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 const Text(' × ', style: TextStyle(color: AppTheme.textSecondary)),
                 SizedBox(
                   width: 50,
-                  child: TextField(
+                  child: TextFormField(
+                    controller: _dropRepsControllers[index],
                     decoration: const InputDecoration(
                       hintText: 'reps',
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -599,7 +654,18 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 18),
-            onPressed: () => setState(() => _drops.removeAt(index)),
+            onPressed: () {
+              // Dispose controllers for this drop before removing
+              if (index < _dropWeightControllers.length) {
+                _dropWeightControllers[index].dispose();
+                _dropWeightControllers.removeAt(index);
+              }
+              if (index < _dropRepsControllers.length) {
+                _dropRepsControllers[index].dispose();
+                _dropRepsControllers.removeAt(index);
+              }
+              setState(() => _drops.removeAt(index));
+            },
           ),
         ],
       ),
@@ -609,10 +675,16 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   void _addDrop() {
     setState(() {
       final lastWeight = _drops.isEmpty ? _currentWeight : _drops.last.weight;
+      final newWeight = (lastWeight * 0.8).roundToDouble();
+      
       _drops.add(DropsetEntry(
-        weight: (lastWeight * 0.8).roundToDouble(),
+        weight: newWeight,
         reps: _currentReps,
       ));
+      
+      // Create controllers for the new drop (Flutter best practice)
+      _dropWeightControllers.add(TextEditingController(text: newWeight.toString()));
+      _dropRepsControllers.add(TextEditingController(text: _currentReps.toString()));
     });
   }
 
