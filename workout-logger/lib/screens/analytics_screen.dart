@@ -966,6 +966,9 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
               labelText: 'Target Value',
             ),
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+            ],
           ),
           
           const SizedBox(height: AppSpacing.lg),

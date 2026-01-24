@@ -36,11 +36,21 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   int _currentReps = 10;
   bool _isDropset = false;
   List<DropsetEntry> _drops = [];
+  
+  // TextEditingControllers for dropset fields (following Flutter best practices)
+  final TextEditingController _mainWeightController = TextEditingController();
+  final TextEditingController _mainRepsController = TextEditingController();
+  final List<TextEditingController> _dropWeightControllers = [];
+  final List<TextEditingController> _dropRepsControllers = [];
 
   @override
   void initState() {
     super.initState();
-    _initializeWorkout();
+    // Defer initialization until after the first frame to avoid
+    // calling notifyListeners() during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeWorkout();
+    });
   }
 
   void _initializeWorkout() {
@@ -66,6 +76,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       setState(() {
         _currentWeight = lastSet.weight;
         _currentReps = lastSet.reps;
+        // Sync controllers with state (single source of truth)
+        _mainWeightController.text = _currentWeight.toString();
+        _mainRepsController.text = _currentReps.toString();
       });
     }
   }
@@ -73,6 +86,15 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   @override
   void dispose() {
     _restTimer?.cancel();
+    // Dispose TextEditingControllers to prevent memory leaks (Flutter best practice)
+    _mainWeightController.dispose();
+    _mainRepsController.dispose();
+    for (var controller in _dropWeightControllers) {
+      controller.dispose();
+    }
+    for (var controller in _dropRepsControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -149,9 +171,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 const SizedBox(height: AppSpacing.lg),
                 
                 // Weight and reps input
-                _buildInputSection(),
+                if (!_isDropset) _buildInputSection(),
                 
-                const SizedBox(height: AppSpacing.md),
+                if (!_isDropset) const SizedBox(height: AppSpacing.md),
                 
                 // Dropset toggle
                 _buildDropsetSection(),
@@ -464,7 +486,22 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 onChanged: (val) {
                   setState(() {
                     _isDropset = val;
-                    if (!val) _drops.clear();
+                    if (!val) {
+                      // Dispose all drop controllers when turning off dropset mode
+                      for (var controller in _dropWeightControllers) {
+                        controller.dispose();
+                      }
+                      for (var controller in _dropRepsControllers) {
+                        controller.dispose();
+                      }
+                      _dropWeightControllers.clear();
+                      _dropRepsControllers.clear();
+                      _drops.clear();
+                    } else {
+                      // Sync main controllers when enabling dropset to match current state values
+                      _mainWeightController.text = _currentWeight.toString();
+                      _mainRepsController.text = _currentReps.toString();
+                    }
                   });
                 },
                 activeColor: AppTheme.warning,
@@ -473,6 +510,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           ),
           if (_isDropset) ...[
             const SizedBox(height: AppSpacing.md),
+            _buildMainSetEntry(),
             ..._drops.asMap().entries.map((entry) => _buildDropEntry(entry.key)),
             TextButton.icon(
               onPressed: _addDrop,
@@ -485,8 +523,78 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     );
   }
 
+  Widget _buildMainSetEntry() {
+    // Controllers are initialized in _loadLastSessionData and updated via onChanged
+    // No controller.text assignments in build to avoid cursor jumps
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        children: [
+          const Text(
+            'Start:',
+            style: TextStyle(color: AppTheme.textSecondary),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 60,
+                  child: TextFormField(
+                    controller: _mainWeightController,
+                    decoration: const InputDecoration(
+                      hintText: 'kg',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                    ],
+                    onChanged: (val) {
+                      final parsed = double.tryParse(val);
+                      if (parsed != null) {
+                        _currentWeight = parsed;
+                        // Don't call setState here - controller is the source of truth during input
+                      }
+                    },
+                  ),
+                ),
+                const Text(' × ', style: TextStyle(color: AppTheme.textSecondary)),
+                SizedBox(
+                  width: 50,
+                  child: TextFormField(
+                    controller: _mainRepsController,
+                    decoration: const InputDecoration(
+                      hintText: 'reps',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    onChanged: (val) {
+                      final parsed = int.tryParse(val);
+                      if (parsed != null) {
+                        _currentReps = parsed;
+                        // Don't call setState here - controller is the source of truth during input
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 48), // Align with delete button
+        ],
+      ),
+    );
+  }
+
   Widget _buildDropEntry(int index) {
-    final drop = _drops[index];
+    // Controllers are created and initialized in _addDrop()
+    // Build method only READS from controllers, never creates or modifies them
+    // This prevents cursor jumps and duplicate controller creation
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
@@ -501,38 +609,50 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               children: [
                 SizedBox(
                   width: 60,
-                  child: TextField(
+                  child: TextFormField(
+                    controller: _dropWeightControllers[index],
                     decoration: const InputDecoration(
                       hintText: 'kg',
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                    ],
                     onChanged: (val) {
-                      setState(() {
+                      final parsed = double.tryParse(val);
+                      if (parsed != null) {
+                        // Update drop data, controller is source of truth during input
                         _drops[index] = DropsetEntry(
-                          weight: double.tryParse(val) ?? drop.weight,
-                          reps: drop.reps,
+                          weight: parsed,
+                          reps: _drops[index].reps,
                         );
-                      });
+                      }
                     },
                   ),
                 ),
                 const Text(' × ', style: TextStyle(color: AppTheme.textSecondary)),
                 SizedBox(
                   width: 50,
-                  child: TextField(
+                  child: TextFormField(
+                    controller: _dropRepsControllers[index],
                     decoration: const InputDecoration(
                       hintText: 'reps',
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                     onChanged: (val) {
-                      setState(() {
+                      final parsed = int.tryParse(val);
+                      if (parsed != null) {
+                        // Update drop data, controller is source of truth during input
                         _drops[index] = DropsetEntry(
-                          weight: drop.weight,
-                          reps: int.tryParse(val) ?? drop.reps,
+                          weight: _drops[index].weight,
+                          reps: parsed,
                         );
-                      });
+                      }
                     },
                   ),
                 ),
@@ -541,7 +661,18 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 18),
-            onPressed: () => setState(() => _drops.removeAt(index)),
+            onPressed: () {
+              // Dispose controllers for this drop before removing
+              if (index < _dropWeightControllers.length) {
+                _dropWeightControllers[index].dispose();
+                _dropWeightControllers.removeAt(index);
+              }
+              if (index < _dropRepsControllers.length) {
+                _dropRepsControllers[index].dispose();
+                _dropRepsControllers.removeAt(index);
+              }
+              setState(() => _drops.removeAt(index));
+            },
           ),
         ],
       ),
@@ -551,10 +682,16 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   void _addDrop() {
     setState(() {
       final lastWeight = _drops.isEmpty ? _currentWeight : _drops.last.weight;
+      final newWeight = (lastWeight * 0.8).roundToDouble();
+      
       _drops.add(DropsetEntry(
-        weight: (lastWeight * 0.8).roundToDouble(),
+        weight: newWeight,
         reps: _currentReps,
       ));
+      
+      // Create controllers for the new drop (Flutter best practice)
+      _dropWeightControllers.add(TextEditingController(text: newWeight.toString()));
+      _dropRepsControllers.add(TextEditingController(text: _currentReps.toString()));
     });
   }
 
@@ -883,15 +1020,24 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       weight: _currentWeight,
       reps: _currentReps,
       isDropset: _isDropset,
-      drops: _isDropset ? _drops : null,
+      drops: _isDropset ? List.from(_drops) : null,
     );
 
     provider.addSet(set);
     HapticFeedback.heavyImpact();
 
-    // Reset dropset state
+    // Reset dropset state and dispose controllers to prevent memory leaks
     setState(() {
       _isDropset = false;
+      // Dispose all drop controllers before clearing
+      for (var controller in _dropWeightControllers) {
+        controller.dispose();
+      }
+      for (var controller in _dropRepsControllers) {
+        controller.dispose();
+      }
+      _dropWeightControllers.clear();
+      _dropRepsControllers.clear();
       _drops.clear();
     });
 
@@ -946,6 +1092,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
             TextField(
               autofocus: true,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+              ],
               decoration: const InputDecoration(
                 labelText: 'Enter value',
               ),
