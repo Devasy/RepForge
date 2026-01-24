@@ -149,9 +149,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 const SizedBox(height: AppSpacing.lg),
                 
                 // Weight and reps input
-                _buildInputSection(),
+                if (!_isDropset) _buildInputSection(),
                 
-                const SizedBox(height: AppSpacing.md),
+                if (!_isDropset) const SizedBox(height: AppSpacing.md),
                 
                 // Dropset toggle
                 _buildDropsetSection(),
@@ -473,6 +473,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           ),
           if (_isDropset) ...[
             const SizedBox(height: AppSpacing.md),
+            _buildMainSetEntry(),
             ..._drops.asMap().entries.map((entry) => _buildDropEntry(entry.key)),
             TextButton.icon(
               onPressed: _addDrop,
@@ -480,6 +481,59 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               label: const Text('Add Drop'),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainSetEntry() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        children: [
+          const Text(
+            'Start:',
+            style: TextStyle(color: AppTheme.textSecondary),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 60,
+                  child: TextFormField(
+                    initialValue: _currentWeight.toString(),
+                    decoration: const InputDecoration(
+                      hintText: 'kg',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (val) {
+                      final parsed = double.tryParse(val);
+                      if (parsed != null) setState(() => _currentWeight = parsed);
+                    },
+                  ),
+                ),
+                const Text(' × ', style: TextStyle(color: AppTheme.textSecondary)),
+                SizedBox(
+                  width: 50,
+                  child: TextFormField(
+                    initialValue: _currentReps.toString(),
+                    decoration: const InputDecoration(
+                      hintText: 'reps',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (val) {
+                      final parsed = int.tryParse(val);
+                      if (parsed != null) setState(() => _currentReps = parsed);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 48), // Align with delete button
         ],
       ),
     );
