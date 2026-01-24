@@ -497,6 +497,10 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                       _dropWeightControllers.clear();
                       _dropRepsControllers.clear();
                       _drops.clear();
+                    } else {
+                      // Sync main controllers when enabling dropset to match current state values
+                      _mainWeightController.text = _currentWeight.toString();
+                      _mainRepsController.text = _currentReps.toString();
                     }
                   });
                 },
@@ -543,6 +547,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                    ],
                     onChanged: (val) {
                       final parsed = double.tryParse(val);
                       if (parsed != null) {
@@ -562,6 +569,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                     onChanged: (val) {
                       final parsed = int.tryParse(val);
                       if (parsed != null) {
@@ -606,6 +616,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                    ],
                     onChanged: (val) {
                       final parsed = double.tryParse(val);
                       if (parsed != null) {
@@ -628,6 +641,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                     onChanged: (val) {
                       final parsed = int.tryParse(val);
                       if (parsed != null) {
@@ -1076,6 +1092,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
             TextField(
               autofocus: true,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+              ],
               decoration: const InputDecoration(
                 labelText: 'Enter value',
               ),
