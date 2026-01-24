@@ -883,7 +883,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       weight: _currentWeight,
       reps: _currentReps,
       isDropset: _isDropset,
-      drops: _isDropset ? _drops : null,
+      drops: _isDropset ? List.from(_drops) : null,
     );
 
     provider.addSet(set);
