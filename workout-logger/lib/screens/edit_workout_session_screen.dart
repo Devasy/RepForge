@@ -1,4 +1,4 @@
-// Edit Workout Session Screen - Modify recorded workout sessions
+﻿// Edit Workout Session Screen - Modify recorded workout sessions
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -512,10 +512,20 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
                 key: ValueKey('exercise_$exerciseIndex'),
                 exerciseName: exercise?.name ?? 'Unknown Exercise',
                 editableLog: editableLog,
-                onSetChanged: (setIndex, weight, reps) {
+                onSetChanged: (setIndex, weight, reps, isDropset, drops) {
                   setState(() {
                     editableLog.sets[setIndex].weight = weight;
                     editableLog.sets[setIndex].reps = reps;
+                    if (editableLog.sets[setIndex].isDropset != isDropset) {
+                      editableLog.sets[setIndex].isDropset = isDropset;
+                      if (isDropset &&
+                          editableLog.sets[setIndex].drops == null) {
+                        editableLog.sets[setIndex].drops = [];
+                      }
+                    }
+                    if (drops != null) {
+                      editableLog.sets[setIndex].drops = drops;
+                    }
                   });
                   _markChanged();
                 },
@@ -578,18 +588,25 @@ class _EditableSet {
   _EditableSet({
     required this.weight,
     required this.reps,
+    required this.timestamp,
     this.isDropset = false,
     this.drops,
     this.timeTaken,
-    DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
+  });
 }
 
 // Editable Exercise Card Widget
 class _EditableExerciseCard extends StatelessWidget {
   final String exerciseName;
   final _EditableExerciseLog editableLog;
-  final Function(int setIndex, double weight, int reps) onSetChanged;
+  final Function(
+    int setIndex,
+    double weight,
+    int reps,
+    bool isDropset,
+    List<DropsetEntry>? drops,
+  )
+  onSetChanged;
   final VoidCallback onAddSet;
   final Function(int setIndex) onDeleteSet;
   final VoidCallback onDeleteExercise;
@@ -646,10 +663,36 @@ class _EditableExerciseCard extends StatelessWidget {
                 setNumber: setIndex + 1,
                 weight: set.weight,
                 reps: set.reps,
-                onWeightChanged: (weight) =>
-                    onSetChanged(setIndex, weight, set.reps),
-                onRepsChanged: (reps) =>
-                    onSetChanged(setIndex, set.weight, reps),
+                isDropset: set.isDropset,
+                drops: set.drops,
+                onWeightChanged: (weight) => onSetChanged(
+                  setIndex,
+                  weight,
+                  set.reps,
+                  set.isDropset,
+                  set.drops,
+                ),
+                onRepsChanged: (reps) => onSetChanged(
+                  setIndex,
+                  set.weight,
+                  reps,
+                  set.isDropset,
+                  set.drops,
+                ),
+                onDropsChanged: (drops) => onSetChanged(
+                  setIndex,
+                  set.weight,
+                  set.reps,
+                  set.isDropset,
+                  drops,
+                ),
+                onIsDropsetChanged: (val) => onSetChanged(
+                  setIndex,
+                  set.weight,
+                  set.reps,
+                  val,
+                  set.drops,
+                ),
                 onDelete: () => onDeleteSet(setIndex),
               );
             }),
@@ -699,16 +742,25 @@ class _EditableSetRow extends StatefulWidget {
   final int setNumber;
   final double weight;
   final int reps;
+  final bool isDropset;
+  final List<DropsetEntry>? drops;
   final Function(double) onWeightChanged;
   final Function(int) onRepsChanged;
+  final Function(List<DropsetEntry>) onDropsChanged;
+  final Function(bool) onIsDropsetChanged;
   final VoidCallback onDelete;
 
   const _EditableSetRow({
+    super.key,
     required this.setNumber,
     required this.weight,
     required this.reps,
+    this.isDropset = false,
+    this.drops,
     required this.onWeightChanged,
     required this.onRepsChanged,
+    required this.onDropsChanged,
+    required this.onIsDropsetChanged,
     required this.onDelete,
   });
 
@@ -732,10 +784,7 @@ class _EditableSetRowState extends State<_EditableSetRow> {
   @override
   void didUpdateWidget(covariant _EditableSetRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Only update controllers if the value genuinely changed AND we don't have focus
-    // This prevents clobbering user input while typing
     if (widget.weight != oldWidget.weight && !_weightFocus.hasFocus) {
-      // Also check if current text already matches to avoid cursor jumps if logic falls through
       if (double.tryParse(_weightController.text) != widget.weight) {
         _weightController.text = widget.weight.toString();
       }
@@ -760,32 +809,301 @@ class _EditableSetRowState extends State<_EditableSetRow> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      child: Row(
+      child: Column(
         children: [
-          // Set number
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(
-              child: Text(
-                '${widget.setNumber}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryColor,
+          Row(
+            children: [
+              // Set number
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    '${widget.setNumber}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+
+              // Weight input
+              SizedBox(
+                width: 80,
+                child: TextField(
+                  controller: _weightController,
+                  focusNode: _weightFocus,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                    suffixText: 'kg',
+                    suffixStyle: const TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 12,
+                    ),
+                    filled: true,
+                    fillColor: AppTheme.surfaceColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    final weight = double.tryParse(value) ?? 0;
+                    widget.onWeightChanged(weight);
+                  },
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+
+              // × symbol
+              const Text('×', style: TextStyle(color: AppTheme.textMuted)),
+              const SizedBox(width: AppSpacing.sm),
+
+              // Reps input
+              SizedBox(
+                width: 70,
+                child: TextField(
+                  controller: _repsController,
+                  focusNode: _repsFocus,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                    suffixText: 'reps',
+                    suffixStyle: const TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 12,
+                    ),
+                    filled: true,
+                    fillColor: AppTheme.surfaceColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    final reps = int.tryParse(value) ?? 0;
+                    widget.onRepsChanged(reps);
+                  },
+                ),
+              ),
+
+              const Spacer(),
+
+              // Toggle Dropset button
+              IconButton(
+                onPressed: () => widget.onIsDropsetChanged(!widget.isDropset),
+                icon: Icon(
+                  widget.isDropset ? Icons.layers : Icons.layers_outlined,
+                  size: 18,
+                ),
+                color: widget.isDropset
+                    ? AppTheme.primaryColor
+                    : AppTheme.textMuted,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                tooltip: widget.isDropset
+                    ? 'Remove drops'
+                    : 'Convert to dropset',
+              ),
+
+              // Delete button
+              IconButton(
+                onPressed: widget.onDelete,
+                icon: const Icon(Icons.close, size: 18),
+                color: AppTheme.textMuted,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                tooltip: 'Delete set',
+              ),
+            ],
+          ),
+
+          // Dropset Rows
+          if (widget.isDropset) ...[
+            if (widget.drops != null) ...[
+              const SizedBox(height: 4),
+              ...widget.drops!.asMap().entries.map((entry) {
+                final index = entry.key;
+                final drop = entry.value;
+                return _EditableDropRow(
+                  key: ValueKey('drop_${widget.setNumber}_$index'),
+                  dropNumber: index + 1,
+                  weight: drop.weight,
+                  reps: drop.reps,
+                  onWeightChanged: (val) {
+                    final newDrops = List<DropsetEntry>.from(widget.drops!);
+                    newDrops[index] = DropsetEntry(
+                      weight: val,
+                      reps: drop.reps,
+                    );
+                    widget.onDropsChanged(newDrops);
+                  },
+                  onRepsChanged: (val) {
+                    final newDrops = List<DropsetEntry>.from(widget.drops!);
+                    newDrops[index] = DropsetEntry(
+                      weight: drop.weight,
+                      reps: val,
+                    );
+                    widget.onDropsChanged(newDrops);
+                  },
+                  onDelete: () {
+                    final newDrops = List<DropsetEntry>.from(widget.drops!)
+                      ..removeAt(index);
+                    widget.onDropsChanged(newDrops);
+                  },
+                );
+              }),
+            ],
+
+            // Add drop button
+            Padding(
+              padding: const EdgeInsets.only(left: 32, top: 4, bottom: 4),
+              child: InkWell(
+                onTap: () {
+                  final newDrops = List<DropsetEntry>.from(widget.drops ?? []);
+                  // Default to 80% of last weight or current weight
+                  double initialWeight = widget.weight * 0.8;
+                  if (newDrops.isNotEmpty) {
+                    initialWeight = newDrops.last.weight * 0.8;
+                  }
+                  // Round to nearest 0.5
+                  initialWeight = (initialWeight * 2).round() / 2;
+
+                  newDrops.add(
+                    DropsetEntry(weight: initialWeight, reps: widget.reps),
+                  );
+                  widget.onDropsChanged(newDrops);
+                },
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline,
+                      size: 14,
+                      color: AppTheme.primaryColor.withOpacity(0.7),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Add Drop',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.primaryColor.withOpacity(0.7),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EditableDropRow extends StatefulWidget {
+  final int dropNumber;
+  final double weight;
+  final int reps;
+  final Function(double) onWeightChanged;
+  final Function(int) onRepsChanged;
+  final VoidCallback onDelete;
+
+  const _EditableDropRow({
+    super.key,
+    required this.dropNumber,
+    required this.weight,
+    required this.reps,
+    required this.onWeightChanged,
+    required this.onRepsChanged,
+    required this.onDelete,
+  });
+
+  @override
+  State<_EditableDropRow> createState() => _EditableDropRowState();
+}
+
+class _EditableDropRowState extends State<_EditableDropRow> {
+  late TextEditingController _weightController;
+  late TextEditingController _repsController;
+  final FocusNode _weightFocus = FocusNode();
+  final FocusNode _repsFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _weightController = TextEditingController(text: widget.weight.toString());
+    _repsController = TextEditingController(text: widget.reps.toString());
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditableDropRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.weight != oldWidget.weight && !_weightFocus.hasFocus) {
+      if (double.tryParse(_weightController.text) != widget.weight) {
+        _weightController.text = widget.weight.toString();
+      }
+    }
+    if (widget.reps != oldWidget.reps && !_repsFocus.hasFocus) {
+      if (int.tryParse(_repsController.text) != widget.reps) {
+        _repsController.text = widget.reps.toString();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _weightController.dispose();
+    _repsController.dispose();
+    _weightFocus.dispose();
+    _repsFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 32, top: 4, bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            Icons.subdirectory_arrow_right,
+            size: 16,
+            color: AppTheme.textMuted.withOpacity(0.5),
+          ),
+          const SizedBox(width: 8),
+
+          Text(
+            'Drop ${widget.dropNumber}',
+            style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
           ),
           const SizedBox(width: AppSpacing.sm),
 
           // Weight input
           SizedBox(
-            width: 80,
+            width: 70,
+            height: 32,
             child: TextField(
               controller: _weightController,
               focusNode: _weightFocus,
@@ -793,21 +1111,21 @@ class _EditableSetRowState extends State<_EditableSetRow> {
                 decimal: true,
               ),
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: 13),
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
+                  horizontal: 4,
+                  vertical: 0,
                 ),
                 suffixText: 'kg',
                 suffixStyle: const TextStyle(
+                  fontSize: 10,
                   color: AppTheme.textMuted,
-                  fontSize: 12,
                 ),
                 filled: true,
-                fillColor: AppTheme.surfaceColor,
+                fillColor: AppTheme.surfaceColor.withOpacity(0.7),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -817,36 +1135,39 @@ class _EditableSetRowState extends State<_EditableSetRow> {
               },
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
 
-          // × symbol
-          const Text('×', style: TextStyle(color: AppTheme.textMuted)),
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(width: 8),
+          const Text(
+            '×',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
+          const SizedBox(width: 8),
 
           // Reps input
           SizedBox(
-            width: 70,
+            width: 60,
+            height: 32,
             child: TextField(
               controller: _repsController,
               focusNode: _repsFocus,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: 13),
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
+                  horizontal: 4,
+                  vertical: 0,
                 ),
                 suffixText: 'reps',
                 suffixStyle: const TextStyle(
+                  fontSize: 10,
                   color: AppTheme.textMuted,
-                  fontSize: 12,
                 ),
                 filled: true,
-                fillColor: AppTheme.surfaceColor,
+                fillColor: AppTheme.surfaceColor.withOpacity(0.7),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -859,14 +1180,13 @@ class _EditableSetRowState extends State<_EditableSetRow> {
 
           const Spacer(),
 
-          // Delete button
           IconButton(
             onPressed: widget.onDelete,
-            icon: const Icon(Icons.close, size: 18),
+            icon: const Icon(Icons.close, size: 16),
             color: AppTheme.textMuted,
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            tooltip: 'Delete set',
+            constraints: const BoxConstraints(),
+            tooltip: 'Remove drop',
           ),
         ],
       ),

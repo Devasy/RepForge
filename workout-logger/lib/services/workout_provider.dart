@@ -83,6 +83,9 @@ class WorkoutProvider extends ChangeNotifier {
     );
     if (dataPoints.length >= 2) {
       _growthModels[exerciseId] = MLService.trainGrowthModel(dataPoints);
+    } else {
+      // Remove stale model if not enough data to train (e.g. after deletion)
+      _growthModels.remove(exerciseId);
     }
   }
 
@@ -166,11 +169,43 @@ class WorkoutProvider extends ChangeNotifier {
   }
 
   /// Delete a custom exercise
+  ///
+  /// Returns false if exercise not found, not custom, or IN USE by sessions/routines/targets
   Future<bool> deleteCustomExercise(String exerciseId) async {
     // Only allow deleting custom exercises
     final exercise = getExercise(exerciseId);
     if (exercise == null || !exercise.isCustom) {
       return false;
+    }
+
+    // Check for references in Sessions
+    for (var session in _sessions) {
+      if (session.exercises.any((e) => e.exerciseId == exerciseId)) {
+        debugPrint(
+          'Cannot delete custom exercise: Used in session ${session.id}',
+        );
+        return false;
+      }
+    }
+
+    // Check for references in Routines
+    for (var routine in _routines) {
+      if (routine.exerciseIds.contains(exerciseId)) {
+        debugPrint(
+          'Cannot delete custom exercise: Used in routine ${routine.name}',
+        );
+        return false;
+      }
+    }
+
+    // Check for references in Targets
+    for (var target in _targets) {
+      if (target.exerciseId == exerciseId) {
+        debugPrint(
+          'Cannot delete custom exercise: Used in target ${target.id}',
+        );
+        return false;
+      }
     }
 
     // Remove from storage
@@ -179,6 +214,9 @@ class WorkoutProvider extends ChangeNotifier {
     // Remove from local list
     _allExercises = List.from(_allExercises)
       ..removeWhere((e) => e.id == exerciseId);
+
+    // Also remove any growth model
+    _growthModels.remove(exerciseId);
 
     notifyListeners();
     return true;
