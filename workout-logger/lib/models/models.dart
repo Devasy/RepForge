@@ -1,5 +1,8 @@
 // Data Models for Workout Logger App
 
+// Sentinel value for copyWith methods to distinguish "not provided" from "null"
+const Object _sentinel = Object();
+
 // ==================== Muscle Groups ====================
 
 class MuscleGroup {
@@ -147,19 +150,19 @@ class WorkoutSet {
   );
 
   WorkoutSet copyWith({
-    double? weight,
-    int? reps,
-    bool? isDropset,
-    List<DropsetEntry>? drops,
-    int? timeTaken,
-    DateTime? timestamp,
+    Object? weight = _sentinel,
+    Object? reps = _sentinel,
+    Object? isDropset = _sentinel,
+    Object? drops = _sentinel,
+    Object? timeTaken = _sentinel,
+    Object? timestamp = _sentinel,
   }) => WorkoutSet(
-    weight: weight ?? this.weight,
-    reps: reps ?? this.reps,
-    isDropset: isDropset ?? this.isDropset,
-    drops: drops ?? this.drops,
-    timeTaken: timeTaken ?? this.timeTaken,
-    timestamp: timestamp ?? this.timestamp,
+    weight: weight == _sentinel ? this.weight : weight as double,
+    reps: reps == _sentinel ? this.reps : reps as int,
+    isDropset: isDropset == _sentinel ? this.isDropset : isDropset as bool,
+    drops: drops == _sentinel ? this.drops : drops as List<DropsetEntry>?,
+    timeTaken: timeTaken == _sentinel ? this.timeTaken : timeTaken as int?,
+    timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime?,
   );
 }
 
@@ -201,13 +204,15 @@ class ExerciseLog {
   );
 
   ExerciseLog copyWith({
-    String? exerciseId,
-    List<WorkoutSet>? sets,
-    String? notes,
+    Object? exerciseId = _sentinel,
+    Object? sets = _sentinel,
+    Object? notes = _sentinel,
   }) => ExerciseLog(
-    exerciseId: exerciseId ?? this.exerciseId,
-    sets: sets ?? this.sets,
-    notes: notes ?? this.notes,
+    exerciseId: exerciseId == _sentinel
+        ? this.exerciseId
+        : exerciseId as String,
+    sets: sets == _sentinel ? this.sets : sets as List<WorkoutSet>,
+    notes: notes == _sentinel ? this.notes : notes as String?,
   );
 }
 
@@ -254,19 +259,21 @@ class WorkoutSession {
   );
 
   WorkoutSession copyWith({
-    String? id,
-    DateTime? date,
-    String? routineId,
-    List<ExerciseLog>? exercises,
-    int? duration,
-    String? notes,
+    Object? id = _sentinel,
+    Object? date = _sentinel,
+    Object? routineId = _sentinel,
+    Object? exercises = _sentinel,
+    Object? duration = _sentinel,
+    Object? notes = _sentinel,
   }) => WorkoutSession(
-    id: id ?? this.id,
-    date: date ?? this.date,
-    routineId: routineId ?? this.routineId,
-    exercises: exercises ?? this.exercises,
-    duration: duration ?? this.duration,
-    notes: notes ?? this.notes,
+    id: id == _sentinel ? this.id : id as String,
+    date: date == _sentinel ? this.date : date as DateTime,
+    routineId: routineId == _sentinel ? this.routineId : routineId as String?,
+    exercises: exercises == _sentinel
+        ? this.exercises
+        : exercises as List<ExerciseLog>,
+    duration: duration == _sentinel ? this.duration : duration as int,
+    notes: notes == _sentinel ? this.notes : notes as String?,
   );
 }
 

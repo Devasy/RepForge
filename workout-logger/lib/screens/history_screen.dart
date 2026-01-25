@@ -1,5 +1,6 @@
 // History Screen - View past workout sessions
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -339,8 +340,10 @@ class _SessionDetailsSheet extends StatelessWidget {
   }
 
   void _editSession(BuildContext context) {
-    Navigator.of(context).pop(); // Close the bottom sheet first
-    Navigator.of(context).push<bool>(
+    // Capture navigator before pop to avoid using deactivated context
+    final navigator = Navigator.of(context);
+    navigator.pop(); // Close the bottom sheet first
+    navigator.push<bool>(
       MaterialPageRoute(
         builder: (context) => EditWorkoutSessionScreen(session: session),
       ),
@@ -389,10 +392,11 @@ class _SessionDetailsSheet extends StatelessWidget {
           );
         }
       } catch (e) {
+        debugPrint('Failed to delete workout session: $e');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to delete: $e'),
+            const SnackBar(
+              content: Text('Failed to delete workout. Please try again.'),
               backgroundColor: AppTheme.error,
             ),
           );

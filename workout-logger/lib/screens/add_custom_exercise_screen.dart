@@ -1,6 +1,5 @@
 // Add Custom Exercise Screen - Form for creating user-defined exercises
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';

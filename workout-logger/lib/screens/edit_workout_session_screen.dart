@@ -1,5 +1,6 @@
 // Edit Workout Session Screen - Modify recorded workout sessions
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -38,7 +39,7 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
       text: widget.session.duration.toString(),
     );
 
-    // Convert to editable structure
+    // Convert to editable structure, preserving all set metadata
     _editableExercises = widget.session.exercises.map((log) {
       return _EditableExerciseLog(
         exerciseId: log.exerciseId,
@@ -48,6 +49,9 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
                 weight: set.weight,
                 reps: set.reps,
                 isDropset: set.isDropset,
+                drops: set.drops,
+                timeTaken: set.timeTaken,
+                timestamp: set.timestamp,
               ),
             )
             .toList(),
@@ -143,6 +147,9 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
           weight: lastSet?.weight ?? 0,
           reps: lastSet?.reps ?? 0,
           isDropset: false,
+          drops: null,
+          timeTaken: null,
+          timestamp: DateTime.now(),
         ),
       );
     });
@@ -193,7 +200,7 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      // Convert editable exercises back to ExerciseLog
+      // Convert editable exercises back to ExerciseLog, preserving metadata
       final updatedExercises = exercisesWithSets.map((e) {
         return ExerciseLog(
           exerciseId: e.exerciseId,
@@ -203,6 +210,9 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
                   weight: s.weight,
                   reps: s.reps,
                   isDropset: s.isDropset,
+                  drops: s.drops,
+                  timeTaken: s.timeTaken,
+                  timestamp: s.timestamp,
                 ),
               )
               .toList(),
@@ -238,10 +248,11 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
         Navigator.of(context).pop(true); // Return success
       }
     } catch (e) {
+      debugPrint('Failed to save workout session: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save: $e'),
+          const SnackBar(
+            content: Text('Failed to save workout. Please try again.'),
             backgroundColor: AppTheme.error,
           ),
         );
@@ -560,12 +571,18 @@ class _EditableSet {
   double weight;
   int reps;
   bool isDropset;
+  List<DropsetEntry>? drops;
+  int? timeTaken;
+  DateTime timestamp;
 
   _EditableSet({
     required this.weight,
     required this.reps,
     this.isDropset = false,
-  });
+    this.drops,
+    this.timeTaken,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
 }
 
 // Editable Exercise Card Widget
