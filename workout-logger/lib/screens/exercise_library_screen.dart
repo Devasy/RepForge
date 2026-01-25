@@ -637,8 +637,10 @@ class _ExerciseDetailsSheet extends StatelessWidget {
     if (confirmed == true && context.mounted) {
       final success = await provider.deleteCustomExercise(exercise.id);
       if (success && context.mounted) {
+        // Capture messenger before pop to avoid deactivated context
+        final messenger = ScaffoldMessenger.of(context);
         Navigator.of(context).pop(); // Close the bottom sheet
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Row(
               children: [

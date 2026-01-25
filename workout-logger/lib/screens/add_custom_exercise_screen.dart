@@ -1,5 +1,6 @@
 // Add Custom Exercise Screen - Form for creating user-defined exercises
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -12,13 +13,14 @@ class AddCustomExerciseScreen extends StatefulWidget {
   const AddCustomExerciseScreen({super.key});
 
   @override
-  State<AddCustomExerciseScreen> createState() => _AddCustomExerciseScreenState();
+  State<AddCustomExerciseScreen> createState() =>
+      _AddCustomExerciseScreenState();
 }
 
 class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  
+
   String _selectedCategory = 'compound';
   String? _selectedMuscleGroup;
   bool _isSubmitting = false;
@@ -67,10 +69,11 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
         Navigator.of(context).pop(true); // Return success
       }
     } catch (e) {
+      debugPrint('Failed to save custom exercise: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save exercise: $e'),
+          const SnackBar(
+            content: Text('Failed to save exercise. Please try again.'),
             backgroundColor: AppTheme.error,
           ),
         );
@@ -137,9 +140,9 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: AppSpacing.lg),
-              
+
               // Exercise Name
               Text(
                 'Exercise Name',
@@ -153,9 +156,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                   prefixIcon: Icon(Icons.fitness_center),
                 ),
                 textCapitalization: TextCapitalization.words,
-                inputFormatters: [
-                  LengthLimitingTextInputFormatter(50),
-                ],
+                inputFormatters: [LengthLimitingTextInputFormatter(50)],
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter an exercise name';
@@ -166,9 +167,9 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: AppSpacing.lg),
-              
+
               // Category Selection
               Text(
                 'Exercise Type',
@@ -201,105 +202,113 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                   }),
                 ),
               ),
-              
+
               const SizedBox(height: AppSpacing.xs),
               Text(
                 _selectedCategory == 'compound'
                     ? 'Works multiple muscle groups (e.g., squats, bench press)'
                     : 'Targets a single muscle group (e.g., bicep curls)',
-                style: TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
               ),
-              
+
               const SizedBox(height: AppSpacing.lg),
-              
+
               // Primary Muscle Group
               Text(
                 'Primary Muscle Group',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: AppSpacing.sm),
-              
+
               // Muscle Group Grid
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  childAspectRatio: 2.2,
-                  crossAxisSpacing: AppSpacing.sm,
-                  mainAxisSpacing: AppSpacing.sm,
-                ),
-                itemCount: MuscleGroups.names.length,
-                itemBuilder: (context, index) {
-                  final muscleId = MuscleGroups.names.keys.elementAt(index);
-                  final muscleName = MuscleGroups.names[muscleId]!;
-                  final muscleColor = AppTheme.getMuscleColor(muscleId);
-                  final isSelected = _selectedMuscleGroup == muscleId;
-                  
-                  return Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => setState(() => _selectedMuscleGroup = muscleId),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? muscleColor.withOpacity(0.3)
-                              : AppTheme.surfaceColor,
+              Builder(
+                builder: (context) {
+                  // Materialize keys once to avoid O(n²) lookup
+                  final muscleKeys = MuscleGroups.names.keys.toList();
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          childAspectRatio: 2.2,
+                          crossAxisSpacing: AppSpacing.sm,
+                          mainAxisSpacing: AppSpacing.sm,
+                        ),
+                    itemCount: muscleKeys.length,
+                    itemBuilder: (context, index) {
+                      final muscleId = muscleKeys[index];
+                      final muscleName = MuscleGroups.names[muscleId]!;
+                      final muscleColor = AppTheme.getMuscleColor(muscleId);
+                      final isSelected = _selectedMuscleGroup == muscleId;
+
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () =>
+                              setState(() => _selectedMuscleGroup = muscleId),
                           borderRadius: BorderRadius.circular(AppRadius.md),
-                          border: Border.all(
-                            color: isSelected
-                                ? muscleColor
-                                : AppTheme.cardColor,
-                            width: 2,
-                          ),
-                        ),
-                        child: Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (isSelected) ...[
-                                Icon(
-                                  Icons.check_circle,
-                                  size: 14,
-                                  color: muscleColor,
-                                ),
-                                const SizedBox(width: 4),
-                              ],
-                              Flexible(
-                                child: Text(
-                                  muscleName,
-                                  style: TextStyle(
-                                    color: isSelected
-                                        ? muscleColor
-                                        : AppTheme.textSecondary,
-                                    fontSize: 11,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? muscleColor.withOpacity(0.3)
+                                  : AppTheme.surfaceColor,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              border: Border.all(
+                                color: isSelected
+                                    ? muscleColor
+                                    : AppTheme.cardColor,
+                                width: 2,
                               ),
-                            ],
+                            ),
+                            child: Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (isSelected) ...[
+                                    Icon(
+                                      Icons.check_circle,
+                                      size: 14,
+                                      color: muscleColor,
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
+                                  Flexible(
+                                    child: Text(
+                                      muscleName,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? muscleColor
+                                            : AppTheme.textSecondary,
+                                        fontSize: 11,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   );
                 },
               ),
-              
+
               if (_selectedMuscleGroup != null) ...[
                 const SizedBox(height: AppSpacing.md),
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
-                    color: AppTheme.getMuscleColor(_selectedMuscleGroup!).withOpacity(0.1),
+                    color: AppTheme.getMuscleColor(
+                      _selectedMuscleGroup!,
+                    ).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Row(
@@ -324,9 +333,9 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                   ),
                 ),
               ],
-              
+
               const SizedBox(height: AppSpacing.xxl),
-              
+
               // Save Button
               SizedBox(
                 width: double.infinity,
@@ -348,7 +357,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: AppSpacing.lg),
             ],
           ),

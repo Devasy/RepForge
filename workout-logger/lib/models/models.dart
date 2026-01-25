@@ -72,8 +72,9 @@ class Exercise {
 
   String get primaryMuscle {
     if (muscleActivations.isEmpty) return 'Unknown';
-    final sorted = List<MuscleActivation>.from(muscleActivations)
-      ..sort((a, b) => b.activationPercentage.compareTo(a.activationPercentage));
+    final sorted = List<MuscleActivation>.from(
+      muscleActivations,
+    )..sort((a, b) => b.activationPercentage.compareTo(a.activationPercentage));
     return sorted.first.muscleGroupId;
   }
 
@@ -144,6 +145,22 @@ class WorkoutSet {
     timeTaken: json['timeTaken'],
     timestamp: DateTime.parse(json['timestamp']),
   );
+
+  WorkoutSet copyWith({
+    double? weight,
+    int? reps,
+    bool? isDropset,
+    List<DropsetEntry>? drops,
+    int? timeTaken,
+    DateTime? timestamp,
+  }) => WorkoutSet(
+    weight: weight ?? this.weight,
+    reps: reps ?? this.reps,
+    isDropset: isDropset ?? this.isDropset,
+    drops: drops ?? this.drops,
+    timeTaken: timeTaken ?? this.timeTaken,
+    timestamp: timestamp ?? this.timestamp,
+  );
 }
 
 class DropsetEntry {
@@ -167,11 +184,7 @@ class ExerciseLog {
   final List<WorkoutSet> sets;
   final String? notes;
 
-  ExerciseLog({
-    required this.exerciseId,
-    required this.sets,
-    this.notes,
-  });
+  ExerciseLog({required this.exerciseId, required this.sets, this.notes});
 
   double get totalVolume => sets.fold(0.0, (sum, set) => sum + set.volume);
 
@@ -185,6 +198,16 @@ class ExerciseLog {
     exerciseId: json['exerciseId'],
     sets: (json['sets'] as List).map((s) => WorkoutSet.fromJson(s)).toList(),
     notes: json['notes'],
+  );
+
+  ExerciseLog copyWith({
+    String? exerciseId,
+    List<WorkoutSet>? sets,
+    String? notes,
+  }) => ExerciseLog(
+    exerciseId: exerciseId ?? this.exerciseId,
+    sets: sets ?? this.sets,
+    notes: notes ?? this.notes,
   );
 }
 
@@ -228,6 +251,22 @@ class WorkoutSession {
         .toList(),
     duration: json['duration'],
     notes: json['notes'],
+  );
+
+  WorkoutSession copyWith({
+    String? id,
+    DateTime? date,
+    String? routineId,
+    List<ExerciseLog>? exercises,
+    int? duration,
+    String? notes,
+  }) => WorkoutSession(
+    id: id ?? this.id,
+    date: date ?? this.date,
+    routineId: routineId ?? this.routineId,
+    exercises: exercises ?? this.exercises,
+    duration: duration ?? this.duration,
+    notes: notes ?? this.notes,
   );
 }
 

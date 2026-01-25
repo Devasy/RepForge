@@ -101,12 +101,36 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== CUSTOM EXERCISES ====================
 
+  /// Allowed category values for exercises
+  static const Set<String> _allowedCategories = {'compound', 'isolation'};
+
   /// Add a custom exercise created by the user
+  /// 
+  /// Throws [ArgumentError] if inputs are invalid.
   Future<void> addCustomExercise({
     required String name,
     required String category,
     required String primaryMuscleGroupId,
   }) async {
+    // Validate and normalize name (trim and collapse whitespace)
+    final normalizedName = name.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalizedName.isEmpty) {
+      throw ArgumentError('Exercise name cannot be empty');
+    }
+
+    // Validate primaryMuscleGroupId
+    if (primaryMuscleGroupId.isEmpty) {
+      throw ArgumentError('Primary muscle group is required');
+    }
+
+    // Normalize and validate category
+    final normalizedCategory = category.toLowerCase().trim();
+    if (!_allowedCategories.contains(normalizedCategory)) {
+      throw ArgumentError(
+        'Invalid category "$category". Must be one of: ${_allowedCategories.join(", ")}',
+      );
+    }
+
     // Generate unique ID
     final id = 'custom_${_uuid.v4()}';
 
@@ -118,12 +142,12 @@ class WorkoutProvider extends ChangeNotifier {
       ),
     ];
 
-    // Create exercise with isCustom flag
+    // Create exercise with isCustom flag using normalized values
     final exercise = Exercise(
       id: id,
-      name: name,
+      name: normalizedName,
       muscleActivations: muscleActivations,
-      category: category,
+      category: normalizedCategory,
       isCustom: true,
     );
 
@@ -329,6 +353,53 @@ class WorkoutProvider extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  // ==================== SESSION MANAGEMENT ====================
+
+  /// Delete a workout session
+  Future<void> deleteWorkoutSession(String sessionId) async {
+    // Find the session to get exercise IDs for model retraining
+    final session = _sessions.firstWhere(
+      (s) => s.id == sessionId,
+      orElse: () => throw Exception('Session not found'),
+    );
+    final affectedExerciseIds = session.exercises.map((e) => e.exerciseId).toSet();
+
+    // Remove from storage
+    await _storage.deleteWorkoutSession(sessionId);
+
+    // Remove from local list
+    _sessions = List.from(_sessions)..removeWhere((s) => s.id == sessionId);
+
+    // Retrain growth models for affected exercises
+    for (var exerciseId in affectedExerciseIds) {
+      await _updateGrowthModel(exerciseId);
+    }
+
+    notifyListeners();
+  }
+
+  /// Update an existing workout session
+  Future<void> updateWorkoutSession(WorkoutSession updatedSession) async {
+    // Save to storage (overwrites by ID)
+    await _storage.saveWorkoutSession(updatedSession);
+
+    // Update local list
+    final index = _sessions.indexWhere((s) => s.id == updatedSession.id);
+    if (index != -1) {
+      _sessions = List.from(_sessions)..[index] = updatedSession;
+    }
+
+    // Sort sessions by date (most recent first)
+    _sessions.sort((a, b) => b.date.compareTo(a.date));
+
+    // Retrain growth models for affected exercises
+    for (var log in updatedSession.exercises) {
+      await _updateGrowthModel(log.exerciseId);
+    }
+
+    notifyListeners();
   }
 
   // ==================== ROUTINES ====================
