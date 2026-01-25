@@ -374,14 +374,17 @@ class _SessionDetailsSheet extends StatelessWidget {
     );
 
     if (confirmed == true && context.mounted) {
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
       try {
         await provider.deleteWorkoutSession(session.id);
         if (context.mounted) {
-          Navigator.of(context).pop(); // Close the bottom sheet
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+          // Ideally we can trust navigator if it's still valid, but keep check for safety
+          navigator.pop(); // Close the bottom sheet
+          messenger.showSnackBar(
+            const SnackBar(
               content: Row(
-                children: const [
+                children: [
                   Icon(Icons.check_circle, color: AppTheme.success),
                   SizedBox(width: 8),
                   Text('Workout deleted'),
@@ -394,7 +397,7 @@ class _SessionDetailsSheet extends StatelessWidget {
       } catch (e) {
         debugPrint('Failed to delete workout session: $e');
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             const SnackBar(
               content: Text('Failed to delete workout. Please try again.'),
               backgroundColor: AppTheme.error,

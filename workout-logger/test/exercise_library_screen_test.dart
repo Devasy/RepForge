@@ -5,97 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/exercise_library_screen.dart';
-import 'package:repforge/services/storage_service.dart';
 import 'package:repforge/services/workout_provider.dart';
-
-// Mock StorageService for testing - all methods return Future
-class MockStorageService implements StorageService {
-  final List<Exercise> _customExercises = [];
-
-  void addMockCustomExercise(Exercise exercise) {
-    _customExercises.add(exercise);
-  }
-
-  @override
-  Future<void> init() async {}
-
-  @override
-  Future<List<Exercise>> getAllExercises() async => _customExercises;
-
-  @override
-  Future<List<Exercise>> getCustomExercises() async => _customExercises;
-
-  @override
-  Future<void> saveCustomExercise(Exercise exercise) async {
-    _customExercises.add(exercise);
-  }
-
-  @override
-  Future<void> deleteCustomExercise(String id) async {
-    _customExercises.removeWhere((e) => e.id == id);
-  }
-
-  @override
-  Future<List<WorkoutSession>> getAllWorkoutSessions() async => [];
-
-  @override
-  Future<List<Routine>> getAllRoutines() async => [];
-
-  @override
-  Future<List<MuscleGroup>> getAllMuscleGroups() async => [];
-
-  @override
-  Future<List<Target>> getAllTargets() async => [];
-
-  @override
-  Future<void> saveWorkoutSession(WorkoutSession session) async {}
-  @override
-  Future<WorkoutSession?> getWorkoutSession(String id) async => null;
-  @override
-  Future<void> deleteWorkoutSession(String id) async {}
-  @override
-  Future<List<WorkoutSession>> getSessionsForExercise(
-    String exerciseId,
-  ) async => [];
-  @override
-  Future<List<WorkoutSession>> getSessionsInDateRange(
-    DateTime start,
-    DateTime end,
-  ) async => [];
-  @override
-  Future<void> saveRoutine(Routine routine) async {}
-  @override
-  Future<Routine?> getRoutine(String id) async => null;
-  @override
-  Future<void> deleteRoutine(String id) async {}
-  @override
-  Future<void> saveTarget(Target target) async {}
-  @override
-  Future<Target?> getTarget(String id) async => null;
-  @override
-  Future<void> deleteTarget(String id) async {}
-  @override
-  Future<List<Target>> getTargetsForExercise(String exerciseId) async => [];
-  @override
-  Future<void> updateMuscleGroupGrowthRate(
-    String muscleGroupId,
-    double rate,
-  ) async {}
-  @override
-  Future<MuscleGroup?> getMuscleGroup(String id) async => null;
-  @override
-  Future<Exercise?> getExercise(String id) async => null;
-  @override
-  Future<void> saveSetting(String key, String value) async {}
-  @override
-  Future<String?> getSetting(String key) async => null;
-  @override
-  Future<String> exportAllData() async => '{}';
-  @override
-  Future<void> importData(String jsonData) async {}
-  @override
-  Future<Map<String, dynamic>> getQuickStats() async => {};
-}
+import 'test_utils/mock_storage_service.dart';
 
 Widget createTestWidget({
   required Widget child,
@@ -336,6 +247,36 @@ void main() {
       expect(find.text('Delete Custom Exercise?'), findsOneWidget);
       expect(find.text('Cancel'), findsOneWidget);
       expect(find.text('Delete'), findsWidgets);
+    });
+
+    testWidgets('should delete exercise when Delete is confirmed', (
+      tester,
+    ) async {
+      // Arrange
+      await tester.pumpWidget(
+        createTestWidget(
+          child: const ExerciseLibraryScreen(),
+          provider: provider,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Act - Open details and tap delete
+      await tester.tap(find.text('Exercise To Delete'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
+
+      // Tap Delete in dialog
+      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      // Assert - Exercise should be removed
+      expect(
+        provider.allExercises.any((e) => e.name == 'Exercise To Delete'),
+        isFalse,
+      );
     });
 
     testWidgets('should cancel delete when Cancel is tapped', (tester) async {

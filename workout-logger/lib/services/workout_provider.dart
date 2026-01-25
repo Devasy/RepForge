@@ -386,6 +386,9 @@ class WorkoutProvider extends ChangeNotifier {
       await _updateGrowthModel(exerciseId);
     }
 
+    // Recalculate targets for affected exercises
+    await _recalculateTargets(affectedExerciseIds);
+
     notifyListeners();
   }
 
@@ -427,6 +430,9 @@ class WorkoutProvider extends ChangeNotifier {
       await _updateGrowthModel(exerciseId);
     }
 
+    // Recalculate targets for affected exercises
+    await _recalculateTargets(allAffectedExerciseIds);
+
     notifyListeners();
   }
 
@@ -465,27 +471,8 @@ class WorkoutProvider extends ChangeNotifier {
     required String type,
     required double targetValue,
   }) async {
-    // Get current value from last session
-    double currentValue = 0;
-    final lastLog = getLastSessionForExercise(exerciseId);
-    if (lastLog != null && lastLog.sets.isNotEmpty) {
-      switch (type) {
-        case 'reps':
-          currentValue = lastLog.sets
-              .map((s) => s.reps)
-              .reduce((a, b) => a > b ? a : b)
-              .toDouble();
-          break;
-        case 'weight':
-          currentValue = lastLog.sets
-              .map((s) => s.weight)
-              .reduce((a, b) => a > b ? a : b);
-          break;
-        case 'volume':
-          currentValue = lastLog.totalVolume;
-          break;
-      }
-    }
+    // Get current value from history
+    double currentValue = _calculateCurrentTargetValue(exerciseId, type);
 
     // Predict completion date
     DateTime? estimatedDate;
@@ -505,6 +492,7 @@ class WorkoutProvider extends ChangeNotifier {
       targetValue: targetValue,
       currentValue: currentValue,
       estimatedCompletionDate: estimatedDate,
+      isCompleted: currentValue >= targetValue,
     );
 
     await _storage.saveTarget(target);
@@ -512,48 +500,86 @@ class WorkoutProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _updateTargetsFromSession(WorkoutSession session) async {
-    for (var log in session.exercises) {
-      final exerciseTargets = _targets
-          .where((t) => t.exerciseId == log.exerciseId && !t.isCompleted)
+  /// Recalculate targets for a set of exercises based on full history
+  Future<void> _recalculateTargets(Set<String> exerciseIds) async {
+    for (var exerciseId in exerciseIds) {
+      final relevantTargets = _targets
+          .where((t) => t.exerciseId == exerciseId)
           .toList();
 
-      for (var target in exerciseTargets) {
-        double newValue = 0;
-        switch (target.targetType) {
-          case 'reps':
-            newValue = log.sets
-                .map((s) => s.reps)
-                .reduce((a, b) => a > b ? a : b)
-                .toDouble();
-            break;
-          case 'weight':
-            newValue = log.sets
-                .map((s) => s.weight)
-                .reduce((a, b) => a > b ? a : b);
-            break;
-          case 'volume':
-            newValue = log.totalVolume;
-            break;
-        }
+      for (var target in relevantTargets) {
+        // Recalculate current value from all sessions
+        final newValue = _calculateCurrentTargetValue(
+          exerciseId,
+          target.targetType,
+        );
 
         target.currentValue = newValue;
+
+        // If it was completed but now isn't (e.g. deleted PR session), uncomplete it
+        // If it wasn't completed but now is (unlikely on delete, but possible on edit), complete it
         target.isCompleted = newValue >= target.targetValue;
 
-        // Update prediction
-        final growthModel = _growthModels[log.exerciseId];
-        if (growthModel != null && !target.isCompleted) {
-          target.estimatedCompletionDate = MLService.predictTargetCompletion(
-            currentValue: newValue,
-            targetValue: target.targetValue,
-            growthModel: growthModel,
-          );
+        // Update prediction if not completed
+        if (!target.isCompleted) {
+          final growthModel = _growthModels[exerciseId];
+          if (growthModel != null) {
+            target.estimatedCompletionDate = MLService.predictTargetCompletion(
+              currentValue: newValue,
+              targetValue: target.targetValue,
+              growthModel: growthModel,
+            );
+          } else {
+            target.estimatedCompletionDate = null;
+          }
+        } else {
+          target.estimatedCompletionDate = null;
         }
 
         await _storage.saveTarget(target);
       }
     }
-    notifyListeners();
+  }
+
+  /// Calculate the current best value for a target type from all history
+  double _calculateCurrentTargetValue(String exerciseId, String targetType) {
+    double bestValue = 0;
+
+    for (var session in _sessions) {
+      for (var log in session.exercises) {
+        if (log.exerciseId == exerciseId && log.sets.isNotEmpty) {
+          double sessionValue = 0;
+          switch (targetType) {
+            case 'reps':
+              sessionValue = log.sets
+                  .map((s) => s.reps)
+                  .reduce((a, b) => a > b ? a : b)
+                  .toDouble();
+              break;
+            case 'weight':
+              sessionValue = log.sets
+                  .map((s) => s.weight)
+                  .reduce((a, b) => a > b ? a : b);
+              break;
+            case 'volume':
+              sessionValue = log.totalVolume;
+              break;
+          }
+          if (sessionValue > bestValue) {
+            bestValue = sessionValue;
+          }
+        }
+      }
+    }
+    return bestValue;
+  }
+
+  Future<void> _updateTargetsFromSession(WorkoutSession session) async {
+    // This is optimzed for adding new sessions, but we can just use the generic recalculate
+    // to be safe and consistent, although it's slightly more expensive.
+    // Given the scale of mobile data, scanning history is acceptable.
+    final exerciseIds = session.exercises.map((e) => e.exerciseId).toSet();
+    await _recalculateTargets(exerciseIds);
   }
 
   Future<void> deleteTarget(String id) async {

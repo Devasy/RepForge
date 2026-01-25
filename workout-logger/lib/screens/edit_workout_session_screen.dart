@@ -719,6 +719,8 @@ class _EditableSetRow extends StatefulWidget {
 class _EditableSetRowState extends State<_EditableSetRow> {
   late TextEditingController _weightController;
   late TextEditingController _repsController;
+  final FocusNode _weightFocus = FocusNode();
+  final FocusNode _repsFocus = FocusNode();
 
   @override
   void initState() {
@@ -730,12 +732,18 @@ class _EditableSetRowState extends State<_EditableSetRow> {
   @override
   void didUpdateWidget(covariant _EditableSetRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Update controllers if parent changed values
-    if (widget.weight != oldWidget.weight) {
-      _weightController.text = widget.weight.toString();
+    // Only update controllers if the value genuinely changed AND we don't have focus
+    // This prevents clobbering user input while typing
+    if (widget.weight != oldWidget.weight && !_weightFocus.hasFocus) {
+      // Also check if current text already matches to avoid cursor jumps if logic falls through
+      if (double.tryParse(_weightController.text) != widget.weight) {
+        _weightController.text = widget.weight.toString();
+      }
     }
-    if (widget.reps != oldWidget.reps) {
-      _repsController.text = widget.reps.toString();
+    if (widget.reps != oldWidget.reps && !_repsFocus.hasFocus) {
+      if (int.tryParse(_repsController.text) != widget.reps) {
+        _repsController.text = widget.reps.toString();
+      }
     }
   }
 
@@ -743,6 +751,8 @@ class _EditableSetRowState extends State<_EditableSetRow> {
   void dispose() {
     _weightController.dispose();
     _repsController.dispose();
+    _weightFocus.dispose();
+    _repsFocus.dispose();
     super.dispose();
   }
 
@@ -778,6 +788,7 @@ class _EditableSetRowState extends State<_EditableSetRow> {
             width: 80,
             child: TextField(
               controller: _weightController,
+              focusNode: _weightFocus,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
@@ -817,6 +828,7 @@ class _EditableSetRowState extends State<_EditableSetRow> {
             width: 70,
             child: TextField(
               controller: _repsController,
+              focusNode: _repsFocus,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               textAlign: TextAlign.center,

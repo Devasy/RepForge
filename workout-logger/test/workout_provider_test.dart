@@ -1,62 +1,8 @@
 // Unit Tests for WorkoutProvider - Custom Exercise functionality
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
-import 'package:repforge/models/models.dart';
-import 'package:repforge/services/storage_service.dart';
 import 'package:repforge/services/workout_provider.dart';
-
-// Mock class for StorageService
-class MockStorageService extends Mock implements StorageService {
-  final List<Exercise> _customExercises = [];
-  final List<WorkoutSession> _sessions = [];
-  final List<Routine> _routines = [];
-
-  @override
-  Future<void> init() async {}
-
-  @override
-  Future<List<Exercise>> getAllExercises() async {
-    return _customExercises;
-  }
-
-  @override
-  Future<List<Exercise>> getCustomExercises() async {
-    return _customExercises;
-  }
-
-  @override
-  Future<void> saveCustomExercise(Exercise exercise) async {
-    _customExercises.add(exercise);
-  }
-
-  @override
-  Future<void> deleteCustomExercise(String id) async {
-    _customExercises.removeWhere((e) => e.id == id);
-  }
-
-  @override
-  Future<List<WorkoutSession>> getAllWorkoutSessions() async {
-    return _sessions;
-  }
-
-  @override
-  Future<List<Routine>> getAllRoutines() async {
-    return _routines;
-  }
-
-  @override
-  Future<List<MuscleGroup>> getAllMuscleGroups() async {
-    return [];
-  }
-
-  @override
-  Future<List<Target>> getAllTargets() async {
-    return [];
-  }
-
-  List<Exercise> get customExercises => _customExercises;
-}
+import 'test_utils/mock_storage_service.dart';
 
 void main() {
   group('WorkoutProvider - Custom Exercise Tests', () {
@@ -85,10 +31,10 @@ void main() {
 
         // Assert
         expect(provider.allExercises.length, greaterThan(0));
+        // firstWhere throws if not found, so finding it implies it exists/is not null
         final addedExercise = provider.allExercises.firstWhere(
           (e) => e.name == name,
         );
-        expect(addedExercise, isNotNull);
         expect(addedExercise.name, equals(name));
       });
 
