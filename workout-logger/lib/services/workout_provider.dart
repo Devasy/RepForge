@@ -17,7 +17,7 @@ class WorkoutProvider extends ChangeNotifier {
   List<Target> _targets = [];
   List<MuscleGroup> _muscleGroups = [];
   List<Exercise> _allExercises = [];
-  Map<String, GrowthModel> _growthModels = {}; // exerciseId -> GrowthModel
+  final Map<String, GrowthModel> _growthModels = {}; // exerciseId -> GrowthModel
 
   // Active workout state
   WorkoutSession? _activeSession;
@@ -97,6 +97,62 @@ class WorkoutProvider extends ChangeNotifier {
 
   String getMuscleGroupName(String id) {
     return MuscleGroups.names[id] ?? 'Unknown';
+  }
+
+  // ==================== CUSTOM EXERCISES ====================
+
+  /// Add a custom exercise created by the user
+  Future<void> addCustomExercise({
+    required String name,
+    required String category,
+    required String primaryMuscleGroupId,
+  }) async {
+    // Generate unique ID
+    final id = 'custom_${_uuid.v4()}';
+
+    // Create muscle activation (100% for primary muscle in v1)
+    final muscleActivations = [
+      MuscleActivation(
+        muscleGroupId: primaryMuscleGroupId,
+        activationPercentage: 100,
+      ),
+    ];
+
+    // Create exercise with isCustom flag
+    final exercise = Exercise(
+      id: id,
+      name: name,
+      muscleActivations: muscleActivations,
+      category: category,
+      isCustom: true,
+    );
+
+    // Persist to storage
+    await _storage.saveCustomExercise(exercise);
+
+    // Add to local list (use List.from for immutability)
+    _allExercises = List.from(_allExercises)..add(exercise);
+
+    notifyListeners();
+  }
+
+  /// Delete a custom exercise
+  Future<bool> deleteCustomExercise(String exerciseId) async {
+    // Only allow deleting custom exercises
+    final exercise = getExercise(exerciseId);
+    if (exercise == null || !exercise.isCustom) {
+      return false;
+    }
+
+    // Remove from storage
+    await _storage.deleteCustomExercise(exerciseId);
+
+    // Remove from local list
+    _allExercises = List.from(_allExercises)
+      ..removeWhere((e) => e.id == exerciseId);
+
+    notifyListeners();
+    return true;
   }
 
   // ==================== WORKOUT FLOW ====================

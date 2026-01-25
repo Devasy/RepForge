@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../theme/app_theme.dart';
 import '../data/exercise_database.dart';
+import 'add_custom_exercise_screen.dart';
 
 class ExerciseLibraryScreen extends StatefulWidget {
   const ExerciseLibraryScreen({super.key});
@@ -21,16 +22,30 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allExercises = ExerciseDatabase.getAll();
-    
+    // Use Provider's exercise list (includes custom exercises)
+    final allExercises = context.watch<WorkoutProvider>().allExercises;
+
     // Filter exercises
     var filteredExercises = allExercises.where((e) {
-      final matchesSearch = _searchQuery.isEmpty ||
+      final matchesSearch =
+          _searchQuery.isEmpty ||
           e.name.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesMuscle = _selectedMuscleGroup == null ||
-          e.muscleActivations.any((m) => m.muscleGroupId == _selectedMuscleGroup);
+      final matchesMuscle =
+          _selectedMuscleGroup == null ||
+          e.muscleActivations.any(
+            (m) => m.muscleGroupId == _selectedMuscleGroup,
+          );
       return matchesSearch && matchesMuscle;
     }).toList();
+
+    // Sort: custom exercises first within each group for visibility
+    filteredExercises.sort((a, b) {
+      // First by custom status (custom first)
+      if (a.isCustom && !b.isCustom) return -1;
+      if (!a.isCustom && b.isCustom) return 1;
+      // Then alphabetically
+      return a.name.compareTo(b.name);
+    });
 
     // Group by primary muscle
     final grouped = <String, List<Exercise>>{};
@@ -39,9 +54,53 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       grouped.putIfAbsent(primary, () => []).add(exercise);
     }
 
+    // Count custom exercises for display
+    final customCount = allExercises.where((e) => e.isCustom).length;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Exercise Library'),
+        actions: [
+          if (customCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.md),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$customCount custom',
+                    style: const TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (context) => const AddCustomExerciseScreen(),
+            ),
+          );
+          // No need to manually refresh - Provider will notify listeners
+          if (result == true && mounted) {
+            // Optional: Show a subtle confirmation
+          }
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Add Exercise'),
       ),
       body: Column(
         children: [
@@ -62,7 +121,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
               onChanged: (val) => setState(() => _searchQuery = val),
             ),
           ),
-          
+
           // Muscle group filter chips
           SizedBox(
             height: 48,
@@ -73,44 +132,57 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                 FilterChip(
                   label: const Text('All'),
                   selected: _selectedMuscleGroup == null,
-                  onSelected: (_) => setState(() => _selectedMuscleGroup = null),
+                  onSelected: (_) =>
+                      setState(() => _selectedMuscleGroup = null),
                 ),
                 const SizedBox(width: 8),
-                ...MuscleGroups.names.entries.map((entry) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(entry.value),
-                    selected: _selectedMuscleGroup == entry.key,
-                    selectedColor: AppTheme.getMuscleColor(entry.key).withOpacity(0.3),
-                    onSelected: (selected) => setState(() {
-                      _selectedMuscleGroup = selected ? entry.key : null;
-                    }),
+                ...MuscleGroups.names.entries.map(
+                  (entry) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(entry.value),
+                      selected: _selectedMuscleGroup == entry.key,
+                      selectedColor: AppTheme.getMuscleColor(
+                        entry.key,
+                      ).withOpacity(0.3),
+                      onSelected: (selected) => setState(() {
+                        _selectedMuscleGroup = selected ? entry.key : null;
+                      }),
+                    ),
                   ),
-                )),
+                ),
               ],
             ),
           ),
-          
+
           const SizedBox(height: AppSpacing.sm),
-          
+
           // Exercise list
           Expanded(
             child: grouped.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
-                    padding: const EdgeInsets.all(AppSpacing.md),
+                    padding: const EdgeInsets.only(
+                      left: AppSpacing.md,
+                      right: AppSpacing.md,
+                      top: AppSpacing.md,
+                      bottom: 80, // Space for FAB
+                    ),
                     itemCount: grouped.length,
                     itemBuilder: (context, index) {
                       final muscleId = grouped.keys.elementAt(index);
                       final exercises = grouped[muscleId]!;
-                      final muscleName = MuscleGroups.names[muscleId] ?? muscleId;
+                      final muscleName =
+                          MuscleGroups.names[muscleId] ?? muscleId;
                       final muscleColor = AppTheme.getMuscleColor(muscleId);
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.sm,
+                            ),
                             child: Row(
                               children: [
                                 Container(
@@ -141,9 +213,9 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                               ],
                             ),
                           ),
-                          ...exercises.map((exercise) => _ExerciseCard(
-                            exercise: exercise,
-                          )),
+                          ...exercises.map(
+                            (exercise) => _ExerciseCard(exercise: exercise),
+                          ),
                           const SizedBox(height: AppSpacing.md),
                         ],
                       );
@@ -160,11 +232,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.search_off,
-            size: 64,
-            color: AppTheme.textMuted,
-          ),
+          Icon(Icons.search_off, size: 64, color: AppTheme.textMuted),
           const SizedBox(height: 16),
           const Text(
             'No exercises found',
@@ -192,37 +260,72 @@ class _ExerciseCard extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  exercise.category == 'compound'
-                      ? Icons.fitness_center
-                      : Icons.accessibility_new,
-                  color: AppTheme.primaryColor,
-                ),
+              // Icon with custom badge
+              Stack(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: exercise.isCustom
+                          ? AppTheme.warning.withOpacity(0.2)
+                          : AppTheme.primaryColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      exercise.category == 'compound'
+                          ? Icons.fitness_center
+                          : Icons.accessibility_new,
+                      color: exercise.isCustom
+                          ? AppTheme.warning
+                          : AppTheme.primaryColor,
+                    ),
+                  ),
+                  if (exercise.isCustom)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.warning,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.star,
+                          size: 10,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      exercise.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            exercise.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: exercise.category == 'compound'
                                 ? AppTheme.primaryColor.withOpacity(0.2)
@@ -240,9 +343,30 @@ class _ExerciseCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (exercise.isCustom) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.warning.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'CUSTOM',
+                              style: TextStyle(
+                                color: AppTheme.warning,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: 8),
                         Text(
-                          '${exercise.muscleActivations.length} muscles',
+                          '${exercise.muscleActivations.length} muscle${exercise.muscleActivations.length != 1 ? 's' : ''}',
                           style: TextStyle(
                             color: AppTheme.textMuted,
                             fontSize: 12,
@@ -253,10 +377,7 @@ class _ExerciseCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right,
-                color: AppTheme.textMuted,
-              ),
+              const Icon(Icons.chevron_right, color: AppTheme.textMuted),
             ],
           ),
         ),
@@ -305,22 +426,47 @@ class _ExerciseDetailsSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          
+
           // Header
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  exercise.category == 'compound'
-                      ? Icons.fitness_center
-                      : Icons.accessibility_new,
-                  color: AppTheme.primaryColor,
-                ),
+              Stack(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: exercise.isCustom
+                          ? AppTheme.warning.withOpacity(0.2)
+                          : AppTheme.primaryColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      exercise.category == 'compound'
+                          ? Icons.fitness_center
+                          : Icons.accessibility_new,
+                      color: exercise.isCustom
+                          ? AppTheme.warning
+                          : AppTheme.primaryColor,
+                    ),
+                  ),
+                  if (exercise.isCustom)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.warning,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.star,
+                          size: 10,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -331,18 +477,53 @@ class _ExerciseDetailsSheet extends StatelessWidget {
                       exercise.name,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    Text(
-                      exercise.category == 'compound' ? 'Compound Exercise' : 'Isolation Exercise',
-                      style: const TextStyle(color: AppTheme.textSecondary),
+                    Row(
+                      children: [
+                        Text(
+                          exercise.category == 'compound'
+                              ? 'Compound Exercise'
+                              : 'Isolation Exercise',
+                          style: const TextStyle(color: AppTheme.textSecondary),
+                        ),
+                        if (exercise.isCustom) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.warning.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'CUSTOM',
+                              style: TextStyle(
+                                color: AppTheme.warning,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
               ),
+              // Delete button for custom exercises
+              if (exercise.isCustom)
+                IconButton(
+                  onPressed: () => _confirmDelete(context, provider),
+                  icon: const Icon(Icons.delete_outline),
+                  color: AppTheme.error,
+                  tooltip: 'Delete custom exercise',
+                ),
             ],
           ),
-          
+
           const SizedBox(height: AppSpacing.lg),
-          
+
           // Muscle activations
           Text(
             'Muscle Activation',
@@ -350,9 +531,11 @@ class _ExerciseDetailsSheet extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           ...exercise.muscleActivations.map((activation) {
-            final muscleName = MuscleGroups.names[activation.muscleGroupId] ?? activation.muscleGroupId;
+            final muscleName =
+                MuscleGroups.names[activation.muscleGroupId] ??
+                activation.muscleGroupId;
             final color = AppTheme.getMuscleColor(activation.muscleGroupId);
-            
+
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: Row(
@@ -369,16 +552,13 @@ class _ExerciseDetailsSheet extends StatelessWidget {
                   Expanded(child: Text(muscleName)),
                   Text(
                     '${activation.activationPercentage}%',
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(color: color, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
             );
           }),
-          
+
           if (lastSession != null) ...[
             const SizedBox(height: AppSpacing.lg),
             Text(
@@ -398,7 +578,7 @@ class _ExerciseDetailsSheet extends StatelessWidget {
               }).toList(),
             ),
           ],
-          
+
           if (growthModel != null && growthModel.r2 > 0.2) ...[
             const SizedBox(height: AppSpacing.md),
             Container(
@@ -421,11 +601,57 @@ class _ExerciseDetailsSheet extends StatelessWidget {
               ),
             ),
           ],
-          
+
           const SizedBox(height: AppSpacing.lg),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WorkoutProvider provider,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        title: const Text('Delete Custom Exercise?'),
+        content: Text(
+          'Are you sure you want to delete "${exercise.name}"? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final success = await provider.deleteCustomExercise(exercise.id);
+      if (success && context.mounted) {
+        Navigator.of(context).pop(); // Close the bottom sheet
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: AppTheme.success),
+                const SizedBox(width: 8),
+                Text('"${exercise.name}" deleted'),
+              ],
+            ),
+            backgroundColor: AppTheme.cardColor,
+          ),
+        );
+      }
+    }
   }
 }
 
@@ -451,12 +677,16 @@ class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allExercises = ExerciseDatabase.getAll();
-    
+    // Use Provider's exercise list (includes custom exercises)
+    final allExercises = context.watch<WorkoutProvider>().allExercises;
+
     var filteredExercises = allExercises.where((e) {
       return _searchQuery.isEmpty ||
           e.name.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
+
+    // Sort alphabetically within groups
+    filteredExercises.sort((a, b) => a.name.compareTo(b.name));
 
     // Group by primary muscle
     final grouped = <String, List<Exercise>>{};
@@ -477,7 +707,7 @@ class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
             onChanged: (val) => setState(() => _searchQuery = val),
           ),
         ),
-        
+
         if (widget.selectionMode && _selectedIds.isNotEmpty)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -498,7 +728,7 @@ class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
               ],
             ),
           ),
-        
+
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(AppSpacing.md),
@@ -512,7 +742,9 @@ class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       muscleName,
                       style: TextStyle(
@@ -567,7 +799,7 @@ class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
             },
           ),
         ),
-        
+
         if (widget.selectionMode)
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
