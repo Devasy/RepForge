@@ -17,6 +17,7 @@ This repository uses GitHub Actions to automatically create releases when PRs ar
 - **Manual bumps**: For minor/major version changes, edit `pubspec.yaml` manually before merging
 
 ### Version Format
+ 
 ```yaml
 version: MAJOR.MINOR.PATCH+BUILD
 # Example: 1.0.2+3
@@ -25,6 +26,7 @@ version: MAJOR.MINOR.PATCH+BUILD
 ## 🔧 Setup Instructions
 
 ### 1. Enable GitHub Actions
+ 
 Ensure GitHub Actions is enabled in your repository settings:
 - Go to **Settings** → **Actions** → **General**
 - Under "Actions permissions", select "Allow all actions and reusable workflows"
@@ -143,7 +145,7 @@ The workflow will still increment from whatever version you set.
 
 ## 🔄 Workflow Diagram
 
-```
+```text
 PR Merged to main
        ↓
 Checkout code

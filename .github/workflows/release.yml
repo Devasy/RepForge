@@ -8,6 +8,7 @@ on:
 jobs:
   release:
     name: Build and Release APK
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     
     permissions:
@@ -52,10 +53,17 @@ jobs:
         id: commit_version
         run: |
           git add workout-logger/pubspec.yaml
-          git commit -m "chore: bump version to ${{ steps.bump_version.outputs.version }}" || echo "No changes to commit"
-          git push origin main
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            echo "committed=false" >> $GITHUB_OUTPUT
+          else
+            git commit -m "chore: bump version to ${{ steps.bump_version.outputs.version }}"
+            git push origin main
+            echo "committed=true" >> $GITHUB_OUTPUT
+          fi
       
       - name: Create Git tag
+        if: steps.commit_version.outputs.committed == 'true'
         run: |
           git tag "v${{ steps.bump_version.outputs.version }}"
           git push origin "v${{ steps.bump_version.outputs.version }}"
@@ -70,7 +78,7 @@ jobs:
              workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.bump_version.outputs.version }}.apk
       
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.bump_version.outputs.version }}
           name: RepForge v${{ steps.bump_version.outputs.version }}

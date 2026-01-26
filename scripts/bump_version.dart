@@ -1,9 +1,10 @@
 import 'dart:io';
 
 /// Script to automatically bump version in pubspec.yaml
-/// Increments patch version and build number
-/// Usage: dart scripts/bump_version.dart
-void main() async {
+/// Increments build number by default.
+/// Increments patch version ONLY if 'patch' argument is provided.
+/// Usage: dart scripts/bump_version.dart [patch]
+void main(List<String> args) async {
   final pubspecFile = File('workout-logger/pubspec.yaml');
 
   if (!await pubspecFile.exists()) {
@@ -17,11 +18,15 @@ void main() async {
   String? newVersion;
   final updatedLines = <String>[];
 
+  // Check if patch bump is requested
+  final shouldBumpPatch = args.contains('patch');
+
   for (var line in lines) {
     if (line.startsWith('version:')) {
-      // Extract current version (format: version: 1.0.2+3)
+      // Extract current version (format: version: 1.0.2+3 or 1.0.2)
+      // Group 1: Major, Group 2: Minor, Group 3: Patch, Group 4: Build (optional)
       final versionMatch = RegExp(
-        r'version:\s*(\d+)\.(\d+)\.(\d+)\+(\d+)',
+        r'version:\s*(\d+)\.(\d+)\.(\d+)(?:\+(\d+))?',
       ).firstMatch(line);
 
       if (versionMatch == null) {
@@ -32,18 +37,20 @@ void main() async {
       final major = int.parse(versionMatch.group(1)!);
       final minor = int.parse(versionMatch.group(2)!);
       final patch = int.parse(versionMatch.group(3)!);
-      final build = int.parse(versionMatch.group(4)!);
+      final build = int.parse(versionMatch.group(4) ?? '0');
 
-      // Increment patch and build
-      final newPatch = patch + 1;
+      // Calculate new versions
+      final newPatch = shouldBumpPatch ? patch + 1 : patch;
       final newBuild = build + 1;
 
       newVersion = '$major.$minor.$newPatch+$newBuild';
       updatedLines.add('version: $newVersion');
 
-      print(
-        'Bumping version: ${versionMatch.group(1)}.${versionMatch.group(2)}.${versionMatch.group(3)}+${versionMatch.group(4)} → $newVersion',
-      );
+      final oldVersionStr =
+          '${versionMatch.group(1)}.${versionMatch.group(2)}.${versionMatch.group(3)}' +
+          (versionMatch.group(4) != null ? '+${versionMatch.group(4)}' : '');
+
+      print('Bumping version: $oldVersionStr → $newVersion');
     } else {
       updatedLines.add(line);
     }
@@ -63,11 +70,15 @@ void main() async {
   // Also write to GitHub Actions output if running in CI
   final githubOutput = Platform.environment['GITHUB_OUTPUT'];
   if (githubOutput != null) {
-    final outputFile = File(githubOutput);
-    await outputFile.writeAsString(
-      'version=$newVersion\n',
-      mode: FileMode.append,
-    );
+    try {
+      final outputFile = File(githubOutput);
+      await outputFile.writeAsString(
+        'version=$newVersion\n',
+        mode: FileMode.append,
+      );
+    } catch (e) {
+      print('Warning: Could not write to GITHUB_OUTPUT: $e');
+    }
   }
 
   exit(0);
