@@ -41,7 +41,7 @@ jobs:
       - name: Bump version
         id: bump_version
         run: |
-          dart scripts/bump_version.dart
+          dart scripts/bump_version.dart patch
           echo "Version bumped successfully"
       
       - name: Configure Git
