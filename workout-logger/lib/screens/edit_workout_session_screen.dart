@@ -541,7 +541,7 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.fitness_center,
                         size: 48,
                         color: AppTheme.textMuted,
