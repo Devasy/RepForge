@@ -350,7 +350,9 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
               itemCount: _selectedExerciseIds.length + 1,
               onReorder: (oldIndex, newIndex) {
                 if (oldIndex >= _selectedExerciseIds.length || 
-                    newIndex >= _selectedExerciseIds.length + 1) return;
+                    newIndex >= _selectedExerciseIds.length + 1) {
+                  return;
+                }
                 
                 setState(() {
                   if (newIndex > oldIndex) newIndex--;

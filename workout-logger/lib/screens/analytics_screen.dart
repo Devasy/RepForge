@@ -446,7 +446,7 @@ class _ExercisesTabState extends State<_ExercisesTab> {
         Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           child: DropdownButtonFormField<String>(
-            value: _selectedExerciseId,
+            initialValue: _selectedExerciseId,
             decoration: const InputDecoration(
               labelText: 'Select Exercise',
               prefixIcon: Icon(Icons.fitness_center),
@@ -639,7 +639,7 @@ class _ExerciseProgressView extends StatelessWidget {
                       showTitles: true,
                       reservedSize: 40,
                       getTitlesWidget: (value, meta) => Text(
-                        '${(value * 100).toStringAsFixed(0)}',
+                        (value * 100).toStringAsFixed(0),
                         style: const TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 10,
@@ -933,7 +933,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
           const SizedBox(height: AppSpacing.lg),
           
           DropdownButtonFormField<String>(
-            value: _selectedExerciseId,
+            initialValue: _selectedExerciseId,
             decoration: const InputDecoration(
               labelText: 'Exercise',
             ),
@@ -947,7 +947,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
           const SizedBox(height: AppSpacing.md),
           
           DropdownButtonFormField<String>(
-            value: _targetType,
+            initialValue: _targetType,
             decoration: const InputDecoration(
               labelText: 'Target Type',
             ),

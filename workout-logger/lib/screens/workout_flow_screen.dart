@@ -35,7 +35,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   double _currentWeight = 20;
   int _currentReps = 10;
   bool _isDropset = false;
-  List<DropsetEntry> _drops = [];
+  final List<DropsetEntry> _drops = [];
   
   // TextEditingControllers for dropset fields (following Flutter best practices)
   final TextEditingController _mainWeightController = TextEditingController();
@@ -504,7 +504,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                     }
                   });
                 },
-                activeColor: AppTheme.warning,
+                activeThumbColor: AppTheme.warning,
               ),
             ],
           ),

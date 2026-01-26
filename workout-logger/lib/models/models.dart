@@ -1,5 +1,8 @@
 // Data Models for Workout Logger App
 
+// Sentinel value for copyWith methods to distinguish "not provided" from "null"
+const Object _sentinel = Object();
+
 // ==================== Muscle Groups ====================
 
 class MuscleGroup {
@@ -72,8 +75,9 @@ class Exercise {
 
   String get primaryMuscle {
     if (muscleActivations.isEmpty) return 'Unknown';
-    final sorted = List<MuscleActivation>.from(muscleActivations)
-      ..sort((a, b) => b.activationPercentage.compareTo(a.activationPercentage));
+    final sorted = List<MuscleActivation>.from(
+      muscleActivations,
+    )..sort((a, b) => b.activationPercentage.compareTo(a.activationPercentage));
     return sorted.first.muscleGroupId;
   }
 
@@ -144,6 +148,22 @@ class WorkoutSet {
     timeTaken: json['timeTaken'],
     timestamp: DateTime.parse(json['timestamp']),
   );
+
+  WorkoutSet copyWith({
+    Object? weight = _sentinel,
+    Object? reps = _sentinel,
+    Object? isDropset = _sentinel,
+    Object? drops = _sentinel,
+    Object? timeTaken = _sentinel,
+    Object? timestamp = _sentinel,
+  }) => WorkoutSet(
+    weight: weight == _sentinel ? this.weight : weight as double,
+    reps: reps == _sentinel ? this.reps : reps as int,
+    isDropset: isDropset == _sentinel ? this.isDropset : isDropset as bool,
+    drops: drops == _sentinel ? this.drops : drops as List<DropsetEntry>?,
+    timeTaken: timeTaken == _sentinel ? this.timeTaken : timeTaken as int?,
+    timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime?,
+  );
 }
 
 class DropsetEntry {
@@ -167,11 +187,7 @@ class ExerciseLog {
   final List<WorkoutSet> sets;
   final String? notes;
 
-  ExerciseLog({
-    required this.exerciseId,
-    required this.sets,
-    this.notes,
-  });
+  ExerciseLog({required this.exerciseId, required this.sets, this.notes});
 
   double get totalVolume => sets.fold(0.0, (sum, set) => sum + set.volume);
 
@@ -185,6 +201,18 @@ class ExerciseLog {
     exerciseId: json['exerciseId'],
     sets: (json['sets'] as List).map((s) => WorkoutSet.fromJson(s)).toList(),
     notes: json['notes'],
+  );
+
+  ExerciseLog copyWith({
+    Object? exerciseId = _sentinel,
+    Object? sets = _sentinel,
+    Object? notes = _sentinel,
+  }) => ExerciseLog(
+    exerciseId: exerciseId == _sentinel
+        ? this.exerciseId
+        : exerciseId as String,
+    sets: sets == _sentinel ? this.sets : sets as List<WorkoutSet>,
+    notes: notes == _sentinel ? this.notes : notes as String?,
   );
 }
 
@@ -228,6 +256,24 @@ class WorkoutSession {
         .toList(),
     duration: json['duration'],
     notes: json['notes'],
+  );
+
+  WorkoutSession copyWith({
+    Object? id = _sentinel,
+    Object? date = _sentinel,
+    Object? routineId = _sentinel,
+    Object? exercises = _sentinel,
+    Object? duration = _sentinel,
+    Object? notes = _sentinel,
+  }) => WorkoutSession(
+    id: id == _sentinel ? this.id : id as String,
+    date: date == _sentinel ? this.date : date as DateTime,
+    routineId: routineId == _sentinel ? this.routineId : routineId as String?,
+    exercises: exercises == _sentinel
+        ? this.exercises
+        : exercises as List<ExerciseLog>,
+    duration: duration == _sentinel ? this.duration : duration as int,
+    notes: notes == _sentinel ? this.notes : notes as String?,
   );
 }
 

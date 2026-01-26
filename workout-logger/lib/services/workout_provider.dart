@@ -17,7 +17,8 @@ class WorkoutProvider extends ChangeNotifier {
   List<Target> _targets = [];
   List<MuscleGroup> _muscleGroups = [];
   List<Exercise> _allExercises = [];
-  Map<String, GrowthModel> _growthModels = {}; // exerciseId -> GrowthModel
+  final Map<String, GrowthModel> _growthModels =
+      {}; // exerciseId -> GrowthModel
 
   // Active workout state
   WorkoutSession? _activeSession;
@@ -32,8 +33,9 @@ class WorkoutProvider extends ChangeNotifier {
   List<Target> get targets => _targets;
   List<MuscleGroup> get muscleGroups => _muscleGroups;
   List<Exercise> get allExercises => _allExercises;
-  
-  bool get hasActiveWorkout => _activeSession != null || _workoutStartTime != null;
+
+  bool get hasActiveWorkout =>
+      _activeSession != null || _workoutStartTime != null;
   Routine? get activeRoutine => _activeRoutine;
   int get currentExerciseIndex => _currentExerciseIndex;
   List<ExerciseLog> get currentExerciseLogs => _currentExerciseLogs;
@@ -60,7 +62,7 @@ class WorkoutProvider extends ChangeNotifier {
 
   Future<void> _trainAllGrowthModels() async {
     final exerciseIds = <String>{};
-    
+
     // Get all unique exercise IDs from sessions
     for (var session in _sessions) {
       for (var log in session.exercises) {
@@ -75,9 +77,15 @@ class WorkoutProvider extends ChangeNotifier {
   }
 
   Future<void> _updateGrowthModel(String exerciseId) async {
-    final dataPoints = MLService.extractExerciseDataPoints(exerciseId, _sessions);
+    final dataPoints = MLService.extractExerciseDataPoints(
+      exerciseId,
+      _sessions,
+    );
     if (dataPoints.length >= 2) {
       _growthModels[exerciseId] = MLService.trainGrowthModel(dataPoints);
+    } else {
+      // Remove stale model if not enough data to train (e.g. after deletion)
+      _growthModels.remove(exerciseId);
     }
   }
 
@@ -97,6 +105,131 @@ class WorkoutProvider extends ChangeNotifier {
 
   String getMuscleGroupName(String id) {
     return MuscleGroups.names[id] ?? 'Unknown';
+  }
+
+  // ==================== CUSTOM EXERCISES ====================
+
+  /// Allowed category values for exercises
+  static const Set<String> _allowedCategories = {'compound', 'isolation'};
+
+  /// Add a custom exercise created by the user
+  ///
+  /// Throws [ArgumentError] if inputs are invalid.
+  Future<void> addCustomExercise({
+    required String name,
+    required String category,
+    required String primaryMuscleGroupId,
+  }) async {
+    // Validate and normalize name (trim and collapse whitespace)
+    final normalizedName = name.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalizedName.isEmpty) {
+      throw ArgumentError('Exercise name cannot be empty');
+    }
+
+    // Validate primaryMuscleGroupId
+    if (primaryMuscleGroupId.isEmpty) {
+      throw ArgumentError('Primary muscle group is required');
+    }
+
+    // Normalize and validate category
+    final normalizedCategory = category.toLowerCase().trim();
+    if (!_allowedCategories.contains(normalizedCategory)) {
+      throw ArgumentError(
+        'Invalid category "$category". Must be one of: ${_allowedCategories.join(", ")}',
+      );
+    }
+
+    // Generate unique ID
+    final id = 'custom_${_uuid.v4()}';
+
+    // Create muscle activation (100% for primary muscle in v1)
+    final muscleActivations = [
+      MuscleActivation(
+        muscleGroupId: primaryMuscleGroupId,
+        activationPercentage: 100,
+      ),
+    ];
+
+    // Create exercise with isCustom flag using normalized values
+    final exercise = Exercise(
+      id: id,
+      name: normalizedName,
+      muscleActivations: muscleActivations,
+      category: normalizedCategory,
+      isCustom: true,
+    );
+
+    // Persist to storage
+    await _storage.saveCustomExercise(exercise);
+
+    // Add to local list (use List.from for immutability)
+    _allExercises = List.from(_allExercises)..add(exercise);
+
+    notifyListeners();
+  }
+
+  /// Delete a custom exercise
+  ///
+  /// Returns false if exercise not found, not custom, or IN USE by sessions/routines/targets
+  Future<bool> deleteCustomExercise(String exerciseId) async {
+    // Only allow deleting custom exercises
+    final exercise = getExercise(exerciseId);
+    if (exercise == null || !exercise.isCustom) {
+      return false;
+    }
+
+    // Check for references in Sessions
+    for (var session in _sessions) {
+      if (session.exercises.any((e) => e.exerciseId == exerciseId)) {
+        debugPrint(
+          'Cannot delete custom exercise: Used in session ${session.id}',
+        );
+        return false;
+      }
+    }
+
+    // Check for references in Routines
+    for (var routine in _routines) {
+      if (routine.exerciseIds.contains(exerciseId)) {
+        debugPrint(
+          'Cannot delete custom exercise: Used in routine ${routine.name}',
+        );
+        return false;
+      }
+    }
+
+    // Check for references in Targets
+    for (var target in _targets) {
+      if (target.exerciseId == exerciseId) {
+        debugPrint(
+          'Cannot delete custom exercise: Used in target ${target.id}',
+        );
+        return false;
+      }
+    }
+
+    // Check for references in active workout
+    if (_currentExerciseLogs.any((l) => l.exerciseId == exerciseId)) {
+      debugPrint('Cannot delete custom exercise: Used in active workout');
+      return false;
+    }
+    if (_activeRoutine?.exerciseIds.contains(exerciseId) ?? false) {
+      debugPrint('Cannot delete custom exercise: Used in active routine');
+      return false;
+    }
+
+    // Remove from storage
+    await _storage.deleteCustomExercise(exerciseId);
+
+    // Remove from local list
+    _allExercises = List.from(_allExercises)
+      ..removeWhere((e) => e.id == exerciseId);
+
+    // Also remove any growth model
+    _growthModels.remove(exerciseId);
+
+    notifyListeners();
+    return true;
   }
 
   // ==================== WORKOUT FLOW ====================
@@ -119,7 +252,7 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Get current exercise being performed
   Exercise? get currentExercise {
-    if (_currentExerciseLogs.isEmpty || 
+    if (_currentExerciseLogs.isEmpty ||
         _currentExerciseIndex >= _currentExerciseLogs.length) {
       return null;
     }
@@ -129,7 +262,7 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Get current exercise log
   ExerciseLog? get currentExerciseLog {
-    if (_currentExerciseLogs.isEmpty || 
+    if (_currentExerciseLogs.isEmpty ||
         _currentExerciseIndex >= _currentExerciseLogs.length) {
       return null;
     }
@@ -275,6 +408,87 @@ class WorkoutProvider extends ChangeNotifier {
     return null;
   }
 
+  // ==================== SESSION MANAGEMENT ====================
+
+  /// Delete a workout session
+  Future<void> deleteWorkoutSession(String sessionId) async {
+    // Find the session to get exercise IDs for model retraining
+    final sessionIndex = _sessions.indexWhere((s) => s.id == sessionId);
+
+    // Return early if session not found (e.g., stale sessionId)
+    if (sessionIndex == -1) {
+      debugPrint('Session $sessionId not found, skipping deletion');
+      return;
+    }
+
+    final session = _sessions[sessionIndex];
+    // All exercises in the deleted session need their growth models retrained
+    final affectedExerciseIds = session.exercises
+        .map((e) => e.exerciseId)
+        .toSet();
+
+    // Remove from storage first
+    await _storage.deleteWorkoutSession(sessionId);
+
+    // Remove from local list
+    _sessions = List.from(_sessions)..removeWhere((s) => s.id == sessionId);
+
+    // Retrain growth models for all affected exercises
+    // (their data has changed because a session was removed)
+    for (var exerciseId in affectedExerciseIds) {
+      await _updateGrowthModel(exerciseId);
+    }
+
+    // Recalculate targets for affected exercises
+    await _recalculateTargets(affectedExerciseIds);
+
+    notifyListeners();
+  }
+
+  /// Update an existing workout session
+  Future<void> updateWorkoutSession(WorkoutSession updatedSession) async {
+    // Find the previous version of the session to compare exercises
+    final previousSession = _sessions.firstWhere(
+      (s) => s.id == updatedSession.id,
+      orElse: () => updatedSession, // Fallback if not found (shouldn't happen)
+    );
+
+    // Gather exercise IDs from BOTH previous and updated sessions
+    // so we retrain models for exercises that were added OR removed
+    final previousExerciseIds = previousSession.exercises
+        .map((e) => e.exerciseId)
+        .toSet();
+    final updatedExerciseIds = updatedSession.exercises
+        .map((e) => e.exerciseId)
+        .toSet();
+    final allAffectedExerciseIds = previousExerciseIds.union(
+      updatedExerciseIds,
+    );
+
+    // Save to storage (overwrites by ID)
+    await _storage.saveWorkoutSession(updatedSession);
+
+    // Update local list
+    final index = _sessions.indexWhere((s) => s.id == updatedSession.id);
+    if (index != -1) {
+      _sessions = List.from(_sessions)..[index] = updatedSession;
+    }
+
+    // Sort sessions by date (most recent first)
+    _sessions.sort((a, b) => b.date.compareTo(a.date));
+
+    // Retrain growth models for ALL affected exercises
+    // (both exercises that were in the old session and exercises in the new session)
+    for (var exerciseId in allAffectedExerciseIds) {
+      await _updateGrowthModel(exerciseId);
+    }
+
+    // Recalculate targets for affected exercises
+    await _recalculateTargets(allAffectedExerciseIds);
+
+    notifyListeners();
+  }
+
   // ==================== ROUTINES ====================
 
   Future<void> createRoutine(String name, List<String> exerciseIds) async {
@@ -310,22 +524,8 @@ class WorkoutProvider extends ChangeNotifier {
     required String type,
     required double targetValue,
   }) async {
-    // Get current value from last session
-    double currentValue = 0;
-    final lastLog = getLastSessionForExercise(exerciseId);
-    if (lastLog != null && lastLog.sets.isNotEmpty) {
-      switch (type) {
-        case 'reps':
-          currentValue = lastLog.sets.map((s) => s.reps).reduce((a, b) => a > b ? a : b).toDouble();
-          break;
-        case 'weight':
-          currentValue = lastLog.sets.map((s) => s.weight).reduce((a, b) => a > b ? a : b);
-          break;
-        case 'volume':
-          currentValue = lastLog.totalVolume;
-          break;
-      }
-    }
+    // Get current value from history
+    double currentValue = _calculateCurrentTargetValue(exerciseId, type);
 
     // Predict completion date
     DateTime? estimatedDate;
@@ -345,6 +545,7 @@ class WorkoutProvider extends ChangeNotifier {
       targetValue: targetValue,
       currentValue: currentValue,
       estimatedCompletionDate: estimatedDate,
+      isCompleted: currentValue >= targetValue,
     );
 
     await _storage.saveTarget(target);
@@ -352,43 +553,86 @@ class WorkoutProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _updateTargetsFromSession(WorkoutSession session) async {
-    for (var log in session.exercises) {
-      final exerciseTargets = _targets.where((t) => 
-        t.exerciseId == log.exerciseId && !t.isCompleted
-      ).toList();
+  /// Recalculate targets for a set of exercises based on full history
+  Future<void> _recalculateTargets(Set<String> exerciseIds) async {
+    for (var exerciseId in exerciseIds) {
+      final relevantTargets = _targets
+          .where((t) => t.exerciseId == exerciseId)
+          .toList();
 
-      for (var target in exerciseTargets) {
-        double newValue = 0;
-        switch (target.targetType) {
-          case 'reps':
-            newValue = log.sets.map((s) => s.reps).reduce((a, b) => a > b ? a : b).toDouble();
-            break;
-          case 'weight':
-            newValue = log.sets.map((s) => s.weight).reduce((a, b) => a > b ? a : b);
-            break;
-          case 'volume':
-            newValue = log.totalVolume;
-            break;
-        }
+      for (var target in relevantTargets) {
+        // Recalculate current value from all sessions
+        final newValue = _calculateCurrentTargetValue(
+          exerciseId,
+          target.targetType,
+        );
 
         target.currentValue = newValue;
+
+        // If it was completed but now isn't (e.g. deleted PR session), uncomplete it
+        // If it wasn't completed but now is (unlikely on delete, but possible on edit), complete it
         target.isCompleted = newValue >= target.targetValue;
 
-        // Update prediction
-        final growthModel = _growthModels[log.exerciseId];
-        if (growthModel != null && !target.isCompleted) {
-          target.estimatedCompletionDate = MLService.predictTargetCompletion(
-            currentValue: newValue,
-            targetValue: target.targetValue,
-            growthModel: growthModel,
-          );
+        // Update prediction if not completed
+        if (!target.isCompleted) {
+          final growthModel = _growthModels[exerciseId];
+          if (growthModel != null) {
+            target.estimatedCompletionDate = MLService.predictTargetCompletion(
+              currentValue: newValue,
+              targetValue: target.targetValue,
+              growthModel: growthModel,
+            );
+          } else {
+            target.estimatedCompletionDate = null;
+          }
+        } else {
+          target.estimatedCompletionDate = null;
         }
 
         await _storage.saveTarget(target);
       }
     }
-    notifyListeners();
+  }
+
+  /// Calculate the current best value for a target type from all history
+  double _calculateCurrentTargetValue(String exerciseId, String targetType) {
+    double bestValue = 0;
+
+    for (var session in _sessions) {
+      for (var log in session.exercises) {
+        if (log.exerciseId == exerciseId && log.sets.isNotEmpty) {
+          double sessionValue = 0;
+          switch (targetType) {
+            case 'reps':
+              sessionValue = log.sets
+                  .map((s) => s.reps)
+                  .reduce((a, b) => a > b ? a : b)
+                  .toDouble();
+              break;
+            case 'weight':
+              sessionValue = log.sets
+                  .map((s) => s.weight)
+                  .reduce((a, b) => a > b ? a : b);
+              break;
+            case 'volume':
+              sessionValue = log.totalVolume;
+              break;
+          }
+          if (sessionValue > bestValue) {
+            bestValue = sessionValue;
+          }
+        }
+      }
+    }
+    return bestValue;
+  }
+
+  Future<void> _updateTargetsFromSession(WorkoutSession session) async {
+    // This is optimzed for adding new sessions, but we can just use the generic recalculate
+    // to be safe and consistent, although it's slightly more expensive.
+    // Given the scale of mobile data, scanning history is acceptable.
+    final exerciseIds = session.exercises.map((e) => e.exerciseId).toSet();
+    await _recalculateTargets(exerciseIds);
   }
 
   Future<void> deleteTarget(String id) async {
@@ -400,9 +644,11 @@ class WorkoutProvider extends ChangeNotifier {
   // ==================== ANALYTICS ====================
 
   /// Get volume progression for an exercise
-  List<({DateTime date, double volume})> getVolumeProgression(String exerciseId) {
+  List<({DateTime date, double volume})> getVolumeProgression(
+    String exerciseId,
+  ) {
     final data = <({DateTime date, double volume})>[];
-    
+
     for (var session in _sessions.reversed) {
       for (var log in session.exercises) {
         if (log.exerciseId == exerciseId) {
@@ -411,7 +657,7 @@ class WorkoutProvider extends ChangeNotifier {
         }
       }
     }
-    
+
     return data;
   }
 
@@ -428,9 +674,10 @@ class WorkoutProvider extends ChangeNotifier {
         if (exercise == null) continue;
 
         for (var activation in exercise.muscleActivations) {
-          final muscleVolume = log.totalVolume * (activation.activationPercentage / 100);
-          volumeByMuscle[activation.muscleGroupId] = 
-            (volumeByMuscle[activation.muscleGroupId] ?? 0) + muscleVolume;
+          final muscleVolume =
+              log.totalVolume * (activation.activationPercentage / 100);
+          volumeByMuscle[activation.muscleGroupId] =
+              (volumeByMuscle[activation.muscleGroupId] ?? 0) + muscleVolume;
         }
       }
     }
