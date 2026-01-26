@@ -1,0 +1,95 @@
+name: Release Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Build and Release APK
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write  # Required to create releases and push commits
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper versioning
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.2'
+          channel: 'stable'
+          cache: true
+      
+      - name: Install dependencies
+        working-directory: ./workout-logger
+        run: flutter pub get
+      
+      - name: Bump version
+        id: bump_version
+        run: |
+          dart scripts/bump_version.dart
+          echo "Version bumped successfully"
+      
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Commit version bump
+        id: commit_version
+        run: |
+          git add workout-logger/pubspec.yaml
+          git commit -m "chore: bump version to ${{ steps.bump_version.outputs.version }}" || echo "No changes to commit"
+          git push origin main
+      
+      - name: Create Git tag
+        run: |
+          git tag "v${{ steps.bump_version.outputs.version }}"
+          git push origin "v${{ steps.bump_version.outputs.version }}"
+      
+      - name: Build APK
+        working-directory: ./workout-logger
+        run: flutter build apk --release
+      
+      - name: Rename APK
+        run: |
+          mv workout-logger/build/app/outputs/flutter-apk/app-release.apk \
+             workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.bump_version.outputs.version }}.apk
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.bump_version.outputs.version }}
+          name: RepForge v${{ steps.bump_version.outputs.version }}
+          body: |
+            ## RepForge v${{ steps.bump_version.outputs.version }}
+            
+            ### 📱 Download
+            Download the APK file below to install on your Android device.
+            
+            ### 🔄 Changes
+            This release was automatically generated from the latest changes merged to main.
+            
+            ### 📊 Build Information
+            - **Version**: ${{ steps.bump_version.outputs.version }}
+            - **Build Date**: ${{ github.event.head_commit.timestamp }}
+            - **Commit**: ${{ github.sha }}
+          files: |
+            workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.bump_version.outputs.version }}.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
