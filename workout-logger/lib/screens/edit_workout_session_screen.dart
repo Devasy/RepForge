@@ -751,7 +751,6 @@ class _EditableSetRow extends StatefulWidget {
   final VoidCallback onDelete;
 
   const _EditableSetRow({
-    super.key,
     required this.setNumber,
     required this.weight,
     required this.reps,

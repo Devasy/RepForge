@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/add_custom_exercise_screen.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'test_utils/mock_storage_service.dart';

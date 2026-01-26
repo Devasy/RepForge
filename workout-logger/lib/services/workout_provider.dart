@@ -208,6 +208,16 @@ class WorkoutProvider extends ChangeNotifier {
       }
     }
 
+    // Check for references in active workout
+    if (_currentExerciseLogs.any((l) => l.exerciseId == exerciseId)) {
+      debugPrint('Cannot delete custom exercise: Used in active workout');
+      return false;
+    }
+    if (_activeRoutine?.exerciseIds.contains(exerciseId) ?? false) {
+      debugPrint('Cannot delete custom exercise: Used in active routine');
+      return false;
+    }
+
     // Remove from storage
     await _storage.deleteCustomExercise(exerciseId);
 
@@ -403,10 +413,15 @@ class WorkoutProvider extends ChangeNotifier {
   /// Delete a workout session
   Future<void> deleteWorkoutSession(String sessionId) async {
     // Find the session to get exercise IDs for model retraining
-    final session = _sessions.firstWhere(
-      (s) => s.id == sessionId,
-      orElse: () => throw Exception('Session not found'),
-    );
+    final sessionIndex = _sessions.indexWhere((s) => s.id == sessionId);
+
+    // Return early if session not found (e.g., stale sessionId)
+    if (sessionIndex == -1) {
+      debugPrint('Session $sessionId not found, skipping deletion');
+      return;
+    }
+
+    final session = _sessions[sessionIndex];
     // All exercises in the deleted session need their growth models retrained
     final affectedExerciseIds = session.exercises
         .map((e) => e.exerciseId)
