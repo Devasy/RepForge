@@ -127,3 +127,7 @@ The application works but faces scalability and maintainability challenges due t
 1.  **Extract Interfaces:** Create `IStorageService` and `IExerciseRepository`.
 2.  **Split Provider:** Break `WorkoutProvider` into `WorkoutManager` (active session), `HistoryManager` (past data), and `RoutineManager`.
 3.  **Dependency Injection:** Refactor `MLService` to be injectable and inject dependencies via the constructor using interfaces.
+
+## References
+
+*   [How to Implement the SOLID Principles in Flutter and Dart](https://www.freecodecamp.org/news/implement-the-solid-principles-in-flutter-and-dart/)
