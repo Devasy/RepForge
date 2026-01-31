@@ -1,17 +1,23 @@
 // Main App Entry Point
+//
+// Following Dependency Inversion Principle: we create concrete implementations
+// here at the composition root and inject them into high-level modules.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'services/storage_service.dart';
+import 'services/ml_service.dart';
+import 'services/interfaces/storage_service_interface.dart';
+import 'services/interfaces/ml_service_interface.dart';
 import 'services/workout_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -19,12 +25,14 @@ void main() async {
   ]);
 
   // Set system overlay style
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: AppTheme.backgroundColor,
-    systemNavigationBarIconBrightness: Brightness.light,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: AppTheme.backgroundColor,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
 
   runApp(const WorkoutLoggerApp());
 }
@@ -34,10 +42,21 @@ class WorkoutLoggerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Composition Root: Create concrete implementations and inject them
+    // This is the only place where we reference concrete implementations.
+    // All other code depends on abstractions (interfaces).
+    final IStorageService storageService = StorageService();
+    final IMLService mlService = MLService();
+
     return MultiProvider(
       providers: [
+        // Provide the storage service interface for direct access if needed
+        Provider<IStorageService>.value(value: storageService),
+        // Provide the ML service interface for direct access if needed
+        Provider<IMLService>.value(value: mlService),
+        // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
-          create: (_) => WorkoutProvider(StorageService()),
+          create: (_) => WorkoutProvider(storageService, mlService: mlService),
         ),
       ],
       child: MaterialApp(
@@ -85,11 +104,7 @@ class _AppInitializerState extends State<AppInitializer> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.error_outline,
-                size: 64,
-                color: AppTheme.error,
-              ),
+              const Icon(Icons.error_outline, size: 64, color: AppTheme.error),
               const SizedBox(height: 16),
               Text(
                 'Failed to initialize app',
@@ -138,9 +153,7 @@ class _AppInitializerState extends State<AppInitializer> {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 32),
-              const CircularProgressIndicator(
-                color: AppTheme.primaryColor,
-              ),
+              const CircularProgressIndicator(color: AppTheme.primaryColor),
             ],
           ),
         ),

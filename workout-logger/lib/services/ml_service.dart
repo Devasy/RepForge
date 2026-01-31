@@ -1,16 +1,36 @@
 // ML Service - Linear Regression for Growth Rate Prediction
 // and Progressive Overload Recommendations
+//
+// This is a concrete implementation of IMLService.
+// Following Dependency Inversion Principle: high-level modules depend on
+// the IMLService abstraction, not this concrete class.
+// Following Open/Closed Principle: new ML algorithms can be added by
+// creating new implementations of IMLService.
 
 import 'dart:math';
 import '../models/models.dart';
+import 'interfaces/ml_service_interface.dart';
 
-class MLService {
+// Re-export DataPoint from interface for backward compatibility
+export 'interfaces/ml_service_interface.dart' show DataPoint;
+
+/// Linear regression based implementation of the ML service.
+///
+/// This class implements IMLService, allowing it to be swapped
+/// for other ML algorithms without modifying the consuming code.
+class MLService implements IMLService {
   // ==================== LINEAR REGRESSION ====================
-  
+
   /// Train a growth model using simple linear regression
   /// x = session number (0, 1, 2, ...)
   /// y = volume or performance metric
-  static GrowthModel trainGrowthModel(List<DataPoint> dataPoints) {
+  @override
+  GrowthModel trainGrowthModel(List<DataPoint> dataPoints) {
+    return MLService.trainGrowthModelStatic(dataPoints);
+  }
+
+  /// Static version for backward compatibility
+  static GrowthModel trainGrowthModelStatic(List<DataPoint> dataPoints) {
     if (dataPoints.isEmpty) {
       return GrowthModel(
         slope: 0,
@@ -63,7 +83,9 @@ class MLService {
       ssResidual += pow(point.y - predicted, 2);
     }
 
-    final double r2Value = ssTotal > 0 ? (1 - (ssResidual / ssTotal)).toDouble() : 0.0;
+    final double r2Value = ssTotal > 0
+        ? (1 - (ssResidual / ssTotal)).toDouble()
+        : 0.0;
 
     return GrowthModel(
       slope: slope,
@@ -74,7 +96,8 @@ class MLService {
   }
 
   /// Extract data points from workout history for a specific exercise
-  static List<DataPoint> extractExerciseDataPoints(
+  @override
+  List<DataPoint> extractExerciseDataPoints(
     String exerciseId,
     List<WorkoutSession> sessions,
   ) {
@@ -88,10 +111,9 @@ class MLService {
     for (var session in sorted) {
       for (var exerciseLog in session.exercises) {
         if (exerciseLog.exerciseId == exerciseId) {
-          dataPoints.add(DataPoint(
-            x: sessionIndex.toDouble(),
-            y: exerciseLog.totalVolume,
-          ));
+          dataPoints.add(
+            DataPoint(x: sessionIndex.toDouble(), y: exerciseLog.totalVolume),
+          );
           sessionIndex++;
           break;
         }
@@ -104,9 +126,10 @@ class MLService {
   // ==================== RECOMMENDATIONS ====================
 
   /// Generate set recommendations based on previous performance
-  static List<SetRecommendation> recommendSets({
+  @override
+  List<SetRecommendation> recommendSets({
     required List<WorkoutSet> lastSession,
-    required GrowthModel? growthModel,
+    GrowthModel? growthModel,
     double targetProgressPercent = 5.0, // Default 5% increase
   }) {
     if (lastSession.isEmpty) {
@@ -115,9 +138,10 @@ class MLService {
 
     // Calculate target volume increase
     final lastVolume = lastSession.fold<double>(
-      0, (sum, set) => sum + set.volume
+      0,
+      (sum, set) => sum + set.volume,
     );
-    
+
     // Use growth model slope if available, otherwise use default percentage
     double targetVolumeIncrease;
     if (growthModel != null && growthModel.r2 > 0.3) {
@@ -154,7 +178,7 @@ class MLService {
     if (currentReps < 12) {
       final newReps = currentReps + 1;
       final newVolume = currentWeight * newReps;
-      
+
       if (newVolume >= targetVolume * 0.95) {
         return SetRecommendation(
           weight: currentWeight,
@@ -168,7 +192,7 @@ class MLService {
       if (currentReps < 11) {
         final twoMoreReps = currentReps + 2;
         final volumeWith2Reps = currentWeight * twoMoreReps;
-        
+
         if (volumeWith2Reps >= targetVolume * 0.95) {
           return SetRecommendation(
             weight: currentWeight,
@@ -183,7 +207,7 @@ class MLService {
     // Strategy 2: Increase weight
     final weightIncrement = currentWeight < 40 ? 2.5 : 5.0;
     final newWeight = currentWeight + weightIncrement;
-    
+
     // When increasing weight, maintain or slightly reduce reps
     int newReps = currentReps;
     if (currentReps >= 10) {
@@ -192,7 +216,7 @@ class MLService {
     newReps = newReps.clamp(6, 15);
 
     final newVolume = newWeight * newReps;
-    
+
     String confidence;
     if (newVolume >= targetVolume * 0.9 && newVolume <= targetVolume * 1.1) {
       confidence = 'high';
@@ -211,19 +235,24 @@ class MLService {
   }
 
   /// Fill in default recommendations for a new exercise
-  static List<SetRecommendation> getDefaultRecommendations(int setCount) {
-    return List.generate(setCount, (index) => SetRecommendation(
-      weight: 0,
-      reps: 10,
-      confidence: 'low',
-      reasoning: 'No previous data - adjust based on feel',
-    ));
+  @override
+  List<SetRecommendation> getDefaultRecommendations(int setCount) {
+    return List.generate(
+      setCount,
+      (index) => SetRecommendation(
+        weight: 0,
+        reps: 10,
+        confidence: 'low',
+        reasoning: 'No previous data - adjust based on feel',
+      ),
+    );
   }
 
   // ==================== TARGET PREDICTIONS ====================
 
   /// Predict when a target will be achieved
-  static DateTime? predictTargetCompletion({
+  @override
+  DateTime? predictTargetCompletion({
     required double currentValue,
     required double targetValue,
     required GrowthModel growthModel,
@@ -253,7 +282,9 @@ class MLService {
     required GrowthModel growthModel,
     double sessionsPerWeek = 3.0,
   }) {
-    final expected = predictTargetCompletion(
+    // Create instance to call the non-static method
+    final mlService = MLService();
+    final expected = mlService.predictTargetCompletion(
       currentValue: currentValue,
       targetValue: targetValue,
       growthModel: growthModel,
@@ -272,12 +303,4 @@ class MLService {
       pessimistic: expected.add(Duration(days: uncertainty)),
     );
   }
-}
-
-/// Simple data point for regression
-class DataPoint {
-  final double x;
-  final double y;
-
-  DataPoint({required this.x, required this.y});
 }
