@@ -18,9 +18,7 @@ class RoutinesScreen extends StatelessWidget {
     final routines = provider.routines;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Routines'),
-      ),
+      appBar: AppBar(title: const Text('Routines')),
       body: routines.isEmpty
           ? _buildEmptyState(context)
           : _buildRoutineList(context, routines, provider),
@@ -37,11 +35,7 @@ class RoutinesScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.list_alt,
-            size: 64,
-            color: AppTheme.textMuted,
-          ),
+          Icon(Icons.list_alt, size: 64, color: AppTheme.textMuted),
           const SizedBox(height: 16),
           Text(
             'No Routines Yet',
@@ -73,10 +67,7 @@ class RoutinesScreen extends StatelessWidget {
       itemCount: routines.length,
       itemBuilder: (context, index) {
         final routine = routines[index];
-        return _RoutineCard(
-          routine: routine,
-          provider: provider,
-        );
+        return _RoutineCard(routine: routine, provider: provider);
       },
     );
   }
@@ -84,9 +75,7 @@ class RoutinesScreen extends StatelessWidget {
   void _showCreateRoutineDialog(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const CreateRoutineScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const CreateRoutineScreen()),
     );
   }
 }
@@ -95,10 +84,7 @@ class _RoutineCard extends StatelessWidget {
   final Routine routine;
   final WorkoutProvider provider;
 
-  const _RoutineCard({
-    required this.routine,
-    required this.provider,
-  });
+  const _RoutineCard({required this.routine, required this.provider});
 
   @override
   Widget build(BuildContext context) {
@@ -171,10 +157,7 @@ class _RoutineCard extends StatelessWidget {
                 children: routine.exerciseIds.take(5).map((id) {
                   final name = provider.getExerciseName(id);
                   return Chip(
-                    label: Text(
-                      name,
-                      style: const TextStyle(fontSize: 11),
-                    ),
+                    label: Text(name, style: const TextStyle(fontSize: 11)),
                     padding: EdgeInsets.zero,
                     visualDensity: VisualDensity.compact,
                   );
@@ -201,9 +184,7 @@ class _RoutineCard extends StatelessWidget {
   void _showRoutineDetails(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => RoutineDetailScreen(routine: routine),
-      ),
+      MaterialPageRoute(builder: (_) => RoutineDetailScreen(routine: routine)),
     );
   }
 
@@ -234,7 +215,10 @@ class _RoutineCard extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: AppTheme.error),
-              title: const Text('Delete Routine', style: TextStyle(color: AppTheme.error)),
+              title: const Text(
+                'Delete Routine',
+                style: TextStyle(color: AppTheme.error),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 _confirmDelete(context);
@@ -285,6 +269,7 @@ class CreateRoutineScreen extends StatefulWidget {
 class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
   final _nameController = TextEditingController();
   final List<String> _selectedExerciseIds = [];
+  String _pickerSearchQuery = '';
 
   @override
   void initState() {
@@ -303,16 +288,15 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final exercises = ExerciseDatabase.getAll();
+    // Use provider's exercises list (includes custom exercises)
+    final provider = context.watch<WorkoutProvider>();
+    final exercises = provider.allExercises;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.routine == null ? 'New Routine' : 'Edit Routine'),
         actions: [
-          TextButton(
-            onPressed: _saveRoutine,
-            child: const Text('Save'),
-          ),
+          TextButton(onPressed: _saveRoutine, child: const Text('Save')),
         ],
       ),
       body: Column(
@@ -338,7 +322,8 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                 const Spacer(),
                 if (_selectedExerciseIds.isNotEmpty)
                   TextButton(
-                    onPressed: () => setState(() => _selectedExerciseIds.clear()),
+                    onPressed: () =>
+                        setState(() => _selectedExerciseIds.clear()),
                     child: const Text('Clear All'),
                   ),
               ],
@@ -349,11 +334,11 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
               padding: const EdgeInsets.all(AppSpacing.md),
               itemCount: _selectedExerciseIds.length + 1,
               onReorder: (oldIndex, newIndex) {
-                if (oldIndex >= _selectedExerciseIds.length || 
+                if (oldIndex >= _selectedExerciseIds.length ||
                     newIndex >= _selectedExerciseIds.length + 1) {
                   return;
                 }
-                
+
                 setState(() {
                   if (newIndex > oldIndex) newIndex--;
                   final item = _selectedExerciseIds.removeAt(oldIndex);
@@ -368,13 +353,13 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () => _showExercisePicker(exercises),
                       icon: const Icon(Icons.add),
-                      label: const Text('Add Exercise'),
+                      label: const Text('Add Exercises'),
                     ),
                   );
                 }
 
                 final exerciseId = _selectedExerciseIds[index];
-                final exercise = ExerciseDatabase.getById(exerciseId);
+                final exercise = provider.getExercise(exerciseId);
 
                 return Card(
                   key: ValueKey(exerciseId),
@@ -382,7 +367,10 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                   child: ListTile(
                     leading: ReorderableDragStartListener(
                       index: index,
-                      child: const Icon(Icons.drag_handle, color: AppTheme.textMuted),
+                      child: const Icon(
+                        Icons.drag_handle,
+                        color: AppTheme.textMuted,
+                      ),
                     ),
                     title: Text(exercise?.name ?? 'Unknown'),
                     subtitle: Text(
@@ -390,7 +378,10 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                       style: const TextStyle(fontSize: 12),
                     ),
                     trailing: IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, color: AppTheme.error),
+                      icon: const Icon(
+                        Icons.remove_circle_outline,
+                        color: AppTheme.error,
+                      ),
                       onPressed: () {
                         setState(() => _selectedExerciseIds.removeAt(index));
                       },
@@ -406,6 +397,10 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
   }
 
   void _showExercisePicker(List<Exercise> allExercises) {
+    // Reset search when opening picker
+    _pickerSearchQuery = '';
+    final Set<String> tempSelectedIds = {};
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.cardColor,
@@ -413,68 +408,196 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.8,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) {
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          // Filter exercises by search and exclude already selected
+          var filteredExercises = allExercises.where((ex) {
+            if (_selectedExerciseIds.contains(ex.id)) return false;
+            if (_pickerSearchQuery.isEmpty) return true;
+            return ex.name.toLowerCase().contains(
+              _pickerSearchQuery.toLowerCase(),
+            );
+          }).toList();
+
           // Group by muscle
           final grouped = <String, List<Exercise>>{};
-          for (var ex in allExercises) {
-            if (!_selectedExerciseIds.contains(ex.id)) {
-              final primary = ex.primaryMuscle;
-              grouped.putIfAbsent(primary, () => []).add(ex);
-            }
+          for (var ex in filteredExercises) {
+            final primary = ex.primaryMuscle;
+            grouped.putIfAbsent(primary, () => []).add(ex);
           }
 
-          return ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.textMuted,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                'Add Exercise',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              ...grouped.entries.map((entry) {
-                final muscleName = MuscleGroups.names[entry.key] ?? entry.key;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                      child: Text(
-                        muscleName,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w600,
+          return DraggableScrollableSheet(
+            initialChildSize: 0.8,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            expand: false,
+            builder: (context, scrollController) {
+              return Column(
+                children: [
+                  // Fixed header with search and done button
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: AppTheme.textMuted,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Add Exercises',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            if (tempSelectedIds.isNotEmpty)
+                              TextButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedExerciseIds.addAll(
+                                      tempSelectedIds,
+                                    );
+                                  });
+                                  Navigator.pop(context);
+                                },
+                                icon: const Icon(Icons.check),
+                                label: Text('Add ${tempSelectedIds.length}'),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        // Search field
+                        TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Search exercises...',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _pickerSearchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      setModalState(
+                                        () => _pickerSearchQuery = '',
+                                      );
+                                    },
+                                  )
+                                : null,
+                            isDense: true,
+                          ),
+                          onChanged: (val) {
+                            setModalState(() => _pickerSearchQuery = val);
+                          },
+                        ),
+                        if (tempSelectedIds.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            '${tempSelectedIds.length} exercise${tempSelectedIds.length > 1 ? 's' : ''} selected',
+                            style: const TextStyle(
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    ...entry.value.map((exercise) => ListTile(
-                      title: Text(exercise.name),
-                      trailing: const Icon(Icons.add_circle_outline, color: AppTheme.primaryColor),
-                      onTap: () {
-                        setState(() => _selectedExerciseIds.add(exercise.id));
-                        Navigator.pop(context);
-                      },
-                    )),
-                  ],
-                );
-              }),
-            ],
+                  ),
+                  // Scrollable exercise list
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                      ),
+                      children: [
+                        ...grouped.entries.map((entry) {
+                          final muscleName =
+                              MuscleGroups.names[entry.key] ?? entry.key;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: AppSpacing.sm,
+                                ),
+                                child: Text(
+                                  muscleName,
+                                  style: const TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              ...entry.value.map((exercise) {
+                                final isSelected = tempSelectedIds.contains(
+                                  exercise.id,
+                                );
+                                return ListTile(
+                                  leading: Checkbox(
+                                    value: isSelected,
+                                    onChanged: (val) {
+                                      setModalState(() {
+                                        if (val == true) {
+                                          tempSelectedIds.add(exercise.id);
+                                        } else {
+                                          tempSelectedIds.remove(exercise.id);
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  title: Text(
+                                    exercise.name,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? AppTheme.primaryColor
+                                          : null,
+                                    ),
+                                  ),
+                                  subtitle: exercise.isCustom
+                                      ? const Text(
+                                          'Custom',
+                                          style: TextStyle(
+                                            color: AppTheme.primaryColor,
+                                            fontSize: 12,
+                                          ),
+                                        )
+                                      : null,
+                                  trailing: isSelected
+                                      ? const Icon(
+                                          Icons.check_circle,
+                                          color: AppTheme.primaryColor,
+                                        )
+                                      : const Icon(
+                                          Icons.add_circle_outline,
+                                          color: AppTheme.textMuted,
+                                        ),
+                                  onTap: () {
+                                    setModalState(() {
+                                      if (isSelected) {
+                                        tempSelectedIds.remove(exercise.id);
+                                      } else {
+                                        tempSelectedIds.add(exercise.id);
+                                      }
+                                    });
+                                  },
+                                );
+                              }),
+                            ],
+                          );
+                        }),
+                        const SizedBox(height: AppSpacing.xl),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
