@@ -14,11 +14,7 @@ class WorkoutFlowScreen extends StatefulWidget {
   final Routine? routine;
   final bool isQuickStart;
 
-  const WorkoutFlowScreen({
-    super.key,
-    this.routine,
-    this.isQuickStart = false,
-  });
+  const WorkoutFlowScreen({super.key, this.routine, this.isQuickStart = false});
 
   @override
   State<WorkoutFlowScreen> createState() => _WorkoutFlowScreenState();
@@ -36,7 +32,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   int _currentReps = 10;
   bool _isDropset = false;
   final List<DropsetEntry> _drops = [];
-  
+
   // TextEditingControllers for dropset fields (following Flutter best practices)
   final TextEditingController _mainWeightController = TextEditingController();
   final TextEditingController _mainRepsController = TextEditingController();
@@ -55,7 +51,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _initializeWorkout() {
     final provider = context.read<WorkoutProvider>();
-    
+
     if (widget.routine != null) {
       provider.startWorkout(routine: widget.routine);
       _loadLastSessionData();
@@ -103,9 +99,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final provider = context.watch<WorkoutProvider>();
 
     if (!provider.hasActiveWorkout) {
-      return const Scaffold(
-        body: Center(child: Text('No active workout')),
-      );
+      return const Scaffold(body: Center(child: Text('No active workout')));
     }
 
     // If no exercises yet (quick start), show exercise selector
@@ -130,33 +124,35 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           onPressed: _showCancelDialog,
         ),
       ),
-      body: const ExerciseSelectorScreen(selectionMode: true),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _startWithSelectedExercises,
-        label: const Text('Start Workout'),
-        icon: const Icon(Icons.play_arrow),
+      body: ExerciseSelectorScreen(
+        selectionMode: true,
+        onExercisesSelected: _startWithSelectedExercises,
       ),
     );
   }
 
-  void _startWithSelectedExercises() {
-    // This will be handled by the exercise selector
-    Navigator.pop(context);
+  void _startWithSelectedExercises(List<String> exerciseIds) {
+    if (exerciseIds.isEmpty) return;
+
+    final provider = context.read<WorkoutProvider>();
+    // Restart workout with the selected exercises
+    provider.startWorkout(exerciseIds: exerciseIds);
+    _loadLastSessionData();
   }
 
   Widget _buildWorkoutView() {
     final provider = context.watch<WorkoutProvider>();
     final currentExercise = provider.currentExercise;
     final currentLog = provider.currentExerciseLog;
-    final recommendations = currentExercise != null 
-        ? provider.getRecommendations(currentExercise.id) 
+    final recommendations = currentExercise != null
+        ? provider.getRecommendations(currentExercise.id)
         : <SetRecommendation>[];
 
     return Column(
       children: [
         // Header
         _buildHeader(provider, currentExercise),
-        
+
         // Main content
         Expanded(
           child: SingleChildScrollView(
@@ -166,31 +162,34 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               children: [
                 // Recommendation card
                 if (recommendations.isNotEmpty && currentLog != null)
-                  _buildRecommendationCard(recommendations, currentLog.sets.length),
-                
+                  _buildRecommendationCard(
+                    recommendations,
+                    currentLog.sets.length,
+                  ),
+
                 const SizedBox(height: AppSpacing.lg),
-                
+
                 // Weight and reps input
                 if (!_isDropset) _buildInputSection(),
-                
+
                 if (!_isDropset) const SizedBox(height: AppSpacing.md),
-                
+
                 // Dropset toggle
                 _buildDropsetSection(),
-                
+
                 const SizedBox(height: AppSpacing.lg),
-                
+
                 // Set done button
                 _buildSetDoneButton(),
-                
+
                 const SizedBox(height: AppSpacing.lg),
-                
+
                 // Previous sets
                 if (currentLog != null && currentLog.sets.isNotEmpty)
                   _buildPreviousSets(currentLog.sets),
-                
+
                 const SizedBox(height: AppSpacing.lg),
-                
+
                 // Last session info
                 if (currentExercise != null)
                   _buildLastSessionInfo(currentExercise.id),
@@ -198,7 +197,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
             ),
           ),
         ),
-        
+
         // Bottom actions
         _buildBottomActions(provider),
       ],
@@ -273,12 +272,15 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     );
   }
 
-  Widget _buildRecommendationCard(List<SetRecommendation> recommendations, int currentSetIndex) {
+  Widget _buildRecommendationCard(
+    List<SetRecommendation> recommendations,
+    int currentSetIndex,
+  ) {
     if (currentSetIndex >= recommendations.length) return const SizedBox();
-    
+
     final rec = recommendations[currentSetIndex];
-    final confidenceColor = rec.confidence == 'high' 
-        ? AppTheme.success 
+    final confidenceColor = rec.confidence == 'high'
+        ? AppTheme.success
         : (rec.confidence == 'medium' ? AppTheme.warning : AppTheme.textMuted);
 
     return Container(
@@ -293,9 +295,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: AppTheme.primaryColor.withOpacity(0.3),
-        ),
+        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -317,10 +317,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               children: [
                 const Text(
                   'Suggested',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                 ),
                 Text(
                   '${rec.weight}kg × ${rec.reps} reps',
@@ -393,10 +390,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: AppSpacing.sm),
           Row(
@@ -413,7 +407,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 child: GestureDetector(
                   onTap: () => _showNumberPicker(value, decimals, onChanged),
                   child: Text(
-                    decimals == 0 ? value.toInt().toString() : value.toStringAsFixed(decimals),
+                    decimals == 0
+                        ? value.toInt().toString()
+                        : value.toStringAsFixed(decimals),
                     style: const TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -511,7 +507,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           if (_isDropset) ...[
             const SizedBox(height: AppSpacing.md),
             _buildMainSetEntry(),
-            ..._drops.asMap().entries.map((entry) => _buildDropEntry(entry.key)),
+            ..._drops.asMap().entries.map(
+              (entry) => _buildDropEntry(entry.key),
+            ),
             TextButton.icon(
               onPressed: _addDrop,
               icon: const Icon(Icons.add),
@@ -530,10 +528,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
         children: [
-          const Text(
-            'Start:',
-            style: TextStyle(color: AppTheme.textSecondary),
-          ),
+          const Text('Start:', style: TextStyle(color: AppTheme.textSecondary)),
           const SizedBox(width: 8),
           Expanded(
             child: Row(
@@ -544,7 +539,10 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                     controller: _mainWeightController,
                     decoration: const InputDecoration(
                       hintText: 'kg',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
                     ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [
@@ -559,19 +557,23 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                     },
                   ),
                 ),
-                const Text(' × ', style: TextStyle(color: AppTheme.textSecondary)),
+                const Text(
+                  ' × ',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
                 SizedBox(
                   width: 50,
                   child: TextFormField(
                     controller: _mainRepsController,
                     decoration: const InputDecoration(
                       hintText: 'reps',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
                     ),
                     keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     onChanged: (val) {
                       final parsed = int.tryParse(val);
                       if (parsed != null) {
@@ -594,7 +596,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     // Controllers are created and initialized in _addDrop()
     // Build method only READS from controllers, never creates or modifies them
     // This prevents cursor jumps and duplicate controller creation
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
@@ -613,7 +615,10 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                     controller: _dropWeightControllers[index],
                     decoration: const InputDecoration(
                       hintText: 'kg',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
                     ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [
@@ -631,19 +636,23 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                     },
                   ),
                 ),
-                const Text(' × ', style: TextStyle(color: AppTheme.textSecondary)),
+                const Text(
+                  ' × ',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
                 SizedBox(
                   width: 50,
                   child: TextFormField(
                     controller: _dropRepsControllers[index],
                     decoration: const InputDecoration(
                       hintText: 'reps',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
                     ),
                     keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     onChanged: (val) {
                       final parsed = int.tryParse(val);
                       if (parsed != null) {
@@ -683,15 +692,16 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     setState(() {
       final lastWeight = _drops.isEmpty ? _currentWeight : _drops.last.weight;
       final newWeight = (lastWeight * 0.8).roundToDouble();
-      
-      _drops.add(DropsetEntry(
-        weight: newWeight,
-        reps: _currentReps,
-      ));
-      
+
+      _drops.add(DropsetEntry(weight: newWeight, reps: _currentReps));
+
       // Create controllers for the new drop (Flutter best practice)
-      _dropWeightControllers.add(TextEditingController(text: newWeight.toString()));
-      _dropRepsControllers.add(TextEditingController(text: _currentReps.toString()));
+      _dropWeightControllers.add(
+        TextEditingController(text: newWeight.toString()),
+      );
+      _dropRepsControllers.add(
+        TextEditingController(text: _currentReps.toString()),
+      );
     });
   }
 
@@ -714,10 +724,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
             SizedBox(width: 12),
             Text(
               'SET DONE',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -742,7 +749,10 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           final set = entry.value;
           return Container(
             margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
             decoration: BoxDecoration(
               color: AppTheme.cardColor,
               borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -765,9 +775,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 const SizedBox(width: 12),
                 Text(
                   'Set ${index + 1}',
-                  style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                  ),
+                  style: const TextStyle(color: AppTheme.textSecondary),
                 ),
                 const Spacer(),
                 Text(
@@ -780,7 +788,10 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 if (set.isDropset) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.warning.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(4),
@@ -806,7 +817,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   Widget _buildLastSessionInfo(String exerciseId) {
     final provider = context.read<WorkoutProvider>();
     final lastSession = provider.getLastSessionForExercise(exerciseId);
-    
+
     if (lastSession == null) {
       return Container(
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -867,7 +878,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   Widget _buildBottomActions(WorkoutProvider provider) {
     final isFirst = provider.currentExerciseIndex == 0;
-    final isLast = provider.currentExerciseIndex >= provider.currentExerciseLogs.length - 1;
+    final isLast =
+        provider.currentExerciseIndex >=
+        provider.currentExerciseLogs.length - 1;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -899,10 +912,12 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: isLast ? _finishWorkout : () {
-                provider.nextExercise();
-                _loadLastSessionData();
-              },
+              onPressed: isLast
+                  ? _finishWorkout
+                  : () {
+                      provider.nextExercise();
+                      _loadLastSessionData();
+                    },
               icon: Icon(isLast ? Icons.check : Icons.arrow_forward),
               label: Text(isLast ? 'Finish' : 'Next'),
             ),
@@ -969,10 +984,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               ),
               child: const Text(
                 'SKIP',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -1015,7 +1027,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _completeSet() {
     final provider = context.read<WorkoutProvider>();
-    
+
     final set = WorkoutSet(
       weight: _currentWeight,
       reps: _currentReps,
@@ -1077,7 +1089,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     HapticFeedback.selectionClick();
   }
 
-  void _showNumberPicker(double currentValue, int decimals, Function(double) onChanged) {
+  void _showNumberPicker(
+    double currentValue,
+    int decimals,
+    Function(double) onChanged,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.cardColor,
@@ -1091,15 +1107,17 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           children: [
             TextField(
               autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
               ],
-              decoration: const InputDecoration(
-                labelText: 'Enter value',
-              ),
+              decoration: const InputDecoration(labelText: 'Enter value'),
               controller: TextEditingController(
-                text: decimals == 0 ? currentValue.toInt().toString() : currentValue.toString(),
+                text: decimals == 0
+                    ? currentValue.toInt().toString()
+                    : currentValue.toString(),
               ),
               onSubmitted: (val) {
                 final parsed = double.tryParse(val);
@@ -1173,7 +1191,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           children: [30, 60, 90, 120, 150, 180].map((seconds) {
             return ListTile(
               title: Text('$seconds seconds'),
-              trailing: _restSeconds == seconds 
+              trailing: _restSeconds == seconds
                   ? const Icon(Icons.check, color: AppTheme.primaryColor)
                   : null,
               onTap: () {
