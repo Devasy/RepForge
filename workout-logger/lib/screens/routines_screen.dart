@@ -544,7 +544,12 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                                     onChanged: (val) {
                                       setModalState(() {
                                         if (val == true) {
-                                          tempSelectedIds.add(exercise.id);
+                                          // Prevent duplicates
+                                          if (!tempSelectedIds.contains(
+                                            exercise.id,
+                                          )) {
+                                            tempSelectedIds.add(exercise.id);
+                                          }
                                         } else {
                                           tempSelectedIds.remove(exercise.id);
                                         }
@@ -582,7 +587,12 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                                       if (isSelected) {
                                         tempSelectedIds.remove(exercise.id);
                                       } else {
-                                        tempSelectedIds.add(exercise.id);
+                                        // Prevent duplicates
+                                        if (!tempSelectedIds.contains(
+                                          exercise.id,
+                                        )) {
+                                          tempSelectedIds.add(exercise.id);
+                                        }
                                       }
                                     });
                                   },

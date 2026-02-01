@@ -207,12 +207,14 @@ class ActiveWorkoutManager extends ChangeNotifier {
       rethrow;
     }
 
-    // Only proceed if save was successful
-    onWorkoutSaved?.call(session);
-
-    // Clear active workout state
-    _resetState();
-    notifyListeners();
+    // Notify callback and ensure cleanup happens even if callback throws
+    try {
+      onWorkoutSaved?.call(session);
+    } finally {
+      // Always clear active workout state
+      _resetState();
+      notifyListeners();
+    }
 
     return session;
   }

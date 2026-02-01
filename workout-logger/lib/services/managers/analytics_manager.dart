@@ -54,6 +54,9 @@ class AnalyticsManager extends ChangeNotifier {
     await Future.wait(
       exerciseIds.map((exerciseId) => updateGrowthModel(exerciseId, sessions)),
     );
+
+    // Notify listeners after bulk update completes
+    notifyListeners();
   }
 
   /// Update growth model for a specific exercise
@@ -77,13 +80,16 @@ class AnalyticsManager extends ChangeNotifier {
   }
 
   /// Update growth models for multiple exercises
+  ///
+  /// Runs all model updates concurrently for better performance.
   Future<void> updateGrowthModelsForExercises(
     Set<String> exerciseIds,
     List<WorkoutSession> sessions,
   ) async {
-    for (var exerciseId in exerciseIds) {
-      await updateGrowthModel(exerciseId, sessions);
-    }
+    // Run updates in parallel like trainAllGrowthModels
+    await Future.wait(
+      exerciseIds.map((exerciseId) => updateGrowthModel(exerciseId, sessions)),
+    );
     notifyListeners();
   }
 
@@ -144,12 +150,16 @@ class AnalyticsManager extends ChangeNotifier {
   }
 
   /// Get weekly volume by muscle group
+  ///
+  /// [now] parameter allows test injection of a fixed timestamp for deterministic testing.
   Map<String, double> getWeeklyVolumeByMuscle(
     List<WorkoutSession> sessions,
-    List<Exercise> exercises,
-  ) {
+    List<Exercise> exercises, {
+    DateTime? now,
+  }) {
     final volumeByMuscle = <String, double>{};
-    final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+    final currentTime = now ?? DateTime.now();
+    final weekAgo = currentTime.subtract(const Duration(days: 7));
 
     for (var session in sessions) {
       if (session.date.isBefore(weekAgo)) continue;
