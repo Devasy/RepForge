@@ -38,25 +38,28 @@ void main() async {
 }
 
 class WorkoutLoggerApp extends StatelessWidget {
+  // Singleton instances created once at app startup
+  // This ensures the same instances are used throughout the app lifecycle
+  static final IStorageService _storageService = StorageService();
+  static final IMLService _mlService = MLService();
+
   const WorkoutLoggerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Composition Root: Create concrete implementations and inject them
+    // Composition Root: Provide the singleton implementations
     // This is the only place where we reference concrete implementations.
     // All other code depends on abstractions (interfaces).
-    final IStorageService storageService = StorageService();
-    final IMLService mlService = MLService();
-
     return MultiProvider(
       providers: [
         // Provide the storage service interface for direct access if needed
-        Provider<IStorageService>.value(value: storageService),
+        Provider<IStorageService>.value(value: _storageService),
         // Provide the ML service interface for direct access if needed
-        Provider<IMLService>.value(value: mlService),
+        Provider<IMLService>.value(value: _mlService),
         // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
-          create: (_) => WorkoutProvider(storageService, mlService: mlService),
+          create: (_) =>
+              WorkoutProvider(_storageService, mlService: _mlService),
         ),
       ],
       child: MaterialApp(

@@ -33,24 +33,26 @@ class HistoryManager extends ChangeNotifier {
   /// Load all sessions from storage
   Future<void> loadSessions() async {
     _sessions = await _storage.getAllWorkoutSessions();
+    // Sort newest-first to ensure consistent ordering for queries
+    _sessions.sort((a, b) => b.date.compareTo(a.date));
     notifyListeners();
   }
 
   /// Add a new session to history
-  void addSession(WorkoutSession session) {
+  ///
+  /// Persists the session to storage and updates in-memory state.
+  Future<void> addSession(WorkoutSession session) async {
     _sessions.insert(0, session);
     final exerciseIds = session.exercises.map((e) => e.exerciseId).toSet();
     onSessionsChanged?.call(exerciseIds);
+    await _storage.saveWorkoutSession(session);
     notifyListeners();
   }
 
   /// Get a session by ID
   WorkoutSession? getSession(String sessionId) {
-    try {
-      return _sessions.firstWhere((s) => s.id == sessionId);
-    } catch (_) {
-      return null;
-    }
+    final index = _sessions.indexWhere((s) => s.id == sessionId);
+    return index != -1 ? _sessions[index] : null;
   }
 
   /// Get sessions for a specific exercise
@@ -62,12 +64,12 @@ class HistoryManager extends ChangeNotifier {
         .toList();
   }
 
-  /// Get sessions within a date range
+  /// Get sessions within a date range (inclusive of start and end)
   List<WorkoutSession> getSessionsInDateRange(DateTime start, DateTime end) {
     return _sessions
         .where(
           (session) =>
-              session.date.isAfter(start) && session.date.isBefore(end),
+              !session.date.isBefore(start) && !session.date.isAfter(end),
         )
         .toList();
   }
@@ -100,11 +102,15 @@ class HistoryManager extends ChangeNotifier {
   }
 
   /// Update an existing workout session
+  ///
+  /// Throws [StateError] if session is not found.
   Future<void> updateSession(WorkoutSession updatedSession) async {
-    final previousSession = _sessions.firstWhere(
-      (s) => s.id == updatedSession.id,
-      orElse: () => updatedSession,
-    );
+    final index = _sessions.indexWhere((s) => s.id == updatedSession.id);
+    if (index == -1) {
+      throw StateError('Session ${updatedSession.id} not found');
+    }
+
+    final previousSession = _sessions[index];
 
     // Gather affected exercise IDs from both old and new versions
     final previousExerciseIds = previousSession.exercises
@@ -119,10 +125,7 @@ class HistoryManager extends ChangeNotifier {
 
     await _storage.saveWorkoutSession(updatedSession);
 
-    final index = _sessions.indexWhere((s) => s.id == updatedSession.id);
-    if (index != -1) {
-      _sessions = List.from(_sessions)..[index] = updatedSession;
-    }
+    _sessions = List.from(_sessions)..[index] = updatedSession;
 
     // Keep sorted by date
     _sessions.sort((a, b) => b.date.compareTo(a.date));

@@ -4,6 +4,7 @@
 // Following Dependency Inversion Principle: tests can inject this mock
 // instead of the real StorageService.
 
+import 'package:repforge/data/exercise_database.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/interfaces/storage_service_interface.dart';
 
@@ -49,7 +50,11 @@ class MockStorageService implements IStorageService {
   Future<void> init() async {}
 
   @override
-  Future<List<Exercise>> getAllExercises() async => List.from(_customExercises);
+  Future<List<Exercise>> getAllExercises() async {
+    // Merge built-in exercises with custom exercises to mirror production behavior
+    final builtInExercises = ExerciseDatabase.getAll();
+    return [...builtInExercises, ..._customExercises];
+  }
 
   @override
   Future<List<Exercise>> getCustomExercises() async =>

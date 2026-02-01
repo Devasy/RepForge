@@ -86,13 +86,19 @@ class AnalyticsManager extends ChangeNotifier {
   }
 
   /// Get set recommendations for an exercise
+  ///
+  /// Sessions are sorted newest-first to find the most recent exercise log.
   List<SetRecommendation> getRecommendations(
     String exerciseId,
     List<WorkoutSession> sessions,
   ) {
+    // Sort sessions newest-first to find the most recent exercise log
+    final sortedSessions = List<WorkoutSession>.from(sessions)
+      ..sort((a, b) => b.date.compareTo(a.date));
+
     // Find last session with this exercise
     ExerciseLog? lastLog;
-    for (var session in sessions) {
+    for (var session in sortedSessions) {
       for (var log in session.exercises) {
         if (log.exerciseId == exerciseId) {
           lastLog = log;
@@ -163,11 +169,8 @@ class AnalyticsManager extends ChangeNotifier {
   }
 
   Exercise? _findExercise(String id, List<Exercise> exercises) {
-    try {
-      return exercises.firstWhere((e) => e.id == id);
-    } catch (_) {
-      return null;
-    }
+    final index = exercises.indexWhere((e) => e.id == id);
+    return index != -1 ? exercises[index] : null;
   }
 
   /// Get quick stats for dashboard

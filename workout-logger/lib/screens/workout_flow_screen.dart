@@ -1100,40 +1100,10 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-              ],
-              decoration: const InputDecoration(labelText: 'Enter value'),
-              controller: TextEditingController(
-                text: decimals == 0
-                    ? currentValue.toInt().toString()
-                    : currentValue.toString(),
-              ),
-              onSubmitted: (val) {
-                final parsed = double.tryParse(val);
-                if (parsed != null) {
-                  onChanged(parsed);
-                }
-                Navigator.pop(context);
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Done'),
-            ),
-          ],
-        ),
+      builder: (context) => _NumberPickerContent(
+        initialValue: currentValue,
+        decimals: decimals,
+        onChanged: onChanged,
       ),
     );
   }
@@ -1259,6 +1229,75 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
             },
             child: const Text('Save & Finish'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A StatefulWidget for the number picker content that properly manages
+/// its TextEditingController lifecycle to avoid memory leaks.
+class _NumberPickerContent extends StatefulWidget {
+  final double initialValue;
+  final int decimals;
+  final Function(double) onChanged;
+
+  const _NumberPickerContent({
+    required this.initialValue,
+    required this.decimals,
+    required this.onChanged,
+  });
+
+  @override
+  State<_NumberPickerContent> createState() => _NumberPickerContentState();
+}
+
+class _NumberPickerContentState extends State<_NumberPickerContent> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.decimals == 0
+          ? widget.initialValue.toInt().toString()
+          : widget.initialValue.toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final parsed = double.tryParse(_controller.text);
+    if (parsed != null) {
+      widget.onChanged(parsed);
+    }
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+            ],
+            decoration: const InputDecoration(labelText: 'Enter value'),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          ElevatedButton(onPressed: _submit, child: const Text('Done')),
         ],
       ),
     );

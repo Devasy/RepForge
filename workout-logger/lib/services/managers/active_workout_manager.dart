@@ -160,6 +160,9 @@ class ActiveWorkoutManager extends ChangeNotifier {
   }
 
   /// Finish workout and save
+  ///
+  /// Note: If saving fails, the active workout state remains intact and the
+  /// exception is rethrown. Callers must handle errors appropriately.
   Future<WorkoutSession> finishWorkout({String? notes}) async {
     if (!hasActiveWorkout) {
       throw StateError('No active workout to finish.');
@@ -183,9 +186,15 @@ class ActiveWorkoutManager extends ChangeNotifier {
       notes: notes,
     );
 
-    await _storage.saveWorkoutSession(session);
+    try {
+      await _storage.saveWorkoutSession(session);
+    } catch (e) {
+      // Log the error and rethrow - active workout state remains intact
+      debugPrint('Failed to save workout session: $e');
+      rethrow;
+    }
 
-    // Notify callback if provided
+    // Only proceed if save was successful
     onWorkoutSaved?.call(session);
 
     // Clear active workout state

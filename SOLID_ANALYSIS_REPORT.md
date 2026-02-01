@@ -1,6 +1,6 @@
 # SOLID Principles Analysis Report
 
-This report provides a detailed analysis of the Flutter codebase ("Workout Logger") against the SOLID principles. 
+This report provides a detailed analysis of the Flutter codebase ("Workout Logger") against the SOLID principles.
 
 ## ✅ SOLID Refactoring Complete
 

@@ -64,12 +64,22 @@ class TargetManager extends ChangeNotifier {
   GrowthModel? getGrowthModel(String exerciseId) => _growthModels[exerciseId];
 
   /// Create a new target
+  ///
+  /// Throws [ArgumentError] if [type] is not a supported target type.
   Future<Target> createTarget({
     required String exerciseId,
     required String type,
     required double targetValue,
     required List<WorkoutSession> sessions,
   }) async {
+    // Validate target type upfront before any calculations
+    if (!TargetCalculatorFactory.supportedTypes.contains(type.toLowerCase())) {
+      throw ArgumentError(
+        'Unsupported target type: "$type". '
+        'Allowed values: ${TargetCalculatorFactory.supportedTypes.join(", ")}',
+      );
+    }
+
     // Calculate current value using strategy pattern
     final currentValue = TargetCalculatorFactory.calculateCurrentValue(
       exerciseId,

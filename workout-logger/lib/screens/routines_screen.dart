@@ -269,7 +269,6 @@ class CreateRoutineScreen extends StatefulWidget {
 class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
   final _nameController = TextEditingController();
   final List<String> _selectedExerciseIds = [];
-  String _pickerSearchQuery = '';
 
   @override
   void initState() {
@@ -397,8 +396,8 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
   }
 
   void _showExercisePicker(List<Exercise> allExercises) {
-    // Reset search when opening picker
-    _pickerSearchQuery = '';
+    // Local state for picker search - scoped to this modal only
+    String pickerSearchQuery = '';
     final Set<String> tempSelectedIds = {};
 
     showModalBottomSheet(
@@ -413,9 +412,9 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
           // Filter exercises by search and exclude already selected
           var filteredExercises = allExercises.where((ex) {
             if (_selectedExerciseIds.contains(ex.id)) return false;
-            if (_pickerSearchQuery.isEmpty) return true;
+            if (pickerSearchQuery.isEmpty) return true;
             return ex.name.toLowerCase().contains(
-              _pickerSearchQuery.toLowerCase(),
+              pickerSearchQuery.toLowerCase(),
             );
           }).toList();
 
@@ -479,12 +478,12 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                           decoration: InputDecoration(
                             hintText: 'Search exercises...',
                             prefixIcon: const Icon(Icons.search),
-                            suffixIcon: _pickerSearchQuery.isNotEmpty
+                            suffixIcon: pickerSearchQuery.isNotEmpty
                                 ? IconButton(
                                     icon: const Icon(Icons.clear),
                                     onPressed: () {
                                       setModalState(
-                                        () => _pickerSearchQuery = '',
+                                        () => pickerSearchQuery = '',
                                       );
                                     },
                                   )
@@ -492,7 +491,7 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                             isDense: true,
                           ),
                           onChanged: (val) {
-                            setModalState(() => _pickerSearchQuery = val);
+                            setModalState(() => pickerSearchQuery = val);
                           },
                         ),
                         if (tempSelectedIds.isNotEmpty) ...[

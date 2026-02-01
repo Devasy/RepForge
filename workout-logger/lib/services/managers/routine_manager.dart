@@ -36,11 +36,8 @@ class RoutineManager extends ChangeNotifier {
 
   /// Get a routine by ID
   Routine? getRoutine(String id) {
-    try {
-      return _routines.firstWhere((r) => r.id == id);
-    } catch (_) {
-      return null;
-    }
+    final index = _routines.indexWhere((r) => r.id == id);
+    return index != -1 ? _routines[index] : null;
   }
 
   /// Create a new routine
@@ -57,11 +54,15 @@ class RoutineManager extends ChangeNotifier {
   }
 
   /// Update an existing routine
+  ///
+  /// If the routine is not found in memory, it will be added.
   Future<void> updateRoutine(Routine routine) async {
     await _storage.saveRoutine(routine);
     final index = _routines.indexWhere((r) => r.id == routine.id);
     if (index != -1) {
       _routines[index] = routine;
+    } else {
+      _routines.add(routine);
     }
     notifyListeners();
   }

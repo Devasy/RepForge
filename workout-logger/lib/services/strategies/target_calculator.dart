@@ -93,6 +93,17 @@ class TargetCalculatorFactory {
     'volume': VolumeTargetCalculator(),
   };
 
+  /// Reset the strategies registry to defaults.
+  ///
+  /// This is primarily used in tests to restore isolation after
+  /// registering custom calculators.
+  static void reset() {
+    _strategies.clear();
+    _strategies['reps'] = RepsTargetCalculator();
+    _strategies['weight'] = WeightTargetCalculator();
+    _strategies['volume'] = VolumeTargetCalculator();
+  }
+
   /// Get a calculator for the specified target type
   ///
   /// Returns null if the target type is not supported.

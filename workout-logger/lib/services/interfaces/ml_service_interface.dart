@@ -14,6 +14,18 @@ class DataPoint {
   final double y; // Volume or performance metric
 
   DataPoint({required this.x, required this.y});
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is DataPoint &&
+        other.runtimeType == runtimeType &&
+        other.x == x &&
+        other.y == y;
+  }
+
+  @override
+  int get hashCode => Object.hash(x, y);
 }
 
 /// Abstract interface for ML operations

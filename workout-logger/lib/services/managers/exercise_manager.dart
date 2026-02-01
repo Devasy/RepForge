@@ -43,13 +43,12 @@ class ExerciseManager extends ChangeNotifier {
   }
 
   /// Get an exercise by ID
+  ///
+  /// Returns null if not found. Caller should ensure loadExercises() has been
+  /// called first to populate the in-memory exercise list.
   Exercise? getExercise(String id) {
-    try {
-      return _allExercises.firstWhere((e) => e.id == id);
-    } catch (_) {
-      // Fallback to built-in database
-      return ExerciseDatabase.getById(id);
-    }
+    final index = _allExercises.indexWhere((e) => e.id == id);
+    return index != -1 ? _allExercises[index] : null;
   }
 
   /// Get exercise name by ID
@@ -152,8 +151,13 @@ class ExerciseManager extends ChangeNotifier {
   }
 
   /// Get exercises by category
+  ///
+  /// Performs case-insensitive comparison to match both built-in and custom exercises.
   List<Exercise> getExercisesByCategory(String category) {
-    return _allExercises.where((e) => e.category == category).toList();
+    final normalizedCategory = category.toLowerCase();
+    return _allExercises
+        .where((e) => e.category.toLowerCase() == normalizedCategory)
+        .toList();
   }
 
   /// Search exercises by name

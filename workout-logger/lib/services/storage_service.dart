@@ -104,7 +104,7 @@ class StorageService implements IStorageService {
     return allSessions
         .where(
           (session) =>
-              session.date.isAfter(start) && session.date.isBefore(end),
+              !session.date.isBefore(start) && !session.date.isAfter(end),
         )
         .toList();
   }
