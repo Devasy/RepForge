@@ -1,0 +1,187 @@
+- displayName: Launch App and View Home Screen
+  id: launch_app
+  steps:
+    - goal: Open the app and verify the home screen displays
+      hint: Tap the app icon to launch
+      successCriteria: Screen shows "Workout Logger" title with dashboard cards showing workout statistics
+
+- displayName: View Exercise Library
+  id: view_exercise_library
+  prerequisiteTestCaseId: launch_app
+  steps:
+    - goal: Navigate to the exercise library screen
+      hint: Tap on the "Exercises" tab or button in the navigation
+      successCriteria: Screen displays a list of exercises grouped by muscle groups
+    - goal: Search for a specific exercise
+      hint: Tap the search field and type "bench press"
+      successCriteria: Filtered list shows bench press exercise
+
+- displayName: Start a Quick Workout
+  id: start_quick_workout
+  prerequisiteTestCaseId: launch_app
+  steps:
+    - goal: Navigate to start workout screen
+      hint: Tap "Start Workout" or "Quick Start" button on home screen
+      successCriteria: Screen shows "Select Exercises" or exercise selection interface
+    - goal: Select exercises for the workout
+      hint: Select at least 2 exercises from the list (e.g., Bench Press, Squats)
+      successCriteria: Selected exercises appear in the workout list
+    - goal: Start the workout session
+      hint: Tap "Start Workout" or "Begin" button
+      successCriteria: Workout flow screen displays with first exercise and set entry interface
+
+- displayName: Log Exercise Sets
+  id: log_exercise_sets
+  prerequisiteTestCaseId: start_quick_workout
+  steps:
+    - goal: Enter weight and reps for a set
+      hint: Tap weight field, enter "100", tap reps field, enter "10"
+      successCriteria: Weight shows "100" and reps shows "10"
+    - goal: Add the set to the exercise log
+      hint: Tap "Add Set" or checkmark button
+      successCriteria: Set appears in the list showing "100 kg × 10 reps"
+    - goal: Add another set
+      hint: Enter weight "105" and reps "8", then tap "Add Set"
+      successCriteria: Second set appears showing "105 kg × 8 reps"
+
+- displayName: Complete Workout
+  id: complete_workout
+  prerequisiteTestCaseId: log_exercise_sets
+  steps:
+    - goal: Navigate to the next exercise or finish workout
+      hint: Tap "Next Exercise" or "Finish Workout" button
+      successCriteria: Confirmation dialog appears asking to save workout
+    - goal: Save the completed workout
+      hint: Tap "Save & Finish" or "Save" button in the dialog
+      successCriteria: Screen returns to home showing success message and updated workout count
+
+- displayName: View Workout History
+  id: view_workout_history
+  prerequisiteTestCaseId: complete_workout
+  steps:
+    - goal: Navigate to workout history screen
+      hint: Tap "History" tab or button in navigation
+      successCriteria: Screen displays list of completed workouts with dates
+    - goal: View details of a specific workout
+      hint: Tap on the most recent workout in the list
+      successCriteria: Workout details screen shows exercises, sets, weights, and reps for that session
+
+- displayName: Create a New Routine
+  id: create_new_routine
+  prerequisiteTestCaseId: launch_app
+  steps:
+    - goal: Navigate to routines screen
+      hint: Tap "Routines" tab or button in navigation
+      successCriteria: Screen shows list of routines with "Create Routine" or "+" button
+    - goal: Start creating a new routine
+      hint: Tap "Create Routine" or "+" button
+      successCriteria: Routine creation screen appears with name input field
+    - goal: Enter routine name
+      hint: Tap name field and type "Push Day"
+      successCriteria: Name field shows "Push Day"
+    - goal: Add exercises to the routine
+      hint: Tap "Add Exercises" button and select 3-4 exercises (e.g., Bench Press, Shoulder Press, Tricep Dips)
+      successCriteria: Selected exercises appear in the routine exercise list
+    - goal: Save the routine
+      hint: Tap "Save" button
+      successCriteria: Screen returns to routines list showing the new "Push Day" routine
+
+- displayName: Start Workout from Routine
+  id: start_workout_from_routine
+  prerequisiteTestCaseId: create_new_routine
+  steps:
+    - goal: Select a routine to start workout
+      hint: On routines screen, tap on "Push Day" routine
+      successCriteria: Routine details screen shows exercises in the routine
+    - goal: Start workout from this routine
+      hint: Tap "Start Workout" button
+      successCriteria: Workout flow screen displays with first exercise from the routine
+
+- displayName: Add Custom Exercise
+  id: add_custom_exercise
+  prerequisiteTestCaseId: view_exercise_library
+  steps:
+    - goal: Navigate to add custom exercise screen
+      hint: On exercise library screen, tap "Add Custom Exercise" or "+" button
+      successCriteria: Custom exercise creation form appears
+    - goal: Enter exercise details
+      hint: Enter name "Cable Flyes", select category "Isolation", select primary muscle "Chest"
+      successCriteria: All fields are filled with entered values
+    - goal: Save the custom exercise
+      hint: Tap "Save" or "Create" button
+      successCriteria: Screen returns to exercise library with new exercise visible
+
+- displayName: View Analytics Dashboard
+  id: view_analytics
+  prerequisiteTestCaseId: complete_workout
+  steps:
+    - goal: Navigate to analytics screen
+      hint: Tap "Analytics" or "Stats" tab in navigation
+      successCriteria: Screen displays workout statistics, charts, and progress metrics
+    - goal: View exercise-specific analytics
+      hint: Tap on an exercise from the list or chart
+      successCriteria: Detailed analytics for that exercise showing volume progression or performance trends
+
+- displayName: Set a Fitness Target
+  id: set_fitness_target
+  prerequisiteTestCaseId: launch_app
+  steps:
+    - goal: Navigate to targets or goals section
+      hint: Look for "Targets", "Goals", or similar option in navigation or home screen
+      successCriteria: Targets screen displays with list of current targets and "Add Target" option
+    - goal: Create a new target
+      hint: Tap "Add Target" or "+" button
+      successCriteria: Target creation form appears
+    - goal: Set target details
+      hint: Select exercise "Bench Press", select type "Weight", enter target value "120"
+      successCriteria: Target form shows all entered values
+    - goal: Save the target
+      hint: Tap "Save" or "Create" button
+      successCriteria: Screen returns to targets list showing new target with progress indicator
+
+- displayName: Edit Workout History
+  id: edit_workout_history
+  prerequisiteTestCaseId: view_workout_history
+  steps:
+    - goal: Open a workout for editing
+      hint: On workout details screen, tap "Edit" button or icon
+      successCriteria: Workout edit screen appears with editable sets and exercises
+    - goal: Modify a set's weight
+      hint: Tap on a set's weight value, change to a different value, and save
+      successCriteria: Updated weight value is displayed in the set list
+    - goal: Save changes
+      hint: Tap "Save" button
+      successCriteria: Screen returns to workout details showing updated values
+
+- displayName: Delete Custom Exercise
+  id: delete_custom_exercise
+  prerequisiteTestCaseId: add_custom_exercise
+  steps:
+    - goal: Find the custom exercise
+      hint: On exercise library, locate the "Cable Flyes" custom exercise
+      successCriteria: Custom exercise is visible with "Custom" badge or indicator
+    - goal: Delete the custom exercise
+      hint: Long press or tap menu on the exercise, select "Delete"
+      successCriteria: Confirmation dialog appears
+    - goal: Confirm deletion
+      hint: Tap "Delete" or "Confirm" in the dialog
+      successCriteria: Exercise is removed from the library list
+
+- displayName: Cancel Active Workout
+  id: cancel_active_workout
+  prerequisiteTestCaseId: start_quick_workout
+  steps:
+    - goal: Initiate workout cancellation
+      hint: During active workout, tap back button or menu and select "Cancel Workout"
+      successCriteria: Confirmation dialog appears warning that progress will not be saved
+    - goal: Confirm cancellation
+      hint: Tap "Cancel Workout" in the confirmation dialog
+      successCriteria: Returns to home screen without saving, workout count unchanged
+
+- displayName: App Navigation Flow
+  id: app_navigation_flow
+  prerequisiteTestCaseId: launch_app
+  steps:
+    - goal: Navigate to each main section
+      hint: Tap through all navigation tabs - Home, Exercises, Routines, History, Analytics
+      successCriteria: Each screen loads successfully and displays relevant content without errors
