@@ -16,22 +16,34 @@ abstract class TargetCalculatorStrategy {
   double calculate(String exerciseId, List<WorkoutSession> sessions);
 }
 
+/// Helper function to get all exercise logs for a specific exercise across sessions.
+///
+/// Returns an iterable of ExerciseLog entries that have non-empty sets.
+Iterable<ExerciseLog> _getExerciseLogsForExercise(
+  String exerciseId,
+  List<WorkoutSession> sessions,
+) sync* {
+  for (var session in sessions) {
+    for (var log in session.exercises) {
+      if (log.exerciseId == exerciseId && log.sets.isNotEmpty) {
+        yield log;
+      }
+    }
+  }
+}
+
 /// Calculator for maximum reps achieved
 class RepsTargetCalculator implements TargetCalculatorStrategy {
   @override
   double calculate(String exerciseId, List<WorkoutSession> sessions) {
     double bestValue = 0;
 
-    for (var session in sessions) {
-      for (var log in session.exercises) {
-        if (log.exerciseId == exerciseId && log.sets.isNotEmpty) {
-          final maxReps = log.sets
-              .map((s) => s.reps)
-              .reduce((a, b) => a > b ? a : b);
-          if (maxReps > bestValue) {
-            bestValue = maxReps.toDouble();
-          }
-        }
+    for (var log in _getExerciseLogsForExercise(exerciseId, sessions)) {
+      final maxReps = log.sets
+          .map((s) => s.reps)
+          .reduce((a, b) => a > b ? a : b);
+      if (maxReps > bestValue) {
+        bestValue = maxReps.toDouble();
       }
     }
 
@@ -45,16 +57,12 @@ class WeightTargetCalculator implements TargetCalculatorStrategy {
   double calculate(String exerciseId, List<WorkoutSession> sessions) {
     double bestValue = 0;
 
-    for (var session in sessions) {
-      for (var log in session.exercises) {
-        if (log.exerciseId == exerciseId && log.sets.isNotEmpty) {
-          final maxWeight = log.sets
-              .map((s) => s.weight)
-              .reduce((a, b) => a > b ? a : b);
-          if (maxWeight > bestValue) {
-            bestValue = maxWeight;
-          }
-        }
+    for (var log in _getExerciseLogsForExercise(exerciseId, sessions)) {
+      final maxWeight = log.sets
+          .map((s) => s.weight)
+          .reduce((a, b) => a > b ? a : b);
+      if (maxWeight > bestValue) {
+        bestValue = maxWeight;
       }
     }
 
@@ -68,13 +76,9 @@ class VolumeTargetCalculator implements TargetCalculatorStrategy {
   double calculate(String exerciseId, List<WorkoutSession> sessions) {
     double bestValue = 0;
 
-    for (var session in sessions) {
-      for (var log in session.exercises) {
-        if (log.exerciseId == exerciseId && log.sets.isNotEmpty) {
-          if (log.totalVolume > bestValue) {
-            bestValue = log.totalVolume;
-          }
-        }
+    for (var log in _getExerciseLogsForExercise(exerciseId, sessions)) {
+      if (log.totalVolume > bestValue) {
+        bestValue = log.totalVolume;
       }
     }
 

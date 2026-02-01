@@ -398,7 +398,8 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
   void _showExercisePicker(List<Exercise> allExercises) {
     // Local state for picker search - scoped to this modal only
     String pickerSearchQuery = '';
-    final Set<String> tempSelectedIds = {};
+    // Use List instead of Set to preserve selection order
+    final List<String> tempSelectedIds = [];
 
     showModalBottomSheet(
       context: context,

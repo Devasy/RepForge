@@ -58,10 +58,24 @@ class ActiveWorkoutManager extends ChangeNotifier {
   String? get currentExerciseId => currentExerciseLog?.exerciseId;
 
   /// Start a new workout with a routine or list of exercises
+  ///
+  /// Throws [StateError] if a workout is already in progress or if no
+  /// exercises are provided.
   void startWorkout({Routine? routine, List<String>? exerciseIds}) {
     if (hasActiveWorkout) {
       throw StateError(
         'A workout is already in progress. Cancel or finish it first.',
+      );
+    }
+
+    // Resolve exercise IDs from routine or provided list
+    final ids = routine?.exerciseIds ?? exerciseIds ?? [];
+
+    // Validate that at least one exercise is provided
+    if (ids.isEmpty) {
+      throw StateError(
+        'Cannot start a workout with zero exercises. '
+        'Provide a routine with exercises or a non-empty exerciseIds list.',
       );
     }
 
@@ -71,7 +85,6 @@ class ActiveWorkoutManager extends ChangeNotifier {
     _currentExerciseLogs = [];
 
     // Initialize exercise logs based on routine or provided exercise IDs
-    final ids = routine?.exerciseIds ?? exerciseIds ?? [];
     for (var id in ids) {
       _currentExerciseLogs.add(ExerciseLog(exerciseId: id, sets: []));
     }

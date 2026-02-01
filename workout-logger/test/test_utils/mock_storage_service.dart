@@ -117,7 +117,7 @@ class MockStorageService implements IStorageService {
     return _sessions
         .where(
           (session) =>
-              session.date.isAfter(start) && session.date.isBefore(end),
+              !session.date.isBefore(start) && !session.date.isAfter(end),
         )
         .toList();
   }
@@ -207,11 +207,14 @@ class MockStorageService implements IStorageService {
 
   @override
   Future<Exercise?> getExercise(String id) async {
-    try {
-      return _customExercises.firstWhere((e) => e.id == id);
-    } catch (_) {
-      return null;
+    // Check built-in exercises first, matching production behavior
+    final builtIn = ExerciseDatabase.getById(id);
+    if (builtIn != null) {
+      return builtIn;
     }
+    // Fall back to custom exercises
+    final index = _customExercises.indexWhere((e) => e.id == id);
+    return index != -1 ? _customExercises[index] : null;
   }
 
   @override

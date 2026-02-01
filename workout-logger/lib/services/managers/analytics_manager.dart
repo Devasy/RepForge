@@ -38,6 +38,8 @@ class AnalyticsManager extends ChangeNotifier {
   GrowthModel? getGrowthModel(String exerciseId) => _growthModels[exerciseId];
 
   /// Train all growth models from session history
+  ///
+  /// Runs all model updates concurrently for better performance.
   Future<void> trainAllGrowthModels(List<WorkoutSession> sessions) async {
     final exerciseIds = <String>{};
 
@@ -48,10 +50,10 @@ class AnalyticsManager extends ChangeNotifier {
       }
     }
 
-    // Train model for each exercise
-    for (var exerciseId in exerciseIds) {
-      await updateGrowthModel(exerciseId, sessions);
-    }
+    // Train models concurrently for better performance
+    await Future.wait(
+      exerciseIds.map((exerciseId) => updateGrowthModel(exerciseId, sessions)),
+    );
   }
 
   /// Update growth model for a specific exercise
