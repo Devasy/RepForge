@@ -57,6 +57,8 @@ class WorkoutLoggerApp extends StatelessWidget {
         Provider<IStorageService>.value(value: _storageService),
         // Provide the ML service interface for direct access if needed
         Provider<IMLService>.value(value: _mlService),
+        // Provide the ApiService singleton via DI
+        Provider<ApiService>.value(value: ApiService()),
         // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
           create: (_) =>
@@ -96,7 +98,7 @@ class _AppInitializerState extends State<AppInitializer> {
       await provider.init();
 
       // Fire-and-forget analytics in background
-      final api = ApiService();
+      final api = context.read<ApiService>();
       api.sendHeartbeat();
       api.trackEvent('app_open');
       provider

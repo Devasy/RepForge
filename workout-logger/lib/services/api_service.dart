@@ -1,9 +1,12 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
+
+// Conditional import: uses dart:io on native, stub on web.
+import 'platform_stub.dart'
+    if (dart.library.io) 'platform_io.dart';
 
 /// Singleton service for communicating with the RepForge analytics backend.
 class ApiService {
@@ -13,20 +16,30 @@ class ApiService {
   );
 
   static final ApiService _instance = ApiService._internal();
-  factory ApiService({http.Client? client}) {
-    if (client != null) _instance._client = client;
-    return _instance;
-  }
+
+  factory ApiService() => _instance;
   ApiService._internal();
 
   http.Client _client = http.Client();
+
+  /// Replace the HTTP client for testing only.
+  @visibleForTesting
+  static void setTestClient(http.Client client) {
+    _instance._client = client;
+  }
 
   String? _cachedAppId;
 
   /// Returns a stable installation ID (UUID v4) persisted in Hive.
   Future<String> get userAppId async {
     if (_cachedAppId != null) return _cachedAppId!;
-    final box = Hive.box<String>('settings');
+    // Defensively open the box if it's not already open
+    final Box<String> box;
+    if (Hive.isBoxOpen('settings')) {
+      box = Hive.box<String>('settings');
+    } else {
+      box = await Hive.openBox<String>('settings');
+    }
     var id = box.get('user_app_id');
     if (id == null) {
       id = const Uuid().v4();
@@ -38,9 +51,7 @@ class ApiService {
 
   String get _platform {
     if (kIsWeb) return 'web';
-    if (Platform.isAndroid) return 'android';
-    if (Platform.isIOS) return 'ios';
-    return 'unknown';
+    return getPlatformName();
   }
 
   // ───────── ingest helpers ─────────

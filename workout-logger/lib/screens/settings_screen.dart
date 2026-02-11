@@ -23,8 +23,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final jsonString = await provider.exportAllData();
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
 
-      final api = ApiService();
-      api.trackEvent('backup_triggered');
+      final api = context.read<ApiService>();
+      await api.trackEvent('backup_triggered').catchError((_) => null);
       final success = await api.backupData(data);
 
       if (!mounted) return;
@@ -44,10 +44,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Backup error: $e\n$stackTrace');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+        const SnackBar(
+          content: Text('Something went wrong. Please try again.'),
+          backgroundColor: AppTheme.error,
+        ),
       );
     } finally {
       if (mounted) {

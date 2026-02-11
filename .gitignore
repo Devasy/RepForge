@@ -32,8 +32,6 @@ android/gradlew.bat
 android/local.properties
 android/.gradle
 android/captures/
-android/gradlew.bat
-android/local.properties
 .gradle
 /android/.gradle/
 
@@ -73,7 +71,7 @@ coverage.xml
 *.cover
 .mypy_cache
 .pytest_cache
-.hypothesise
+.hypothesis/
 
 # Environment Variables
 .env

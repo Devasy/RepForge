@@ -1,21 +1,41 @@
+import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 
 from .models import UsageStats, BackupData, AppEvent, HeartbeatPayload
 from .database import db
 
-app = FastAPI(title="RepForge Analytics API", version="1.1.0")
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="RepForge Analytics API", version="1.2.0")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ────────────────────── auth ──────────────────────
+
+ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "")
+
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def require_admin(api_key: Optional[str] = Security(_api_key_header)):
+    """Enforce admin API key on analytics read endpoints."""
+    if not ADMIN_API_KEY:
+        raise HTTPException(status_code=503, detail="Admin key not configured")
+    if api_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
 # ────────────────────── helpers ──────────────────────
@@ -36,14 +56,18 @@ async def report_usage(stats: UsageStats):
         # upsert: latest report per user_app_id replaces older one
         await db.reports.update_one(
             {"user_app_id": stats.user_app_id},
-            {"$set": doc},
+            {"$set": dict(doc)},   # copy to avoid _id mutation leaking
             upsert=True,
         )
         # also keep a time-series log for trend analysis
+        doc.pop("_id", None)
         await db.report_log.insert_one(doc)
         return {"status": "success", "message": "Usage stats reported"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("report_usage failed")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @app.post("/backup")
@@ -59,8 +83,11 @@ async def backup_data(data: BackupData):
             upsert=True,
         )
         return {"status": "success", "message": "Backup received"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("backup_data failed")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @app.post("/event")
@@ -70,8 +97,11 @@ async def track_event(event: AppEvent):
     try:
         await db.events.insert_one(event.model_dump())
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("track_event failed")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @app.post("/heartbeat")
@@ -97,13 +127,17 @@ async def heartbeat(payload: HeartbeatPayload):
         # also append to heartbeat log for DAU/MAU queries
         await db.heartbeats.insert_one(doc)
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("heartbeat failed")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 # ────────────────────── analytics / read endpoints ──────────────────────
+# All analytics routes require ADMIN_API_KEY via X-API-Key header.
 
-@app.get("/analytics/overview")
+@app.get("/analytics/overview", dependencies=[Depends(require_admin)])
 async def analytics_overview():
     """High-level numbers: total users, DAU, WAU, MAU, total workouts."""
     _ensure_db()
@@ -113,10 +147,10 @@ async def analytics_overview():
     month_ago = now - timedelta(days=30)
 
     total_users = await db.users.count_documents({})
-    dau = await db.heartbeats.count_documents(
-        {"timestamp": {"$gte": day_ago}},
+    # DAU = distinct users with heartbeat in last 24 h
+    dau_ids = await db.heartbeats.distinct(
+        "user_app_id", {"timestamp": {"$gte": day_ago}}
     )
-    # distinct user_app_ids in last 7 / 30 days
     wau_ids = await db.heartbeats.distinct(
         "user_app_id", {"timestamp": {"$gte": week_ago}}
     )
@@ -132,14 +166,14 @@ async def analytics_overview():
 
     return {
         "total_users": total_users,
-        "dau": dau,
+        "dau": len(dau_ids),
         "wau": len(wau_ids),
         "mau": len(mau_ids),
         "total_workouts_all_users": total_workouts,
     }
 
 
-@app.get("/analytics/retention")
+@app.get("/analytics/retention", dependencies=[Depends(require_admin)])
 async def analytics_retention(days: int = Query(30, ge=1, le=365)):
     """Return daily active-user counts for the last N days (retention curve)."""
     _ensure_db()
@@ -169,7 +203,7 @@ async def analytics_retention(days: int = Query(30, ge=1, le=365)):
     return {"days": days, "retention": results}
 
 
-@app.get("/analytics/events")
+@app.get("/analytics/events", dependencies=[Depends(require_admin)])
 async def analytics_events(
     event: Optional[str] = None,
     days: int = Query(7, ge=1, le=365),
@@ -192,12 +226,12 @@ async def analytics_events(
     return {"days": days, "events": [{"event": r["_id"], "count": r["count"]} for r in results]}
 
 
-@app.get("/analytics/users")
+@app.get("/analytics/users", dependencies=[Depends(require_admin)])
 async def analytics_users(
     limit: int = Query(50, ge=1, le=500),
     sort_by: str = Query("last_seen", regex="^(last_seen|first_seen|total_opens)$"),
 ):
-    """List individual user records for drill-down."""
+    """List user records (PII-redacted) for drill-down."""
     _ensure_db()
     cursor = db.users.find(
         {}, {"_id": 0}
@@ -206,7 +240,7 @@ async def analytics_users(
     return {"count": len(users), "users": users}
 
 
-@app.get("/analytics/user/{user_app_id}")
+@app.get("/analytics/user/{user_app_id}", dependencies=[Depends(require_admin)])
 async def analytics_user_detail(user_app_id: str):
     """Full detail for a single installation: profile, latest report, events."""
     _ensure_db()
@@ -223,4 +257,4 @@ async def analytics_user_detail(user_app_id: str):
 
 @app.get("/")
 async def root():
-    return {"message": "RepForge Analytics Backend Running", "version": "1.1.0"}
+    return {"message": "RepForge Analytics Backend Running", "version": "1.2.0"}
