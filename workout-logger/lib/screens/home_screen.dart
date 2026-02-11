@@ -11,6 +11,7 @@ import 'history_screen.dart';
 import 'routines_screen.dart';
 import 'analytics_screen.dart';
 import 'exercise_library_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -134,19 +135,34 @@ class DashboardTab extends StatelessWidget {
     final now = DateTime.now();
     final greeting = now.hour < 12 ? 'Good morning' : (now.hour < 17 ? 'Good afternoon' : 'Good evening');
     
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          greeting,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: AppTheme.textSecondary,
-          ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              greeting,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Ready to crush it? 💪',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Ready to crush it? 💪',
-          style: Theme.of(context).textTheme.headlineMedium,
+        IconButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            );
+          },
+          icon: const Icon(Icons.settings_outlined),
+          color: AppTheme.textPrimary,
         ),
       ],
     );

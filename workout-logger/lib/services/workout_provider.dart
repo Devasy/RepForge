@@ -721,4 +721,10 @@ class WorkoutProvider extends ChangeNotifier {
   Future<Map<String, dynamic>> getQuickStats() async {
     return await _storage.getQuickStats();
   }
+
+  // ==================== BACKUP ====================
+
+  Future<String> exportAllData() async {
+    return await _storage.exportAllData();
+  }
 }

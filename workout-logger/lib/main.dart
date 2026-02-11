@@ -12,6 +12,7 @@ import 'services/ml_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
 import 'services/workout_provider.dart';
+import 'services/api_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
@@ -93,6 +94,14 @@ class _AppInitializerState extends State<AppInitializer> {
     try {
       final provider = context.read<WorkoutProvider>();
       await provider.init();
+
+      // Report usage stats in background
+      provider.getQuickStats().then((stats) {
+        ApiService().reportUsage(stats);
+      }).catchError((e) {
+        debugPrint('Failed to report usage: $e');
+      });
+
       setState(() => _initialized = true);
     } catch (e) {
       setState(() => _error = e.toString());
