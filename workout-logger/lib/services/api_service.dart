@@ -5,8 +5,7 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
 // Conditional import: uses dart:io on native, stub on web.
-import 'platform_stub.dart'
-    if (dart.library.io) 'platform_io.dart';
+import 'platform_stub.dart' if (dart.library.io) 'platform_io.dart';
 
 /// Singleton service for communicating with the RepForge analytics backend.
 class ApiService {
