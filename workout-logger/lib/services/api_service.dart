@@ -1,28 +1,108 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:hive/hive.dart';
+import 'package:uuid/uuid.dart';
 
+/// Singleton service for communicating with the RepForge analytics backend.
 class ApiService {
-  // TODO: Update this URL with your Railway deployment URL
-  // Example: https://repforge-backend-production.up.railway.app
   static const String _baseUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://10.0.2.2:8000', // Default to Android Emulator for dev
+    defaultValue: 'https://workout-logger-production-1e93.up.railway.app',
   );
 
-  final http.Client _client;
+  static final ApiService _instance = ApiService._internal();
+  factory ApiService({http.Client? client}) {
+    if (client != null) _instance._client = client;
+    return _instance;
+  }
+  ApiService._internal();
 
-  ApiService({http.Client? client}) : _client = client ?? http.Client();
+  http.Client _client = http.Client();
+
+  String? _cachedAppId;
+
+  /// Returns a stable installation ID (UUID v4) persisted in Hive.
+  Future<String> get userAppId async {
+    if (_cachedAppId != null) return _cachedAppId!;
+    final box = Hive.box<String>('settings');
+    var id = box.get('user_app_id');
+    if (id == null) {
+      id = const Uuid().v4();
+      await box.put('user_app_id', id);
+    }
+    _cachedAppId = id;
+    return id;
+  }
+
+  String get _platform {
+    if (kIsWeb) return 'web';
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isIOS) return 'ios';
+    return 'unknown';
+  }
+
+  // ───────── ingest helpers ─────────
+
+  Future<void> sendHeartbeat() async {
+    try {
+      final id = await userAppId;
+      final body = {
+        'user_app_id': id,
+        'platform': _platform,
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+      };
+      final res = await _client.post(
+        Uri.parse('$_baseUrl/heartbeat'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (res.statusCode != 200) {
+        debugPrint('Heartbeat failed: ${res.body}');
+      }
+    } catch (e) {
+      debugPrint('Heartbeat error: $e');
+    }
+  }
+
+  Future<void> trackEvent(
+    String event, {
+    Map<String, dynamic>? metadata,
+  }) async {
+    try {
+      final id = await userAppId;
+      final body = {
+        'user_app_id': id,
+        'event': event,
+        'platform': _platform,
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+        if (metadata != null) 'metadata': metadata,
+      };
+      final res = await _client.post(
+        Uri.parse('$_baseUrl/event'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (res.statusCode != 200) {
+        debugPrint('Event tracking failed: ${res.body}');
+      }
+    } catch (e) {
+      debugPrint('Event tracking error: $e');
+    }
+  }
 
   Future<void> reportUsage(Map<String, dynamic> stats) async {
     try {
-      // Map Dart camelCase stats to Python snake_case model
+      final id = await userAppId;
       final payload = {
+        'user_app_id': id,
         'total_workouts': stats['totalWorkouts'],
         'weekly_workouts': stats['weeklyWorkouts'],
         'weekly_volume': stats['weeklyVolume'],
         'exercises_this_week': stats['exercisesThisWeek'],
-        'report_date': DateTime.now().toIso8601String(),
+        'platform': _platform,
+        'report_date': DateTime.now().toUtc().toIso8601String(),
       };
 
       final response = await _client.post(
@@ -41,6 +121,9 @@ class ApiService {
 
   Future<bool> backupData(Map<String, dynamic> data) async {
     try {
+      final id = await userAppId;
+      data['user_app_id'] = id;
+
       final response = await _client.post(
         Uri.parse('$_baseUrl/backup'),
         headers: {'Content-Type': 'application/json'},

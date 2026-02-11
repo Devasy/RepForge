@@ -23,7 +23,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final jsonString = await provider.exportAllData();
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
 
-      final success = await ApiService().backupData(data);
+      final api = ApiService();
+      api.trackEvent('backup_triggered');
+      final success = await api.backupData(data);
 
       if (!mounted) return;
 
@@ -45,10 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: AppTheme.error,
-        ),
+        SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
       );
     } finally {
       if (mounted) {

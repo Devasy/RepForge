@@ -77,3 +77,6 @@ coverage.xml
 
 # Environment Variables
 .env
+
+# Streamlit secrets
+dashboard/.streamlit/secrets.toml

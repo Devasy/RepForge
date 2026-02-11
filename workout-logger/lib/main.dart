@@ -95,12 +95,18 @@ class _AppInitializerState extends State<AppInitializer> {
       final provider = context.read<WorkoutProvider>();
       await provider.init();
 
-      // Report usage stats in background
-      provider.getQuickStats().then((stats) {
-        ApiService().reportUsage(stats);
-      }).catchError((e) {
-        debugPrint('Failed to report usage: $e');
-      });
+      // Fire-and-forget analytics in background
+      final api = ApiService();
+      api.sendHeartbeat();
+      api.trackEvent('app_open');
+      provider
+          .getQuickStats()
+          .then((stats) {
+            api.reportUsage(stats);
+          })
+          .catchError((e) {
+            debugPrint('Failed to report usage: $e');
+          });
 
       setState(() => _initialized = true);
     } catch (e) {

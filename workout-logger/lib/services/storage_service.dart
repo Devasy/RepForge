@@ -33,6 +33,7 @@ class StorageService implements IStorageService {
   bool _initialized = false;
 
   /// Initialize Hive and open boxes
+  @override
   Future<void> init() async {
     if (_initialized) return;
 
@@ -64,10 +65,12 @@ class StorageService implements IStorageService {
 
   // ==================== WORKOUT SESSIONS ====================
 
+  @override
   Future<void> saveWorkoutSession(WorkoutSession session) async {
     await _sessionsBox.put(session.id, jsonEncode(session.toJson()));
   }
 
+  @override
   Future<List<WorkoutSession>> getAllWorkoutSessions() async {
     final sessions = <WorkoutSession>[];
     for (var json in _sessionsBox.values) {
@@ -77,16 +80,19 @@ class StorageService implements IStorageService {
     return sessions;
   }
 
+  @override
   Future<WorkoutSession?> getWorkoutSession(String id) async {
     final json = _sessionsBox.get(id);
     if (json == null) return null;
     return WorkoutSession.fromJson(jsonDecode(json));
   }
 
+  @override
   Future<void> deleteWorkoutSession(String id) async {
     await _sessionsBox.delete(id);
   }
 
+  @override
   Future<List<WorkoutSession>> getSessionsForExercise(String exerciseId) async {
     final allSessions = await getAllWorkoutSessions();
     return allSessions
@@ -96,6 +102,7 @@ class StorageService implements IStorageService {
         .toList();
   }
 
+  @override
   Future<List<WorkoutSession>> getSessionsInDateRange(
     DateTime start,
     DateTime end,
@@ -111,10 +118,12 @@ class StorageService implements IStorageService {
 
   // ==================== ROUTINES ====================
 
+  @override
   Future<void> saveRoutine(Routine routine) async {
     await _routinesBoxInstance.put(routine.id, jsonEncode(routine.toJson()));
   }
 
+  @override
   Future<List<Routine>> getAllRoutines() async {
     final routines = <Routine>[];
     for (var json in _routinesBoxInstance.values) {
@@ -123,22 +132,26 @@ class StorageService implements IStorageService {
     return routines;
   }
 
+  @override
   Future<Routine?> getRoutine(String id) async {
     final json = _routinesBoxInstance.get(id);
     if (json == null) return null;
     return Routine.fromJson(jsonDecode(json));
   }
 
+  @override
   Future<void> deleteRoutine(String id) async {
     await _routinesBoxInstance.delete(id);
   }
 
   // ==================== TARGETS ====================
 
+  @override
   Future<void> saveTarget(Target target) async {
     await _targetsBoxInstance.put(target.id, jsonEncode(target.toJson()));
   }
 
+  @override
   Future<List<Target>> getAllTargets() async {
     final targets = <Target>[];
     for (var json in _targetsBoxInstance.values) {
@@ -147,16 +160,19 @@ class StorageService implements IStorageService {
     return targets;
   }
 
+  @override
   Future<Target?> getTarget(String id) async {
     final json = _targetsBoxInstance.get(id);
     if (json == null) return null;
     return Target.fromJson(jsonDecode(json));
   }
 
+  @override
   Future<void> deleteTarget(String id) async {
     await _targetsBoxInstance.delete(id);
   }
 
+  @override
   Future<List<Target>> getTargetsForExercise(String exerciseId) async {
     final allTargets = await getAllTargets();
     return allTargets.where((t) => t.exerciseId == exerciseId).toList();
@@ -164,6 +180,7 @@ class StorageService implements IStorageService {
 
   // ==================== MUSCLE GROUPS ====================
 
+  @override
   Future<void> updateMuscleGroupGrowthRate(
     String muscleGroupId,
     double rate,
@@ -180,6 +197,7 @@ class StorageService implements IStorageService {
     }
   }
 
+  @override
   Future<List<MuscleGroup>> getAllMuscleGroups() async {
     final groups = <MuscleGroup>[];
     for (var json in _muscleGroupsBoxInstance.values) {
@@ -188,6 +206,7 @@ class StorageService implements IStorageService {
     return groups;
   }
 
+  @override
   Future<MuscleGroup?> getMuscleGroup(String id) async {
     final json = _muscleGroupsBoxInstance.get(id);
     if (json == null) return null;
@@ -196,6 +215,7 @@ class StorageService implements IStorageService {
 
   // ==================== CUSTOM EXERCISES ====================
 
+  @override
   Future<void> saveCustomExercise(Exercise exercise) async {
     await _customExercisesBoxInstance.put(
       exercise.id,
@@ -203,6 +223,7 @@ class StorageService implements IStorageService {
     );
   }
 
+  @override
   Future<List<Exercise>> getCustomExercises() async {
     final exercises = <Exercise>[];
     for (var json in _customExercisesBoxInstance.values) {
@@ -211,11 +232,13 @@ class StorageService implements IStorageService {
     return exercises;
   }
 
+  @override
   Future<void> deleteCustomExercise(String id) async {
     await _customExercisesBoxInstance.delete(id);
   }
 
   /// Get all exercises (built-in + custom)
+  @override
   Future<List<Exercise>> getAllExercises() async {
     final builtIn = ExerciseDatabase.getAll();
     final custom = await getCustomExercises();
@@ -223,6 +246,7 @@ class StorageService implements IStorageService {
   }
 
   /// Get exercise by ID (built-in or custom)
+  @override
   Future<Exercise?> getExercise(String id) async {
     // Check built-in first
     final builtIn = ExerciseDatabase.getById(id);
@@ -239,16 +263,19 @@ class StorageService implements IStorageService {
 
   // ==================== SETTINGS ====================
 
+  @override
   Future<void> saveSetting(String key, String value) async {
     await _settingsBoxInstance.put(key, value);
   }
 
+  @override
   Future<String?> getSetting(String key) async {
     return _settingsBoxInstance.get(key);
   }
 
   // ==================== EXPORT / IMPORT ====================
 
+  @override
   Future<String> exportAllData() async {
     final data = {
       'sessions': _sessionsBox.values.toList(),
@@ -261,6 +288,7 @@ class StorageService implements IStorageService {
     return jsonEncode(data);
   }
 
+  @override
   Future<void> importData(String jsonData) async {
     final data = jsonDecode(jsonData) as Map<String, dynamic>;
 
@@ -291,6 +319,7 @@ class StorageService implements IStorageService {
 
   // ==================== STATS ====================
 
+  @override
   Future<Map<String, dynamic>> getQuickStats() async {
     final sessions = await getAllWorkoutSessions();
     final now = DateTime.now();
