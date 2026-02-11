@@ -1,5 +1,62 @@
-__pycache__/
+# Miscellaneous
+*.class
+*.log
+*.lock
 *.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+
+# Android
+android/app/libs/
+android/app/src/main/assets/
+android/app/src/main/res/
+android/app/src/main/jniLibs/
+android/app/src/main/obj/
+android/app/src/main/symbols/
+android/gradle/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/.gradle
+android/captures/
+android/gradlew.bat
+android/local.properties
+.gradle
+/android/.gradle/
+
+# iOS
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+ios/.generated/
+
+# Visual Studio Code
+.vscode/
+
+# IntelliJ
+.idea/
+*.iml
+
+# Python
+__pycache__/
 *.pyo
 *.pyd
 .Python
@@ -14,8 +71,9 @@ pip-delete-this-directory.txt
 nosetests.xml
 coverage.xml
 *.cover
-*.log
-.git
 .mypy_cache
 .pytest_cache
 .hypothesise
+
+# Environment Variables
+.env
