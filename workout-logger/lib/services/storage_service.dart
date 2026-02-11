@@ -1,11 +1,21 @@
 // Storage Service - Hive-based local persistence
+//
+// This is a concrete implementation of IStorageService using Hive.
+// Following Dependency Inversion Principle: high-level modules depend on
+// the IStorageService abstraction, not this concrete class.
 
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/models.dart';
 import '../data/exercise_database.dart';
+import 'interfaces/storage_service_interface.dart';
 
-class StorageService {
+/// Hive-based implementation of the storage service.
+///
+/// This class implements IStorageService, allowing it to be swapped
+/// for other storage backends (SQL, Firebase, etc.) without modifying
+/// the consuming code.
+class StorageService implements IStorageService {
   static const String _workoutSessionsBox = 'workout_sessions';
   static const String _routinesBox = 'routines';
   static const String _targetsBox = 'targets';
@@ -32,7 +42,9 @@ class StorageService {
     _routinesBoxInstance = await Hive.openBox<String>(_routinesBox);
     _targetsBoxInstance = await Hive.openBox<String>(_targetsBox);
     _muscleGroupsBoxInstance = await Hive.openBox<String>(_muscleGroupsBox);
-    _customExercisesBoxInstance = await Hive.openBox<String>(_customExercisesBox);
+    _customExercisesBoxInstance = await Hive.openBox<String>(
+      _customExercisesBox,
+    );
     _settingsBoxInstance = await Hive.openBox<String>(_settingsBox);
 
     // Initialize default muscle groups if empty
@@ -77,16 +89,24 @@ class StorageService {
 
   Future<List<WorkoutSession>> getSessionsForExercise(String exerciseId) async {
     final allSessions = await getAllWorkoutSessions();
-    return allSessions.where((session) =>
-      session.exercises.any((e) => e.exerciseId == exerciseId)
-    ).toList();
+    return allSessions
+        .where(
+          (session) => session.exercises.any((e) => e.exerciseId == exerciseId),
+        )
+        .toList();
   }
 
-  Future<List<WorkoutSession>> getSessionsInDateRange(DateTime start, DateTime end) async {
+  Future<List<WorkoutSession>> getSessionsInDateRange(
+    DateTime start,
+    DateTime end,
+  ) async {
     final allSessions = await getAllWorkoutSessions();
-    return allSessions.where((session) =>
-      session.date.isAfter(start) && session.date.isBefore(end)
-    ).toList();
+    return allSessions
+        .where(
+          (session) =>
+              !session.date.isBefore(start) && !session.date.isAfter(end),
+        )
+        .toList();
   }
 
   // ==================== ROUTINES ====================
@@ -144,13 +164,19 @@ class StorageService {
 
   // ==================== MUSCLE GROUPS ====================
 
-  Future<void> updateMuscleGroupGrowthRate(String muscleGroupId, double rate) async {
+  Future<void> updateMuscleGroupGrowthRate(
+    String muscleGroupId,
+    double rate,
+  ) async {
     final json = _muscleGroupsBoxInstance.get(muscleGroupId);
     if (json != null) {
       final mg = MuscleGroup.fromJson(jsonDecode(json));
       mg.growthRate = rate;
       mg.lastUpdated = DateTime.now();
-      await _muscleGroupsBoxInstance.put(muscleGroupId, jsonEncode(mg.toJson()));
+      await _muscleGroupsBoxInstance.put(
+        muscleGroupId,
+        jsonEncode(mg.toJson()),
+      );
     }
   }
 
@@ -171,7 +197,10 @@ class StorageService {
   // ==================== CUSTOM EXERCISES ====================
 
   Future<void> saveCustomExercise(Exercise exercise) async {
-    await _customExercisesBoxInstance.put(exercise.id, jsonEncode(exercise.toJson()));
+    await _customExercisesBoxInstance.put(
+      exercise.id,
+      jsonEncode(exercise.toJson()),
+    );
   }
 
   Future<List<Exercise>> getCustomExercises() async {
@@ -234,7 +263,7 @@ class StorageService {
 
   Future<void> importData(String jsonData) async {
     final data = jsonDecode(jsonData) as Map<String, dynamic>;
-    
+
     // Import sessions
     if (data['sessions'] != null) {
       for (var json in data['sessions']) {
@@ -266,12 +295,14 @@ class StorageService {
     final sessions = await getAllWorkoutSessions();
     final now = DateTime.now();
     final weekAgo = now.subtract(const Duration(days: 7));
-    
-    final weekSessions = sessions.where((s) => s.date.isAfter(weekAgo)).toList();
-    
+
+    final weekSessions = sessions
+        .where((s) => s.date.isAfter(weekAgo))
+        .toList();
+
     double weeklyVolume = 0;
     int exercisesCompleted = 0;
-    
+
     for (var session in weekSessions) {
       weeklyVolume += session.totalVolume;
       exercisesCompleted += session.exercises.length;

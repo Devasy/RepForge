@@ -1,14 +1,29 @@
 // Workout Provider - State Management for the App
+//
+// NOTE: This class is maintained for backward compatibility.
+// For new code, consider using the individual managers:
+// - ActiveWorkoutManager: Current workout state
+// - HistoryManager: Past sessions
+// - RoutineManager: Workout routines
+// - ExerciseManager: Exercise library
+// - TargetManager: Goals and targets
+// - AnalyticsManager: Statistics and recommendations
+//
+// Following Dependency Inversion Principle: this class now depends on
+// abstractions (IStorageService, IMLService) rather than concrete implementations.
 
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../data/exercise_database.dart';
-import 'storage_service.dart';
+import 'interfaces/storage_service_interface.dart';
+import 'interfaces/ml_service_interface.dart';
 import 'ml_service.dart';
+import 'strategies/target_calculator.dart';
 
 class WorkoutProvider extends ChangeNotifier {
-  final StorageService _storage;
+  final IStorageService _storage;
+  final IMLService _mlService;
   final Uuid _uuid = const Uuid();
 
   // State
@@ -41,7 +56,12 @@ class WorkoutProvider extends ChangeNotifier {
   List<ExerciseLog> get currentExerciseLogs => _currentExerciseLogs;
   DateTime? get workoutStartTime => _workoutStartTime;
 
-  WorkoutProvider(this._storage);
+  /// Create WorkoutProvider with dependency injection.
+  ///
+  /// Following Dependency Inversion Principle: accepts abstractions
+  /// rather than concrete implementations.
+  WorkoutProvider(this._storage, {IMLService? mlService})
+    : _mlService = mlService ?? MLService();
 
   // ==================== INITIALIZATION ====================
 
@@ -77,12 +97,12 @@ class WorkoutProvider extends ChangeNotifier {
   }
 
   Future<void> _updateGrowthModel(String exerciseId) async {
-    final dataPoints = MLService.extractExerciseDataPoints(
+    final dataPoints = _mlService.extractExerciseDataPoints(
       exerciseId,
       _sessions,
     );
     if (dataPoints.length >= 2) {
-      _growthModels[exerciseId] = MLService.trainGrowthModel(dataPoints);
+      _growthModels[exerciseId] = _mlService.trainGrowthModel(dataPoints);
     } else {
       // Remove stale model if not enough data to train (e.g. after deletion)
       _growthModels.remove(exerciseId);
@@ -387,10 +407,10 @@ class WorkoutProvider extends ChangeNotifier {
     }
 
     if (lastLog == null || lastLog.sets.isEmpty) {
-      return MLService.getDefaultRecommendations(3);
+      return _mlService.getDefaultRecommendations(3);
     }
 
-    return MLService.recommendSets(
+    return _mlService.recommendSets(
       lastSession: lastLog.sets,
       growthModel: _growthModels[exerciseId],
     );
@@ -524,14 +544,14 @@ class WorkoutProvider extends ChangeNotifier {
     required String type,
     required double targetValue,
   }) async {
-    // Get current value from history
+    // Get current value from history using Strategy Pattern (Open/Closed Principle)
     double currentValue = _calculateCurrentTargetValue(exerciseId, type);
 
-    // Predict completion date
+    // Predict completion date using injected ML service
     DateTime? estimatedDate;
     final growthModel = _growthModels[exerciseId];
     if (growthModel != null) {
-      estimatedDate = MLService.predictTargetCompletion(
+      estimatedDate = _mlService.predictTargetCompletion(
         currentValue: currentValue,
         targetValue: targetValue,
         growthModel: growthModel,
@@ -573,11 +593,11 @@ class WorkoutProvider extends ChangeNotifier {
         // If it wasn't completed but now is (unlikely on delete, but possible on edit), complete it
         target.isCompleted = newValue >= target.targetValue;
 
-        // Update prediction if not completed
+        // Update prediction if not completed using injected ML service
         if (!target.isCompleted) {
           final growthModel = _growthModels[exerciseId];
           if (growthModel != null) {
-            target.estimatedCompletionDate = MLService.predictTargetCompletion(
+            target.estimatedCompletionDate = _mlService.predictTargetCompletion(
               currentValue: newValue,
               targetValue: target.targetValue,
               growthModel: growthModel,
@@ -595,7 +615,15 @@ class WorkoutProvider extends ChangeNotifier {
   }
 
   /// Calculate the current best value for a target type from all history
+  /// Uses Strategy Pattern (Open/Closed Principle) via TargetCalculatorFactory
   double _calculateCurrentTargetValue(String exerciseId, String targetType) {
+    // Try to use the strategy pattern first
+    final calculator = TargetCalculatorFactory.getCalculator(targetType);
+    if (calculator != null) {
+      return calculator.calculate(exerciseId, _sessions);
+    }
+
+    // Fallback for backward compatibility with unknown types
     double bestValue = 0;
 
     for (var session in _sessions) {
