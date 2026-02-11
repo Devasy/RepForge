@@ -51,7 +51,7 @@ async def backup_data(data: BackupData):
     """Receive a full data backup from a device."""
     _ensure_db()
     try:
-        doc = data.model_dump()
+        doc = data.parsed_backup()  # decode any JSON-string list items
         # keep only latest backup per user; overwrite previous
         await db.backups.update_one(
             {"user_app_id": data.user_app_id},

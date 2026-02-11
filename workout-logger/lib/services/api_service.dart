@@ -122,12 +122,31 @@ class ApiService {
   Future<bool> backupData(Map<String, dynamic> data) async {
     try {
       final id = await userAppId;
-      data['user_app_id'] = id;
+
+      // Hive stores items as JSON strings – decode them to Maps for the API
+      final decoded = <String, dynamic>{'user_app_id': id};
+      for (final key in data.keys) {
+        final value = data[key];
+        if (value is List) {
+          decoded[key] = value.map((item) {
+            if (item is String) {
+              try {
+                return jsonDecode(item);
+              } catch (_) {
+                return item;
+              }
+            }
+            return item;
+          }).toList();
+        } else {
+          decoded[key] = value;
+        }
+      }
 
       final response = await _client.post(
         Uri.parse('$_baseUrl/backup'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(data),
+        body: jsonEncode(decoded),
       );
 
       if (response.statusCode == 200) {

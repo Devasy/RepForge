@@ -20,13 +20,33 @@ class UsageStats(BaseModel):
 
 class BackupData(BaseModel):
     user_app_id: str
-    sessions: List[Dict[str, Any]]
-    routines: List[Dict[str, Any]]
-    targets: List[Dict[str, Any]]
-    muscleGroups: List[Dict[str, Any]]
-    customExercises: List[Dict[str, Any]]
+    sessions: List[Any]  # May arrive as List[str] or List[dict]
+    routines: List[Any]
+    targets: List[Any]
+    muscleGroups: List[Any]
+    customExercises: List[Any]
     exportDate: str  # ISO string from Dart
     backup_received_at: datetime = Field(default_factory=_utcnow)
+
+    def parsed_backup(self) -> dict:
+        """Return a copy with any JSON-string items decoded to dicts."""
+        import json
+        def _parse_list(items: list) -> list:
+            out = []
+            for item in items:
+                if isinstance(item, str):
+                    try:
+                        out.append(json.loads(item))
+                    except (json.JSONDecodeError, TypeError):
+                        out.append(item)
+                else:
+                    out.append(item)
+            return out
+
+        data = self.model_dump()
+        for key in ('sessions', 'routines', 'targets', 'muscleGroups', 'customExercises'):
+            data[key] = _parse_list(data.get(key, []))
+        return data
 
 
 class AppEvent(BaseModel):
