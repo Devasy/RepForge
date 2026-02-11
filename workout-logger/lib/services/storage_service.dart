@@ -277,42 +277,108 @@ class StorageService implements IStorageService {
 
   @override
   Future<String> exportAllData() async {
+    // Collect settings as a map
+    final settingsMap = <String, String>{};
+    for (var key in _settingsBoxInstance.keys) {
+      final value = _settingsBoxInstance.get(key);
+      if (value != null) {
+        settingsMap[key as String] = value;
+      }
+    }
+
     final data = {
       'sessions': _sessionsBox.values.toList(),
       'routines': _routinesBoxInstance.values.toList(),
       'targets': _targetsBoxInstance.values.toList(),
       'muscleGroups': _muscleGroupsBoxInstance.values.toList(),
       'customExercises': _customExercisesBoxInstance.values.toList(),
+      'settings': settingsMap,
       'exportDate': DateTime.now().toIso8601String(),
+      'appVersion': '1.0.6',
     };
     return jsonEncode(data);
+  }
+
+  /// Decode a backup item that may be a JSON string or an already-decoded Map.
+  Map<String, dynamic> _decodeItem(dynamic item) {
+    if (item is String) {
+      return jsonDecode(item) as Map<String, dynamic>;
+    }
+    return item as Map<String, dynamic>;
   }
 
   @override
   Future<void> importData(String jsonData) async {
     final data = jsonDecode(jsonData) as Map<String, dynamic>;
 
-    // Import sessions
+    // Import sessions (merge: skip if id already exists)
     if (data['sessions'] != null) {
-      for (var json in data['sessions']) {
-        final session = WorkoutSession.fromJson(jsonDecode(json));
-        await saveWorkoutSession(session);
+      for (var item in data['sessions']) {
+        final map = _decodeItem(item);
+        final session = WorkoutSession.fromJson(map);
+        final existing = await getWorkoutSession(session.id);
+        if (existing == null) {
+          await saveWorkoutSession(session);
+        }
       }
     }
 
-    // Import routines
+    // Import routines (merge: skip if id already exists)
     if (data['routines'] != null) {
-      for (var json in data['routines']) {
-        final routine = Routine.fromJson(jsonDecode(json));
-        await saveRoutine(routine);
+      for (var item in data['routines']) {
+        final map = _decodeItem(item);
+        final routine = Routine.fromJson(map);
+        final existing = await getRoutine(routine.id);
+        if (existing == null) {
+          await saveRoutine(routine);
+        }
       }
     }
 
-    // Import targets
+    // Import targets (merge: skip if id already exists)
     if (data['targets'] != null) {
-      for (var json in data['targets']) {
-        final target = Target.fromJson(jsonDecode(json));
-        await saveTarget(target);
+      for (var item in data['targets']) {
+        final map = _decodeItem(item);
+        final target = Target.fromJson(map);
+        final existing = await getTarget(target.id);
+        if (existing == null) {
+          await saveTarget(target);
+        }
+      }
+    }
+
+    // Import muscle groups (merge: skip if id already exists)
+    if (data['muscleGroups'] != null) {
+      for (var item in data['muscleGroups']) {
+        final map = _decodeItem(item);
+        final mg = MuscleGroup.fromJson(map);
+        final existing = await getMuscleGroup(mg.id);
+        if (existing == null) {
+          await _muscleGroupsBoxInstance.put(mg.id, jsonEncode(mg.toJson()));
+        }
+      }
+    }
+
+    // Import custom exercises (merge: skip if id already exists)
+    if (data['customExercises'] != null) {
+      for (var item in data['customExercises']) {
+        final map = _decodeItem(item);
+        final exercise = Exercise.fromJson(map);
+        final existing = _customExercisesBoxInstance.get(exercise.id);
+        if (existing == null) {
+          await saveCustomExercise(exercise);
+        }
+      }
+    }
+
+    // Import settings (merge: skip keys that already exist)
+    if (data['settings'] != null && data['settings'] is Map) {
+      final settings = data['settings'] as Map<String, dynamic>;
+      for (var entry in settings.entries) {
+        final existing = _settingsBoxInstance.get(entry.key);
+        if (existing == null) {
+          await _settingsBoxInstance.put(entry.key, entry.value.toString());
+        }
       }
     }
   }

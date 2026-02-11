@@ -1,6 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:intl/intl.dart';
 import '../services/workout_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
@@ -14,6 +19,10 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isBackingUp = false;
+  bool _isExporting = false;
+  bool _isImporting = false;
+
+  // ==================== Remote Backup ====================
 
   Future<void> _performBackup() async {
     setState(() => _isBackingUp = true);
@@ -60,6 +69,161 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  // ==================== Local Export ====================
+
+  Future<void> _exportToFile() async {
+    setState(() => _isExporting = true);
+
+    try {
+      final provider = context.read<WorkoutProvider>();
+      final jsonString = await provider.exportAllData();
+
+      final tempDir = await getTemporaryDirectory();
+      final dateStr = DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now());
+      final fileName = 'repforge_backup_$dateStr.json';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsString(jsonString);
+
+      final result = await Share.shareXFiles([
+        XFile(file.path),
+      ], subject: 'RepForge Backup');
+
+      if (!mounted) return;
+
+      if (result.status == ShareResultStatus.success ||
+          result.status == ShareResultStatus.dismissed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Backup file exported successfully!'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Export error: $e\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Export failed. Please try again.'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
+  // ==================== Local Import ====================
+
+  Future<void> _importFromFile() async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Import Backup',
+          style: TextStyle(color: AppTheme.textPrimary),
+        ),
+        content: const Text(
+          'This will merge the backup data with your existing data. '
+          'Existing workouts, routines, and targets will be kept. '
+          'New items from the backup will be added.\n\n'
+          'Select a .json backup file to continue.',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Choose File'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isImporting = true);
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (result == null || result.files.single.path == null) {
+        if (mounted) setState(() => _isImporting = false);
+        return;
+      }
+
+      final file = File(result.files.single.path!);
+      final jsonString = await file.readAsString();
+
+      // Basic validation: ensure it's valid JSON with expected keys
+      final data = jsonDecode(jsonString) as Map<String, dynamic>;
+      if (!data.containsKey('sessions') && !data.containsKey('routines')) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid backup file. Expected a RepForge backup.'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+        return;
+      }
+
+      final provider = context.read<WorkoutProvider>();
+      await provider.importData(jsonString);
+
+      if (!mounted) return;
+
+      final itemCount = (data['sessions'] as List?)?.length ?? 0;
+      final routineCount = (data['routines'] as List?)?.length ?? 0;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Import complete! Processed $itemCount sessions, $routineCount routines.',
+          ),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Import error: $e\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Import failed. Make sure you selected a valid backup file.',
+          ),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isImporting = false);
+      }
+    }
+  }
+
+  // ==================== Build ====================
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,6 +237,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           _buildSectionHeader('Data Management'),
           const SizedBox(height: 16),
+          _buildLocalBackupCard(),
+          const SizedBox(height: 16),
           _buildBackupCard(),
         ],
       ),
@@ -85,6 +251,117 @@ class _SettingsScreenState extends State<SettingsScreen> {
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
         color: AppTheme.primaryColor,
         fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _buildLocalBackupCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.secondaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.save_alt_rounded,
+                  color: AppTheme.secondaryColor,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Local Backup',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Export or import a backup file to transfer data between devices',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _isExporting ? null : _exportToFile,
+                  icon: _isExporting
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Icon(Icons.upload_file_rounded, size: 20),
+                  label: Text(_isExporting ? 'Exporting...' : 'Export'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.secondaryColor,
+                    foregroundColor: AppTheme.backgroundColor,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isImporting ? null : _importFromFile,
+                  icon: _isImporting
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppTheme.secondaryColor,
+                            ),
+                          ),
+                        )
+                      : const Icon(Icons.download_rounded, size: 20),
+                  label: Text(_isImporting ? 'Importing...' : 'Import'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.secondaryColor,
+                    side: const BorderSide(color: AppTheme.secondaryColor),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -126,7 +403,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     Text(
-                      'Securely backup your workout data',
+                      'Securely backup your workout data to the cloud',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,

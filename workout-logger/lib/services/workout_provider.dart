@@ -727,4 +727,10 @@ class WorkoutProvider extends ChangeNotifier {
   Future<String> exportAllData() async {
     return await _storage.exportAllData();
   }
+
+  Future<void> importData(String jsonData) async {
+    await _storage.importData(jsonData);
+    await loadAllData();
+    await _trainAllGrowthModels();
+  }
 }
