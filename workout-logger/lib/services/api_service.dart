@@ -3,9 +3,12 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
 class ApiService {
-  // TODO: Replace with your Railway URL
-  static const String _baseUrl = 'http://10.0.2.2:8000'; // For Android Emulator
-  // static const String _baseUrl = 'http://localhost:8000'; // For iOS Simulator
+  // TODO: Update this URL with your Railway deployment URL
+  // Example: https://repforge-backend-production.up.railway.app
+  static const String _baseUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'http://10.0.2.2:8000', // Default to Android Emulator for dev
+  );
 
   final http.Client _client;
 

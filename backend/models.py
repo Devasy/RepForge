@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
@@ -7,7 +7,7 @@ class UsageStats(BaseModel):
     weekly_workouts: int
     weekly_volume: float
     exercises_this_week: int
-    report_date: datetime = datetime.now()
+    report_date: datetime = Field(default_factory=datetime.now)
 
 class BackupData(BaseModel):
     sessions: List[Dict[str, Any]]
@@ -16,4 +16,4 @@ class BackupData(BaseModel):
     muscleGroups: List[Dict[str, Any]]
     customExercises: List[Dict[str, Any]]
     exportDate: str # Since it's ISO string from Dart
-    backup_received_at: datetime = datetime.now()
+    backup_received_at: datetime = Field(default_factory=datetime.now)
