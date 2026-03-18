@@ -327,7 +327,7 @@ class StorageService implements IStorageService {
   Future<String> exportAllData() async {
     // Collect settings as a map
     final settingsMap = <String, String>{};
-    for (var key in _settingsBoxInstance.keys) {
+    for (final key in _settingsBoxInstance.keys) {
       final value = _settingsBoxInstance.get(key);
       if (value != null) {
         settingsMap[key as String] = value;
