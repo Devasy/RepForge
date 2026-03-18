@@ -6,6 +6,7 @@
 
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../models/models.dart';
 import '../data/exercise_database.dart';
 import 'interfaces/storage_service_interface.dart';
@@ -30,12 +31,27 @@ class StorageService implements IStorageService {
   late Box<String> _customExercisesBoxInstance;
   late Box<String> _settingsBoxInstance;
 
+  String _appVersion = const String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: 'unknown',
+  );
+
   bool _initialized = false;
 
   /// Initialize Hive and open boxes
   @override
   Future<void> init() async {
     if (_initialized) return;
+
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final version = packageInfo.version;
+      final buildNumber = packageInfo.buildNumber;
+      _appVersion = buildNumber.isNotEmpty ? '$version+$buildNumber' : version;
+    } catch (_) {
+      // Keep build-time fallback from APP_VERSION/unknown in environments
+      // where platform package metadata is unavailable.
+    }
 
     await Hive.initFlutter();
 
@@ -336,7 +352,7 @@ class StorageService implements IStorageService {
           .toList(growable: false),
       'settings': settingsMap,
       'exportDate': DateTime.now().toIso8601String(),
-      'appVersion': '1.0.6',
+      'appVersion': _appVersion,
     };
     return jsonEncode(data);
   }
