@@ -92,5 +92,3 @@ class HeartbeatPayload(BaseModel):
     app_version: Optional[str] = None
     platform: Optional[str] = None
     timestamp: datetime = Field(default_factory=_utcnow)
-    platform: Optional[str] = None
-    timestamp: datetime = Field(default_factory=_utcnow)
