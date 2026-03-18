@@ -112,8 +112,8 @@ This codebase was explicitly refactored around SOLID — see `SOLID_ANALYSIS_REP
 - **Provider** (`ChangeNotifier`) pattern throughout
 - `WorkoutProvider` is the top-level orchestrator
 - Individual managers call `notifyListeners()` when their slice of state changes
-- Use `Consumer<WorkoutProvider>` or `context.watch<WorkoutProvider>()` in widgets
-
+- Prefer watching the smallest scoped manager/provider needed by a widget.
+- Avoid broad `context.watch<WorkoutProvider>()` in leaf widgets; use selector/manager-specific access to reduce coupling and rebuilds.
 ### Data Persistence
 - **Hive** (key-value, NoSQL) — no SQL, no cloud required
 - 6 boxes: `workout_sessions`, `routines`, `targets`, `muscle_groups`, `custom_exercises`, `settings`
