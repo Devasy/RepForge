@@ -299,12 +299,14 @@ class StorageService implements IStorageService {
     return jsonEncode(data);
   }
 
-  /// Decode a backup item that may be a JSON string or an already-decoded Map.
   Map<String, dynamic> _decodeItem(dynamic item) {
     if (item is String) {
       return jsonDecode(item) as Map<String, dynamic>;
     }
-    return item as Map<String, dynamic>;
+    if (item is Map) {
+      return Map<String, dynamic>.from(item);
+    }
+    throw FormatException('Unexpected backup item type: ${item.runtimeType}');
   }
 
   @override
