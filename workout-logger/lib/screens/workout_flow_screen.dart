@@ -154,53 +154,62 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
         _buildHeader(provider, currentExercise),
 
         // Main content
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Recommendation card
-                if (recommendations.isNotEmpty && currentLog != null)
-                  _buildRecommendationCard(
-                    recommendations,
-                    currentLog.sets.length,
-                  ),
-
-                const SizedBox(height: AppSpacing.lg),
-
-                // Weight and reps input
-                if (!_isDropset) _buildInputSection(),
-
-                if (!_isDropset) const SizedBox(height: AppSpacing.md),
-
-                // Dropset toggle
-                _buildDropsetSection(),
-
-                const SizedBox(height: AppSpacing.lg),
-
-                // Set done button
-                _buildSetDoneButton(),
-
-                const SizedBox(height: AppSpacing.lg),
-
-                // Previous sets
-                if (currentLog != null && currentLog.sets.isNotEmpty)
-                  _buildPreviousSets(currentLog.sets),
-
-                const SizedBox(height: AppSpacing.lg),
-
-                // Last session info
-                if (currentExercise != null)
-                  _buildLastSessionInfo(currentExercise.id),
-              ],
-            ),
-          ),
+        _buildWorkoutContent(
+          currentExercise: currentExercise,
+          currentLog: currentLog,
+          recommendations: recommendations,
         ),
 
         // Bottom actions
         _buildBottomActions(provider),
       ],
+    );
+  }
+
+  Widget _buildWorkoutContent({
+    required Exercise? currentExercise,
+    required ExerciseLog? currentLog,
+    required List<SetRecommendation> recommendations,
+  }) {
+    return Expanded(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Recommendation card
+            if (recommendations.isNotEmpty && currentLog != null)
+              _buildRecommendationCard(recommendations, currentLog.sets.length),
+
+            const SizedBox(height: AppSpacing.lg),
+
+            // Weight and reps input
+            if (!_isDropset) _buildInputSection(),
+
+            if (!_isDropset) const SizedBox(height: AppSpacing.md),
+
+            // Dropset toggle
+            _buildDropsetSection(),
+
+            const SizedBox(height: AppSpacing.lg),
+
+            // Set done button
+            _buildSetDoneButton(),
+
+            const SizedBox(height: AppSpacing.lg),
+
+            // Previous sets
+            if (currentLog != null && currentLog.sets.isNotEmpty)
+              _buildPreviousSets(currentLog.sets),
+
+            const SizedBox(height: AppSpacing.lg),
+
+            // Last session info
+            if (currentExercise != null)
+              _buildLastSessionInfo(currentExercise.id),
+          ],
+        ),
+      ),
     );
   }
 
