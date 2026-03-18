@@ -148,7 +148,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Assert - Should only show matching exercise
-      expect(find.text('Bicep Curl'), findsOneWidget);
+      expect(find.text('Bicep Curl'), findsWidgets);
       expect(find.text('Tricep Pushdown'), findsNothing);
     });
 

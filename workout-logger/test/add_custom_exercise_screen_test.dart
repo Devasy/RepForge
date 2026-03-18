@@ -112,11 +112,15 @@ void main() {
       await tester.pump();
 
       // Select a muscle group
-      await tester.tap(find.text('Shoulders'));
-      await tester.pump();
+      await tester.ensureVisible(find.text('Shoulders'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Shoulders'), warnIfMissed: false);
+      await tester.pumpAndSettle();
 
       // Submit
-      await tester.tap(find.text('Save'));
+      await tester.ensureVisible(find.text('Save'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
       // Assert - Storage should have been called

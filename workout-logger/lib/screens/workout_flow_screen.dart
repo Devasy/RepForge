@@ -216,7 +216,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
         color: AppTheme.surfaceColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -279,30 +279,27 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     if (currentSetIndex >= recommendations.length) return const SizedBox();
 
     final rec = recommendations[currentSetIndex];
-    final confidenceColor = rec.confidence == 'high'
-        ? AppTheme.success
-        : (rec.confidence == 'medium' ? AppTheme.warning : AppTheme.textMuted);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppTheme.primaryColor.withOpacity(0.2),
-            AppTheme.secondaryColor.withOpacity(0.1),
+            AppTheme.primaryColor.withValues(alpha: 0.2),
+            AppTheme.secondaryColor.withValues(alpha: 0.1),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.2),
+              color: AppTheme.primaryColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
@@ -448,7 +445,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           height: 40,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.primaryColor.withOpacity(0.5)),
+            border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.5)),
           ),
           child: Icon(icon, color: AppTheme.primaryColor),
         ),
@@ -763,7 +760,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: AppTheme.success.withOpacity(0.2),
+                    color: AppTheme.success.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(
@@ -793,7 +790,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppTheme.warning.withOpacity(0.2),
+                      color: AppTheme.warning.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
@@ -888,7 +885,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
         color: AppTheme.surfaceColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),

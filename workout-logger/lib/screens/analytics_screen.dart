@@ -190,8 +190,8 @@ class _OverviewTab extends StatelessWidget {
                       show: true,
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.primaryColor.withOpacity(0.3),
-                          AppTheme.primaryColor.withOpacity(0.0),
+                          AppTheme.primaryColor.withValues(alpha: 0.3),
+                          AppTheme.primaryColor.withValues(alpha: 0.0),
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -313,16 +313,13 @@ class _OverviewTab extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: weeks.entries.map((entry) {
-              final label = entry.key == 0 
-                  ? 'This Week' 
-                  : '${entry.key} week${entry.key > 1 ? 's' : ''} ago';
               return Column(
                 children: [
                   Container(
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(
+                      color: AppTheme.primaryColor.withValues(alpha:
                         entry.value > 0 ? 0.2 + (entry.value * 0.15) : 0.1
                       ),
                       borderRadius: BorderRadius.circular(12),
@@ -485,7 +482,6 @@ class _ExerciseProgressView extends StatelessWidget {
   Widget build(BuildContext context) {
     final progression = provider.getVolumeProgression(exerciseId);
     final growthModel = provider.getGrowthModel(exerciseId);
-    final exercise = provider.getExercise(exerciseId);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -519,8 +515,8 @@ class _ExerciseProgressView extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isGrowing
-              ? [AppTheme.success.withOpacity(0.2), AppTheme.success.withOpacity(0.1)]
-              : [AppTheme.warning.withOpacity(0.2), AppTheme.warning.withOpacity(0.1)],
+              ? [AppTheme.success.withValues(alpha: 0.2), AppTheme.success.withValues(alpha: 0.1)]
+              : [AppTheme.warning.withValues(alpha: 0.2), AppTheme.warning.withValues(alpha: 0.1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -661,8 +657,8 @@ class _ExerciseProgressView extends StatelessWidget {
                       show: true,
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.secondaryColor.withOpacity(0.3),
-                          AppTheme.secondaryColor.withOpacity(0.0),
+                          AppTheme.secondaryColor.withValues(alpha: 0.3),
+                          AppTheme.secondaryColor.withValues(alpha: 0.0),
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,

@@ -104,7 +104,7 @@ class _RoutineCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.2),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -686,7 +686,7 @@ class RoutineDetailScreen extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: AppTheme.primaryColor.withOpacity(0.2),
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.2),
                 child: Text(
                   '${index + 1}',
                   style: const TextStyle(
