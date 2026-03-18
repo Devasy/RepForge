@@ -275,6 +275,38 @@ class StorageService implements IStorageService {
 
   // ==================== EXPORT / IMPORT ====================
 
+  dynamic _normalizeExportValue(dynamic value) {
+    if (value is String) {
+      try {
+        return jsonDecode(value);
+      } catch (_) {
+        return value;
+      }
+    }
+    return value;
+  }
+
+  Map<String, dynamic>? _normalizeImportItem(dynamic item) {
+    if (item is Map<String, dynamic>) {
+      return item;
+    }
+    if (item is Map) {
+      return Map<String, dynamic>.from(item);
+    }
+    if (item is String) {
+      // Backward compatibility for older exports that stored JSON strings.
+      try {
+        final decoded = jsonDecode(item);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
   @override
   Future<String> exportAllData() async {
     // Collect settings as a map
@@ -287,11 +319,21 @@ class StorageService implements IStorageService {
     }
 
     final data = {
-      'sessions': _sessionsBox.values.toList(),
-      'routines': _routinesBoxInstance.values.toList(),
-      'targets': _targetsBoxInstance.values.toList(),
-      'muscleGroups': _muscleGroupsBoxInstance.values.toList(),
-      'customExercises': _customExercisesBoxInstance.values.toList(),
+      'sessions': _sessionsBox.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
+      'routines': _routinesBoxInstance.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
+      'targets': _targetsBoxInstance.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
+      'muscleGroups': _muscleGroupsBoxInstance.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
+      'customExercises': _customExercisesBoxInstance.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
       'settings': settingsMap,
       'exportDate': DateTime.now().toIso8601String(),
       'appVersion': '1.0.6',
@@ -299,24 +341,16 @@ class StorageService implements IStorageService {
     return jsonEncode(data);
   }
 
-  Map<String, dynamic> _decodeItem(dynamic item) {
-    if (item is String) {
-      return jsonDecode(item) as Map<String, dynamic>;
-    }
-    if (item is Map) {
-      return Map<String, dynamic>.from(item);
-    }
-    throw FormatException('Unexpected backup item type: ${item.runtimeType}');
-  }
-
   @override
   Future<void> importData(String jsonData) async {
     final data = jsonDecode(jsonData) as Map<String, dynamic>;
 
     // Import sessions (merge: skip if id already exists)
-    if (data['sessions'] != null) {
-      for (var item in data['sessions']) {
-        final map = _decodeItem(item);
+    final sessions = data['sessions'];
+    if (sessions is List) {
+      for (var item in sessions) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
         final session = WorkoutSession.fromJson(map);
         final existing = await getWorkoutSession(session.id);
         if (existing == null) {
@@ -326,9 +360,11 @@ class StorageService implements IStorageService {
     }
 
     // Import routines (merge: skip if id already exists)
-    if (data['routines'] != null) {
-      for (var item in data['routines']) {
-        final map = _decodeItem(item);
+    final routines = data['routines'];
+    if (routines is List) {
+      for (var item in routines) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
         final routine = Routine.fromJson(map);
         final existing = await getRoutine(routine.id);
         if (existing == null) {
@@ -338,9 +374,11 @@ class StorageService implements IStorageService {
     }
 
     // Import targets (merge: skip if id already exists)
-    if (data['targets'] != null) {
-      for (var item in data['targets']) {
-        final map = _decodeItem(item);
+    final targets = data['targets'];
+    if (targets is List) {
+      for (var item in targets) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
         final target = Target.fromJson(map);
         final existing = await getTarget(target.id);
         if (existing == null) {
@@ -350,9 +388,11 @@ class StorageService implements IStorageService {
     }
 
     // Import muscle groups (merge: skip if id already exists)
-    if (data['muscleGroups'] != null) {
-      for (var item in data['muscleGroups']) {
-        final map = _decodeItem(item);
+    final muscleGroups = data['muscleGroups'];
+    if (muscleGroups is List) {
+      for (var item in muscleGroups) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
         final mg = MuscleGroup.fromJson(map);
         final existing = await getMuscleGroup(mg.id);
         if (existing == null) {
@@ -362,9 +402,11 @@ class StorageService implements IStorageService {
     }
 
     // Import custom exercises (merge: skip if id already exists)
-    if (data['customExercises'] != null) {
-      for (var item in data['customExercises']) {
-        final map = _decodeItem(item);
+    final customExercises = data['customExercises'];
+    if (customExercises is List) {
+      for (var item in customExercises) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
         final exercise = Exercise.fromJson(map);
         final existing = _customExercisesBoxInstance.get(exercise.id);
         if (existing == null) {

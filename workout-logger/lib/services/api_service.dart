@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
@@ -63,14 +64,18 @@ class ApiService {
         'platform': _platform,
         'timestamp': DateTime.now().toUtc().toIso8601String(),
       };
-      final res = await _client.post(
-        Uri.parse('$_baseUrl/heartbeat'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
+      final res = await _client
+          .post(
+            Uri.parse('$_baseUrl/heartbeat'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
       if (res.statusCode != 200) {
         debugPrint('Heartbeat failed: ${res.body}');
       }
+    } on TimeoutException {
+      debugPrint('Heartbeat timeout after 10 seconds');
     } catch (e) {
       debugPrint('Heartbeat error: $e');
     }
@@ -89,14 +94,18 @@ class ApiService {
         'timestamp': DateTime.now().toUtc().toIso8601String(),
         if (metadata != null) 'metadata': metadata,
       };
-      final res = await _client.post(
-        Uri.parse('$_baseUrl/event'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
+      final res = await _client
+          .post(
+            Uri.parse('$_baseUrl/event'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 10));
       if (res.statusCode != 200) {
         debugPrint('Event tracking failed: ${res.body}');
       }
+    } on TimeoutException {
+      debugPrint('Event tracking timeout after 10 seconds');
     } catch (e) {
       debugPrint('Event tracking error: $e');
     }
@@ -115,15 +124,19 @@ class ApiService {
         'report_date': DateTime.now().toUtc().toIso8601String(),
       };
 
-      final response = await _client.post(
-        Uri.parse('$_baseUrl/report'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(payload),
-      );
+      final response = await _client
+          .post(
+            Uri.parse('$_baseUrl/report'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
         debugPrint('Failed to report usage: ${response.body}');
       }
+    } on TimeoutException {
+      debugPrint('Usage report timeout after 10 seconds');
     } catch (e) {
       debugPrint('Error reporting usage: $e');
     }
@@ -133,31 +146,15 @@ class ApiService {
     try {
       final id = await userAppId;
 
-      // Hive stores items as JSON strings – decode them to Maps for the API
-      final decoded = <String, dynamic>{'user_app_id': id};
-      for (final key in data.keys) {
-        final value = data[key];
-        if (value is List) {
-          decoded[key] = value.map((item) {
-            if (item is String) {
-              try {
-                return jsonDecode(item);
-              } catch (_) {
-                return item;
-              }
-            }
-            return item;
-          }).toList();
-        } else {
-          decoded[key] = value;
-        }
-      }
+      final payload = <String, dynamic>{'user_app_id': id, ...data};
 
-      final response = await _client.post(
-        Uri.parse('$_baseUrl/backup'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(decoded),
-      );
+      final response = await _client
+          .post(
+            Uri.parse('$_baseUrl/backup'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(minutes: 2));
 
       if (response.statusCode == 200) {
         return true;
@@ -165,6 +162,9 @@ class ApiService {
         debugPrint('Failed to backup data: ${response.body}');
         return false;
       }
+    } on TimeoutException {
+      debugPrint('Backup upload timeout after 2 minutes');
+      return false;
     } catch (e) {
       debugPrint('Error backing up data: $e');
       return false;
