@@ -37,3 +37,14 @@ The events are deeply integrated in the app lifecycle and UI:
 
 ### Conclusion:
 **The API integration is completely functional, properly typed, resilient to timeouts, and makes all calls successfully.** If you aren't seeing data locally, it may be an issue with MongoDB networking environment variables inside the Railway instance (e.g. `MONGODB_URI`), but the Dart app is properly transmitting the network calls to `https://workout-logger-production-1e93.up.railway.app`.
+
+### Additional User Questions Addressed
+
+**1. How often does the app make heartbeat calls?**
+The heartbeat API call (`/heartbeat`) is **only executed exactly once per app open**. It is not on an interval (like every 5 seconds). The code is executed in the `_initializeApp()` function within `lib/main.dart` which runs when the app is launched.
+
+**2. Is the phone model sent in the heartbeat?**
+**No.** The heartbeat payload currently does *not* capture or send the hardware model of the phone. It only sends:
+- `user_app_id` (a generated UUID unique to the app installation).
+- `platform` (either `"ios"`, `"android"`, `"web"`, `"macos"`, `"windows"`, or `"linux"`).
+- `timestamp` (the exact time the call was sent).
