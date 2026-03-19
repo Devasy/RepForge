@@ -1,0 +1,5 @@
+streamlit~=1.41.0
+pymongo[srv]~=4.10.0
+dnspython~=2.7.0
+pandas~=2.2.0
+plotly~=5.24.0

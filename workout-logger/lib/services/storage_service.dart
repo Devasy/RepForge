@@ -6,6 +6,7 @@
 
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../models/models.dart';
 import '../data/exercise_database.dart';
 import 'interfaces/storage_service_interface.dart';
@@ -32,11 +33,27 @@ class StorageService implements IStorageService {
   late Box<String> _settingsBoxInstance;
   late Box<String> _trainingProgramsBoxInstance;
 
+  String _appVersion = const String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: 'unknown',
+  );
+
   bool _initialized = false;
 
   /// Initialize Hive and open boxes
+  @override
   Future<void> init() async {
     if (_initialized) return;
+
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final version = packageInfo.version;
+      final buildNumber = packageInfo.buildNumber;
+      _appVersion = buildNumber.isNotEmpty ? '$version+$buildNumber' : version;
+    } catch (_) {
+      // Keep build-time fallback from APP_VERSION/unknown in environments
+      // where platform package metadata is unavailable.
+    }
 
     await Hive.initFlutter();
 
@@ -69,10 +86,12 @@ class StorageService implements IStorageService {
 
   // ==================== WORKOUT SESSIONS ====================
 
+  @override
   Future<void> saveWorkoutSession(WorkoutSession session) async {
     await _sessionsBox.put(session.id, jsonEncode(session.toJson()));
   }
 
+  @override
   Future<List<WorkoutSession>> getAllWorkoutSessions() async {
     final sessions = <WorkoutSession>[];
     for (var json in _sessionsBox.values) {
@@ -82,16 +101,19 @@ class StorageService implements IStorageService {
     return sessions;
   }
 
+  @override
   Future<WorkoutSession?> getWorkoutSession(String id) async {
     final json = _sessionsBox.get(id);
     if (json == null) return null;
     return WorkoutSession.fromJson(jsonDecode(json));
   }
 
+  @override
   Future<void> deleteWorkoutSession(String id) async {
     await _sessionsBox.delete(id);
   }
 
+  @override
   Future<List<WorkoutSession>> getSessionsForExercise(String exerciseId) async {
     final allSessions = await getAllWorkoutSessions();
     return allSessions
@@ -101,6 +123,7 @@ class StorageService implements IStorageService {
         .toList();
   }
 
+  @override
   Future<List<WorkoutSession>> getSessionsInDateRange(
     DateTime start,
     DateTime end,
@@ -116,10 +139,12 @@ class StorageService implements IStorageService {
 
   // ==================== ROUTINES ====================
 
+  @override
   Future<void> saveRoutine(Routine routine) async {
     await _routinesBoxInstance.put(routine.id, jsonEncode(routine.toJson()));
   }
 
+  @override
   Future<List<Routine>> getAllRoutines() async {
     final routines = <Routine>[];
     for (var json in _routinesBoxInstance.values) {
@@ -128,22 +153,26 @@ class StorageService implements IStorageService {
     return routines;
   }
 
+  @override
   Future<Routine?> getRoutine(String id) async {
     final json = _routinesBoxInstance.get(id);
     if (json == null) return null;
     return Routine.fromJson(jsonDecode(json));
   }
 
+  @override
   Future<void> deleteRoutine(String id) async {
     await _routinesBoxInstance.delete(id);
   }
 
   // ==================== TARGETS ====================
 
+  @override
   Future<void> saveTarget(Target target) async {
     await _targetsBoxInstance.put(target.id, jsonEncode(target.toJson()));
   }
 
+  @override
   Future<List<Target>> getAllTargets() async {
     final targets = <Target>[];
     for (var json in _targetsBoxInstance.values) {
@@ -152,16 +181,19 @@ class StorageService implements IStorageService {
     return targets;
   }
 
+  @override
   Future<Target?> getTarget(String id) async {
     final json = _targetsBoxInstance.get(id);
     if (json == null) return null;
     return Target.fromJson(jsonDecode(json));
   }
 
+  @override
   Future<void> deleteTarget(String id) async {
     await _targetsBoxInstance.delete(id);
   }
 
+  @override
   Future<List<Target>> getTargetsForExercise(String exerciseId) async {
     final allTargets = await getAllTargets();
     return allTargets.where((t) => t.exerciseId == exerciseId).toList();
@@ -169,6 +201,7 @@ class StorageService implements IStorageService {
 
   // ==================== MUSCLE GROUPS ====================
 
+  @override
   Future<void> updateMuscleGroupGrowthRate(
     String muscleGroupId,
     double rate,
@@ -185,6 +218,7 @@ class StorageService implements IStorageService {
     }
   }
 
+  @override
   Future<List<MuscleGroup>> getAllMuscleGroups() async {
     final groups = <MuscleGroup>[];
     for (var json in _muscleGroupsBoxInstance.values) {
@@ -193,6 +227,7 @@ class StorageService implements IStorageService {
     return groups;
   }
 
+  @override
   Future<MuscleGroup?> getMuscleGroup(String id) async {
     final json = _muscleGroupsBoxInstance.get(id);
     if (json == null) return null;
@@ -201,6 +236,7 @@ class StorageService implements IStorageService {
 
   // ==================== CUSTOM EXERCISES ====================
 
+  @override
   Future<void> saveCustomExercise(Exercise exercise) async {
     await _customExercisesBoxInstance.put(
       exercise.id,
@@ -208,6 +244,7 @@ class StorageService implements IStorageService {
     );
   }
 
+  @override
   Future<List<Exercise>> getCustomExercises() async {
     final exercises = <Exercise>[];
     for (var json in _customExercisesBoxInstance.values) {
@@ -216,11 +253,13 @@ class StorageService implements IStorageService {
     return exercises;
   }
 
+  @override
   Future<void> deleteCustomExercise(String id) async {
     await _customExercisesBoxInstance.delete(id);
   }
 
   /// Get all exercises (built-in + custom)
+  @override
   Future<List<Exercise>> getAllExercises() async {
     final builtIn = ExerciseDatabase.getAll();
     final custom = await getCustomExercises();
@@ -228,6 +267,7 @@ class StorageService implements IStorageService {
   }
 
   /// Get exercise by ID (built-in or custom)
+  @override
   Future<Exercise?> getExercise(String id) async {
     // Check built-in first
     final builtIn = ExerciseDatabase.getById(id);
@@ -244,52 +284,166 @@ class StorageService implements IStorageService {
 
   // ==================== SETTINGS ====================
 
+  @override
   Future<void> saveSetting(String key, String value) async {
     await _settingsBoxInstance.put(key, value);
   }
 
+  @override
   Future<String?> getSetting(String key) async {
     return _settingsBoxInstance.get(key);
   }
 
   // ==================== EXPORT / IMPORT ====================
 
+  dynamic _normalizeExportValue(dynamic value) {
+    if (value is String) {
+      try {
+        return jsonDecode(value);
+      } catch (_) {
+        return value;
+      }
+    }
+    return value;
+  }
+
+  Map<String, dynamic>? _normalizeImportItem(dynamic item) {
+    if (item is Map<String, dynamic>) {
+      return item;
+    }
+    if (item is Map) {
+      return Map<String, dynamic>.from(item);
+    }
+    if (item is String) {
+      // Backward compatibility for older exports that stored JSON strings.
+      try {
+        final decoded = jsonDecode(item);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  @override
   Future<String> exportAllData() async {
+    // Collect settings as a map
+    final settingsMap = <String, String>{};
+    for (final key in _settingsBoxInstance.keys) {
+      final value = _settingsBoxInstance.get(key);
+      if (value != null) {
+        settingsMap[key as String] = value;
+      }
+    }
+
     final data = {
-      'sessions': _sessionsBox.values.toList(),
-      'routines': _routinesBoxInstance.values.toList(),
-      'targets': _targetsBoxInstance.values.toList(),
-      'muscleGroups': _muscleGroupsBoxInstance.values.toList(),
-      'customExercises': _customExercisesBoxInstance.values.toList(),
+      'sessions': _sessionsBox.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
+      'routines': _routinesBoxInstance.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
+      'targets': _targetsBoxInstance.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
+      'muscleGroups': _muscleGroupsBoxInstance.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
+      'customExercises': _customExercisesBoxInstance.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
+      'settings': settingsMap,
       'exportDate': DateTime.now().toIso8601String(),
+      'appVersion': _appVersion,
     };
     return jsonEncode(data);
   }
 
+  @override
   Future<void> importData(String jsonData) async {
     final data = jsonDecode(jsonData) as Map<String, dynamic>;
 
-    // Import sessions
-    if (data['sessions'] != null) {
-      for (var json in data['sessions']) {
-        final session = WorkoutSession.fromJson(jsonDecode(json));
-        await saveWorkoutSession(session);
+    // Import sessions (merge: skip if id already exists)
+    final sessions = data['sessions'];
+    if (sessions is List) {
+      for (var item in sessions) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final session = WorkoutSession.fromJson(map);
+        final existing = await getWorkoutSession(session.id);
+        if (existing == null) {
+          await saveWorkoutSession(session);
+        }
       }
     }
 
-    // Import routines
-    if (data['routines'] != null) {
-      for (var json in data['routines']) {
-        final routine = Routine.fromJson(jsonDecode(json));
-        await saveRoutine(routine);
+    // Import routines (merge: skip if id already exists)
+    final routines = data['routines'];
+    if (routines is List) {
+      for (var item in routines) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final routine = Routine.fromJson(map);
+        final existing = await getRoutine(routine.id);
+        if (existing == null) {
+          await saveRoutine(routine);
+        }
       }
     }
 
-    // Import targets
-    if (data['targets'] != null) {
-      for (var json in data['targets']) {
-        final target = Target.fromJson(jsonDecode(json));
-        await saveTarget(target);
+    // Import targets (merge: skip if id already exists)
+    final targets = data['targets'];
+    if (targets is List) {
+      for (var item in targets) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final target = Target.fromJson(map);
+        final existing = await getTarget(target.id);
+        if (existing == null) {
+          await saveTarget(target);
+        }
+      }
+    }
+
+    // Import muscle groups (merge: skip if id already exists)
+    final muscleGroups = data['muscleGroups'];
+    if (muscleGroups is List) {
+      for (var item in muscleGroups) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final mg = MuscleGroup.fromJson(map);
+        final existing = await getMuscleGroup(mg.id);
+        if (existing == null) {
+          await _muscleGroupsBoxInstance.put(mg.id, jsonEncode(mg.toJson()));
+        }
+      }
+    }
+
+    // Import custom exercises (merge: skip if id already exists)
+    final customExercises = data['customExercises'];
+    if (customExercises is List) {
+      for (var item in customExercises) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final exercise = Exercise.fromJson(map);
+        final existing = _customExercisesBoxInstance.get(exercise.id);
+        if (existing == null) {
+          await saveCustomExercise(exercise);
+        }
+      }
+    }
+
+    // Import settings (merge: skip keys that already exist)
+    if (data['settings'] != null && data['settings'] is Map) {
+      final settings = data['settings'] as Map<String, dynamic>;
+      for (var entry in settings.entries) {
+        final existing = _settingsBoxInstance.get(entry.key);
+        if (existing == null) {
+          await _settingsBoxInstance.put(entry.key, entry.value.toString());
+        }
       }
     }
   }
@@ -328,6 +482,7 @@ class StorageService implements IStorageService {
 
   // ==================== STATS ====================
 
+  @override
   Future<Map<String, dynamic>> getQuickStats() async {
     final sessions = await getAllWorkoutSessions();
     final now = DateTime.now();

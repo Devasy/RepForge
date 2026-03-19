@@ -12,6 +12,7 @@ import 'services/ml_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
 import 'services/workout_provider.dart';
+import 'services/api_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
@@ -56,6 +57,8 @@ class WorkoutLoggerApp extends StatelessWidget {
         Provider<IStorageService>.value(value: _storageService),
         // Provide the ML service interface for direct access if needed
         Provider<IMLService>.value(value: _mlService),
+        // Provide the ApiService singleton via DI
+        Provider<ApiService>.value(value: ApiService()),
         // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
           create: (_) =>
@@ -93,6 +96,20 @@ class _AppInitializerState extends State<AppInitializer> {
     try {
       final provider = context.read<WorkoutProvider>();
       await provider.init();
+
+      // Fire-and-forget analytics in background
+      final api = context.read<ApiService>();
+      api.sendHeartbeat();
+      api.trackEvent('app_open');
+      provider
+          .getQuickStats()
+          .then((stats) {
+            api.reportUsage(stats);
+          })
+          .catchError((e) {
+            debugPrint('Failed to report usage: $e');
+          });
+
       setState(() => _initialized = true);
     } catch (e) {
       setState(() => _error = e.toString());
