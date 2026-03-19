@@ -22,6 +22,7 @@ class StorageService implements IStorageService {
   static const String _muscleGroupsBox = 'muscle_groups';
   static const String _customExercisesBox = 'custom_exercises';
   static const String _settingsBox = 'settings';
+  static const String _trainingProgramsBox = 'training_programs';
 
   late Box<String> _sessionsBox;
   late Box<String> _routinesBoxInstance;
@@ -29,6 +30,7 @@ class StorageService implements IStorageService {
   late Box<String> _muscleGroupsBoxInstance;
   late Box<String> _customExercisesBoxInstance;
   late Box<String> _settingsBoxInstance;
+  late Box<String> _trainingProgramsBoxInstance;
 
   bool _initialized = false;
 
@@ -46,6 +48,9 @@ class StorageService implements IStorageService {
       _customExercisesBox,
     );
     _settingsBoxInstance = await Hive.openBox<String>(_settingsBox);
+    _trainingProgramsBoxInstance = await Hive.openBox<String>(
+      _trainingProgramsBox,
+    );
 
     // Initialize default muscle groups if empty
     if (_muscleGroupsBoxInstance.isEmpty) {
@@ -287,6 +292,38 @@ class StorageService implements IStorageService {
         await saveTarget(target);
       }
     }
+  }
+
+  // ==================== TRAINING PROGRAMS ====================
+
+  @override
+  Future<void> saveTrainingProgram(TrainingProgram program) async {
+    await _trainingProgramsBoxInstance.put(
+      program.id,
+      jsonEncode(program.toJson()),
+    );
+  }
+
+  @override
+  Future<List<TrainingProgram>> getAllTrainingPrograms() async {
+    final programs = <TrainingProgram>[];
+    for (final json in _trainingProgramsBoxInstance.values) {
+      programs.add(TrainingProgram.fromJson(jsonDecode(json)));
+    }
+    programs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return programs;
+  }
+
+  @override
+  Future<TrainingProgram?> getTrainingProgram(String id) async {
+    final json = _trainingProgramsBoxInstance.get(id);
+    if (json == null) return null;
+    return TrainingProgram.fromJson(jsonDecode(json));
+  }
+
+  @override
+  Future<void> deleteTrainingProgram(String id) async {
+    await _trainingProgramsBoxInstance.delete(id);
   }
 
   // ==================== STATS ====================

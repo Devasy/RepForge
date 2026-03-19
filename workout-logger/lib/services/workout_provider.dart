@@ -8,6 +8,7 @@
 // - ExerciseManager: Exercise library
 // - TargetManager: Goals and targets
 // - AnalyticsManager: Statistics and recommendations
+// - ProgramManager: Training programs (multi-week plans)
 //
 // Following Dependency Inversion Principle: this class now depends on
 // abstractions (IStorageService, IMLService) rather than concrete implementations.
@@ -20,6 +21,7 @@ import 'interfaces/storage_service_interface.dart';
 import 'interfaces/ml_service_interface.dart';
 import 'ml_service.dart';
 import 'strategies/target_calculator.dart';
+import 'managers/program_manager.dart';
 
 class WorkoutProvider extends ChangeNotifier {
   final IStorageService _storage;
@@ -34,6 +36,8 @@ class WorkoutProvider extends ChangeNotifier {
   List<Exercise> _allExercises = [];
   final Map<String, GrowthModel> _growthModels =
       {}; // exerciseId -> GrowthModel
+
+  late final ProgramManager programManager;
 
   // Active workout state
   WorkoutSession? _activeSession;
@@ -61,7 +65,9 @@ class WorkoutProvider extends ChangeNotifier {
   /// Following Dependency Inversion Principle: accepts abstractions
   /// rather than concrete implementations.
   WorkoutProvider(this._storage, {IMLService? mlService})
-    : _mlService = mlService ?? MLService();
+    : _mlService = mlService ?? MLService() {
+    programManager = ProgramManager(_storage);
+  }
 
   // ==================== INITIALIZATION ====================
 
@@ -77,6 +83,7 @@ class WorkoutProvider extends ChangeNotifier {
     _targets = await _storage.getAllTargets();
     _muscleGroups = await _storage.getAllMuscleGroups();
     _allExercises = await _storage.getAllExercises();
+    await programManager.loadPrograms();
     notifyListeners();
   }
 
