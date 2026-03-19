@@ -1,0 +1,684 @@
+{
+  "name": "12-Week Aesthetics + Endurance",
+  "description": "A 12-week hypertrophy program targeting aesthetics and endurance. Shoulders, arms, and back prioritised. Progressive overload through 3 phases: Foundation, Intensify, and Peak. Includes knee rehab protocol and programmed deloads at weeks 5 and 9.",
+  "durationWeeks": 12,
+  "trainingDaysPerWeek": 5,
+  "author": "RepForge",
+  "isImported": true,
+  "phases": [
+    {
+      "id": "phase_1",
+      "name": "Foundation",
+      "description": "Build the habit, learn every movement with perfect form. Volume is moderate. Focus on mind-muscle connection. Every set should be felt, not just done.",
+      "startWeek": 1,
+      "endWeek": 4,
+      "defaultSetsDisplay": "3×10",
+      "defaultRestSeconds": 75,
+      "rpeTarget": 7,
+      "isDeloadWeek": false
+    },
+    {
+      "id": "phase_2",
+      "name": "Intensify",
+      "description": "Add a 4th set across all major lifts. Introduce supersets for arms. Rest drops to 60s for isolation work. Visible changes begin — biceps and shoulders get hit directly twice a week.",
+      "startWeek": 5,
+      "endWeek": 8,
+      "defaultSetsDisplay": "4×10",
+      "defaultRestSeconds": 60,
+      "rpeTarget": 8,
+      "isDeloadWeek": false
+    },
+    {
+      "id": "phase_3",
+      "name": "Peak",
+      "description": "Higher reps (12–15), shorter rest (45–60s), tri-sets for arms and shoulders. Maximises muscle endurance and the pump aesthetic — dense, defined muscles.",
+      "startWeek": 9,
+      "endWeek": 12,
+      "defaultSetsDisplay": "4×12",
+      "defaultRestSeconds": 45,
+      "rpeTarget": 9,
+      "isDeloadWeek": false
+    }
+  ],
+  "weeklySchedule": [
+    {
+      "id": "day_mon",
+      "dayOfWeek": "monday",
+      "dayType": "push",
+      "name": "PUSH — Chest + Triceps + Front Delt",
+      "description": "Primary strength lift day. Start session when fresh.",
+      "estimatedDurationMinutes": 55,
+      "isRestDay": false,
+      "exercises": [
+        {
+          "id": "ex_ibp",
+          "exerciseId": "incline_bench_press",
+          "exerciseName": "Incline Bench Press",
+          "orderIndex": 0,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 40 },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 8, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 42.5 },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 45 }
+          ],
+          "tempo": "3-1-1",
+          "restSeconds": 90,
+          "notes": "3s down, 1s pause at bottom, 1s up. Break your 40kg plateau here."
+        },
+        {
+          "id": "ex_fbp",
+          "exerciseId": "flat_bench_press",
+          "exerciseName": "Flat Bench Press",
+          "orderIndex": 1,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 35 },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 37.5 },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 40 }
+          ],
+          "tempo": "2-0-1",
+          "restSeconds": 75,
+          "notes": "Start 5kg lighter than incline. Chest width comes from flat press."
+        },
+        {
+          "id": "ex_pec",
+          "exerciseId": "pec_deck",
+          "exerciseName": "Pec Deck / Cable Fly",
+          "orderIndex": 2,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false }
+          ],
+          "tempo": "2-1-2",
+          "restSeconds": 60,
+          "notes": "Squeeze hard at peak contraction. Hold 1s. Builds chest definition."
+        },
+        {
+          "id": "ex_ohte",
+          "exerciseId": "overhead_tricep_extension",
+          "exerciseName": "Overhead Tricep Extension (Cable)",
+          "orderIndex": 3,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 30 },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 32.5 },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 35 }
+          ],
+          "tempo": "3-0-1",
+          "restSeconds": 60,
+          "notes": "Long head of tricep — biggest part. Elbows stay still, only forearm moves."
+        },
+        {
+          "id": "ex_tpd_ss",
+          "exerciseId": "tricep_pushdown",
+          "exerciseName": "Tricep Pushdown (rope)",
+          "orderIndex": 4,
+          "supersetGroup": "A",
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false }
+          ],
+          "tempo": "2-1-1",
+          "restSeconds": 0,
+          "notes": "SUPERSET with Lateral Raise (P2/P3). Flare elbows out at bottom."
+        },
+        {
+          "id": "ex_lr_ss",
+          "exerciseId": "lateral_raise",
+          "exerciseName": "Lateral Raise (standing DB)",
+          "orderIndex": 5,
+          "supersetGroup": "B",
+          "setSchemes": [
+            { "phaseId": "phase_2", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 10 },
+            { "phaseId": "phase_3", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 11.25 }
+          ],
+          "tempo": "2-1-2",
+          "restSeconds": 60,
+          "notes": "Added in Phase 2. Slight forward lean, lead with elbows not hands."
+        }
+      ]
+    },
+    {
+      "id": "day_tue",
+      "dayOfWeek": "tuesday",
+      "dayType": "rest",
+      "name": "REST + REHAB",
+      "description": "Wall Sits · Tibialis Raises · Clamshells · TKE",
+      "estimatedDurationMinutes": 20,
+      "isRestDay": true,
+      "exercises": []
+    },
+    {
+      "id": "day_wed",
+      "dayOfWeek": "wednesday",
+      "dayType": "core",
+      "name": "CORE — Anti-rotation + Stability",
+      "description": "Better core = better on every other lift. Log this!",
+      "estimatedDurationMinutes": 32,
+      "isRestDay": false,
+      "exercises": [
+        {
+          "id": "ex_plank",
+          "exerciseId": "plank",
+          "exerciseName": "Plank",
+          "orderIndex": 0,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 30, "maxReps": 45, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 45, "maxReps": 60, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 3, "minReps": 60, "maxReps": 60, "isAmrap": false }
+          ],
+          "tempo": "controlled",
+          "restSeconds": 45,
+          "notes": "Straight line head to heel. Track time improvements week to week."
+        },
+        {
+          "id": "ex_deadbug",
+          "exerciseId": "dead_bug",
+          "exerciseName": "Dead Bug",
+          "orderIndex": 1,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 10, "maxReps": 10, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 10, "maxReps": 10, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false }
+          ],
+          "tempo": "3-1-3",
+          "restSeconds": 45,
+          "notes": "Lower back pressed flat to floor. Opposite arm + leg extend slowly."
+        },
+        {
+          "id": "ex_pallof",
+          "exerciseId": "pallof_press",
+          "exerciseName": "Pallof Press (cable)",
+          "orderIndex": 2,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 12, "maxReps": 12, "isAmrap": false }
+          ],
+          "tempo": "2-2-2",
+          "restSeconds": 45,
+          "notes": "Anti-rotation. Stand sideways to cable, press out and hold."
+        },
+        {
+          "id": "ex_cablecrunch",
+          "exerciseId": "cable_crunch",
+          "exerciseName": "Cable Crunch",
+          "orderIndex": 3,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false }
+          ],
+          "tempo": "2-1-2",
+          "restSeconds": 45,
+          "notes": "Kneel facing cable, rope behind head, crunch down. Weighted ab work."
+        }
+      ]
+    },
+    {
+      "id": "day_thu",
+      "dayOfWeek": "thursday",
+      "dayType": "pull",
+      "name": "PULL — Back + Biceps + Rear Delt",
+      "description": "This day fixes your arm visibility problem directly.",
+      "estimatedDurationMinutes": 58,
+      "isRestDay": false,
+      "exercises": [
+        {
+          "id": "ex_row",
+          "exerciseId": "seated_cable_row",
+          "exerciseName": "Seated Cable Row",
+          "orderIndex": 0,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 85 },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 90 },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 92.5 }
+          ],
+          "tempo": "2-1-2",
+          "restSeconds": 90,
+          "notes": "Your strongest lift (85kg). Row to lower chest, squeeze scapula."
+        },
+        {
+          "id": "ex_lpd",
+          "exerciseId": "lat_pulldown",
+          "exerciseName": "Lat Pulldown (wide grip)",
+          "orderIndex": 1,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 55 },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 57.5 },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 60 }
+          ],
+          "tempo": "2-1-2",
+          "restSeconds": 75,
+          "notes": "Lean back slightly, pull to upper chest, full stretch at top."
+        },
+        {
+          "id": "ex_pullup",
+          "exerciseId": "pull_ups",
+          "exerciseName": "Pull-ups / Assisted Pull-ups",
+          "orderIndex": 2,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 1, "maxReps": 20, "isAmrap": true },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 1, "maxReps": 20, "isAmrap": true },
+            { "phaseId": "phase_3", "sets": 3, "minReps": 1, "maxReps": 20, "isAmrap": true }
+          ],
+          "tempo": "2-0-1",
+          "restSeconds": 90,
+          "notes": "Track reps week to week. Target +3 reps vs Week 1 by end."
+        },
+        {
+          "id": "ex_rdf",
+          "exerciseId": "rear_delt_fly",
+          "exerciseName": "Rear Delt Fly",
+          "orderIndex": 3,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 35 },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 37.5 },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 40 }
+          ],
+          "tempo": "2-1-2",
+          "restSeconds": 60,
+          "notes": "Makes shoulders look 3D. Lead with elbows, squeeze at top."
+        },
+        {
+          "id": "ex_preacher",
+          "exerciseId": "preacher_curl",
+          "exerciseName": "Preacher Curl (EZ bar)",
+          "orderIndex": 4,
+          "supersetGroup": "A",
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 15 },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 16 },
+            { "phaseId": "phase_3", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 17.5 }
+          ],
+          "tempo": "3-1-1",
+          "restSeconds": 0,
+          "notes": "SUPERSET with Hammer Curl. 3s eccentric (down) = key to bicep growth."
+        },
+        {
+          "id": "ex_hammer",
+          "exerciseId": "hammer_curl",
+          "exerciseName": "Hammer Curl (DB, alternating)",
+          "orderIndex": 5,
+          "supersetGroup": "B",
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 10 },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 11.25 },
+            { "phaseId": "phase_3", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 12.5 }
+          ],
+          "tempo": "2-1-2",
+          "restSeconds": 60,
+          "notes": "Brachialis = arm thickness. No swinging — strict form only."
+        }
+      ]
+    },
+    {
+      "id": "day_fri",
+      "dayOfWeek": "friday",
+      "dayType": "shoulders",
+      "name": "SHOULDERS + ARMS — Dedicated Day",
+      "description": "THE session that changes how you look in a t-shirt.",
+      "estimatedDurationMinutes": 60,
+      "isRestDay": false,
+      "exercises": [
+        {
+          "id": "ex_dbsp",
+          "exerciseId": "db_shoulder_press",
+          "exerciseName": "DB Shoulder Press (seated)",
+          "orderIndex": 0,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 12 },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 14 },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 16 }
+          ],
+          "tempo": "2-1-1",
+          "restSeconds": 90,
+          "notes": "Elbows at 45°, don't flare out wide. Primary overhead press."
+        },
+        {
+          "id": "ex_lrseated",
+          "exerciseId": "lateral_raise_seated",
+          "exerciseName": "Lateral Raise (seated DB)",
+          "orderIndex": 1,
+          "supersetGroup": "A",
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 8 },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 10 },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 11.25 }
+          ],
+          "tempo": "2-1-3",
+          "restSeconds": 0,
+          "notes": "SUPERSET with Rear Delt Fly. 3s SLOW on the way down — eccentric is where lateral head grows."
+        },
+        {
+          "id": "ex_rdfly",
+          "exerciseId": "rear_delt_fly_cable",
+          "exerciseName": "Rear Delt Fly (cable, bent-over)",
+          "orderIndex": 2,
+          "supersetGroup": "B",
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false }
+          ],
+          "tempo": "2-1-2",
+          "restSeconds": 60,
+          "notes": "Shoulders look 3D from every angle. Hit twice a week (also Thu)."
+        },
+        {
+          "id": "ex_uprow",
+          "exerciseId": "upright_row",
+          "exerciseName": "Upright Row (cable)",
+          "orderIndex": 3,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 12, "maxReps": 12, "isAmrap": false }
+          ],
+          "tempo": "2-1-2",
+          "restSeconds": 60,
+          "notes": "Keep bar/cable close to body, elbows above wrists. Don't go heavy."
+        },
+        {
+          "id": "ex_ezcurl",
+          "exerciseId": "ez_bar_curl",
+          "exerciseName": "EZ Bar Curl",
+          "orderIndex": 4,
+          "supersetGroup": "A",
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 10, "maxReps": 10, "isAmrap": false, "suggestedWeightKg": 15 },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 17.5 },
+            { "phaseId": "phase_3", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 20 }
+          ],
+          "tempo": "3-1-1",
+          "restSeconds": 0,
+          "notes": "SUPERSET with Tricep Pushdown. Arms superset = maximum pump in 6 min."
+        },
+        {
+          "id": "ex_tpdfri",
+          "exerciseId": "tricep_pushdown_straight",
+          "exerciseName": "Tricep Pushdown (straight bar)",
+          "orderIndex": 5,
+          "supersetGroup": "B",
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 35 },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false, "suggestedWeightKg": 37.5 },
+            { "phaseId": "phase_3", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false, "suggestedWeightKg": 40 }
+          ],
+          "tempo": "2-1-1",
+          "restSeconds": 45,
+          "notes": "Keep rest to 45s for metabolic stress. Builds visible arms."
+        }
+      ]
+    },
+    {
+      "id": "day_sat",
+      "dayOfWeek": "saturday",
+      "dayType": "legs",
+      "name": "LEGS + KNEE REHAB",
+      "description": "Modified for knee rehab — no squats, no lunges. Progressive and safe.",
+      "estimatedDurationMinutes": 55,
+      "isRestDay": false,
+      "exercises": [
+        {
+          "id": "ex_legpress",
+          "exerciseId": "leg_press",
+          "exerciseName": "Leg Press (high foot placement)",
+          "orderIndex": 0,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false }
+          ],
+          "tempo": "3-1-1",
+          "restSeconds": 90,
+          "notes": "High foot = glutes/hamstrings dominant, less knee stress. Don't lock out."
+        },
+        {
+          "id": "ex_legcurl",
+          "exerciseId": "leg_curl",
+          "exerciseName": "Leg Curl (machine)",
+          "orderIndex": 1,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 4, "minReps": 12, "maxReps": 12, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 4, "minReps": 15, "maxReps": 15, "isAmrap": false }
+          ],
+          "tempo": "3-1-1",
+          "restSeconds": 75,
+          "notes": "Slow eccentric (3s down). Helps knee stability long-term."
+        },
+        {
+          "id": "ex_legext",
+          "exerciseId": "leg_extension",
+          "exerciseName": "Leg Extension (light, rehab)",
+          "orderIndex": 2,
+          "supersetGroup": null,
+          "setSchemes": [
+            { "phaseId": "phase_1", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false },
+            { "phaseId": "phase_2", "sets": 3, "minReps": 15, "maxReps": 15, "isAmrap": false },
+            { "phaseId": "phase_3", "sets": 3, "minReps": 20, "maxReps": 20, "isAmrap": false }
+          ],
+          "tempo": "2-1-2",
+          "restSeconds": 60,
+          "notes": "Rehab stimulus, not strength. Pain = stop immediately."
+        }
+      ]
+    },
+    {
+      "id": "day_sun",
+      "dayOfWeek": "sunday",
+      "dayType": "rest",
+      "name": "REST",
+      "description": "Walk / stretch / full recovery.",
+      "estimatedDurationMinutes": 0,
+      "isRestDay": true,
+      "exercises": []
+    }
+  ],
+  "milestones": [
+    {
+      "id": "ms_w2",
+      "weekNumber": 2,
+      "title": "Foundation Locked",
+      "description": "You should be hitting every exercise with clean form. Focus especially on feeling your biceps, not just moving the weight.",
+      "phaseId": "phase_1",
+      "targets": [
+        { "description": "All 5 days completed" },
+        { "description": "Plank ≥ 30s" },
+        { "description": "Knee rehab done Tue + Sat" },
+        { "description": "Bicep curl with full 3s eccentric" }
+      ]
+    },
+    {
+      "id": "ms_w4",
+      "weekNumber": 4,
+      "title": "First Strength Benchmarks",
+      "description": "By week 4 you should have baseline numbers across every lift. These will be your reference point for all future progression.",
+      "phaseId": "phase_1",
+      "targets": [
+        { "description": "Incline Bench → 42.5kg × 10", "exerciseId": "incline_bench_press", "targetWeightKg": 42.5, "targetReps": 10 },
+        { "description": "Cable Row → 87.5kg × 10", "exerciseId": "seated_cable_row", "targetWeightKg": 87.5, "targetReps": 10 },
+        { "description": "Lat Pulldown → 57.5kg × 10", "exerciseId": "lat_pulldown", "targetWeightKg": 57.5, "targetReps": 10 },
+        { "description": "Preacher Curl → 16kg × 12", "exerciseId": "preacher_curl", "targetWeightKg": 16, "targetReps": 12 },
+        { "description": "Plank → 45s" },
+        { "description": "Wall Sit → 45s" }
+      ]
+    },
+    {
+      "id": "ms_w6",
+      "weekNumber": 6,
+      "title": "Visible Changes Begin",
+      "description": "Shoulders should look noticeably wider than week 1. Arms should feel different when you flex.",
+      "phaseId": "phase_2",
+      "targets": [
+        { "description": "Lat Pulldown → 60kg × 10", "exerciseId": "lat_pulldown", "targetWeightKg": 60, "targetReps": 10 },
+        { "description": "Hammer Curl → 11.25kg × 12", "exerciseId": "hammer_curl", "targetWeightKg": 11.25, "targetReps": 12 },
+        { "description": "Lateral Raise → 11.25kg × 12", "exerciseId": "lateral_raise", "targetWeightKg": 11.25, "targetReps": 12 },
+        { "description": "Supersets introduced on Thu + Fri" },
+        { "description": "TKE — zero pain with 3 sets" }
+      ]
+    },
+    {
+      "id": "ms_w8",
+      "weekNumber": 8,
+      "title": "Major Strength Jump",
+      "description": "Your arms and shoulders should now be visibly developed. 8 weeks of consistent training translates to meaningful weight increases.",
+      "phaseId": "phase_2",
+      "targets": [
+        { "description": "Incline Bench → 45kg × 10", "exerciseId": "incline_bench_press", "targetWeightKg": 45, "targetReps": 10 },
+        { "description": "Cable Row → 92.5kg × 10", "exerciseId": "seated_cable_row", "targetWeightKg": 92.5, "targetReps": 10 },
+        { "description": "Preacher Curl → 17.5kg × 12", "exerciseId": "preacher_curl", "targetWeightKg": 17.5, "targetReps": 12 },
+        { "description": "EZ Bar Curl → 20kg × 12", "exerciseId": "ez_bar_curl", "targetWeightKg": 20, "targetReps": 12 },
+        { "description": "Shoulder Press → 14–16kg × 10" },
+        { "description": "Plank → 60s" },
+        { "description": "Pull-ups → +2 reps vs Week 1" }
+      ]
+    },
+    {
+      "id": "ms_w10",
+      "weekNumber": 10,
+      "title": "Endurance + Definition Peak",
+      "description": "Muscles will appear fuller even on rest days. You'll need more water and food to support this phase.",
+      "phaseId": "phase_3",
+      "targets": [
+        { "description": "All tri-sets completed on Fri" },
+        { "description": "45s rest maintained on arm isolation" },
+        { "description": "Leg press → 10kg more than W1" }
+      ]
+    },
+    {
+      "id": "ms_w12",
+      "weekNumber": 12,
+      "title": "12-Week Transformation Complete",
+      "description": "Wider shoulders, defined arms, better posture from back work, functional core. People will notice.",
+      "phaseId": "phase_3",
+      "targets": [
+        { "description": "Incline Bench → 47.5–50kg × 10", "exerciseId": "incline_bench_press", "targetWeightKg": 50, "targetReps": 10 },
+        { "description": "Cable Row → 95kg × 10", "exerciseId": "seated_cable_row", "targetWeightKg": 95, "targetReps": 10 },
+        { "description": "Preacher Curl → 18–20kg × 12", "exerciseId": "preacher_curl", "targetWeightKg": 20, "targetReps": 12 },
+        { "description": "EZ Bar Curl → 22.5kg × 12", "exerciseId": "ez_bar_curl", "targetWeightKg": 22.5, "targetReps": 12 },
+        { "description": "Shoulder Press → 17.5–20kg × 10" },
+        { "description": "Lateral Raise → 12.5kg × 15", "exerciseId": "lateral_raise", "targetWeightKg": 12.5, "targetReps": 15 },
+        { "description": "Pull-ups → +3 reps vs Week 1" },
+        { "description": "Plank → 75s" },
+        { "description": "Knee pain-free on daily activities" }
+      ]
+    }
+  ],
+  "progressionRules": [
+    {
+      "exerciseId": "incline_bench_press",
+      "exerciseName": "Incline Bench Press",
+      "liftType": "compound",
+      "currentWeightKg": 40,
+      "incrementKg": 2.5,
+      "weekTargets": [
+        { "weekNumber": 4, "targetWeightKg": 42.5, "targetReps": 10 },
+        { "weekNumber": 8, "targetWeightKg": 45, "targetReps": 10 },
+        { "weekNumber": 12, "targetWeightKg": 50, "targetReps": 10 }
+      ],
+      "keyNote": "Repeat same weight next session if you fail mid-set"
+    },
+    {
+      "exerciseId": "seated_cable_row",
+      "exerciseName": "Seated Cable Row",
+      "liftType": "compound",
+      "currentWeightKg": 85,
+      "incrementKg": 2.5,
+      "weekTargets": [
+        { "weekNumber": 4, "targetWeightKg": 87.5, "targetReps": 10 },
+        { "weekNumber": 8, "targetWeightKg": 92.5, "targetReps": 10 },
+        { "weekNumber": 12, "targetWeightKg": 95, "targetReps": 10 }
+      ],
+      "keyNote": null
+    },
+    {
+      "exerciseId": "preacher_curl",
+      "exerciseName": "Preacher Curl",
+      "liftType": "isolation",
+      "currentWeightKg": 15,
+      "incrementKg": 1.25,
+      "weekTargets": [
+        { "weekNumber": 4, "targetWeightKg": 16, "targetReps": 12 },
+        { "weekNumber": 8, "targetWeightKg": 17.5, "targetReps": 12 },
+        { "weekNumber": 12, "targetWeightKg": 20, "targetReps": 12 }
+      ],
+      "keyNote": "3s eccentric every rep — non-negotiable"
+    },
+    {
+      "exerciseId": "hammer_curl",
+      "exerciseName": "Hammer Curl",
+      "liftType": "isolation",
+      "currentWeightKg": 10,
+      "incrementKg": 1.25,
+      "weekTargets": [
+        { "weekNumber": 4, "targetWeightKg": 11.25, "targetReps": 12 },
+        { "weekNumber": 8, "targetWeightKg": 12.5, "targetReps": 12 },
+        { "weekNumber": 12, "targetWeightKg": 15, "targetReps": 12 }
+      ],
+      "keyNote": null
+    },
+    {
+      "exerciseId": "lateral_raise",
+      "exerciseName": "Lateral Raise",
+      "liftType": "isolation",
+      "currentWeightKg": 10,
+      "incrementKg": 1.25,
+      "weekTargets": [
+        { "weekNumber": 4, "targetWeightKg": 10, "targetReps": 15, "notes": "Reps first before adding weight" },
+        { "weekNumber": 8, "targetWeightKg": 11.25, "targetReps": 12 },
+        { "weekNumber": 12, "targetWeightKg": 12.5, "targetReps": 15 }
+      ],
+      "keyNote": "3s slow eccentric on the way down"
+    },
+    {
+      "exerciseId": "lat_pulldown",
+      "exerciseName": "Lat Pulldown",
+      "liftType": "compound",
+      "currentWeightKg": 55,
+      "incrementKg": 2.5,
+      "weekTargets": [
+        { "weekNumber": 4, "targetWeightKg": 57.5, "targetReps": 10 },
+        { "weekNumber": 6, "targetWeightKg": 60, "targetReps": 10 },
+        { "weekNumber": 12, "targetWeightKg": 62.5, "targetReps": 10 }
+      ],
+      "keyNote": null
+    }
+  ],
+  "deloadWeeks": [
+    {
+      "weekNumber": 5,
+      "weightReductionPercent": 0.12,
+      "maxSets": 2,
+      "notes": "Start of Phase 2 — joints and tendons need recovery"
+    },
+    {
+      "weekNumber": 9,
+      "weightReductionPercent": 0.12,
+      "maxSets": 2,
+      "notes": "Start of Phase 3 — prevents overuse injury, come back stronger"
+    }
+  ],
+  "metadata": {
+    "repRange": "8–15",
+    "setsPerMusclePerWeek": "~16",
+    "sessionDurationMinutes": 60,
+    "tags": ["aesthetics", "hypertrophy", "knee-friendly", "push-pull-legs"]
+  }
+}

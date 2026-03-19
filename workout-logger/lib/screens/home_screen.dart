@@ -10,6 +10,7 @@ import 'workout_flow_screen.dart';
 import 'history_screen.dart';
 import 'routines_screen.dart';
 import 'analytics_screen.dart';
+import 'training_programs_screen.dart';
 import 'exercise_library_screen.dart';
 import 'settings_screen.dart';
 
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
           DashboardTab(),
           HistoryScreen(),
           RoutinesScreen(),
+          TrainingProgramsScreen(),
           AnalyticsScreen(),
         ],
       ),
@@ -55,7 +57,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildNavItem(0, Icons.home_rounded, 'Home'),
                 _buildNavItem(1, Icons.history_rounded, 'History'),
                 _buildNavItem(2, Icons.list_alt_rounded, 'Routines'),
-                _buildNavItem(3, Icons.analytics_rounded, 'Analytics'),
+                _buildNavItem(3, Icons.menu_book_rounded, 'Programs'),
+                _buildNavItem(4, Icons.analytics_rounded, 'Analytics'),
               ],
             ),
           ),

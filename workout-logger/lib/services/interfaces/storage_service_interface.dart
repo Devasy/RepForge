@@ -68,4 +68,18 @@ abstract class IStorageService {
   // ==================== STATS ====================
 
   Future<Map<String, dynamic>> getQuickStats();
+
+  // ==================== TRAINING PROGRAMS ====================
+
+  Future<void> saveTrainingProgram(TrainingProgram program);
+  Future<List<TrainingProgram>> getAllTrainingPrograms();
+  Future<TrainingProgram?> getTrainingProgram(String id);
+  Future<void> deleteTrainingProgram(String id);
+
+  // ==================== PROGRAM ENROLLMENTS ====================
+
+  Future<void> saveEnrollment(ProgramEnrollment enrollment);
+  Future<List<ProgramEnrollment>> getAllEnrollments();
+  Future<ProgramEnrollment?> getActiveEnrollment();
+  Future<void> deleteEnrollment(String id);
 }

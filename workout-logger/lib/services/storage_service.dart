@@ -23,6 +23,8 @@ class StorageService implements IStorageService {
   static const String _muscleGroupsBox = 'muscle_groups';
   static const String _customExercisesBox = 'custom_exercises';
   static const String _settingsBox = 'settings';
+  static const String _trainingProgramsBox = 'training_programs';
+  static const String _enrollmentsBox = 'program_enrollments';
 
   late Box<String> _sessionsBox;
   late Box<String> _routinesBoxInstance;
@@ -30,6 +32,8 @@ class StorageService implements IStorageService {
   late Box<String> _muscleGroupsBoxInstance;
   late Box<String> _customExercisesBoxInstance;
   late Box<String> _settingsBoxInstance;
+  late Box<String> _trainingProgramsBoxInstance;
+  late Box<String> _enrollmentsBoxInstance;
 
   String _appVersion = const String.fromEnvironment(
     'APP_VERSION',
@@ -63,6 +67,10 @@ class StorageService implements IStorageService {
       _customExercisesBox,
     );
     _settingsBoxInstance = await Hive.openBox<String>(_settingsBox);
+    _trainingProgramsBoxInstance = await Hive.openBox<String>(
+      _trainingProgramsBox,
+    );
+    _enrollmentsBoxInstance = await Hive.openBox<String>(_enrollmentsBox);
 
     // Initialize default muscle groups if empty
     if (_muscleGroupsBoxInstance.isEmpty) {
@@ -441,6 +449,72 @@ class StorageService implements IStorageService {
         }
       }
     }
+  }
+
+  // ==================== TRAINING PROGRAMS ====================
+
+  @override
+  Future<void> saveTrainingProgram(TrainingProgram program) async {
+    await _trainingProgramsBoxInstance.put(
+      program.id,
+      jsonEncode(program.toJson()),
+    );
+  }
+
+  @override
+  Future<List<TrainingProgram>> getAllTrainingPrograms() async {
+    final programs = <TrainingProgram>[];
+    for (var json in _trainingProgramsBoxInstance.values) {
+      programs.add(TrainingProgram.fromJson(jsonDecode(json)));
+    }
+    programs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return programs;
+  }
+
+  @override
+  Future<TrainingProgram?> getTrainingProgram(String id) async {
+    final json = _trainingProgramsBoxInstance.get(id);
+    if (json == null) return null;
+    return TrainingProgram.fromJson(jsonDecode(json));
+  }
+
+  @override
+  Future<void> deleteTrainingProgram(String id) async {
+    await _trainingProgramsBoxInstance.delete(id);
+  }
+
+  // ==================== PROGRAM ENROLLMENTS ====================
+
+  @override
+  Future<void> saveEnrollment(ProgramEnrollment enrollment) async {
+    await _enrollmentsBoxInstance.put(
+      enrollment.id,
+      jsonEncode(enrollment.toJson()),
+    );
+  }
+
+  @override
+  Future<List<ProgramEnrollment>> getAllEnrollments() async {
+    final enrollments = <ProgramEnrollment>[];
+    for (var json in _enrollmentsBoxInstance.values) {
+      enrollments.add(ProgramEnrollment.fromJson(jsonDecode(json)));
+    }
+    return enrollments;
+  }
+
+  @override
+  Future<ProgramEnrollment?> getActiveEnrollment() async {
+    final all = await getAllEnrollments();
+    try {
+      return all.firstWhere((e) => e.isActive);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> deleteEnrollment(String id) async {
+    await _enrollmentsBoxInstance.delete(id);
   }
 
   // ==================== STATS ====================
