@@ -13,8 +13,16 @@ import 'exercise_library_screen.dart';
 class WorkoutFlowScreen extends StatefulWidget {
   final Routine? routine;
   final bool isQuickStart;
+  final ProgramDay? programDay;
+  final ProgramWeek? programWeek;
 
-  const WorkoutFlowScreen({super.key, this.routine, this.isQuickStart = false});
+  const WorkoutFlowScreen({
+    super.key,
+    this.routine,
+    this.isQuickStart = false,
+    this.programDay,
+    this.programWeek,
+  });
 
   @override
   State<WorkoutFlowScreen> createState() => _WorkoutFlowScreenState();
@@ -49,10 +57,24 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     });
   }
 
+  ProgramExerciseSlot? _slotForIndex(int idx) {
+    if (widget.programDay == null) return null;
+    final slots = widget.programDay!.exercises;
+    return idx < slots.length ? slots[idx] : null;
+  }
+
   void _initializeWorkout() {
     final provider = context.read<WorkoutProvider>();
 
-    if (widget.routine != null) {
+    if (widget.programDay != null) {
+      final exerciseIds =
+          widget.programDay!.exercises.map((s) => s.exerciseId).toList();
+      provider.startWorkout(exerciseIds: exerciseIds);
+      // Set initial rest time from first slot
+      final firstSlot = _slotForIndex(0);
+      if (firstSlot != null) _restSeconds = firstSlot.restSeconds;
+      _loadLastSessionData();
+    } else if (widget.routine != null) {
       provider.startWorkout(routine: widget.routine);
       _loadLastSessionData();
     } else if (widget.isQuickStart) {
@@ -160,6 +182,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Program metadata banner (shown only in program-mode)
+                _buildProgramMetaBanner(provider),
+
                 // Recommendation card
                 if (recommendations.isNotEmpty && currentLog != null)
                   _buildRecommendationCard(
@@ -170,7 +195,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 const SizedBox(height: AppSpacing.lg),
 
                 // Weight and reps input
-                if (!_isDropset) _buildInputSection(),
+                if (!_isDropset) _buildInputSection(provider),
 
                 if (!_isDropset) const SizedBox(height: AppSpacing.md),
 
@@ -345,13 +370,19 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     );
   }
 
-  Widget _buildInputSection() {
+  Widget _buildInputSection(WorkoutProvider provider) {
+    final exerciseId = provider.currentExercise?.id ?? '';
+    final isAssistedBodyweight =
+        exerciseId == 'pull_ups' || exerciseId == 'chin_ups';
+    final weightLabel =
+        isAssistedBodyweight ? 'Assist kg (0=BW)' : 'Weight (kg)';
+
     return Row(
       children: [
         // Weight input
         Expanded(
           child: _buildNumberInput(
-            label: 'Weight (kg)',
+            label: weightLabel,
             value: _currentWeight,
             onChanged: (val) => setState(() => _currentWeight = val),
             step: _currentWeight < 40 ? 2.5 : 5,
@@ -927,6 +958,118 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     );
   }
 
+  // ==================== Program Meta Banner ====================
+
+  Widget _buildProgramMetaBanner(WorkoutProvider provider) {
+    if (widget.programDay == null || widget.programWeek == null) {
+      return const SizedBox.shrink();
+    }
+    final slot = _slotForIndex(provider.currentExerciseIndex);
+    if (slot == null) return const SizedBox.shrink();
+
+    final week = widget.programWeek!;
+    final displaySets = week.isDeload
+        ? (slot.sets - week.deloadSetReduction).clamp(1, 99)
+        : slot.sets;
+    final repRange = slot.minReps == slot.maxReps
+        ? '${slot.minReps} reps'
+        : '${slot.minReps}–${slot.maxReps} reps';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: week.isDeload
+              ? Colors.amber.withOpacity(0.4)
+              : AppTheme.primaryColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (week.isDeload) ...[
+                const Icon(
+                  Icons.battery_charging_full,
+                  size: 14,
+                  color: Colors.amber,
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  'DELOAD  ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.amber,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
+              Text(
+                'Target: $displaySets × $repRange',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: 4,
+            children: [
+              _programChip(
+                Icons.timer_outlined,
+                '${slot.restSeconds}s rest',
+                AppTheme.textSecondary,
+              ),
+              if (slot.tempo != null)
+                _programChip(Icons.speed, 'Tempo ${slot.tempo}', AppTheme.secondaryColor),
+              if (slot.weightPercentage != null)
+                _programChip(
+                  Icons.fitness_center,
+                  week.isDeload
+                      ? '${(slot.weightPercentage! * week.deloadIntensityFactor).toStringAsFixed(0)}% 1RM'
+                      : '${slot.weightPercentage!.toStringAsFixed(0)}% 1RM',
+                  AppTheme.primaryColor,
+                ),
+              if (slot.supersetGroupId != null)
+                _programChip(Icons.link, 'Superset', AppTheme.secondaryColor),
+            ],
+          ),
+          if (slot.notes != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              slot.notes!,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppTheme.textMuted,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _programChip(IconData icon, String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: color),
+        const SizedBox(width: 3),
+        Text(label, style: TextStyle(fontSize: 11, color: color)),
+      ],
+    );
+  }
+
   // ==================== Rest Timer View ====================
 
   Widget _buildRestTimerView() {
@@ -1027,6 +1170,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _completeSet() {
     final provider = context.read<WorkoutProvider>();
+    final currentIdx = provider.currentExerciseIndex;
+    final currentSlot = _slotForIndex(currentIdx);
+    final nextSlot = _slotForIndex(currentIdx + 1);
 
     final set = WorkoutSet(
       weight: _currentWeight,
@@ -1037,6 +1183,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
     provider.addSet(set);
     HapticFeedback.heavyImpact();
+
+    // Update rest time from current slot
+    if (currentSlot != null) {
+      _restSeconds = currentSlot.restSeconds;
+    }
 
     // Reset dropset state and dispose controllers to prevent memory leaks
     setState(() {
@@ -1053,8 +1204,20 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       _drops.clear();
     });
 
-    // Start rest timer
-    _startRestTimer();
+    // Superset auto-advance: if next exercise is in the same superset group,
+    // advance immediately without a rest timer
+    final isSupersetPair = currentSlot?.supersetGroupId != null &&
+        nextSlot?.supersetGroupId == currentSlot?.supersetGroupId;
+
+    if (isSupersetPair) {
+      provider.nextExercise();
+      _loadLastSessionData();
+      // Apply the next slot's rest time so the subsequent rest is correct
+      final newSlot = _slotForIndex(provider.currentExerciseIndex);
+      if (newSlot != null) setState(() => _restSeconds = newSlot.restSeconds);
+    } else {
+      _startRestTimer();
+    }
   }
 
   void _startRestTimer() {

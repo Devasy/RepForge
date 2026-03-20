@@ -11,6 +11,7 @@ import 'dart:ui' show FontFeature;
 import '../../models/models.dart';
 import '../../services/workout_provider.dart';
 import '../../theme/app_theme.dart';
+import '../workout_flow_screen.dart';
 
 class ProgramDetailScreen extends StatefulWidget {
   final TrainingProgram program;
@@ -515,6 +516,28 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                   .toList(),
             );
           }),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => WorkoutFlowScreen(
+                    programDay: day,
+                    programWeek: week,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.play_arrow, size: 18),
+              label: Text('Start ${day.name}'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
         ],
       ),
     );
