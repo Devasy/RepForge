@@ -345,6 +345,14 @@ class WorkoutProvider extends ChangeNotifier {
     return false;
   }
 
+  /// Jump directly to an exercise by index
+  void goToExercise(int index) {
+    if (index >= 0 && index < _currentExerciseLogs.length) {
+      _currentExerciseIndex = index;
+      notifyListeners();
+    }
+  }
+
   /// Finish workout and save
   Future<WorkoutSession> finishWorkout({String? notes}) async {
     final duration = _workoutStartTime != null

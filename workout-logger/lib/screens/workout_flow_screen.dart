@@ -35,6 +35,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   Timer? _restTimer;
   int _remainingSeconds = 0;
 
+  // Superset cycling: index to return to after rest (null = no return)
+  int? _supersetReturnIndex;
+
   // Input controllers
   double _currentWeight = 20;
   int _currentReps = 10;
@@ -61,6 +64,40 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     if (widget.programDay == null) return null;
     final slots = widget.programDay!.exercises;
     return idx < slots.length ? slots[idx] : null;
+  }
+
+  /// Finds the index of the first exercise in the same superset group, scanning
+  /// backward from [fromIdx].
+  int _supersetGroupStart(int fromIdx, String groupId) {
+    int start = fromIdx;
+    while (start > 0 && _slotForIndex(start - 1)?.supersetGroupId == groupId) {
+      start--;
+    }
+    return start;
+  }
+
+  /// Returns true if any exercise in [startIdx..endIdx] still has fewer sets
+  /// logged than its target (deload-adjusted).
+  bool _supersetNeedsMoreSets(
+    int startIdx,
+    int endIdx,
+    WorkoutProvider provider,
+  ) {
+    for (int i = startIdx; i <= endIdx; i++) {
+      final slot = _slotForIndex(i);
+      if (slot == null) continue;
+      final targetSets = (widget.programWeek?.isDeload == true)
+          ? (slot.sets - (widget.programWeek?.deloadSetReduction ?? 0)).clamp(
+              1,
+              99,
+            )
+          : slot.sets;
+      final logged = i < provider.currentExerciseLogs.length
+          ? provider.currentExerciseLogs[i].sets.length
+          : 0;
+      if (logged < targetSets) return true;
+    }
+    return false;
   }
 
   void _initializeWorkout() {
@@ -1216,6 +1253,15 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       final newSlot = _slotForIndex(provider.currentExerciseIndex);
       if (newSlot != null) setState(() => _restSeconds = newSlot.restSeconds);
     } else {
+      // Detect if we just finished the last exercise in a superset group.
+      // If the group still needs more sets, schedule a return after rest.
+      final groupId = currentSlot?.supersetGroupId;
+      if (groupId != null) {
+        final groupStart = _supersetGroupStart(currentIdx, groupId);
+        if (_supersetNeedsMoreSets(groupStart, currentIdx, provider)) {
+          _supersetReturnIndex = groupStart;
+        }
+      }
       _startRestTimer();
     }
   }
@@ -1237,10 +1283,22 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _skipRest() {
     _restTimer?.cancel();
+    final returnIdx = _supersetReturnIndex;
     setState(() {
       _isResting = false;
       _remainingSeconds = 0;
+      _supersetReturnIndex = null;
     });
+
+    // If in a superset cycle, auto-return to the first exercise in the group
+    if (returnIdx != null) {
+      final provider = context.read<WorkoutProvider>();
+      provider.goToExercise(returnIdx);
+      _loadLastSessionData();
+      final slot = _slotForIndex(returnIdx);
+      if (slot != null) setState(() => _restSeconds = slot.restSeconds);
+    }
+
     HapticFeedback.lightImpact();
   }
 
