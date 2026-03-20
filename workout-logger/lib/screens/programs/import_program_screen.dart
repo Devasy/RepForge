@@ -1,17 +1,20 @@
 // Import Program Screen
 //
-// Full-screen editor for pasting or typing a TrainingProgram JSON.
-// Replaces the cramped bottom-sheet approach so large programs
-// (e.g. a 12-week plan at ~100 KB) can be pasted comfortably.
+// Full-screen editor for loading a TrainingProgram JSON.
+// Supports two input methods:
+//   1. Pick a .json file from device storage (file_picker)
+//   2. Paste raw JSON directly into the text field
 //
-// Features:
+// Other features:
 //   • Expandable text area that fills the screen
-//   • Live character / line counter
-//   • "Validate JSON" step before committing to storage
-//   • Actionable error messages (missing field, bad type, etc.)
-//   • Clear button to wipe the field
+//   • Live character / line / KB counter
+//   • "Validate" step before committing — shows field-level errors
+//   • Import button disabled until JSON is validated
+//   • Clear (×) button in AppBar
 
 import 'dart:convert';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -49,6 +52,11 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       appBar: AppBar(
         title: const Text('Import Program'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.folder_open),
+            tooltip: 'Pick JSON file',
+            onPressed: _pickFile,
+          ),
           if (_ctrl.text.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.clear),
@@ -79,8 +87,8 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       ),
       color: AppTheme.surfaceColor,
       child: Text(
-        'Paste a TrainingProgram JSON. '
-        'Required fields: name · totalWeeks · phases · weeks.',
+        'Tap  to pick a .json file, or paste JSON below. '
+        'Required: name · totalWeeks · phases · weeks.',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
           color: AppTheme.textSecondary,
         ),
@@ -255,6 +263,36 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
   }
 
   // ── Logic ─────────────────────────────────────────────────────────────
+
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        allowMultiple: false,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final path = result.files.single.path;
+      if (path == null) return;
+
+      final content = await File(path).readAsString();
+      _ctrl.text = content;
+      setState(() {
+        _validationState = _ValidationState.idle;
+        _validationError = null;
+        _parsed = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not read file: ${e.toString()}'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
+  }
 
   void _clearField() {
     _ctrl.clear();
