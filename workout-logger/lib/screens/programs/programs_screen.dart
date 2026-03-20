@@ -3,7 +3,7 @@
 // Shows the list of training programs and provides entry points for:
 //   - Viewing program details
 //   - Creating a new program
-//   - Importing a program from JSON (paste dialog)
+//   - Importing a program from JSON (full-screen ImportProgramScreen)
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +13,7 @@ import '../../services/workout_provider.dart';
 import '../../theme/app_theme.dart';
 import 'program_detail_screen.dart';
 import 'program_designer_screen.dart';
+import 'import_program_screen.dart';
 
 class ProgramsScreen extends StatelessWidget {
   const ProgramsScreen({super.key});
@@ -36,7 +37,7 @@ class ProgramsScreen extends StatelessWidget {
             children: [
               FloatingActionButton.small(
                 heroTag: 'import_json',
-                onPressed: () => _showImportDialog(context),
+                onPressed: () => _openImport(context),
                 backgroundColor: AppTheme.surfaceColor,
                 child: const Icon(Icons.download, color: AppTheme.secondaryColor),
               ),
@@ -87,7 +88,7 @@ class ProgramsScreen extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.md),
               OutlinedButton.icon(
-                onPressed: () => _showImportDialog(context),
+                onPressed: () => _openImport(context),
                 icon: const Icon(Icons.download),
                 label: const Text('Import JSON'),
               ),
@@ -125,112 +126,16 @@ class ProgramsScreen extends StatelessWidget {
     );
   }
 
-  void _showImportDialog(BuildContext context) {
-    final ctrl = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.cardColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(
-          left: AppSpacing.lg,
-          right: AppSpacing.lg,
-          top: AppSpacing.lg,
-          bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Import Program from JSON',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Paste a valid TrainingProgram JSON below.\n'
-              'The program must include: name, totalWeeks, phases, weeks.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: ctrl,
-              maxLines: 8,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-              ),
-              decoration: const InputDecoration(
-                hintText: '{ "name": "...", "totalWeeks": 12, ... }',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                ElevatedButton.icon(
-                  onPressed: () => _doImport(context, ctrl.text),
-                  icon: const Icon(Icons.download),
-                  label: const Text('Import'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+  Future<void> _openImport(BuildContext context) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const ImportProgramScreen()),
     );
-  }
-
-  Future<void> _doImport(BuildContext context, String json) async {
-    if (json.trim().isEmpty) {
+    if (result == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please paste JSON before importing')),
+        const SnackBar(content: Text('Program imported successfully!')),
       );
-      return;
     }
-
-    try {
-      final provider = context.read<WorkoutProvider>();
-      await provider.programManager.importFromJson(json.trim());
-      if (context.mounted) {
-        Navigator.pop(context); // close bottom sheet
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Program imported successfully!')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Import failed: ${_friendlyError(e)}'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
-      }
-    }
-  }
-
-  String _friendlyError(Object e) {
-    final msg = e.toString();
-    if (msg.contains('FormatException') || msg.contains('type')) {
-      return 'Invalid JSON format or missing required fields';
-    }
-    return msg.length > 80 ? '${msg.substring(0, 80)}…' : msg;
   }
 }
 

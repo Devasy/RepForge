@@ -1,0 +1,3473 @@
+{
+  "id": "12-week-hypertrophy-2026",
+  "name": "12-Week Hypertrophy Program",
+  "description": "Linear periodisation with undulating intensity. Three phases — Foundation (W1–4), Intensify (W5–8), Peak (W9–12). Prioritises chest, shoulders and arms (3× frequency). Knee-friendly leg work substitutes squats/lunges. Deload weeks: W5 (−15% weight) and W9 (−10% weight).",
+  "totalWeeks": 12,
+  "author": "RepForge Example",
+  "isImported": false,
+  "createdAt": "2026-01-01T00:00:00.000",
+  "phases": [
+    {
+      "id": "phase-foundation",
+      "name": "Foundation",
+      "startWeek": 1,
+      "endWeek": 4,
+      "notes": "Form mastery, mind-muscle connection. RPE 7. 3×10, 75–90 s rest.",
+      "colorHex": null
+    },
+    {
+      "id": "phase-intensify",
+      "name": "Intensify",
+      "startWeek": 5,
+      "endWeek": 8,
+      "notes": "4th set added. Supersets introduced on arm/shoulder days. RPE 8. 60–75 s rest.",
+      "colorHex": null
+    },
+    {
+      "id": "phase-peak",
+      "name": "Peak",
+      "startWeek": 9,
+      "endWeek": 12,
+      "notes": "Higher reps (12–15), shorter rest (45–60 s), tri-sets. RPE 8–9.",
+      "colorHex": null
+    }
+  ],
+  "weeks": [
+    {
+      "weekNumber": 1,
+      "isDeload": false,
+      "deloadIntensityFactor": 1.0,
+      "deloadSetReduction": 0,
+      "phaseId": "phase-foundation",
+      "days": [
+        {
+          "id": "w1-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Primary chest builder"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-0-1"
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-1"
+            }
+          ]
+        },
+        {
+          "id": "w1-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 30–45 s; aim for 60 s by week 4"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w1-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 6,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — stop 1-2 reps short of failure"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "notes": "3-sec eccentric phase"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Non-negotiable — rotator cuff health"
+            }
+          ]
+        },
+        {
+          "id": "w1-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-1"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "notes": "3-sec eccentric; seated to reduce cheating"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Upright-row substitute; keep light"
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 60,
+              "tempo": "3-1-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            }
+          ]
+        },
+        {
+          "id": "w1-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 90,
+              "notes": "High foot placement — glute/hamstring dominant"
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "3-0-1",
+              "notes": "3-sec eccentric — knee rehab focus"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Light weight only — stop if knee pain"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Back extension substitute; lower-back + glutes"
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": null
+    },
+    {
+      "weekNumber": 2,
+      "isDeload": false,
+      "deloadIntensityFactor": 1.0,
+      "deloadSetReduction": 0,
+      "phaseId": "phase-foundation",
+      "days": [
+        {
+          "id": "w2-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Primary chest builder"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-0-1"
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-1"
+            }
+          ]
+        },
+        {
+          "id": "w2-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 30–45 s; aim for 60 s by week 4"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w2-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 6,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — stop 1-2 reps short of failure"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "notes": "3-sec eccentric phase"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Non-negotiable — rotator cuff health"
+            }
+          ]
+        },
+        {
+          "id": "w2-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-1"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "notes": "3-sec eccentric; seated to reduce cheating"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Upright-row substitute; keep light"
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 60,
+              "tempo": "3-1-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            }
+          ]
+        },
+        {
+          "id": "w2-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 90,
+              "notes": "High foot placement — glute/hamstring dominant"
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "3-0-1",
+              "notes": "3-sec eccentric — knee rehab focus"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Light weight only — stop if knee pain"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Back extension substitute; lower-back + glutes"
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": null
+    },
+    {
+      "weekNumber": 3,
+      "isDeload": false,
+      "deloadIntensityFactor": 1.0,
+      "deloadSetReduction": 0,
+      "phaseId": "phase-foundation",
+      "days": [
+        {
+          "id": "w3-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Primary chest builder"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-0-1"
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-1"
+            }
+          ]
+        },
+        {
+          "id": "w3-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 30–45 s; aim for 60 s by week 4"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w3-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 6,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — stop 1-2 reps short of failure"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "notes": "3-sec eccentric phase"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Non-negotiable — rotator cuff health"
+            }
+          ]
+        },
+        {
+          "id": "w3-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-1"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "notes": "3-sec eccentric; seated to reduce cheating"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Upright-row substitute; keep light"
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 60,
+              "tempo": "3-1-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            }
+          ]
+        },
+        {
+          "id": "w3-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 90,
+              "notes": "High foot placement — glute/hamstring dominant"
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "3-0-1",
+              "notes": "3-sec eccentric — knee rehab focus"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Light weight only — stop if knee pain"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Back extension substitute; lower-back + glutes"
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": null
+    },
+    {
+      "weekNumber": 4,
+      "isDeload": false,
+      "deloadIntensityFactor": 1.0,
+      "deloadSetReduction": 0,
+      "phaseId": "phase-foundation",
+      "days": [
+        {
+          "id": "w4-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Primary chest builder"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-0-1"
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-1"
+            }
+          ]
+        },
+        {
+          "id": "w4-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 30–45 s; aim for 60 s by week 4"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w4-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 6,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — stop 1-2 reps short of failure"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "notes": "3-sec eccentric phase"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Non-negotiable — rotator cuff health"
+            }
+          ]
+        },
+        {
+          "id": "w4-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-1"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "notes": "3-sec eccentric; seated to reduce cheating"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Upright-row substitute; keep light"
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 60,
+              "tempo": "3-1-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            }
+          ]
+        },
+        {
+          "id": "w4-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 90,
+              "notes": "High foot placement — glute/hamstring dominant"
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "3-0-1",
+              "notes": "3-sec eccentric — knee rehab focus"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Light weight only — stop if knee pain"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Back extension substitute; lower-back + glutes"
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": null
+    },
+    {
+      "weekNumber": 5,
+      "isDeload": true,
+      "deloadIntensityFactor": 0.85,
+      "deloadSetReduction": 1,
+      "phaseId": "phase-intensify",
+      "days": [
+        {
+          "id": "w5-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 4,
+              "minReps": 8,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Add weight if all reps complete"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-0-1"
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-1",
+              "supersetGroupId": "ss-push-a"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Superset — rest 60s after the pair",
+              "supersetGroupId": "ss-push-a"
+            }
+          ]
+        },
+        {
+          "id": "w5-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 45–60 s"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w5-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 6,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — track reps for progression"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "notes": "3-sec eccentric",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            }
+          ]
+        },
+        {
+          "id": "w5-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-1"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "notes": "Seated; 3-sec eccentric",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-arm-a"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "notes": "Superset for max arm pump — rest 45s after pair",
+              "supersetGroupId": "ss-arm-a"
+            }
+          ]
+        },
+        {
+          "id": "w5-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "notes": "High foot placement"
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Rehab stimulus only"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Add 5 kg vs Phase 1 if form allows"
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": "Deload week — 85% weight, −1 set per exercise. Focus on form."
+    },
+    {
+      "weekNumber": 6,
+      "isDeload": false,
+      "deloadIntensityFactor": 1.0,
+      "deloadSetReduction": 0,
+      "phaseId": "phase-intensify",
+      "days": [
+        {
+          "id": "w6-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 4,
+              "minReps": 8,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Add weight if all reps complete"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-0-1"
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-1",
+              "supersetGroupId": "ss-push-a"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Superset — rest 60s after the pair",
+              "supersetGroupId": "ss-push-a"
+            }
+          ]
+        },
+        {
+          "id": "w6-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 45–60 s"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w6-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 6,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — track reps for progression"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "notes": "3-sec eccentric",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            }
+          ]
+        },
+        {
+          "id": "w6-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-1"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "notes": "Seated; 3-sec eccentric",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-arm-a"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "notes": "Superset for max arm pump — rest 45s after pair",
+              "supersetGroupId": "ss-arm-a"
+            }
+          ]
+        },
+        {
+          "id": "w6-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "notes": "High foot placement"
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Rehab stimulus only"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Add 5 kg vs Phase 1 if form allows"
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": null
+    },
+    {
+      "weekNumber": 7,
+      "isDeload": false,
+      "deloadIntensityFactor": 1.0,
+      "deloadSetReduction": 0,
+      "phaseId": "phase-intensify",
+      "days": [
+        {
+          "id": "w7-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 4,
+              "minReps": 8,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Add weight if all reps complete"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-0-1"
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-1",
+              "supersetGroupId": "ss-push-a"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Superset — rest 60s after the pair",
+              "supersetGroupId": "ss-push-a"
+            }
+          ]
+        },
+        {
+          "id": "w7-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 45–60 s"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w7-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 6,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — track reps for progression"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "notes": "3-sec eccentric",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            }
+          ]
+        },
+        {
+          "id": "w7-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-1"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "notes": "Seated; 3-sec eccentric",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-arm-a"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "notes": "Superset for max arm pump — rest 45s after pair",
+              "supersetGroupId": "ss-arm-a"
+            }
+          ]
+        },
+        {
+          "id": "w7-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "notes": "High foot placement"
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Rehab stimulus only"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Add 5 kg vs Phase 1 if form allows"
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": null
+    },
+    {
+      "weekNumber": 8,
+      "isDeload": false,
+      "deloadIntensityFactor": 1.0,
+      "deloadSetReduction": 0,
+      "phaseId": "phase-intensify",
+      "days": [
+        {
+          "id": "w8-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 4,
+              "minReps": 8,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Add weight if all reps complete"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-0-1"
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-1",
+              "supersetGroupId": "ss-push-a"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Superset — rest 60s after the pair",
+              "supersetGroupId": "ss-push-a"
+            }
+          ]
+        },
+        {
+          "id": "w8-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 45–60 s"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w8-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 6,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — track reps for progression"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "notes": "3-sec eccentric",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            }
+          ]
+        },
+        {
+          "id": "w8-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-1"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "notes": "Seated; 3-sec eccentric",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-arm-a"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "notes": "Superset for max arm pump — rest 45s after pair",
+              "supersetGroupId": "ss-arm-a"
+            }
+          ]
+        },
+        {
+          "id": "w8-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 90,
+              "notes": "High foot placement"
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Rehab stimulus only"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Add 5 kg vs Phase 1 if form allows"
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": null
+    },
+    {
+      "weekNumber": 9,
+      "isDeload": true,
+      "deloadIntensityFactor": 0.9,
+      "deloadSetReduction": 1,
+      "phaseId": "phase-peak",
+      "days": [
+        {
+          "id": "w9-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Target: +2.5 kg vs Phase 2"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "supersetGroupId": "ss-push-a"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-push-a"
+            }
+          ]
+        },
+        {
+          "id": "w9-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 60–75 s"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w9-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 8,
+              "maxReps": 15,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — target +3 reps vs week 1"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            }
+          ]
+        },
+        {
+          "id": "w9-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-arm-a"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Superset — rest 45s after pair; 21s curl added W9+",
+              "supersetGroupId": "ss-arm-a"
+            }
+          ]
+        },
+        {
+          "id": "w9-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 90
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 75,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 60,
+              "notes": "Rehab stimulus — light weight"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": "Mini-deload — 90% weight, −1 set. Prep for peak block."
+    },
+    {
+      "weekNumber": 10,
+      "isDeload": false,
+      "deloadIntensityFactor": 1.0,
+      "deloadSetReduction": 0,
+      "phaseId": "phase-peak",
+      "days": [
+        {
+          "id": "w10-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Target: +2.5 kg vs Phase 2"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "supersetGroupId": "ss-push-a"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-push-a"
+            }
+          ]
+        },
+        {
+          "id": "w10-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 60–75 s"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w10-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 8,
+              "maxReps": 15,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — target +3 reps vs week 1"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            }
+          ]
+        },
+        {
+          "id": "w10-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-arm-a"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Superset — rest 45s after pair; 21s curl added W9+",
+              "supersetGroupId": "ss-arm-a"
+            }
+          ]
+        },
+        {
+          "id": "w10-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 90
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 75,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 60,
+              "notes": "Rehab stimulus — light weight"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": null
+    },
+    {
+      "weekNumber": 11,
+      "isDeload": false,
+      "deloadIntensityFactor": 1.0,
+      "deloadSetReduction": 0,
+      "phaseId": "phase-peak",
+      "days": [
+        {
+          "id": "w11-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Target: +2.5 kg vs Phase 2"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "supersetGroupId": "ss-push-a"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-push-a"
+            }
+          ]
+        },
+        {
+          "id": "w11-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 60–75 s"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w11-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 8,
+              "maxReps": 15,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — target +3 reps vs week 1"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            }
+          ]
+        },
+        {
+          "id": "w11-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-arm-a"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Superset — rest 45s after pair; 21s curl added W9+",
+              "supersetGroupId": "ss-arm-a"
+            }
+          ]
+        },
+        {
+          "id": "w11-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 90
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 75,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 60,
+              "notes": "Rehab stimulus — light weight"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": null
+    },
+    {
+      "weekNumber": 12,
+      "isDeload": false,
+      "deloadIntensityFactor": 1.0,
+      "deloadSetReduction": 0,
+      "phaseId": "phase-peak",
+      "days": [
+        {
+          "id": "w12-push",
+          "name": "Push",
+          "dayOfWeek": 1,
+          "notes": "Chest · Triceps · Front Delts",
+          "exercises": [
+            {
+              "exerciseId": "incline_bench_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "3-1-1",
+              "notes": "Target: +2.5 kg vs Phase 2"
+            },
+            {
+              "exerciseId": "bench_press",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75
+            },
+            {
+              "exerciseId": "pec_deck",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "overhead_tricep_extension",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "supersetGroupId": "ss-push-a"
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2",
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-push-a"
+            }
+          ]
+        },
+        {
+          "id": "w12-core",
+          "name": "Core",
+          "dayOfWeek": 3,
+          "notes": "Abs · Anti-rotation · Lower back stability",
+          "exercises": [
+            {
+              "exerciseId": "plank",
+              "sets": 3,
+              "minReps": 30,
+              "maxReps": 45,
+              "restSeconds": 45,
+              "notes": "Hold 60–75 s"
+            },
+            {
+              "exerciseId": "leg_raises",
+              "sets": 3,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 45,
+              "notes": "Dead bug substitute — lower back flat"
+            },
+            {
+              "exerciseId": "russian_twist",
+              "sets": 3,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 45,
+              "tempo": "2-1-2",
+              "notes": "Pallof press substitute — anti-rotation"
+            },
+            {
+              "exerciseId": "cable_crunch",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Rope attachment, kneel"
+            },
+            {
+              "exerciseId": "crunches",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 45,
+              "notes": "Hollow body hold substitute"
+            }
+          ]
+        },
+        {
+          "id": "w12-pull",
+          "name": "Pull",
+          "dayOfWeek": 4,
+          "notes": "Back · Biceps · Rear Delts",
+          "exercises": [
+            {
+              "exerciseId": "seated_cable_row",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 75,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "pull_ups",
+              "sets": 3,
+              "minReps": 8,
+              "maxReps": 15,
+              "restSeconds": 90,
+              "tempo": "2-0-1",
+              "notes": "AMRAP — target +3 reps vs week 1"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            },
+            {
+              "exerciseId": "preacher_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "hammer_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-pull-a"
+            },
+            {
+              "exerciseId": "face_pull",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-2"
+            }
+          ]
+        },
+        {
+          "id": "w12-shld-arms",
+          "name": "Shoulders & Arms",
+          "dayOfWeek": 5,
+          "notes": "All delt heads · Biceps · Triceps",
+          "exercises": [
+            {
+              "exerciseId": "dumbbell_shoulder_press",
+              "sets": 4,
+              "minReps": 10,
+              "maxReps": 10,
+              "restSeconds": 90
+            },
+            {
+              "exerciseId": "lateral_raise",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "tempo": "2-1-3",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "rear_delt_fly",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60,
+              "notes": "Superset — rest 60s after pair",
+              "supersetGroupId": "ss-shld-a"
+            },
+            {
+              "exerciseId": "front_raise",
+              "sets": 4,
+              "minReps": 12,
+              "maxReps": 12,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "bicep_curl",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "tempo": "3-1-1",
+              "supersetGroupId": "ss-arm-a"
+            },
+            {
+              "exerciseId": "tricep_pushdown",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 45,
+              "notes": "Superset — rest 45s after pair; 21s curl added W9+",
+              "supersetGroupId": "ss-arm-a"
+            }
+          ]
+        },
+        {
+          "id": "w12-legs",
+          "name": "Legs + Rehab",
+          "dayOfWeek": 6,
+          "notes": "Quads · Hamstrings · Glutes · Knee rehab protocol after session",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 90
+            },
+            {
+              "exerciseId": "leg_curl",
+              "sets": 4,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 75,
+              "tempo": "3-0-1"
+            },
+            {
+              "exerciseId": "leg_extension",
+              "sets": 3,
+              "minReps": 20,
+              "maxReps": 20,
+              "restSeconds": 60,
+              "notes": "Rehab stimulus — light weight"
+            },
+            {
+              "exerciseId": "romanian_deadlift",
+              "sets": 3,
+              "minReps": 15,
+              "maxReps": 15,
+              "restSeconds": 60
+            },
+            {
+              "exerciseId": "calf_raise",
+              "sets": 2,
+              "minReps": 25,
+              "maxReps": 25,
+              "restSeconds": 45
+            }
+          ]
+        }
+      ],
+      "notes": null
+    }
+  ]
+}
