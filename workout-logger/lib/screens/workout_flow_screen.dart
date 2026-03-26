@@ -1327,8 +1327,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _adjustRestTime(int seconds) {
     setState(() {
-      _remainingSeconds = (_remainingSeconds + seconds).clamp(0, 600);
-      _restSeconds = (_restSeconds + seconds).clamp(30, 600);
+      _remainingSeconds = (_remainingSeconds + seconds).clamp(0, 600).toInt();
+      _restSeconds = (_restSeconds + seconds).clamp(30, 600).toInt();
     });
     HapticFeedback.selectionClick();
   }

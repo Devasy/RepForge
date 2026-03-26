@@ -13,6 +13,7 @@ import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
 import 'services/workout_provider.dart';
 import 'services/api_service.dart';
+import 'services/managers/program_manager.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
@@ -43,6 +44,7 @@ class WorkoutLoggerApp extends StatelessWidget {
   // This ensures the same instances are used throughout the app lifecycle
   static final IStorageService _storageService = StorageService();
   static final IMLService _mlService = MLService();
+  static final ProgramManager _programManager = ProgramManager(_storageService);
 
   const WorkoutLoggerApp({super.key});
 
@@ -59,10 +61,15 @@ class WorkoutLoggerApp extends StatelessWidget {
         Provider<IMLService>.value(value: _mlService),
         // Provide the ApiService singleton via DI
         Provider<ApiService>.value(value: ApiService()),
+        // ProgramManager passed to tree directly
+        ChangeNotifierProvider<ProgramManager>.value(value: _programManager),
         // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
-          create: (_) =>
-              WorkoutProvider(_storageService, mlService: _mlService),
+          create: (_) => WorkoutProvider(
+            _storageService,
+            mlService: _mlService,
+            programManager: _programManager,
+          ),
         ),
       ],
       child: MaterialApp(

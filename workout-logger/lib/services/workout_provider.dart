@@ -68,9 +68,8 @@ class WorkoutProvider extends ChangeNotifier {
   WorkoutProvider(
     this._storage, {
     IMLService? mlService,
-    ProgramManager? programManager,
-  }) : _mlService = mlService ?? MLService(),
-       programManager = programManager ?? ProgramManager(_storage);
+    required this.programManager,
+  }) : _mlService = mlService ?? MLService();
 
   // ==================== INITIALIZATION ====================
 

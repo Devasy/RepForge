@@ -142,10 +142,18 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
           min: 1,
           max: 52,
           onChanged: (v) {
-            setState(() {
-              _totalWeeks = v;
-              _rebuildWeeks();
-            });
+            final error = _validatePhases(v);
+            if (error != null) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(error),
+                backgroundColor: AppTheme.error,
+              ));
+            } else {
+              setState(() {
+                _totalWeeks = v;
+                _rebuildWeeks();
+              });
+            }
           },
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -232,13 +240,30 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
                   startWeek: start,
                   endWeek: end,
                 );
-                setState(() {
+
+                final backupPhase = idx != null ? _phases[idx] : null;
+                if (idx != null) {
+                  _phases[idx] = phase;
+                } else {
+                  _phases.add(phase);
+                }
+
+                final error = _validatePhases(_totalWeeks);
+                if (error != null) {
+                  // Revert
                   if (idx != null) {
-                    _phases[idx] = phase;
+                    _phases[idx] = backupPhase!;
                   } else {
-                    _phases.add(phase);
+                    _phases.removeLast();
                   }
-                });
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(error),
+                    backgroundColor: AppTheme.error,
+                  ));
+                  return; // Prevent closing
+                }
+
+                setState(() {});
                 Navigator.pop(ctx);
               },
               child: const Text('Save'),
@@ -721,6 +746,7 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
                     tempo: tempoCtrl.text.isEmpty ? null : tempoCtrl.text,
                     weightPercentage: double.tryParse(weightPctCtrl.text),
                     notes: notesCtrl.text.isEmpty ? null : notesCtrl.text,
+                    supersetGroupId: existing?.supersetGroupId,
                   );
                   setState(() {
                     final exercises = List<ProgramExerciseSlot>.from(
@@ -805,6 +831,14 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
       return;
     }
 
+    final phaseError = _validatePhases(_totalWeeks);
+    if (phaseError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(phaseError), backgroundColor: AppTheme.error),
+      );
+      return;
+    }
+
     if (_weeks.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add at least one week before saving')),
@@ -856,6 +890,30 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────
+
+  String? _validatePhases(int proposedTotalWeeks) {
+    if (_phases.isEmpty) return null;
+
+    // Detect truncation
+    for (final phase in _phases) {
+      if (phase.endWeek > proposedTotalWeeks) {
+        return 'Cannot reduce weeks to $proposedTotalWeeks. Phase "${phase.name}" ends on week ${phase.endWeek}.';
+      }
+      if (phase.startWeek > phase.endWeek) {
+        return 'Phase "${phase.name}" has an invalid range (starts after it ends).';
+      }
+    }
+
+    // Detect overlapping
+    final sortedPhases = List<TrainingPhase>.from(_phases)..sort((a, b) => a.startWeek.compareTo(b.startWeek));
+    for (int i = 0; i < sortedPhases.length - 1; i++) {
+      if (sortedPhases[i].endWeek >= sortedPhases[i + 1].startWeek) {
+        return 'Phases "${sortedPhases[i].name}" and "${sortedPhases[i + 1].name}" overlap.';
+      }
+    }
+
+    return null;
+  }
 
   Widget _field(
     TextEditingController ctrl,
@@ -928,7 +986,7 @@ class _NumberStepper extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.remove, size: 18),
             onPressed: value > min
-                ? () => onChanged((value - step).clamp(min, max))
+                ? () => onChanged((value - step).clamp(min, max).toInt())
                 : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -947,7 +1005,7 @@ class _NumberStepper extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.add, size: 18),
             onPressed: value < max
-                ? () => onChanged((value + step).clamp(min, max))
+                ? () => onChanged((value + step).clamp(min, max).toInt())
                 : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
