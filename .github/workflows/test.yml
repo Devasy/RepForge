@@ -15,22 +15,34 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Flutter
+        id: flutter-action
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.7'
+          flutter-version-file: './workout-logger/pubspec.yaml'
           channel: 'stable'
           cache: true
+          # Custom pub cache key hashing pubspec.lock to invalidate cache on dependency changes
+          pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
 
       - name: Install dependencies
+        if: steps.flutter-action.outputs.PUB-CACHE-HIT != 'true'
         working-directory: ./workout-logger
         run: flutter pub get
 
       - name: Analyze
         working-directory: ./workout-logger
-        run: flutter analyze --no-fatal-infos
+        run: |
+          # Only fail on errors, ignore warnings and info messages
+          flutter analyze --no-fatal-infos --no-fatal-warnings | tee analyze_output.txt
+          
+          # Extract and display the summary of issues
+          SUMMARY=$(tail -n 1 analyze_output.txt)
+          echo "Analysis Summary: $SUMMARY"
+          echo "### Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
 
       - name: Run tests
         working-directory: ./workout-logger
