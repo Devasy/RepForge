@@ -78,26 +78,40 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   /// Returns true if any exercise in [startIdx..endIdx] still has fewer sets
   /// logged than its target (deload-adjusted).
-  bool _supersetNeedsMoreSets(
-    int startIdx,
-    int endIdx,
-    WorkoutProvider provider,
-  ) {
+  bool _supersetNeedsMoreSets({
+    required int startIdx,
+    required int endIdx,
+    required WorkoutProvider provider,
+  }) {
     for (int i = startIdx; i <= endIdx; i++) {
       final slot = _slotForIndex(i);
       if (slot == null) continue;
+      if (i >= provider.currentExerciseLogs.length) continue;
       final targetSets = (widget.programWeek?.isDeload == true)
           ? (slot.sets - (widget.programWeek?.deloadSetReduction ?? 0)).clamp(
               1,
               99,
             )
           : slot.sets;
-      final logged = i < provider.currentExerciseLogs.length
-          ? provider.currentExerciseLogs[i].sets.length
-          : 0;
+      final logged = provider.currentExerciseLogs[i].sets.length;
       if (logged < targetSets) return true;
     }
     return false;
+  }
+
+  /// Returns true if the single slot at [index] still needs more sets.
+  bool _slotNeedsMoreSets({
+    required int index,
+    required WorkoutProvider provider,
+  }) {
+    final slot = _slotForIndex(index);
+    if (slot == null) return false;
+    if (index >= provider.currentExerciseLogs.length) return false;
+    final targetSets = (widget.programWeek?.isDeload == true)
+        ? (slot.sets - (widget.programWeek?.deloadSetReduction ?? 0)).clamp(1, 99)
+        : slot.sets;
+    final logged = provider.currentExerciseLogs[index].sets.length;
+    return logged < targetSets;
   }
 
   void _initializeWorkout() {
@@ -1062,22 +1076,22 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
             runSpacing: 4,
             children: [
               _programChip(
-                Icons.timer_outlined,
-                '${slot.restSeconds}s rest',
-                AppTheme.textSecondary,
+                icon: Icons.timer_outlined,
+                label: '${slot.restSeconds}s rest',
+                color: AppTheme.textSecondary,
               ),
               if (slot.tempo != null)
-                _programChip(Icons.speed, 'Tempo ${slot.tempo}', AppTheme.secondaryColor),
+                _programChip(icon: Icons.speed, label: 'Tempo ${slot.tempo}', color: AppTheme.secondaryColor),
               if (slot.weightPercentage != null)
                 _programChip(
-                  Icons.fitness_center,
-                  week.isDeload
+                  icon: Icons.fitness_center,
+                  label: week.isDeload
                       ? '${(slot.weightPercentage! * week.deloadIntensityFactor).toStringAsFixed(0)}% 1RM'
                       : '${slot.weightPercentage!.toStringAsFixed(0)}% 1RM',
-                  AppTheme.primaryColor,
+                  color: AppTheme.primaryColor,
                 ),
               if (slot.supersetGroupId != null)
-                _programChip(Icons.link, 'Superset', AppTheme.secondaryColor),
+                _programChip(icon: Icons.link, label: 'Superset', color: AppTheme.secondaryColor),
             ],
           ),
           if (slot.notes != null) ...[
@@ -1096,7 +1110,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     );
   }
 
-  Widget _programChip(IconData icon, String label, Color color) {
+  Widget _programChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1241,12 +1259,13 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       _drops.clear();
     });
 
-    // Superset auto-advance: if next exercise is in the same superset group,
-    // advance immediately without a rest timer
+    // Superset auto-advance: if next exercise is in the same superset group
+    // AND the next slot still needs more sets, advance immediately.
     final isSupersetPair = currentSlot?.supersetGroupId != null &&
         nextSlot?.supersetGroupId == currentSlot?.supersetGroupId;
 
-    if (isSupersetPair) {
+    if (isSupersetPair &&
+        _slotNeedsMoreSets(index: currentIdx + 1, provider: provider)) {
       provider.nextExercise();
       _loadLastSessionData();
       // Apply the next slot's rest time so the subsequent rest is correct
@@ -1258,7 +1277,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       final groupId = currentSlot?.supersetGroupId;
       if (groupId != null) {
         final groupStart = _supersetGroupStart(currentIdx, groupId);
-        if (_supersetNeedsMoreSets(groupStart, currentIdx, provider)) {
+        if (_supersetNeedsMoreSets(
+          startIdx: groupStart,
+          endIdx: currentIdx,
+          provider: provider,
+        )) {
           _supersetReturnIndex = groupStart;
         }
       }
@@ -1304,8 +1327,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _adjustRestTime(int seconds) {
     setState(() {
-      _remainingSeconds = (_remainingSeconds + seconds).clamp(0, 300);
-      _restSeconds = (_restSeconds + seconds).clamp(30, 300);
+      _remainingSeconds = (_remainingSeconds + seconds).clamp(0, 600);
+      _restSeconds = (_restSeconds + seconds).clamp(30, 600);
     });
     HapticFeedback.selectionClick();
   }

@@ -116,22 +116,22 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
           Row(
             children: [
               _statChip(
-                Icons.calendar_today,
-                '${_program.totalWeeks} weeks',
-                AppTheme.primaryColor,
+                icon: Icons.calendar_today,
+                label: '${_program.totalWeeks} weeks',
+                color: AppTheme.primaryColor,
               ),
               const SizedBox(width: AppSpacing.sm),
               _statChip(
-                Icons.bolt,
-                '${_program.phases.length} phases',
-                AppTheme.secondaryColor,
+                icon: Icons.bolt,
+                label: '${_program.phases.length} phases',
+                color: AppTheme.secondaryColor,
               ),
               const SizedBox(width: AppSpacing.sm),
               if (deloadCount > 0)
                 _statChip(
-                  Icons.battery_charging_full,
-                  '$deloadCount deload${deloadCount > 1 ? 's' : ''}',
-                  Colors.amber,
+                  icon: Icons.battery_charging_full,
+                  label: '$deloadCount deload${deloadCount > 1 ? 's' : ''}',
+                  color: Colors.amber,
                 ),
             ],
           ),
@@ -164,7 +164,11 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
     );
   }
 
-  Widget _statChip(IconData icon, String label, Color color) {
+  Widget _statChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -452,11 +456,35 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
   Widget _buildDaySection(ProgramDay day, ProgramWeek week) {
     final provider = context.read<WorkoutProvider>();
 
-    // Group exercises by superset group
-    final supersetGroups = <String?, List<ProgramExerciseSlot>>{};
+    // Group exercises into contiguous runs by supersetGroupId
+    // to preserve original order (a map would collapse non-contiguous groups).
+    final runs = <List<ProgramExerciseSlot>>[];
+    String? currentRunKey;
+    List<ProgramExerciseSlot> currentRun = [];
     for (final slot in day.exercises) {
       final key = slot.supersetGroupId;
-      supersetGroups.putIfAbsent(key, () => []).add(slot);
+      if (key == null) {
+        // Flush any open superset run
+        if (currentRun.isNotEmpty) {
+          runs.add(currentRun);
+          currentRun = [];
+          currentRunKey = null;
+        }
+        // Standalone exercise
+        runs.add([slot]);
+      } else if (key == currentRunKey) {
+        currentRun.add(slot);
+      } else {
+        // Flush previous run and start new
+        if (currentRun.isNotEmpty) {
+          runs.add(currentRun);
+        }
+        currentRunKey = key;
+        currentRun = [slot];
+      }
+    }
+    if (currentRun.isNotEmpty) {
+      runs.add(currentRun);
     }
 
     return Padding(
@@ -504,16 +532,20 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
           ),
           const SizedBox(height: AppSpacing.sm),
           // Render standalone exercises and superset groups
-          ...supersetGroups.entries.map((entry) {
-            final slots = entry.value;
-            final isSuperset = entry.key != null;
+          ...runs.map((slots) {
+            final isSuperset =
+                slots.length > 1 || slots.first.supersetGroupId != null;
             if (isSuperset) {
-              return _buildSupersetGroup(slots, provider, week);
+              return _buildSupersetGroup(
+                slots: slots,
+                provider: provider,
+                week: week,
+              );
             }
-            return Column(
-              children: slots
-                  .map((slot) => _buildExerciseRow(slot, provider, week))
-                  .toList(),
+            return _buildExerciseRow(
+              slot: slots.first,
+              provider: provider,
+              week: week,
             );
           }),
           const SizedBox(height: AppSpacing.sm),
@@ -543,11 +575,11 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
     );
   }
 
-  Widget _buildSupersetGroup(
-    List<ProgramExerciseSlot> slots,
-    WorkoutProvider provider,
-    ProgramWeek week,
-  ) {
+  Widget _buildSupersetGroup({
+    required List<ProgramExerciseSlot> slots,
+    required WorkoutProvider provider,
+    required ProgramWeek week,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
@@ -574,17 +606,22 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
             ),
           ),
           ...slots.map(
-            (slot) => _buildExerciseRow(slot, provider, week, indent: true),
+            (slot) => _buildExerciseRow(
+              slot: slot,
+              provider: provider,
+              week: week,
+              indent: true,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildExerciseRow(
-    ProgramExerciseSlot slot,
-    WorkoutProvider provider,
-    ProgramWeek week, {
+  Widget _buildExerciseRow({
+    required ProgramExerciseSlot slot,
+    required WorkoutProvider provider,
+    required ProgramWeek week,
     bool indent = false,
   }) {
     final exercise = provider.getExercise(slot.exerciseId);
@@ -693,12 +730,14 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
 
   // ── Actions ──────────────────────────────────────────────────────────
 
-  void _handleMenuAction(String action) async {
+  void _handleMenuAction(String action) {
     switch (action) {
       case 'export':
         _exportProgram();
+        break;
       case 'delete':
         _confirmDelete();
+        break;
     }
   }
 

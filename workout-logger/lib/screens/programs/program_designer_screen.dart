@@ -805,6 +805,39 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
       return;
     }
 
+    if (_weeks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add at least one week before saving')),
+      );
+      return;
+    }
+
+    final hasEmptyDays = _weeks.any(
+      (w) => w.days.any((d) => d.exercises.isEmpty),
+    );
+    if (hasEmptyDays) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Empty Days'),
+          content: const Text(
+            'Some days have no exercises. Save anyway?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save Anyway'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+
     final provider = context.read<WorkoutProvider>();
     final program = TrainingProgram(
       id: widget.existing?.id ?? _uuid.v4(),
@@ -814,7 +847,7 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
       totalWeeks: _totalWeeks,
       phases: _phases,
       weeks: _weeks,
-      isImported: false,
+      isImported: widget.existing?.isImported ?? false,
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
     );
 

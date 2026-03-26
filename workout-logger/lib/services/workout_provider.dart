@@ -37,7 +37,7 @@ class WorkoutProvider extends ChangeNotifier {
   final Map<String, GrowthModel> _growthModels =
       {}; // exerciseId -> GrowthModel
 
-  late final ProgramManager programManager;
+  final ProgramManager programManager;
 
   // Active workout state
   WorkoutSession? _activeSession;
@@ -63,11 +63,14 @@ class WorkoutProvider extends ChangeNotifier {
   /// Create WorkoutProvider with dependency injection.
   ///
   /// Following Dependency Inversion Principle: accepts abstractions
-  /// rather than concrete implementations.
-  WorkoutProvider(this._storage, {IMLService? mlService})
-    : _mlService = mlService ?? MLService() {
-    programManager = ProgramManager(_storage);
-  }
+  /// rather than concrete implementations. [programManager] defaults to a
+  /// new ProgramManager backed by the same storage if not provided.
+  WorkoutProvider(
+    this._storage, {
+    IMLService? mlService,
+    ProgramManager? programManager,
+  }) : _mlService = mlService ?? MLService(),
+       programManager = programManager ?? ProgramManager(_storage);
 
   // ==================== INITIALIZATION ====================
 
