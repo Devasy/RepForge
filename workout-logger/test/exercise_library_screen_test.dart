@@ -125,12 +125,12 @@ void main() {
     testWidgets('should filter exercises by search query', (tester) async {
       // Arrange - Add custom exercises
       await provider.addCustomExercise(
-        name: 'Bicep Curl',
+        name: 'Unique Bicep Curl',
         category: 'isolation',
         primaryMuscleGroupId: 'biceps',
       );
       await provider.addCustomExercise(
-        name: 'Tricep Pushdown',
+        name: 'Unique Tricep Pushdown',
         category: 'isolation',
         primaryMuscleGroupId: 'triceps',
       );
@@ -144,12 +144,12 @@ void main() {
       await tester.pumpAndSettle();
 
       // Act - Enter search query
-      await tester.enterText(find.byType(TextField), 'Bicep');
+      await tester.enterText(find.byType(TextField), 'Unique Bicep');
       await tester.pumpAndSettle();
 
       // Assert - Should only show matching exercise
-      expect(find.text('Bicep Curl'), findsOneWidget);
-      expect(find.text('Tricep Pushdown'), findsNothing);
+      expect(find.text('Unique Bicep Curl'), findsOneWidget);
+      expect(find.text('Unique Tricep Pushdown'), findsNothing);
     });
 
     testWidgets('should show muscle group filter chips', (tester) async {

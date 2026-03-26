@@ -39,6 +39,8 @@ void main() {
 
       // Act - Try to save without entering a name
       // First select a muscle group (required)
+      await tester.ensureVisible(find.text('Chest'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Chest'));
       await tester.pump();
 
@@ -63,6 +65,8 @@ void main() {
 
         // Act - Enter a short name
         await tester.enterText(find.byType(TextFormField), 'Ab');
+        await tester.ensureVisible(find.text('Chest'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Chest'));
         await tester.pump();
 
@@ -112,6 +116,8 @@ void main() {
       await tester.pump();
 
       // Select a muscle group
+      await tester.ensureVisible(find.text('Shoulders'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Shoulders'));
       await tester.pump();
 
