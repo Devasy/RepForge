@@ -39,7 +39,7 @@ jobs:
           flutter analyze --no-fatal-infos --no-fatal-warnings | tee analyze_output.txt
           
           # Extract and display the summary of issues
-          SUMMARY=$(tail -n 1 analyze_output.txt)
+          SUMMARY=$(grep -E "(No issues found|[0-9]+ issue)" analyze_output.txt | tail -1)
           echo "Analysis Summary: $SUMMARY"
           echo "### Analysis Summary" >> $GITHUB_STEP_SUMMARY
           echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
