@@ -12,6 +12,7 @@ import 'services/ml_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
 import 'services/workout_provider.dart';
+import 'services/settings_provider.dart';
 import 'services/api_service.dart';
 import 'services/managers/program_manager.dart';
 import 'theme/app_theme.dart';
@@ -45,6 +46,7 @@ class WorkoutLoggerApp extends StatelessWidget {
   static final IStorageService _storageService = StorageService();
   static final IMLService _mlService = MLService();
   static final ProgramManager _programManager = ProgramManager(_storageService);
+  static final SettingsProvider _settingsProvider = SettingsProvider(_storageService);
 
   const WorkoutLoggerApp({super.key});
 
@@ -63,6 +65,8 @@ class WorkoutLoggerApp extends StatelessWidget {
         Provider<ApiService>.value(value: ApiService()),
         // ProgramManager passed to tree directly
         ChangeNotifierProvider<ProgramManager>.value(value: _programManager),
+        // SettingsProvider for user preferences (weight unit, increments)
+        ChangeNotifierProvider<SettingsProvider>.value(value: _settingsProvider),
         // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
           create: (_) => WorkoutProvider(
@@ -103,6 +107,9 @@ class _AppInitializerState extends State<AppInitializer> {
     try {
       final provider = context.read<WorkoutProvider>();
       await provider.init();
+
+      final settings = context.read<SettingsProvider>();
+      await settings.init();
 
       // Fire-and-forget analytics in background
       final api = context.read<ApiService>();

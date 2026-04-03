@@ -733,6 +733,29 @@ class WorkoutProvider extends ChangeNotifier {
   /// Get growth model for an exercise
   GrowthModel? getGrowthModel(String exerciseId) => _growthModels[exerciseId];
 
+  /// Estimate 1RM using Epley formula: weight × (1 + reps / 30).
+  static double estimateOneRM(double weight, int reps) {
+    if (reps <= 0 || weight <= 0) return 0;
+    if (reps == 1) return weight;
+    return weight * (1 + reps / 30.0);
+  }
+
+  /// Get the best estimated 1RM across all logged sets for an exercise.
+  /// Returns null if no sessions exist for the exercise.
+  double? getBestOneRM(String exerciseId) {
+    double? best;
+    for (final session in _sessions) {
+      for (final log in session.exercises) {
+        if (log.exerciseId != exerciseId) continue;
+        for (final set in log.sets) {
+          final orm = estimateOneRM(set.weight, set.reps);
+          if (best == null || orm > best) best = orm;
+        }
+      }
+    }
+    return best;
+  }
+
   // ==================== QUICK STATS ====================
 
   Future<Map<String, dynamic>> getQuickStats() async {
