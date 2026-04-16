@@ -55,6 +55,12 @@ abstract class IStorageService {
   Future<List<Exercise>> getAllExercises();
   Future<Exercise?> getExercise(String id);
 
+  // ==================== REMOTE EXERCISES ====================
+
+  Future<void> saveRemoteExercises(List<Exercise> exercises);
+  Future<List<Exercise>> getRemoteExercises();
+  Future<void> clearRemoteExercises();
+
   // ==================== SETTINGS ====================
 
   Future<void> saveSetting(String key, String value);

@@ -20,10 +20,29 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   String _searchQuery = '';
   String? _selectedMuscleGroup;
 
+  Future<void> _fetchRemoteExercises(BuildContext context) async {
+    final provider = context.read<WorkoutProvider>();
+    await provider.fetchRemoteExercises();
+    if (!mounted) return;
+    final error = provider.lastFetchError;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to fetch exercises: $error')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Loaded ${provider.lastFetchCount} remote exercises'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Use Provider's exercise list (includes custom exercises)
-    final allExercises = context.watch<WorkoutProvider>().allExercises;
+    final provider = context.watch<WorkoutProvider>();
+    // Use Provider's exercise list (includes custom + remote exercises)
+    final allExercises = provider.allExercises;
 
     // Filter exercises
     var filteredExercises = allExercises.where((e) {
@@ -38,13 +57,12 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       return matchesSearch && matchesMuscle;
     }).toList();
 
-    // Sort: custom exercises first within each group for visibility
+    // Sort: custom first, remote second, then alphabetically
     filteredExercises.sort((a, b) {
-      // First by custom status (custom first)
-      if (a.isCustom && !b.isCustom) return -1;
-      if (!a.isCustom && b.isCustom) return 1;
-      // Then alphabetically
-      return a.name.compareTo(b.name);
+      int rank(Exercise e) =>
+          e.isCustom ? 0 : e.id.startsWith('remote_') ? 1 : 2;
+      final cmp = rank(a).compareTo(rank(b));
+      return cmp != 0 ? cmp : a.name.compareTo(b.name);
     });
 
     // Group by primary muscle
@@ -61,6 +79,23 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       appBar: AppBar(
         title: const Text('Exercise Library'),
         actions: [
+          if (provider.isFetchingRemote)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.cloud_download_outlined),
+              tooltip: 'Fetch exercises',
+              onPressed: () => _fetchRemoteExercises(context),
+            ),
           if (customCount > 0)
             Padding(
               padding: const EdgeInsets.only(right: AppSpacing.md),
@@ -260,7 +295,7 @@ class _ExerciseCard extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
             children: [
-              // Icon with custom badge
+              // Icon with custom/remote badge
               Stack(
                 children: [
                   Container(
@@ -269,7 +304,9 @@ class _ExerciseCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: exercise.isCustom
                           ? AppTheme.warning.withOpacity(0.2)
-                          : AppTheme.primaryColor.withOpacity(0.2),
+                          : exercise.id.startsWith('remote_')
+                              ? AppTheme.secondaryColor.withOpacity(0.2)
+                              : AppTheme.primaryColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -278,7 +315,9 @@ class _ExerciseCard extends StatelessWidget {
                           : Icons.accessibility_new,
                       color: exercise.isCustom
                           ? AppTheme.warning
-                          : AppTheme.primaryColor,
+                          : exercise.id.startsWith('remote_')
+                              ? AppTheme.secondaryColor
+                              : AppTheme.primaryColor,
                     ),
                   ),
                   if (exercise.isCustom)
@@ -293,6 +332,23 @@ class _ExerciseCard extends StatelessWidget {
                         ),
                         child: const Icon(
                           Icons.star,
+                          size: 10,
+                          color: Colors.black,
+                        ),
+                      ),
+                    )
+                  else if (exercise.id.startsWith('remote_'))
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.secondaryColor,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.cloud_done,
                           size: 10,
                           color: Colors.black,
                         ),
@@ -358,6 +414,26 @@ class _ExerciseCard extends StatelessWidget {
                               'CUSTOM',
                               style: TextStyle(
                                 color: AppTheme.warning,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ] else if (exercise.id.startsWith('remote_')) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.secondaryColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'REMOTE',
+                              style: TextStyle(
+                                color: AppTheme.secondaryColor,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -437,7 +513,9 @@ class _ExerciseDetailsSheet extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: exercise.isCustom
                           ? AppTheme.warning.withOpacity(0.2)
-                          : AppTheme.primaryColor.withOpacity(0.2),
+                          : exercise.id.startsWith('remote_')
+                              ? AppTheme.secondaryColor.withOpacity(0.2)
+                              : AppTheme.primaryColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -446,7 +524,9 @@ class _ExerciseDetailsSheet extends StatelessWidget {
                           : Icons.accessibility_new,
                       color: exercise.isCustom
                           ? AppTheme.warning
-                          : AppTheme.primaryColor,
+                          : exercise.id.startsWith('remote_')
+                              ? AppTheme.secondaryColor
+                              : AppTheme.primaryColor,
                     ),
                   ),
                   if (exercise.isCustom)
@@ -461,6 +541,23 @@ class _ExerciseDetailsSheet extends StatelessWidget {
                         ),
                         child: const Icon(
                           Icons.star,
+                          size: 10,
+                          color: Colors.black,
+                        ),
+                      ),
+                    )
+                  else if (exercise.id.startsWith('remote_'))
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.secondaryColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.cloud_done,
                           size: 10,
                           color: Colors.black,
                         ),
@@ -500,6 +597,26 @@ class _ExerciseDetailsSheet extends StatelessWidget {
                               'CUSTOM',
                               style: TextStyle(
                                 color: AppTheme.warning,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ] else if (exercise.id.startsWith('remote_')) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.secondaryColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'REMOTE',
+                              style: TextStyle(
+                                color: AppTheme.secondaryColor,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),

@@ -24,6 +24,7 @@ class StorageService implements IStorageService {
   static const String _customExercisesBox = 'custom_exercises';
   static const String _settingsBox = 'settings';
   static const String _trainingProgramsBox = 'training_programs';
+  static const String _remoteExercisesBox = 'remote_exercises';
 
   late Box<String> _sessionsBox;
   late Box<String> _routinesBoxInstance;
@@ -32,6 +33,7 @@ class StorageService implements IStorageService {
   late Box<String> _customExercisesBoxInstance;
   late Box<String> _settingsBoxInstance;
   late Box<String> _trainingProgramsBoxInstance;
+  late Box<String> _remoteExercisesBoxInstance;
 
   String _appVersion = const String.fromEnvironment(
     'APP_VERSION',
@@ -67,6 +69,9 @@ class StorageService implements IStorageService {
     _settingsBoxInstance = await Hive.openBox<String>(_settingsBox);
     _trainingProgramsBoxInstance = await Hive.openBox<String>(
       _trainingProgramsBox,
+    );
+    _remoteExercisesBoxInstance = await Hive.openBox<String>(
+      _remoteExercisesBox,
     );
 
     // Initialize default muscle groups if empty
@@ -258,15 +263,27 @@ class StorageService implements IStorageService {
     await _customExercisesBoxInstance.delete(id);
   }
 
-  /// Get all exercises (built-in + custom)
+  /// Get all exercises (built-in + custom + remote), deduplicated by ID.
+  /// Built-in and custom take priority over remote if IDs collide.
   @override
   Future<List<Exercise>> getAllExercises() async {
     final builtIn = ExerciseDatabase.getAll();
     final custom = await getCustomExercises();
-    return [...builtIn, ...custom];
+    final remote = await getRemoteExercises();
+    final byId = <String, Exercise>{};
+    for (final e in builtIn) {
+      byId[e.id] = e;
+    }
+    for (final e in custom) {
+      byId[e.id] = e;
+    }
+    for (final e in remote) {
+      byId.putIfAbsent(e.id, () => e);
+    }
+    return byId.values.toList();
   }
 
-  /// Get exercise by ID (built-in or custom)
+  /// Get exercise by ID (built-in, custom, or remote)
   @override
   Future<Exercise?> getExercise(String id) async {
     // Check built-in first
@@ -274,12 +291,45 @@ class StorageService implements IStorageService {
     if (builtIn != null) return builtIn;
 
     // Check custom
-    final json = _customExercisesBoxInstance.get(id);
-    if (json != null) {
-      return Exercise.fromJson(jsonDecode(json));
+    final customJson = _customExercisesBoxInstance.get(id);
+    if (customJson != null) {
+      return Exercise.fromJson(jsonDecode(customJson));
+    }
+
+    // Check remote
+    final remoteJson = _remoteExercisesBoxInstance.get(id);
+    if (remoteJson != null) {
+      return Exercise.fromJson(jsonDecode(remoteJson));
     }
 
     return null;
+  }
+
+  // ==================== REMOTE EXERCISES ====================
+
+  @override
+  Future<void> saveRemoteExercises(List<Exercise> exercises) async {
+    await _remoteExercisesBoxInstance.clear();
+    for (final exercise in exercises) {
+      await _remoteExercisesBoxInstance.put(
+        exercise.id,
+        jsonEncode(exercise.toJson()),
+      );
+    }
+  }
+
+  @override
+  Future<List<Exercise>> getRemoteExercises() async {
+    final exercises = <Exercise>[];
+    for (final json in _remoteExercisesBoxInstance.values) {
+      exercises.add(Exercise.fromJson(jsonDecode(json)));
+    }
+    return exercises;
+  }
+
+  @override
+  Future<void> clearRemoteExercises() async {
+    await _remoteExercisesBoxInstance.clear();
   }
 
   // ==================== SETTINGS ====================

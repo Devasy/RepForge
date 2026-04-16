@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "exercises": [
+    {
+      "id": "remote_cable_crossover",
+      "name": "Cable Crossover",
+      "category": "isolation",
+      "isCustom": false,
+      "muscleActivations": [
+        { "muscleGroupId": "chest", "activationPercentage": 80 },
+        { "muscleGroupId": "front_delts", "activationPercentage": 20 }
+      ]
+    },
+    {
+      "id": "remote_meadows_row",
+      "name": "Meadows Row",
+      "category": "compound",
+      "isCustom": false,
+      "muscleActivations": [
+        { "muscleGroupId": "back", "activationPercentage": 70 },
+        { "muscleGroupId": "rear_delts", "activationPercentage": 25 },
+        { "muscleGroupId": "biceps", "activationPercentage": 20 }
+      ]
+    },
+    {
+      "id": "remote_z_press",
+      "name": "Z-Press",
+      "category": "compound",
+      "isCustom": false,
+      "muscleActivations": [
+        { "muscleGroupId": "front_delts", "activationPercentage": 70 },
+        { "muscleGroupId": "side_delts", "activationPercentage": 30 },
+        { "muscleGroupId": "triceps", "activationPercentage": 20 },
+        { "muscleGroupId": "core", "activationPercentage": 40 }
+      ]
+    },
+    {
+      "id": "remote_larsen_press",
+      "name": "Larsen Press",
+      "category": "compound",
+      "isCustom": false,
+      "muscleActivations": [
+        { "muscleGroupId": "chest", "activationPercentage": 65 },
+        { "muscleGroupId": "triceps", "activationPercentage": 35 },
+        { "muscleGroupId": "front_delts", "activationPercentage": 25 },
+        { "muscleGroupId": "core", "activationPercentage": 30 }
+      ]
+    },
+    {
+      "id": "remote_bayesian_curl",
+      "name": "Bayesian Cable Curl",
+      "category": "isolation",
+      "isCustom": false,
+      "muscleActivations": [
+        { "muscleGroupId": "biceps", "activationPercentage": 90 },
+        { "muscleGroupId": "forearms", "activationPercentage": 20 }
+      ]
+    },
+    {
+      "id": "remote_nordic_curl",
+      "name": "Nordic Hamstring Curl",
+      "category": "isolation",
+      "isCustom": false,
+      "muscleActivations": [
+        { "muscleGroupId": "hamstrings", "activationPercentage": 95 },
+        { "muscleGroupId": "glutes", "activationPercentage": 20 }
+      ]
+    },
+    {
+      "id": "remote_snatch_grip_rdl",
+      "name": "Snatch-Grip Romanian Deadlift",
+      "category": "compound",
+      "isCustom": false,
+      "muscleActivations": [
+        { "muscleGroupId": "hamstrings", "activationPercentage": 75 },
+        { "muscleGroupId": "glutes", "activationPercentage": 50 },
+        { "muscleGroupId": "lower_back", "activationPercentage": 40 },
+        { "muscleGroupId": "traps", "activationPercentage": 30 }
+      ]
+    },
+    {
+      "id": "remote_copenhagen_plank",
+      "name": "Copenhagen Plank",
+      "category": "isolation",
+      "isCustom": false,
+      "muscleActivations": [
+        { "muscleGroupId": "core", "activationPercentage": 60 },
+        { "muscleGroupId": "hamstrings", "activationPercentage": 50 },
+        { "muscleGroupId": "glutes", "activationPercentage": 40 }
+      ]
+    },
+    {
+      "id": "remote_tib_raise",
+      "name": "Tibialis Raise",
+      "category": "isolation",
+      "isCustom": false,
+      "muscleActivations": [
+        { "muscleGroupId": "calves", "activationPercentage": 90 }
+      ]
+    },
+    {
+      "id": "remote_wide_grip_cable_row",
+      "name": "Wide-Grip Cable Row",
+      "category": "compound",
+      "isCustom": false,
+      "muscleActivations": [
+        { "muscleGroupId": "back", "activationPercentage": 70 },
+        { "muscleGroupId": "rear_delts", "activationPercentage": 35 },
+        { "muscleGroupId": "biceps", "activationPercentage": 25 },
+        { "muscleGroupId": "traps", "activationPercentage": 20 }
+      ]
+    }
+  ]
+}

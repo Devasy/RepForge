@@ -20,12 +20,14 @@ class MockStorageService implements IStorageService {
   final List<MuscleGroup> _muscleGroups = [];
   final Map<String, String> _settings = {};
   final List<TrainingProgram> _trainingPrograms = [];
+  final List<Exercise> _remoteExercises = [];
 
   bool saveCustomExerciseCalled = false;
   Exercise? lastSavedExercise;
 
   // Public getters for test assertions
   List<Exercise> get customExercises => _customExercises;
+  List<Exercise> get remoteExercises => _remoteExercises;
   List<WorkoutSession> get sessions => _sessions;
   List<Routine> get routines => _routines;
   List<Target> get targets => _targets;
@@ -33,6 +35,10 @@ class MockStorageService implements IStorageService {
   // Test helpers
   void addMockCustomExercise(Exercise exercise) {
     _customExercises.add(exercise);
+  }
+
+  void addMockRemoteExercise(Exercise exercise) {
+    _remoteExercises.add(exercise);
   }
 
   void addMockSession(WorkoutSession session) {
@@ -52,9 +58,19 @@ class MockStorageService implements IStorageService {
 
   @override
   Future<List<Exercise>> getAllExercises() async {
-    // Merge built-in exercises with custom exercises to mirror production behavior
+    // Merge built-in + custom + remote, mirroring production deduplication
     final builtInExercises = ExerciseDatabase.getAll();
-    return [...builtInExercises, ..._customExercises];
+    final byId = <String, Exercise>{};
+    for (final e in builtInExercises) {
+      byId[e.id] = e;
+    }
+    for (final e in _customExercises) {
+      byId[e.id] = e;
+    }
+    for (final e in _remoteExercises) {
+      byId.putIfAbsent(e.id, () => e);
+    }
+    return byId.values.toList();
   }
 
   @override
@@ -208,15 +224,27 @@ class MockStorageService implements IStorageService {
 
   @override
   Future<Exercise?> getExercise(String id) async {
-    // Check built-in exercises first, matching production behavior
     final builtIn = ExerciseDatabase.getById(id);
-    if (builtIn != null) {
-      return builtIn;
-    }
-    // Fall back to custom exercises
-    final index = _customExercises.indexWhere((e) => e.id == id);
-    return index != -1 ? _customExercises[index] : null;
+    if (builtIn != null) return builtIn;
+    final customIdx = _customExercises.indexWhere((e) => e.id == id);
+    if (customIdx != -1) return _customExercises[customIdx];
+    final remoteIdx = _remoteExercises.indexWhere((e) => e.id == id);
+    return remoteIdx != -1 ? _remoteExercises[remoteIdx] : null;
   }
+
+  @override
+  Future<void> saveRemoteExercises(List<Exercise> exercises) async {
+    _remoteExercises
+      ..clear()
+      ..addAll(exercises);
+  }
+
+  @override
+  Future<List<Exercise>> getRemoteExercises() async =>
+      List.from(_remoteExercises);
+
+  @override
+  Future<void> clearRemoteExercises() async => _remoteExercises.clear();
 
   @override
   Future<void> saveSetting(String key, String value) async {
