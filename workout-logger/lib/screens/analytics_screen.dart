@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
+import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import '../data/exercise_database.dart';
 
@@ -487,15 +488,24 @@ class _ExerciseProgressView extends StatelessWidget {
     final growthModel = provider.getGrowthModel(exerciseId);
     final exercise = provider.getExercise(exerciseId);
 
+    final settings = context.watch<SettingsProvider>();
+    final bestOneRM = provider.getBestOneRM(exerciseId);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1RM card
+          if (bestOneRM != null)
+            _buildOneRMCard(context, bestOneRM, settings),
+
+          if (bestOneRM != null) const SizedBox(height: AppSpacing.md),
+
           // Growth rate card
           if (growthModel != null)
             _buildGrowthCard(context, growthModel),
-          
+
           const SizedBox(height: AppSpacing.md),
           
           // Volume chart
@@ -505,6 +515,85 @@ class _ExerciseProgressView extends StatelessWidget {
           
           // Session history
           _buildSessionHistory(context, progression),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOneRMCard(
+    BuildContext context,
+    double bestOneRMkg,
+    SettingsProvider settings,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.primaryColor.withOpacity(0.2),
+            AppTheme.primaryColor.withOpacity(0.1),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: const Icon(
+              Icons.emoji_events_rounded,
+              color: AppTheme.primaryColor,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Estimated 1RM',
+                  style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  settings.formatWeight(bestOneRMkg),
+                  style: const TextStyle(
+                    color: AppTheme.primaryColor,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'Epley formula',
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 10,
+                ),
+              ),
+              Text(
+                'Best across all sets',
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -696,27 +785,37 @@ class _ExerciseProgressView extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: AppSpacing.md),
-          ...data.take(10).map((entry) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    DateFormat('MMM d, yyyy').format(entry.date),
-                    style: const TextStyle(color: AppTheme.textSecondary),
-                  ),
-                  Text(
-                    '${entry.volume.toStringAsFixed(0)} kg',
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.w600,
+          Builder(
+            builder: (context) {
+              final settings = context.watch<SettingsProvider>();
+              return Column(
+                children: data.take(10).map((entry) {
+                  final displayVolume = settings.toDisplay(entry.volume);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          DateFormat('MMM d, yyyy').format(entry.date),
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                        Text(
+                          '${displayVolume.toStringAsFixed(0)} ${settings.unitLabel}',
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                  );
+                }).toList(),
+              );
+            },
+          ),
         ],
       ),
     );

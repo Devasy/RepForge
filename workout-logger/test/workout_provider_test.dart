@@ -2,6 +2,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/services/workout_provider.dart';
+import 'package:repforge/services/managers/program_manager.dart';
 import 'test_utils/mock_storage_service.dart';
 
 void main() {
@@ -11,7 +12,7 @@ void main() {
 
     setUp(() async {
       mockStorage = MockStorageService();
-      provider = WorkoutProvider(mockStorage);
+      provider = WorkoutProvider(mockStorage, programManager: ProgramManager(mockStorage));
       await provider.init();
     });
 

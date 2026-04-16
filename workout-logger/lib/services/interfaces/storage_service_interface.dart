@@ -60,6 +60,13 @@ abstract class IStorageService {
   Future<void> saveSetting(String key, String value);
   Future<String?> getSetting(String key);
 
+  // ==================== TRAINING PROGRAMS ====================
+
+  Future<void> saveTrainingProgram(TrainingProgram program);
+  Future<List<TrainingProgram>> getAllTrainingPrograms();
+  Future<TrainingProgram?> getTrainingProgram(String id);
+  Future<void> deleteTrainingProgram(String id);
+
   // ==================== EXPORT / IMPORT ====================
 
   Future<String> exportAllData();
