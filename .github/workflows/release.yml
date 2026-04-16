@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - claude/update-flutter-sdk-u3nK9
   workflow_dispatch:
 
 jobs:
@@ -30,18 +29,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Read Flutter version from pubspec.yaml
-        id: flutter_version
-        run: |
-          FLUTTER_VERSION=$(grep '^\s*flutter:' workout-logger/pubspec.yaml | awk '{print $2}')
-          echo "value=$FLUTTER_VERSION" >> $GITHUB_OUTPUT
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ steps.flutter_version.outputs.value }}
+          flutter-version-file: './workout-logger/pubspec.yaml'
           channel: 'stable'
           cache: true
+          pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
 
       - name: Install dependencies
         working-directory: ./workout-logger
