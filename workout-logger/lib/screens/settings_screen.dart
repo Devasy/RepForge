@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import '../services/workout_provider.dart';
+import '../services/settings_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 
@@ -235,11 +236,137 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _buildSectionHeader('Preferences'),
+          const SizedBox(height: 16),
+          _buildPreferencesCard(),
+          const SizedBox(height: 24),
           _buildSectionHeader('Data Management'),
           const SizedBox(height: 16),
           _buildLocalBackupCard(),
           const SizedBox(height: 16),
           _buildBackupCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreferencesCard() {
+    final settings = context.watch<SettingsProvider>();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Units & Increments',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Customize weight display and input steps',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Weight unit toggle
+          const Text(
+            'Weight Unit',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _UnitButton(
+                  label: 'kg',
+                  selected: settings.weightUnit == WeightUnit.kg,
+                  onTap: () => settings.setWeightUnit(WeightUnit.kg),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _UnitButton(
+                  label: 'lbs',
+                  selected: settings.weightUnit == WeightUnit.lbs,
+                  onTap: () => settings.setWeightUnit(WeightUnit.lbs),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Weight increment selector
+          const Text(
+            'Weight Increment',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: settings.availableIncrements.map((inc) {
+              final selected = settings.weightIncrement == inc;
+              return ChoiceChip(
+                label: Text(
+                  inc == inc.truncateToDouble()
+                      ? '${inc.toStringAsFixed(0)} ${settings.unitLabel}'
+                      : '${inc.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '')} ${settings.unitLabel}',
+                ),
+                selected: selected,
+                onSelected: (_) => settings.setWeightIncrement(inc),
+                selectedColor: AppTheme.primaryColor.withOpacity(0.3),
+                backgroundColor: AppTheme.surfaceColor,
+                labelStyle: TextStyle(
+                  color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                ),
+                side: BorderSide(
+                  color: selected
+                      ? AppTheme.primaryColor
+                      : AppTheme.surfaceColor,
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );
@@ -419,6 +546,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _isBackingUp ? null : _performBackup,
+
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -439,6 +567,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _UnitButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _UnitButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppTheme.primaryColor.withOpacity(0.2)
+              : AppTheme.surfaceColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? AppTheme.primaryColor : AppTheme.surfaceColor,
+            width: 1.5,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              fontSize: 15,
+            ),
+          ),
+        ),
       ),
     );
   }

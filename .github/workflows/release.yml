@@ -33,7 +33,7 @@ jobs:
         id: flutter-action
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.7'
+          flutter-version-file: './workout-logger/pubspec.yaml'
           channel: 'stable'
           cache: true
           pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
@@ -72,7 +72,7 @@ jobs:
             echo "committed=false" >> $GITHUB_OUTPUT
           else
             git commit -m "chore: bump version to ${{ steps.version.outputs.value }}"
-            git push origin main
+            git push origin HEAD:${{ github.ref_name }}
             echo "committed=true" >> $GITHUB_OUTPUT
           fi
 

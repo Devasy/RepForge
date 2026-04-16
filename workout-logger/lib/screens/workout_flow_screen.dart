@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
+import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import 'exercise_library_screen.dart';
 
@@ -136,6 +137,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _loadLastSessionData() {
     final provider = context.read<WorkoutProvider>();
+    final settings = context.read<SettingsProvider>();
     final currentExercise = provider.currentExercise;
     if (currentExercise == null) return;
 
@@ -143,10 +145,13 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     if (lastSession != null && lastSession.sets.isNotEmpty) {
       final lastSet = lastSession.sets.last;
       setState(() {
-        _currentWeight = lastSet.weight;
+        _currentWeight = lastSet.weight; // always stored in kg
         _currentReps = lastSet.reps;
-        // Sync controllers with state (single source of truth)
-        _mainWeightController.text = _currentWeight.toString();
+        // Sync controllers using display unit
+        final displayWeight = settings.toDisplay(_currentWeight);
+        _mainWeightController.text = displayWeight == displayWeight.truncateToDouble()
+            ? displayWeight.toStringAsFixed(0)
+            : displayWeight.toStringAsFixed(1);
         _mainRepsController.text = _currentReps.toString();
       });
     }
@@ -422,11 +427,15 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   }
 
   Widget _buildInputSection(WorkoutProvider provider) {
+    final settings = context.watch<SettingsProvider>();
     final exerciseId = provider.currentExercise?.id ?? '';
     final isAssistedBodyweight =
         exerciseId == 'pull_ups' || exerciseId == 'chin_ups';
-    final weightLabel =
-        isAssistedBodyweight ? 'Assist kg (0=BW)' : 'Weight (kg)';
+    final weightLabel = isAssistedBodyweight
+        ? 'Assist (${settings.unitLabel})'
+        : 'Weight (${settings.unitLabel})';
+
+    final displayWeight = settings.toDisplay(_currentWeight);
 
     return Row(
       children: [
@@ -434,9 +443,10 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
         Expanded(
           child: _buildNumberInput(
             label: weightLabel,
-            value: _currentWeight,
-            onChanged: (val) => setState(() => _currentWeight = val),
-            step: _currentWeight < 40 ? 2.5 : 5,
+            value: displayWeight,
+            onChanged: (val) =>
+                setState(() => _currentWeight = settings.toStorage(val)),
+            step: settings.weightIncrement,
             decimals: 1,
           ),
         ),
@@ -604,6 +614,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   }
 
   Widget _buildMainSetEntry() {
+    final settings = context.read<SettingsProvider>();
     // Controllers are initialized in _loadLastSessionData and updated via onChanged
     // No controller.text assignments in build to avoid cursor jumps
     return Padding(
@@ -619,22 +630,24 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   width: 60,
                   child: TextFormField(
                     controller: _mainWeightController,
-                    decoration: const InputDecoration(
-                      hintText: 'kg',
-                      contentPadding: EdgeInsets.symmetric(
+                    decoration: InputDecoration(
+                      hintText: settings.unitLabel,
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 8,
                       ),
                     ),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
                     ],
                     onChanged: (val) {
                       final parsed = double.tryParse(val);
                       if (parsed != null) {
-                        _currentWeight = parsed;
-                        // Don't call setState here - controller is the source of truth during input
+                        // Convert from display unit to kg for storage
+                        _currentWeight = settings.toStorage(parsed);
                       }
                     },
                   ),
@@ -654,13 +667,15 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                         vertical: 8,
                       ),
                     ),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      signed: false,
+                      decimal: false,
+                    ),
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     onChanged: (val) {
                       final parsed = int.tryParse(val);
                       if (parsed != null) {
                         _currentReps = parsed;
-                        // Don't call setState here - controller is the source of truth during input
                       }
                     },
                   ),
@@ -695,23 +710,25 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   width: 60,
                   child: TextFormField(
                     controller: _dropWeightControllers[index],
-                    decoration: const InputDecoration(
-                      hintText: 'kg',
-                      contentPadding: EdgeInsets.symmetric(
+                    decoration: InputDecoration(
+                      hintText: context.read<SettingsProvider>().unitLabel,
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 8,
                       ),
                     ),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
                     ],
                     onChanged: (val) {
                       final parsed = double.tryParse(val);
                       if (parsed != null) {
-                        // Update drop data, controller is source of truth during input
+                        final settings = context.read<SettingsProvider>();
                         _drops[index] = DropsetEntry(
-                          weight: parsed,
+                          weight: settings.toStorage(parsed),
                           reps: _drops[index].reps,
                         );
                       }
@@ -733,12 +750,14 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                         vertical: 8,
                       ),
                     ),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      signed: false,
+                      decimal: false,
+                    ),
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     onChanged: (val) {
                       final parsed = int.tryParse(val);
                       if (parsed != null) {
-                        // Update drop data, controller is source of truth during input
                         _drops[index] = DropsetEntry(
                           weight: _drops[index].weight,
                           reps: parsed,
@@ -815,6 +834,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   }
 
   Widget _buildPreviousSets(List<WorkoutSet> sets) {
+    final settings = context.watch<SettingsProvider>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -829,6 +849,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
         ...sets.asMap().entries.map((entry) {
           final index = entry.key;
           final set = entry.value;
+          final oneRM = WorkoutProvider.estimateOneRM(set.weight, set.reps);
+          final displayWeight = settings.toDisplay(set.weight);
+          final weightStr = displayWeight == displayWeight.truncateToDouble()
+              ? displayWeight.toStringAsFixed(0)
+              : displayWeight.toStringAsFixed(1);
           return Container(
             margin: const EdgeInsets.only(bottom: AppSpacing.sm),
             padding: const EdgeInsets.symmetric(
@@ -860,12 +885,25 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   style: const TextStyle(color: AppTheme.textSecondary),
                 ),
                 const Spacer(),
-                Text(
-                  '${set.weight}kg × ${set.reps}',
-                  style: const TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '$weightStr ${settings.unitLabel} × ${set.reps}',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (set.reps > 1)
+                      Text(
+                        '~${settings.formatWeight(oneRM)} 1RM',
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
                 ),
                 if (set.isDropset) ...[
                   const SizedBox(width: 8),
@@ -944,9 +982,10 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
             runSpacing: 8,
             children: lastSession.sets.asMap().entries.map((entry) {
               final set = entry.value;
+              final settings = context.read<SettingsProvider>();
               return Chip(
                 label: Text(
-                  '${set.weight}kg × ${set.reps}',
+                  '${settings.formatWeight(set.weight)} × ${set.reps}',
                   style: const TextStyle(fontSize: 12),
                 ),
                 backgroundColor: AppTheme.surfaceColor,
@@ -1341,6 +1380,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.cardColor,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1498,6 +1538,7 @@ class _NumberPickerContent extends StatefulWidget {
 
 class _NumberPickerContentState extends State<_NumberPickerContent> {
   late final TextEditingController _controller;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
@@ -1505,13 +1546,19 @@ class _NumberPickerContentState extends State<_NumberPickerContent> {
     _controller = TextEditingController(
       text: widget.decimals == 0
           ? widget.initialValue.toInt().toString()
-          : widget.initialValue.toString(),
+          : widget.initialValue.toStringAsFixed(widget.decimals),
     );
+    _focusNode = FocusNode();
+    // Request focus after the bottom sheet is fully rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -1525,23 +1572,41 @@ class _NumberPickerContentState extends State<_NumberPickerContent> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+    // Pad bottom so content shifts up above the keyboard
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg + bottomInset,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: _controller,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-            ],
+            focusNode: _focusNode,
+            keyboardType: widget.decimals > 0
+                ? const TextInputType.numberWithOptions(decimal: true)
+                : const TextInputType.numberWithOptions(
+                    signed: false,
+                    decimal: false,
+                  ),
+            inputFormatters: widget.decimals > 0
+                ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$'))]
+                : [FilteringTextInputFormatter.digitsOnly],
             decoration: const InputDecoration(labelText: 'Enter value'),
             onSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: AppSpacing.md),
-          ElevatedButton(onPressed: _submit, child: const Text('Done')),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _submit,
+              child: const Text('Done'),
+            ),
+          ),
         ],
       ),
     );
