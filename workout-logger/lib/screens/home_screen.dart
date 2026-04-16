@@ -11,7 +11,7 @@ import 'history_screen.dart';
 import 'routines_screen.dart';
 import 'analytics_screen.dart';
 import 'exercise_library_screen.dart';
-import 'profile_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,7 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
           HistoryScreen(),
           RoutinesScreen(),
           AnalyticsScreen(),
-          ProfileScreen(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -49,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -57,7 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildNavItem(1, Icons.history_rounded, 'History'),
                 _buildNavItem(2, Icons.list_alt_rounded, 'Routines'),
                 _buildNavItem(3, Icons.analytics_rounded, 'Analytics'),
-                _buildNavItem(4, Icons.person_rounded, 'Profile'),
               ],
             ),
           ),
@@ -158,13 +156,12 @@ class DashboardTab extends StatelessWidget {
         ),
         IconButton(
           onPressed: () {
-            // Navigate to Profile tab (index 4)
-            final homeState = context.findAncestorStateOfType<_HomeScreenState>();
-            if (homeState != null) {
-              homeState.setState(() => homeState._currentIndex = 4);
-            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            );
           },
-          icon: const Icon(Icons.person_rounded),
+          icon: const Icon(Icons.settings_outlined),
           color: AppTheme.textPrimary,
         ),
       ],

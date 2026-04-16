@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   release:
@@ -13,8 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write      # Required to create releases and push commits
-      pull-requests: read  # Required to read merged PRs for release notes
+      contents: write  # Required to create releases and push commits
 
     steps:
       - name: Checkout repository
@@ -32,36 +30,26 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: './workout-logger/pubspec.yaml'
+          flutter-version: '3.38.7'
           channel: 'stable'
           cache: true
-          pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
 
       - name: Install dependencies
         working-directory: ./workout-logger
         run: flutter pub get
 
       - name: Bump version
-        if: github.event_name == 'push'
         id: bump_version
         run: |
           dart scripts/bump_version.dart patch
           echo "Version bumped successfully"
 
-      - name: Read version
-        id: version
-        run: |
-          VERSION=$(grep '^version:' workout-logger/pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
-          echo "value=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Configure Git
-        if: github.event_name == 'push'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Commit version bump
-        if: github.event_name == 'push'
         id: commit_version
         run: |
           git add workout-logger/pubspec.yaml
@@ -69,51 +57,16 @@ jobs:
             echo "No changes to commit"
             echo "committed=false" >> $GITHUB_OUTPUT
           else
-            git commit -m "chore: bump version to ${{ steps.version.outputs.value }}"
-            git push origin HEAD:${{ github.ref_name }}
+            git commit -m "chore: bump version to ${{ steps.bump_version.outputs.version }}"
+            git push origin main
             echo "committed=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Create Git tag
-        if: github.event_name == 'push' && steps.commit_version.outputs.committed == 'true'
+        if: steps.commit_version.outputs.committed == 'true'
         run: |
-          git tag "v${{ steps.version.outputs.value }}"
-          git push origin "v${{ steps.version.outputs.value }}"
-
-      - name: Get merged PRs for release notes
-        if: github.event_name == 'push' && steps.commit_version.outputs.committed == 'true'
-        id: merged_prs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          NEW_TAG="v${{ steps.version.outputs.value }}"
-          PREV_TAG=$(git tag --sort=-version:refname | grep '^v' | grep -v "^${NEW_TAG}$" | head -1)
-
-          if [ -n "$PREV_TAG" ]; then
-            SINCE_DATE=$(git log -1 --format=%aI "$PREV_TAG")
-            PR_LIST=$(gh pr list \
-              --state merged \
-              --base main \
-              --limit 50 \
-              --search "merged:>=${SINCE_DATE}" \
-              --json number,title,author \
-              --template '{{range .}}- #{{.number}} {{.title}} (@{{.author.login}}){{"\n"}}{{end}}' 2>/dev/null || echo "")
-          else
-            PR_LIST=$(gh pr list \
-              --state merged \
-              --base main \
-              --limit 10 \
-              --json number,title,author \
-              --template '{{range .}}- #{{.number}} {{.title}} (@{{.author.login}}){{"\n"}}{{end}}' 2>/dev/null || echo "")
-          fi
-
-          [ -z "$PR_LIST" ] && PR_LIST="_No merged pull requests found since the last release._"
-
-          {
-            echo "list<<EOF"
-            echo "$PR_LIST"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          git tag "v${{ steps.bump_version.outputs.version }}"
+          git push origin "v${{ steps.bump_version.outputs.version }}"
 
       - name: Build APK
         working-directory: ./workout-logger
@@ -122,41 +75,28 @@ jobs:
       - name: Rename APK
         run: |
           mv workout-logger/build/app/outputs/flutter-apk/app-release.apk \
-             workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}.apk
-
-      - name: Sanitize ref name for artifact
-        id: sanitize_ref
-        run: echo "ref_name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> $GITHUB_OUTPUT
-
-      - name: Upload APK artifact (manual run)
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: repforge-v${{ steps.version.outputs.value }}-${{ steps.sanitize_ref.outputs.ref_name }}
-          path: workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}.apk
-          retention-days: 7
+             workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.bump_version.outputs.version }}.apk
 
       - name: Create GitHub Release
-        if: github.event_name == 'push' && steps.commit_version.outputs.committed == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.value }}
-          name: RepForge v${{ steps.version.outputs.value }}
+          tag_name: v${{ steps.bump_version.outputs.version }}
+          name: RepForge v${{ steps.bump_version.outputs.version }}
           body: |
-            ## RepForge v${{ steps.version.outputs.value }}
+            ## RepForge v${{ steps.bump_version.outputs.version }}
 
             ### 📱 Download
             Download the APK file below to install on your Android device.
 
-            ### 🔀 Merged Pull Requests
-            ${{ steps.merged_prs.outputs.list }}
+            ### 🔄 Changes
+            This release was automatically generated from the latest changes merged to main.
 
             ### 📊 Build Information
-            - **Version**: ${{ steps.version.outputs.value }}
+            - **Version**: ${{ steps.bump_version.outputs.version }}
             - **Build Date**: ${{ github.event.head_commit.timestamp }}
             - **Commit**: ${{ github.sha }}
           files: |
-            workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}.apk
+            workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.bump_version.outputs.version }}.apk
           draft: false
           prerelease: false
         env:
