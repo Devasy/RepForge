@@ -43,8 +43,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final file = File('${tempDir.path}/repforge_backup_$dateStr.json');
       await file.writeAsString(jsonString);
 
-      final result = await Share.shareXFiles([XFile(file.path)],
-          subject: 'RepForge Backup');
+      final result = await Share.shareXFiles([
+        XFile(file.path),
+      ], subject: 'RepForge Backup');
 
       if (!mounted) return;
       if (result.status == ShareResultStatus.success ||
@@ -52,7 +53,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _showSnack('Backup exported successfully!', AppTheme.success);
       }
     } catch (e) {
-      if (mounted) _showSnack('Export failed. Please try again.', AppTheme.error);
+      if (mounted)
+        _showSnack('Export failed. Please try again.', AppTheme.error);
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
@@ -64,8 +66,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Import Backup',
-            style: TextStyle(color: AppTheme.textPrimary)),
+        title: const Text(
+          'Import Backup',
+          style: TextStyle(color: AppTheme.textPrimary),
+        ),
         content: const Text(
           'This will merge the backup with your existing data. '
           'Select a .json RepForge backup file to continue.',
@@ -74,13 +78,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Choose File'),
@@ -92,8 +100,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _isImporting = true);
     try {
-      final result = await FilePicker.platform
-          .pickFiles(type: FileType.custom, allowedExtensions: ['json']);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
       if (result == null || result.files.single.path == null) {
         if (mounted) setState(() => _isImporting = false);
         return;
@@ -114,10 +124,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final sessionCount = (data['sessions'] as List?)?.length ?? 0;
       final routineCount = (data['routines'] as List?)?.length ?? 0;
       _showSnack(
-          'Import complete! $sessionCount sessions, $routineCount routines.',
-          AppTheme.success);
+        'Import complete! $sessionCount sessions, $routineCount routines.',
+        AppTheme.success,
+      );
     } catch (e) {
-      if (mounted) _showSnack('Import failed. Invalid backup file.', AppTheme.error);
+      if (mounted)
+        _showSnack('Import failed. Invalid backup file.', AppTheme.error);
     } finally {
       if (mounted) setState(() => _isImporting = false);
     }
@@ -136,7 +148,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (!mounted) return;
       _showSnack(
-        success ? 'Cloud backup successful!' : 'Backup failed. Please try again.',
+        success
+            ? 'Cloud backup successful!'
+            : 'Backup failed. Please try again.',
         success ? AppTheme.success : AppTheme.error,
       );
     } catch (_) {
@@ -147,9 +161,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showSnack(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
   // ==================== Build ====================
@@ -199,7 +213,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -295,17 +312,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 selectedColor: AppTheme.primaryColor.withOpacity(0.25),
                 backgroundColor: AppTheme.surfaceColor,
                 labelStyle: TextStyle(
-                  color:
-                      selected ? AppTheme.primaryColor : AppTheme.textSecondary,
-                  fontWeight:
-                      selected ? FontWeight.bold : FontWeight.normal,
+                  color: selected
+                      ? AppTheme.primaryColor
+                      : AppTheme.textSecondary,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
                   fontSize: 13,
                 ),
                 side: BorderSide(
                   color: selected ? AppTheme.primaryColor : Colors.transparent,
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               );
             }).toList(),
           ),
@@ -374,9 +390,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             decoration: InputDecoration(
               hintText: 'mongodb+srv://user:pass@cluster.mongodb.net/db',
               hintStyle: const TextStyle(
-                  color: AppTheme.textMuted, fontSize: 13),
-              prefixIcon: const Icon(Icons.link_rounded,
-                  color: AppTheme.textMuted, size: 20),
+                color: AppTheme.textMuted,
+                fontSize: 13,
+              ),
+              prefixIcon: const Icon(
+                Icons.link_rounded,
+                color: AppTheme.textMuted,
+                size: 20,
+              ),
               filled: true,
               fillColor: AppTheme.surfaceColor.withOpacity(0.5),
               border: OutlineInputBorder(
@@ -384,7 +405,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 borderSide: BorderSide.none,
               ),
               contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 12),
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -568,10 +591,8 @@ class _UnitToggleButton extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color:
-                  selected ? AppTheme.primaryColor : AppTheme.textSecondary,
-              fontWeight:
-                  selected ? FontWeight.bold : FontWeight.normal,
+              color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
               fontSize: 15,
             ),
           ),
@@ -624,14 +645,12 @@ class _ActionTile extends StatelessWidget {
               height: 20,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppTheme.primaryColor,
+                ),
               ),
             )
-          : const Icon(
-              Icons.chevron_right,
-              color: AppTheme.textMuted,
-            ),
+          : const Icon(Icons.chevron_right, color: AppTheme.textMuted),
       onTap: onTap,
     );
   }
@@ -658,10 +677,7 @@ class _InfoTile extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             label,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 13,
-            ),
+            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
           ),
           const Spacer(),
           Text(
@@ -683,11 +699,7 @@ class _Divider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(
-      color: AppTheme.surfaceColor,
-      height: 1,
-      indent: 40,
-    );
+    return const Divider(color: AppTheme.surfaceColor, height: 1, indent: 40);
   }
 }
 
@@ -699,9 +711,7 @@ class _ComingSoonBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.warning.withOpacity(0.15),
         borderRadius: BorderRadius.circular(AppRadius.full),
-        border: Border.all(
-          color: AppTheme.warning.withOpacity(0.4),
-        ),
+        border: Border.all(color: AppTheme.warning.withOpacity(0.4)),
       ),
       child: const Text(
         'Coming Soon',
