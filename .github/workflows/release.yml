@@ -29,10 +29,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Read Flutter version from pubspec.yaml
+        id: flutter_version
+        run: |
+          FLUTTER_VERSION=$(grep '^\s*flutter:' workout-logger/pubspec.yaml | awk '{print $2}')
+          echo "value=$FLUTTER_VERSION" >> $GITHUB_OUTPUT
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.5'
+          flutter-version: ${{ steps.flutter_version.outputs.value }}
           channel: 'stable'
           cache: true
 
