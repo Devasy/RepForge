@@ -1,4 +1,4 @@
-// Routines Screen - Manage workout routines
+// Routines Screen - Manage workout routines and training programs
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,9 +8,38 @@ import '../services/workout_provider.dart';
 import '../theme/app_theme.dart';
 import '../data/exercise_database.dart';
 import 'workout_flow_screen.dart';
+import 'programs/programs_screen.dart';
 
 class RoutinesScreen extends StatelessWidget {
   const RoutinesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Routines'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.list_alt), text: 'Routines'),
+              Tab(icon: Icon(Icons.calendar_month), text: 'Programs'),
+            ],
+          ),
+        ),
+        body: const TabBarView(
+          children: [
+            _RoutinesTab(),
+            ProgramsScreen(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoutinesTab extends StatelessWidget {
+  const _RoutinesTab();
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +47,7 @@ class RoutinesScreen extends StatelessWidget {
     final routines = provider.routines;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Routines')),
+      backgroundColor: AppTheme.backgroundColor,
       body: routines.isEmpty
           ? _buildEmptyState(context)
           : _buildRoutineList(context, routines, provider),
