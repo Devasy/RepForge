@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
-import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import '../data/exercise_database.dart';
 
@@ -191,8 +190,8 @@ class _OverviewTab extends StatelessWidget {
                       show: true,
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.primaryColor.withOpacity(0.3),
-                          AppTheme.primaryColor.withOpacity(0.0),
+                          AppTheme.primaryColor.withValues(alpha: 0.3),
+                          AppTheme.primaryColor.withValues(alpha: 0.0),
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -314,16 +313,13 @@ class _OverviewTab extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: weeks.entries.map((entry) {
-              final label = entry.key == 0 
-                  ? 'This Week' 
-                  : '${entry.key} week${entry.key > 1 ? 's' : ''} ago';
               return Column(
                 children: [
                   Container(
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(
+                      color: AppTheme.primaryColor.withValues(alpha:
                         entry.value > 0 ? 0.2 + (entry.value * 0.15) : 0.1
                       ),
                       borderRadius: BorderRadius.circular(12),
@@ -486,22 +482,12 @@ class _ExerciseProgressView extends StatelessWidget {
   Widget build(BuildContext context) {
     final progression = provider.getVolumeProgression(exerciseId);
     final growthModel = provider.getGrowthModel(exerciseId);
-    final exercise = provider.getExercise(exerciseId);
-
-    final settings = context.watch<SettingsProvider>();
-    final bestOneRM = provider.getBestOneRM(exerciseId);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1RM card
-          if (bestOneRM != null)
-            _buildOneRMCard(context, bestOneRM, settings),
-
-          if (bestOneRM != null) const SizedBox(height: AppSpacing.md),
-
           // Growth rate card
           if (growthModel != null)
             _buildGrowthCard(context, growthModel),
@@ -520,85 +506,6 @@ class _ExerciseProgressView extends StatelessWidget {
     );
   }
 
-  Widget _buildOneRMCard(
-    BuildContext context,
-    double bestOneRMkg,
-    SettingsProvider settings,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryColor.withOpacity(0.2),
-            AppTheme.primaryColor.withOpacity(0.1),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: const Icon(
-              Icons.emoji_events_rounded,
-              color: AppTheme.primaryColor,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Estimated 1RM',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                Text(
-                  settings.formatWeight(bestOneRMkg),
-                  style: const TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'Epley formula',
-                style: TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 10,
-                ),
-              ),
-              Text(
-                'Best across all sets',
-                style: TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildGrowthCard(BuildContext context, GrowthModel model) {
     final isGrowing = model.slope > 0;
     final slopeFormatted = model.slope.abs().toStringAsFixed(1);
@@ -608,8 +515,8 @@ class _ExerciseProgressView extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isGrowing
-              ? [AppTheme.success.withOpacity(0.2), AppTheme.success.withOpacity(0.1)]
-              : [AppTheme.warning.withOpacity(0.2), AppTheme.warning.withOpacity(0.1)],
+              ? [AppTheme.success.withValues(alpha: 0.2), AppTheme.success.withValues(alpha: 0.1)]
+              : [AppTheme.warning.withValues(alpha: 0.2), AppTheme.warning.withValues(alpha: 0.1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -750,8 +657,8 @@ class _ExerciseProgressView extends StatelessWidget {
                       show: true,
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.secondaryColor.withOpacity(0.3),
-                          AppTheme.secondaryColor.withOpacity(0.0),
+                          AppTheme.secondaryColor.withValues(alpha: 0.3),
+                          AppTheme.secondaryColor.withValues(alpha: 0.0),
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -785,37 +692,27 @@ class _ExerciseProgressView extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: AppSpacing.md),
-          Builder(
-            builder: (context) {
-              final settings = context.watch<SettingsProvider>();
-              return Column(
-                children: data.take(10).map((entry) {
-                  final displayVolume = settings.toDisplay(entry.volume);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          DateFormat('MMM d, yyyy').format(entry.date),
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        Text(
-                          '${displayVolume.toStringAsFixed(0)} ${settings.unitLabel}',
-                          style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+          ...data.take(10).map((entry) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    DateFormat('MMM d, yyyy').format(entry.date),
+                    style: const TextStyle(color: AppTheme.textSecondary),
+                  ),
+                  Text(
+                    '${entry.volume.toStringAsFixed(0)} kg',
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w600,
                     ),
-                  );
-                }).toList(),
-              );
-            },
-          ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );

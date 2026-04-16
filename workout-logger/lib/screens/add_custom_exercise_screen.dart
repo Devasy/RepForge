@@ -113,10 +113,10 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -195,7 +195,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                 style: ButtonStyle(
                   backgroundColor: WidgetStateProperty.resolveWith((states) {
                     if (states.contains(WidgetState.selected)) {
-                      return AppTheme.primaryColor.withOpacity(0.2);
+                      return AppTheme.primaryColor.withValues(alpha: 0.2);
                     }
                     return AppTheme.surfaceColor;
                   }),
@@ -252,7 +252,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                             duration: const Duration(milliseconds: 200),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? muscleColor.withOpacity(0.3)
+                                  ? muscleColor.withValues(alpha: 0.3)
                                   : AppTheme.surfaceColor,
                               borderRadius: BorderRadius.circular(AppRadius.md),
                               border: Border.all(
@@ -307,7 +307,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                   decoration: BoxDecoration(
                     color: AppTheme.getMuscleColor(
                       _selectedMuscleGroup!,
-                    ).withOpacity(0.1),
+                    ).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Row(

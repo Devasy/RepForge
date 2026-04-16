@@ -159,7 +159,7 @@ class AppTheme {
       
       chipTheme: ChipThemeData(
         backgroundColor: cardColor,
-        selectedColor: primaryColor.withOpacity(0.3),
+        selectedColor: primaryColor.withValues(alpha: 0.3),
         labelStyle: const TextStyle(color: textPrimary),
         side: BorderSide.none,
         shape: RoundedRectangleBorder(

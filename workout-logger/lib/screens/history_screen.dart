@@ -424,7 +424,7 @@ class _StatBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
@@ -499,7 +499,7 @@ class _ExerciseDetailCard extends StatelessWidget {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.2),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
@@ -534,7 +534,7 @@ class _ExerciseDetailCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.warning.withOpacity(0.2),
+                        color: AppTheme.warning.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(

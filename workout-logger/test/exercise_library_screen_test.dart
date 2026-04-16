@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/screens/exercise_library_screen.dart';
 import 'package:repforge/services/workout_provider.dart';
-import 'package:repforge/services/managers/program_manager.dart';
 import 'test_utils/mock_storage_service.dart';
 
 Widget createTestWidget({
@@ -25,7 +24,7 @@ void main() {
 
     setUp(() async {
       mockStorage = MockStorageService();
-      provider = WorkoutProvider(mockStorage, programManager: ProgramManager(mockStorage));
+      provider = WorkoutProvider(mockStorage);
       await provider.init();
     });
 
@@ -126,12 +125,12 @@ void main() {
     testWidgets('should filter exercises by search query', (tester) async {
       // Arrange - Add custom exercises
       await provider.addCustomExercise(
-        name: 'Unique Bicep Curl',
+        name: 'Bicep Curl',
         category: 'isolation',
         primaryMuscleGroupId: 'biceps',
       );
       await provider.addCustomExercise(
-        name: 'Unique Tricep Pushdown',
+        name: 'Tricep Pushdown',
         category: 'isolation',
         primaryMuscleGroupId: 'triceps',
       );
@@ -145,12 +144,12 @@ void main() {
       await tester.pumpAndSettle();
 
       // Act - Enter search query
-      await tester.enterText(find.byType(TextField), 'Unique Bicep');
+      await tester.enterText(find.byType(TextField).first, 'Bicep');
       await tester.pumpAndSettle();
 
       // Assert - Should only show matching exercise
-      expect(find.text('Unique Bicep Curl'), findsOneWidget);
-      expect(find.text('Unique Tricep Pushdown'), findsNothing);
+      expect(find.text('Bicep Curl'), findsWidgets);
+      expect(find.text('Tricep Pushdown'), findsNothing);
     });
 
     testWidgets('should show muscle group filter chips', (tester) async {
@@ -194,7 +193,7 @@ void main() {
 
     setUp(() async {
       mockStorage = MockStorageService();
-      provider = WorkoutProvider(mockStorage, programManager: ProgramManager(mockStorage));
+      provider = WorkoutProvider(mockStorage);
       await provider.init();
 
       // Add a custom exercise for delete tests

@@ -71,7 +71,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.2),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -144,7 +144,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                       selected: _selectedMuscleGroup == entry.key,
                       selectedColor: AppTheme.getMuscleColor(
                         entry.key,
-                      ).withOpacity(0.3),
+                      ).withValues(alpha: 0.3),
                       onSelected: (selected) => setState(() {
                         _selectedMuscleGroup = selected ? entry.key : null;
                       }),
@@ -268,8 +268,8 @@ class _ExerciseCard extends StatelessWidget {
                     height: 48,
                     decoration: BoxDecoration(
                       color: exercise.isCustom
-                          ? AppTheme.warning.withOpacity(0.2)
-                          : AppTheme.primaryColor.withOpacity(0.2),
+                          ? AppTheme.warning.withValues(alpha: 0.2)
+                          : AppTheme.primaryColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -328,8 +328,8 @@ class _ExerciseCard extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: exercise.category == 'compound'
-                                ? AppTheme.primaryColor.withOpacity(0.2)
-                                : AppTheme.secondaryColor.withOpacity(0.2),
+                                ? AppTheme.primaryColor.withValues(alpha: 0.2)
+                                : AppTheme.secondaryColor.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -351,7 +351,7 @@ class _ExerciseCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppTheme.warning.withOpacity(0.2),
+                              color: AppTheme.warning.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
@@ -436,8 +436,8 @@ class _ExerciseDetailsSheet extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: exercise.isCustom
-                          ? AppTheme.warning.withOpacity(0.2)
-                          : AppTheme.primaryColor.withOpacity(0.2),
+                          ? AppTheme.warning.withValues(alpha: 0.2)
+                          : AppTheme.primaryColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -493,7 +493,7 @@ class _ExerciseDetailsSheet extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppTheme.warning.withOpacity(0.2),
+                              color: AppTheme.warning.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
@@ -584,7 +584,7 @@ class _ExerciseDetailsSheet extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: AppTheme.success.withOpacity(0.1),
+                color: AppTheme.success.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Row(

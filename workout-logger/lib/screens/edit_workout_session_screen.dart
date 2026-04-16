@@ -816,7 +816,7 @@ class _EditableSetRowState extends State<_EditableSetRow> {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.2),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Center(
@@ -998,14 +998,14 @@ class _EditableSetRowState extends State<_EditableSetRow> {
                     Icon(
                       Icons.add_circle_outline,
                       size: 14,
-                      color: AppTheme.primaryColor.withOpacity(0.7),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.7),
                     ),
                     const SizedBox(width: 4),
                     Text(
                       'Add Drop',
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.primaryColor.withOpacity(0.7),
+                        color: AppTheme.primaryColor.withValues(alpha: 0.7),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1088,7 +1088,7 @@ class _EditableDropRowState extends State<_EditableDropRow> {
           Icon(
             Icons.subdirectory_arrow_right,
             size: 16,
-            color: AppTheme.textMuted.withOpacity(0.5),
+            color: AppTheme.textMuted.withValues(alpha: 0.5),
           ),
           const SizedBox(width: 8),
 
@@ -1121,7 +1121,7 @@ class _EditableDropRowState extends State<_EditableDropRow> {
                   color: AppTheme.textMuted,
                 ),
                 filled: true,
-                fillColor: AppTheme.surfaceColor.withOpacity(0.7),
+                fillColor: AppTheme.surfaceColor.withValues(alpha: 0.7),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(6),
                   borderSide: BorderSide.none,
@@ -1163,7 +1163,7 @@ class _EditableDropRowState extends State<_EditableDropRow> {
                   color: AppTheme.textMuted,
                 ),
                 filled: true,
-                fillColor: AppTheme.surfaceColor.withOpacity(0.7),
+                fillColor: AppTheme.surfaceColor.withValues(alpha: 0.7),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(6),
                   borderSide: BorderSide.none,

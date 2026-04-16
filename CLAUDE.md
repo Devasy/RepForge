@@ -16,7 +16,7 @@ This file provides guidance for AI assistants working on the RepForge codebase.
 
 **Package:** `com.devasy.repforge`
 **Version:** `1.0.6+7`
-**Flutter SDK:** `3.41.5`
+**Flutter SDK:** `^3.9.2`
 
 ---
 
@@ -217,7 +217,7 @@ dart run build_runner build --delete-conflicting-outputs
 Triggers automatically on push to `main`:
 1. Runs `dart scripts/bump_version.dart patch` (increments patch version)
 2. Commits version bump and creates a git tag (`v{version}`)
-3. Builds the release APK with the Flutter version pinned in `workout-logger/pubspec.yaml` (currently 3.41.5)
+3. Builds release APK with Flutter 3.38.7
 4. Creates a GitHub Release with the APK attached
 
 **Do not** manually edit `pubspec.yaml` version before merging to `main` — the CI handles it. For a minor/major bump, edit `pubspec.yaml` manually before the merge.

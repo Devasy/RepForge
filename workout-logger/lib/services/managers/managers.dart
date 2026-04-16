@@ -15,4 +15,3 @@ export 'routine_manager.dart';
 export 'exercise_manager.dart';
 export 'target_manager.dart';
 export 'analytics_manager.dart';
-export 'program_manager.dart';
