@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - claude/update-flutter-sdk-u3nK9
   workflow_dispatch:
 
 jobs:
