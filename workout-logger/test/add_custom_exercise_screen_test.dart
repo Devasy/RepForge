@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/screens/add_custom_exercise_screen.dart';
 import 'package:repforge/services/workout_provider.dart';
+import 'package:repforge/services/managers/program_manager.dart';
 import 'test_utils/mock_storage_service.dart';
 
 Widget createTestWidget({
@@ -24,7 +25,7 @@ void main() {
 
     setUp(() async {
       mockStorage = MockStorageService();
-      provider = WorkoutProvider(mockStorage);
+      provider = WorkoutProvider(mockStorage, programManager: ProgramManager(mockStorage));
       await provider.init();
     });
 
@@ -39,6 +40,8 @@ void main() {
 
       // Act - Try to save without entering a name
       // First select a muscle group (required)
+      await tester.ensureVisible(find.text('Chest'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Chest'));
       await tester.pump();
 
@@ -63,6 +66,8 @@ void main() {
 
         // Act - Enter a short name
         await tester.enterText(find.byType(TextFormField), 'Ab');
+        await tester.ensureVisible(find.text('Chest'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Chest'));
         await tester.pump();
 
@@ -112,6 +117,8 @@ void main() {
       await tester.pump();
 
       // Select a muscle group
+      await tester.ensureVisible(find.text('Shoulders'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Shoulders'));
       await tester.pump();
 

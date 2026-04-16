@@ -8,6 +8,7 @@
 // - ExerciseManager: Exercise library
 // - TargetManager: Goals and targets
 // - AnalyticsManager: Statistics and recommendations
+// - ProgramManager: Training programs (multi-week plans)
 //
 // Following Dependency Inversion Principle: this class now depends on
 // abstractions (IStorageService, IMLService) rather than concrete implementations.
@@ -20,6 +21,7 @@ import 'interfaces/storage_service_interface.dart';
 import 'interfaces/ml_service_interface.dart';
 import 'ml_service.dart';
 import 'strategies/target_calculator.dart';
+import 'managers/program_manager.dart';
 
 class WorkoutProvider extends ChangeNotifier {
   final IStorageService _storage;
@@ -34,6 +36,8 @@ class WorkoutProvider extends ChangeNotifier {
   List<Exercise> _allExercises = [];
   final Map<String, GrowthModel> _growthModels =
       {}; // exerciseId -> GrowthModel
+
+  final ProgramManager programManager;
 
   // Active workout state
   WorkoutSession? _activeSession;
@@ -59,9 +63,13 @@ class WorkoutProvider extends ChangeNotifier {
   /// Create WorkoutProvider with dependency injection.
   ///
   /// Following Dependency Inversion Principle: accepts abstractions
-  /// rather than concrete implementations.
-  WorkoutProvider(this._storage, {IMLService? mlService})
-    : _mlService = mlService ?? MLService();
+  /// rather than concrete implementations. [programManager] defaults to a
+  /// new ProgramManager backed by the same storage if not provided.
+  WorkoutProvider(
+    this._storage, {
+    IMLService? mlService,
+    required this.programManager,
+  }) : _mlService = mlService ?? MLService();
 
   // ==================== INITIALIZATION ====================
 
@@ -77,6 +85,7 @@ class WorkoutProvider extends ChangeNotifier {
     _targets = await _storage.getAllTargets();
     _muscleGroups = await _storage.getAllMuscleGroups();
     _allExercises = await _storage.getAllExercises();
+    await programManager.loadPrograms();
     notifyListeners();
   }
 
@@ -336,6 +345,14 @@ class WorkoutProvider extends ChangeNotifier {
       return true;
     }
     return false;
+  }
+
+  /// Jump directly to an exercise by index
+  void goToExercise(int index) {
+    if (index >= 0 && index < _currentExerciseLogs.length) {
+      _currentExerciseIndex = index;
+      notifyListeners();
+    }
   }
 
   /// Finish workout and save
@@ -716,9 +733,44 @@ class WorkoutProvider extends ChangeNotifier {
   /// Get growth model for an exercise
   GrowthModel? getGrowthModel(String exerciseId) => _growthModels[exerciseId];
 
+  /// Estimate 1RM using Epley formula: weight × (1 + reps / 30).
+  static double estimateOneRM(double weight, int reps) {
+    if (reps <= 0 || weight <= 0) return 0;
+    if (reps == 1) return weight;
+    return weight * (1 + reps / 30.0);
+  }
+
+  /// Get the best estimated 1RM across all logged sets for an exercise.
+  /// Returns null if no sessions exist for the exercise.
+  double? getBestOneRM(String exerciseId) {
+    double? best;
+    for (final session in _sessions) {
+      for (final log in session.exercises) {
+        if (log.exerciseId != exerciseId) continue;
+        for (final set in log.sets) {
+          final orm = estimateOneRM(set.weight, set.reps);
+          if (best == null || orm > best) best = orm;
+        }
+      }
+    }
+    return best;
+  }
+
   // ==================== QUICK STATS ====================
 
   Future<Map<String, dynamic>> getQuickStats() async {
     return await _storage.getQuickStats();
+  }
+
+  // ==================== BACKUP ====================
+
+  Future<String> exportAllData() async {
+    return await _storage.exportAllData();
+  }
+
+  Future<void> importData(String jsonData) async {
+    await _storage.importData(jsonData);
+    await loadAllData();
+    await _trainAllGrowthModels();
   }
 }
