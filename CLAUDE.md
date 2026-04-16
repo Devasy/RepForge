@@ -217,7 +217,7 @@ dart run build_runner build --delete-conflicting-outputs
 Triggers automatically on push to `main`:
 1. Runs `dart scripts/bump_version.dart patch` (increments patch version)
 2. Commits version bump and creates a git tag (`v{version}`)
-3. Builds release APK with Flutter 3.41.5
+3. Builds the release APK with the Flutter version pinned in `workout-logger/pubspec.yaml` (currently 3.41.5)
 4. Creates a GitHub Release with the APK attached
 
 **Do not** manually edit `pubspec.yaml` version before merging to `main` — the CI handles it. For a minor/major bump, edit `pubspec.yaml` manually before the merge.
