@@ -7,6 +7,10 @@ import '../../models/models.dart';
 /// Sessions are sorted by date descending before scanning so the result does
 /// not depend on the storage's insertion order. Used by recommendation and
 /// "last session" lookups so the two paths never disagree.
+///
+/// Tie-break: when two sessions share the exact same [WorkoutSession.date],
+/// the choice between them is unspecified. `List.sort` is not stable in Dart,
+/// so callers must not rely on a deterministic winner for equal timestamps.
 ExerciseLog? findMostRecentExerciseLog(
   String exerciseId,
   List<WorkoutSession> sessions,

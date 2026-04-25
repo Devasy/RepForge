@@ -70,6 +70,27 @@ void main() {
       expect(result!.sets.first.weight, 200);
     });
 
+    test(
+      'tie-break is unspecified when two sessions share the exact same date',
+      () {
+        // Documents the contract: List.sort is not stable in Dart, so when
+        // two sessions have identical DateTime values the helper may return
+        // either log. Callers must not depend on a particular winner.
+        final sameDate = DateTime(2025, 5, 1);
+        final a = _session('a', sameDate, [
+          _log('bench', sets: [_set(weight: 1)]),
+        ]);
+        final b = _session('b', sameDate, [
+          _log('bench', sets: [_set(weight: 2)]),
+        ]);
+
+        final result = findMostRecentExerciseLog('bench', [a, b]);
+
+        expect(result, isNotNull);
+        expect(result!.sets.first.weight, anyOf(1, 2));
+      },
+    );
+
     test('skips sessions that do not contain the target exercise', () {
       final markerSets = [_set(weight: 80, reps: 10)];
       final sessions = [
