@@ -229,10 +229,7 @@ class AnalyticsManager extends ChangeNotifier {
     return volumeByMuscle;
   }
 
-  Exercise? _findExercise(String id, List<Exercise> exercises) {
-    final index = exercises.indexWhere((e) => e.id == id);
-    return index != -1 ? exercises[index] : null;
-  }
+
 
   /// Get quick stats for dashboard
   Future<Map<String, dynamic>> getQuickStats() async {
