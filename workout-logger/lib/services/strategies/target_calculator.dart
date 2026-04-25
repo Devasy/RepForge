@@ -38,12 +38,10 @@ class RepsTargetCalculator implements TargetCalculatorStrategy {
   double calculate(String exerciseId, List<WorkoutSession> sessions) {
     double bestValue = 0;
 
-    for (var log in _getExerciseLogsForExercise(exerciseId, sessions)) {
-      final maxReps = log.sets
-          .map((s) => s.reps)
-          .reduce((a, b) => a > b ? a : b);
-      if (maxReps > bestValue) {
-        bestValue = maxReps.toDouble();
+    for (final log in _getExerciseLogsForExercise(exerciseId, sessions)) {
+      // In-place max scan: no intermediate list allocation, no .toDouble() needed.
+      for (final set in log.sets) {
+        if (set.reps > bestValue) bestValue = set.reps.toDouble();
       }
     }
 

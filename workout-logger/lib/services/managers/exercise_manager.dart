@@ -24,6 +24,10 @@ class ExerciseManager extends ChangeNotifier {
 
   List<Exercise> _allExercises = [];
 
+  /// Memoized id → Exercise map for O(1) lookups.
+  /// Rebuilt whenever [_allExercises] changes.
+  Map<String, Exercise> _exerciseIndex = {};
+
   /// Allowed category values for exercises
   static const Set<String> allowedCategories = {'compound', 'isolation'};
 
@@ -39,17 +43,15 @@ class ExerciseManager extends ChangeNotifier {
   /// Load all exercises from storage and database
   Future<void> loadExercises() async {
     _allExercises = await _storage.getAllExercises();
+    _exerciseIndex = {for (final e in _allExercises) e.id: e};
     notifyListeners();
   }
 
-  /// Get an exercise by ID
+  /// Get an exercise by ID in O(1) via the memoized index.
   ///
   /// Returns null if not found. Caller should ensure loadExercises() has been
   /// called first to populate the in-memory exercise list.
-  Exercise? getExercise(String id) {
-    final index = _allExercises.indexWhere((e) => e.id == id);
-    return index != -1 ? _allExercises[index] : null;
-  }
+  Exercise? getExercise(String id) => _exerciseIndex[id];
 
   /// Get exercise name by ID
   String getExerciseName(String id) {
@@ -109,6 +111,7 @@ class ExerciseManager extends ChangeNotifier {
 
     await _storage.saveCustomExercise(exercise);
     _allExercises = List.from(_allExercises)..add(exercise);
+    _exerciseIndex[id] = exercise;
     notifyListeners();
 
     return exercise;
@@ -135,6 +138,7 @@ class ExerciseManager extends ChangeNotifier {
     await _storage.deleteCustomExercise(exerciseId);
     _allExercises = List.from(_allExercises)
       ..removeWhere((e) => e.id == exerciseId);
+    _exerciseIndex.remove(exerciseId);
     notifyListeners();
 
     return true;

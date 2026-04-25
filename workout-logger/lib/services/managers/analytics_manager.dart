@@ -26,6 +26,10 @@ class AnalyticsManager extends ChangeNotifier {
   // Growth models for each exercise
   final Map<String, GrowthModel> _growthModels = {};
 
+  // Pre-computed exerciseId → sorted-newest-first ExerciseLog index.
+  // Rebuilt via [buildSessionIndex] whenever the session list changes.
+  Map<String, List<ExerciseLog>> _sessionIndex = {};
+
   // Callback to update targets with new growth models
   final void Function(String exerciseId, GrowthModel model)?
   onGrowthModelUpdated;
@@ -34,6 +38,30 @@ class AnalyticsManager extends ChangeNotifier {
 
   // Getters
   Map<String, GrowthModel> get growthModels => Map.unmodifiable(_growthModels);
+
+  /// Build (or rebuild) the exerciseId → sorted log index from [sessions].
+  ///
+  /// Call this whenever the session list is mutated (add, delete, update).
+  /// The index maps each exercise id to a list of [ExerciseLog] instances
+  /// ordered newest-first, which lets recommendation and progression APIs
+  /// avoid repeated O(N log N) sorts and O(N²) scans on every render.
+  void buildSessionIndex(List<WorkoutSession> sessions) {
+    final index = <String, List<ExerciseLog>>{};
+
+    // Sort sessions newest-first once and iterate
+    final sorted = List<WorkoutSession>.from(sessions)
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    for (final session in sorted) {
+      for (final log in session.exercises) {
+        if (log.sets.isNotEmpty) {
+          index.putIfAbsent(log.exerciseId, () => []).add(log);
+        }
+      }
+    }
+
+    _sessionIndex = index;
+  }
 
   /// Get growth model for a specific exercise
   GrowthModel? getGrowthModel(String exerciseId) => _growthModels[exerciseId];
@@ -96,12 +124,18 @@ class AnalyticsManager extends ChangeNotifier {
 
   /// Get set recommendations for an exercise.
   ///
-  /// Uses the most-recently-dated session containing this exercise.
+  /// Uses the most-recently-dated session containing this exercise as the
+  /// basis for the recommendation. Reads from the pre-built session index
+  /// so no sort is required at call time — O(1).
   List<SetRecommendation> getRecommendations(
     String exerciseId,
     List<WorkoutSession> sessions,
   ) {
-    final lastLog = findMostRecentExerciseLog(exerciseId, sessions);
+    // Fast path: use pre-built index if available.
+    final logs = _sessionIndex[exerciseId];
+    final lastLog = (logs != null && logs.isNotEmpty)
+        ? logs.first // already sorted newest-first
+        : findMostRecentExerciseLog(exerciseId, sessions); // fallback
 
     if (lastLog == null || lastLog.sets.isEmpty) {
       return _mlService.getDefaultRecommendations(3);
@@ -113,14 +147,28 @@ class AnalyticsManager extends ChangeNotifier {
     );
   }
 
-  /// Get volume progression for an exercise
+  /// Get volume progression for an exercise.
+  ///
+  /// Reads from the pre-built session index (sorted oldest-first by
+  /// reversing the newest-first index list), so no allocation or sort is
+  /// required at call time — O(K) where K is the number of logs for this
+  /// exercise.
   List<({DateTime date, double volume})> getVolumeProgression(
     String exerciseId,
     List<WorkoutSession> sessions,
   ) {
-    final data = <({DateTime date, double volume})>[];
+    // Fast path: use pre-built index
+    final logs = _sessionIndex[exerciseId];
+    if (logs != null) {
+      // Index is newest-first; progression needs oldest-first.
+      return [
+        for (final log in logs.reversed)
+          (date: _logDate(log, sessions), volume: log.totalVolume),
+      ];
+    }
 
-    // Process sessions in chronological order (oldest first)
+    // Fallback (index not built yet) — same as before, sort + scan.
+    final data = <({DateTime date, double volume})>[];
     final sortedSessions = List<WorkoutSession>.from(sessions)
       ..sort((a, b) => a.date.compareTo(b.date));
 
@@ -132,27 +180,41 @@ class AnalyticsManager extends ChangeNotifier {
         }
       }
     }
-
     return data;
   }
 
-  /// Get weekly volume by muscle group
+  /// Look up the session date for a log from the full session list.
   ///
-  /// [now] parameter allows test injection of a fixed timestamp for deterministic testing.
+  /// Used only in the [getVolumeProgression] fallback path.
+  DateTime _logDate(ExerciseLog log, List<WorkoutSession> sessions) {
+    for (final session in sessions) {
+      if (session.exercises.contains(log)) return session.date;
+    }
+    return DateTime.now(); // should not happen
+  }
+
+  /// Get weekly volume by muscle group.
+  ///
+  /// [exerciseMap] is a pre-built id → Exercise map for O(1) lookups,
+  /// eliminating the inner O(N) scan from the original [_findExercise].
+  /// [now] parameter allows test injection of a fixed timestamp.
   Map<String, double> getWeeklyVolumeByMuscle(
     List<WorkoutSession> sessions,
     List<Exercise> exercises, {
     DateTime? now,
+    Map<String, Exercise>? exerciseMap,
   }) {
     final volumeByMuscle = <String, double>{};
     final currentTime = now ?? DateTime.now();
     final weekAgo = currentTime.subtract(const Duration(days: 7));
+    final Map<String, Exercise> lookup =
+        exerciseMap ?? {for (final e in exercises) e.id: e};
 
     for (var session in sessions) {
       if (session.date.isBefore(weekAgo)) continue;
 
       for (var log in session.exercises) {
-        final exercise = _findExercise(log.exerciseId, exercises);
+        final exercise = lookup[log.exerciseId];
         if (exercise == null) continue;
 
         for (var activation in exercise.muscleActivations) {
