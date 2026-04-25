@@ -26,7 +26,7 @@ class AnalyticsManager extends ChangeNotifier {
   // Growth models for each exercise
   final Map<String, GrowthModel> _growthModels = {};
 
-  // Debug-only reference to track the sessions list identity and detect stale usage
+  // Reference to track the sessions list identity and detect stale usage
   List<WorkoutSession>? _lastIndexedSessions;
 
   // Pre-computed exerciseId → sorted-newest-first ExerciseLog and date index.
@@ -49,10 +49,7 @@ class AnalyticsManager extends ChangeNotifier {
   /// ordered newest-first, which lets recommendation and progression APIs
   /// avoid repeated O(N log N) sorts and O(N²) scans on every render.
   void buildSessionIndex(List<WorkoutSession> sessions) {
-    assert(() {
-      _lastIndexedSessions = sessions;
-      return true;
-    }());
+    _lastIndexedSessions = sessions;
 
     final index = <String, List<({ExerciseLog log, DateTime date})>>{};
 
@@ -139,8 +136,10 @@ class AnalyticsManager extends ChangeNotifier {
     String exerciseId,
     List<WorkoutSession> sessions,
   ) {
-    // Fast path: use pre-built index if available.
-    final logs = _sessionIndex[exerciseId];
+    final isFresh = identical(_lastIndexedSessions, sessions);
+    
+    // Fast path: use pre-built index if available and fresh.
+    final logs = isFresh ? _sessionIndex[exerciseId] : null;
     final lastLog = (logs != null && logs.isNotEmpty)
         ? logs.first.log // already sorted newest-first
         : findMostRecentExerciseLog(exerciseId, sessions); // fallback
@@ -165,17 +164,23 @@ class AnalyticsManager extends ChangeNotifier {
     String exerciseId,
     List<WorkoutSession> sessions,
   ) {
-    // Fast path: use pre-built index
-    final logs = _sessionIndex[exerciseId];
-    if (logs != null) {
-      // Index is newest-first; progression needs oldest-first.
-      return [
-        for (final entry in logs.reversed)
-          (date: entry.date, volume: entry.log.totalVolume),
-      ];
+    final isFresh = identical(_lastIndexedSessions, sessions);
+
+    if (isFresh) {
+      if (_sessionIndex.containsKey(exerciseId)) {
+        // Fast path: use pre-built index
+        final logs = _sessionIndex[exerciseId]!;
+        // Index is newest-first; progression needs oldest-first.
+        return [
+          for (final entry in logs.reversed)
+            (date: entry.date, volume: entry.log.totalVolume),
+        ];
+      }
+      // Index is fresh but key is missing, meaning history is truly empty
+      return [];
     }
 
-    // Fallback (index not built yet) — same as before, sort + scan.
+    // Fallback (index not built yet or stale) — sort + scan.
     final data = <({DateTime date, double volume})>[];
     final sortedSessions = List<WorkoutSession>.from(sessions)
       ..sort((a, b) => a.date.compareTo(b.date));
