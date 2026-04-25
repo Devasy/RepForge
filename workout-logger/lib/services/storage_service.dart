@@ -129,10 +129,14 @@ class StorageService implements IStorageService {
     DateTime end,
   ) async {
     final allSessions = await getAllWorkoutSessions();
+    // Tolerate inverted ranges so analytics callers don't silently get an
+    // empty list when start/end are passed in the wrong order.
+    final lo = start.isAfter(end) ? end : start;
+    final hi = start.isAfter(end) ? start : end;
     return allSessions
         .where(
           (session) =>
-              !session.date.isBefore(start) && !session.date.isAfter(end),
+              !session.date.isBefore(lo) && !session.date.isAfter(hi),
         )
         .toList();
   }

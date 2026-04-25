@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import '../../models/models.dart';
 import '../interfaces/storage_service_interface.dart';
 import '../interfaces/ml_service_interface.dart';
+import '../utils/exercise_history.dart';
 
 /// Manages analytics and statistics for workouts.
 ///
@@ -93,28 +94,14 @@ class AnalyticsManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Get set recommendations for an exercise
+  /// Get set recommendations for an exercise.
   ///
-  /// Sessions are sorted newest-first to find the most recent exercise log.
+  /// Uses the most-recently-dated session containing this exercise.
   List<SetRecommendation> getRecommendations(
     String exerciseId,
     List<WorkoutSession> sessions,
   ) {
-    // Sort sessions newest-first to find the most recent exercise log
-    final sortedSessions = List<WorkoutSession>.from(sessions)
-      ..sort((a, b) => b.date.compareTo(a.date));
-
-    // Find last session with this exercise
-    ExerciseLog? lastLog;
-    for (var session in sortedSessions) {
-      for (var log in session.exercises) {
-        if (log.exerciseId == exerciseId) {
-          lastLog = log;
-          break;
-        }
-      }
-      if (lastLog != null) break;
-    }
+    final lastLog = findMostRecentExerciseLog(exerciseId, sessions);
 
     if (lastLog == null || lastLog.sets.isEmpty) {
       return _mlService.getDefaultRecommendations(3);

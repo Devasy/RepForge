@@ -64,12 +64,18 @@ class HistoryManager extends ChangeNotifier {
         .toList();
   }
 
-  /// Get sessions within a date range (inclusive of start and end)
+  /// Get sessions within a date range (inclusive of start and end).
+  ///
+  /// Tolerates inverted ranges (mirrors [StorageService.getSessionsInDateRange])
+  /// so callers don't silently get an empty list when start/end are passed in
+  /// the wrong order.
   List<WorkoutSession> getSessionsInDateRange(DateTime start, DateTime end) {
+    final lo = start.isAfter(end) ? end : start;
+    final hi = start.isAfter(end) ? start : end;
     return _sessions
         .where(
           (session) =>
-              !session.date.isBefore(start) && !session.date.isAfter(end),
+              !session.date.isBefore(lo) && !session.date.isAfter(hi),
         )
         .toList();
   }
