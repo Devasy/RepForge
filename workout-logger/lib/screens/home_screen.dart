@@ -396,7 +396,11 @@ class DashboardTab extends StatelessWidget {
             ),
             TextButton(
               onPressed: () {
-                // Navigate to history tab
+                final homeState = context
+                    .findAncestorStateOfType<_HomeScreenState>();
+                if (homeState != null) {
+                  homeState.setState(() => homeState._currentIndex = 1);
+                }
               },
               child: const Text('See All'),
             ),

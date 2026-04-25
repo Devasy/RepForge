@@ -383,6 +383,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     if (currentSetIndex >= recommendations.length) return const SizedBox();
 
     final rec = recommendations[currentSetIndex];
+    final settings = context.watch<SettingsProvider>();
+    final displayWeight = settings.toDisplay(rec.weight);
+    final displayWeightText = displayWeight == displayWeight.truncateToDouble()
+        ? displayWeight.toStringAsFixed(0)
+        : displayWeight.toStringAsFixed(1);
     final confidenceColor = rec.confidence == 'high'
         ? AppTheme.success
         : (rec.confidence == 'medium' ? AppTheme.warning : AppTheme.textMuted);
@@ -424,7 +429,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                 ),
                 Text(
-                  '${rec.weight}kg × ${rec.reps} reps',
+                  '$displayWeightText ${settings.unitLabel} × ${rec.reps} reps',
                   style: const TextStyle(
                     color: AppTheme.textPrimary,
                     fontSize: 18,
