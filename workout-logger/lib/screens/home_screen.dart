@@ -12,6 +12,7 @@ import 'routines_screen.dart';
 import 'analytics_screen.dart';
 import 'exercise_library_screen.dart';
 import 'profile_screen.dart';
+import 'widgets/workout_conflict_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -74,7 +75,9 @@ class _HomeScreenState extends State<HomeScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor.withOpacity(0.2) : Colors.transparent,
+          color: isSelected
+              ? AppTheme.primaryColor.withOpacity(0.2)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -82,14 +85,18 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(
               icon,
-              color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondary,
+              color: isSelected
+                  ? AppTheme.primaryColor
+                  : AppTheme.textSecondary,
               size: 24,
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondary,
+                color: isSelected
+                    ? AppTheme.primaryColor
+                    : AppTheme.textSecondary,
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -135,8 +142,10 @@ class DashboardTab extends StatelessWidget {
 
   Widget _buildHeader(BuildContext context) {
     final now = DateTime.now();
-    final greeting = now.hour < 12 ? 'Good morning' : (now.hour < 17 ? 'Good afternoon' : 'Good evening');
-    
+    final greeting = now.hour < 12
+        ? 'Good morning'
+        : (now.hour < 17 ? 'Good afternoon' : 'Good evening');
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -145,9 +154,9 @@ class DashboardTab extends StatelessWidget {
           children: [
             Text(
               greeting,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: AppTheme.textSecondary),
             ),
             const SizedBox(height: 4),
             Text(
@@ -159,7 +168,8 @@ class DashboardTab extends StatelessWidget {
         IconButton(
           onPressed: () {
             // Navigate to Profile tab (index 4)
-            final homeState = context.findAncestorStateOfType<_HomeScreenState>();
+            final homeState = context
+                .findAncestorStateOfType<_HomeScreenState>();
             if (homeState != null) {
               homeState.setState(() => homeState._currentIndex = 4);
             }
@@ -173,7 +183,7 @@ class DashboardTab extends StatelessWidget {
 
   Widget _buildQuickStartCard(BuildContext context) {
     final provider = context.watch<WorkoutProvider>();
-    
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -223,7 +233,7 @@ class DashboardTab extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      provider.routines.isEmpty 
+                      provider.routines.isEmpty
                           ? 'Quick start or create a routine'
                           : '${provider.routines.length} routines available',
                       style: TextStyle(
@@ -273,20 +283,19 @@ class DashboardTab extends StatelessWidget {
     return FutureBuilder<Map<String, dynamic>>(
       future: context.read<WorkoutProvider>().getQuickStats(),
       builder: (context, snapshot) {
-        final stats = snapshot.data ?? {
-          'totalWorkouts': 0,
-          'weeklyWorkouts': 0,
-          'weeklyVolume': 0.0,
-          'exercisesThisWeek': 0,
-        };
+        final stats =
+            snapshot.data ??
+            {
+              'totalWorkouts': 0,
+              'weeklyWorkouts': 0,
+              'weeklyVolume': 0.0,
+              'exercisesThisWeek': 0,
+            };
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'This Week',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text('This Week', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.md),
             Row(
               children: [
@@ -302,7 +311,9 @@ class DashboardTab extends StatelessWidget {
                 Expanded(
                   child: _StatCard(
                     icon: Icons.trending_up,
-                    value: _formatVolume(stats['weeklyVolume']?.toDouble() ?? 0),
+                    value: _formatVolume(
+                      stats['weeklyVolume']?.toDouble() ?? 0,
+                    ),
                     label: 'Volume (kg)',
                     color: AppTheme.success,
                   ),
@@ -357,11 +368,7 @@ class DashboardTab extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(
-              Icons.fitness_center,
-              size: 48,
-              color: AppTheme.textMuted,
-            ),
+            Icon(Icons.fitness_center, size: 48, color: AppTheme.textMuted),
             const SizedBox(height: AppSpacing.md),
             Text(
               'No workouts yet',
@@ -396,7 +403,9 @@ class DashboardTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        ...recentSessions.map((session) => _RecentWorkoutCard(session: session)),
+        ...recentSessions.map(
+          (session) => _RecentWorkoutCard(session: session),
+        ),
       ],
     );
   }
@@ -405,10 +414,7 @@ class DashboardTab extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Quick Actions',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
+        Text('Quick Actions', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: AppSpacing.md),
         Row(
           children: [
@@ -429,7 +435,9 @@ class DashboardTab extends StatelessWidget {
                 label: 'Exercises',
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const ExerciseLibraryScreen(),
+                  ),
                 ),
               ),
             ),
@@ -439,25 +447,51 @@ class DashboardTab extends StatelessWidget {
     );
   }
 
-  void _startQuickWorkout(BuildContext context) {
-    Navigator.push(
+  Future<StartWorkoutConflictAction> _resolveWorkoutConflict(
+    BuildContext context,
+    WorkoutProvider provider,
+  ) async {
+    final action = await showWorkoutConflictDialog(
       context,
-      MaterialPageRoute(
-        builder: (_) => const WorkoutFlowScreen(isQuickStart: true),
-      ),
+      workoutStartTime: provider.workoutStartTime ?? DateTime.now(),
     );
+    return action ?? StartWorkoutConflictAction.cancel;
+  }
+
+  Future<void> _startQuickWorkout(BuildContext context) async {
+    final provider = context.read<WorkoutProvider>();
+    StartWorkoutConflictAction conflictAction =
+        StartWorkoutConflictAction.cancel;
+
+    final started = await provider.startWorkoutSafely(
+      exerciseIds: const <String>[],
+      onConflict: () async {
+        conflictAction = await _resolveWorkoutConflict(context, provider);
+        return conflictAction;
+      },
+    );
+
+    if (!context.mounted) return;
+    if (started || conflictAction == StartWorkoutConflictAction.resume) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const WorkoutFlowScreen(isQuickStart: true),
+        ),
+      );
+    }
   }
 
   void _showRoutineSelector(BuildContext context) {
     final provider = context.read<WorkoutProvider>();
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
+      builder: (sheetContext) => Container(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -468,31 +502,51 @@ class DashboardTab extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: AppSpacing.md),
-            ...provider.routines.map((routine) => ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.fitness_center,
-                  color: AppTheme.primaryColor,
-                ),
-              ),
-              title: Text(routine.name),
-              subtitle: Text('${routine.exerciseIds.length} exercises'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => WorkoutFlowScreen(routine: routine),
+            ...provider.routines.map(
+              (routine) => ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                );
-              },
-            )),
+                  child: const Icon(
+                    Icons.fitness_center,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+                title: Text(routine.name),
+                subtitle: Text('${routine.exerciseIds.length} exercises'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+
+                  StartWorkoutConflictAction conflictAction =
+                      StartWorkoutConflictAction.cancel;
+                  final started = await provider.startWorkoutSafely(
+                    routine: routine,
+                    onConflict: () async {
+                      conflictAction = await _resolveWorkoutConflict(
+                        context,
+                        provider,
+                      );
+                      return conflictAction;
+                    },
+                  );
+
+                  if (!context.mounted) return;
+                  if (started ||
+                      conflictAction == StartWorkoutConflictAction.resume) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => WorkoutFlowScreen(routine: routine),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
           ],
         ),
@@ -621,10 +675,7 @@ class _RecentWorkoutCard extends StatelessWidget {
             children: [
               Text(
                 timeFormat.format(session.date),
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textMuted,
-                ),
+                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
               ),
               const SizedBox(height: 2),
               Text(

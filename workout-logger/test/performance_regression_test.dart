@@ -9,7 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/managers/analytics_manager.dart';
 import 'package:repforge/services/managers/exercise_manager.dart';
-import 'package:repforge/services/interfaces/ml_service_interface.dart';
 import 'package:repforge/services/strategies/target_calculator.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/managers/program_manager.dart';

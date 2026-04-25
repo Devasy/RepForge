@@ -23,12 +23,14 @@ class MockStorageService implements IStorageService {
 
   bool saveCustomExerciseCalled = false;
   Exercise? lastSavedExercise;
+  int saveSettingCallCount = 0;
 
   // Public getters for test assertions
   List<Exercise> get customExercises => _customExercises;
   List<WorkoutSession> get sessions => _sessions;
   List<Routine> get routines => _routines;
   List<Target> get targets => _targets;
+  Map<String, String> get settings => _settings;
 
   // Test helpers
   void addMockCustomExercise(Exercise exercise) {
@@ -119,8 +121,7 @@ class MockStorageService implements IStorageService {
     final hi = start.isAfter(end) ? start : end;
     return _sessions
         .where(
-          (session) =>
-              !session.date.isBefore(lo) && !session.date.isAfter(hi),
+          (session) => !session.date.isBefore(lo) && !session.date.isAfter(hi),
         )
         .toList();
   }
@@ -222,6 +223,7 @@ class MockStorageService implements IStorageService {
 
   @override
   Future<void> saveSetting(String key, String value) async {
+    saveSettingCallCount++;
     _settings[key] = value;
   }
 
