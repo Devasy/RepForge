@@ -39,7 +39,7 @@ class RepsTargetCalculator implements TargetCalculatorStrategy {
     double bestValue = 0;
 
     for (final log in _getExerciseLogsForExercise(exerciseId, sessions)) {
-      // In-place max scan: no intermediate list allocation, no .toDouble() needed.
+      // In-place max scan: skips intermediate map()/reduce() allocation.
       for (final set in log.sets) {
         if (set.reps > bestValue) bestValue = set.reps.toDouble();
       }

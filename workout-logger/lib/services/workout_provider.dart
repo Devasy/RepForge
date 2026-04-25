@@ -210,17 +210,29 @@ class WorkoutProvider extends ChangeNotifier {
 
     // Build a set of referenced exercise IDs in a single pass over
     // sessions, routines, targets, and the active workout.
-    final referencedIds = <String>{
-      for (final s in _sessions)
-        for (final e in s.exercises) e.exerciseId,
-      for (final r in _routines) ...r.exerciseIds,
-      for (final t in _targets) t.exerciseId,
-      ..._currentExerciseLogs.map((l) => l.exerciseId),
-      ...?_activeRoutine?.exerciseIds,
-    };
+    final referencedIds = <String>{};
+    final referenceReasons = <String, Set<String>>{};
+
+    void addReference(String id, String reason) {
+      referencedIds.add(id);
+      referenceReasons.putIfAbsent(id, () => {}).add(reason);
+    }
+
+    for (final s in _sessions) {
+      for (final e in s.exercises) addReference(e.exerciseId, '_sessions');
+    }
+    for (final r in _routines) {
+      for (final id in r.exerciseIds) addReference(id, '_routines');
+    }
+    for (final t in _targets) addReference(t.exerciseId, '_targets');
+    for (final l in _currentExerciseLogs) addReference(l.exerciseId, '_currentExerciseLogs');
+    if (_activeRoutine != null) {
+      for (final id in _activeRoutine!.exerciseIds) addReference(id, '_activeRoutine');
+    }
 
     if (referencedIds.contains(exerciseId)) {
-      debugPrint('Cannot delete custom exercise $exerciseId: still referenced');
+      final reasons = referenceReasons[exerciseId]?.join(', ') ?? 'unknown';
+      debugPrint('Cannot delete custom exercise $exerciseId: still referenced in $reasons');
       return false;
     }
 
@@ -683,12 +695,11 @@ class WorkoutProvider extends ChangeNotifier {
       for (final e in _allExercises) e.id: e,
     };
 
-    // Sort newest-first so we can break early
-    final sorted = List<WorkoutSession>.from(_sessions)
-      ..sort((a, b) => b.date.compareTo(a.date));
-
-    for (final session in sorted) {
-      if (session.date.isBefore(weekAgo)) break; // no older sessions to process
+    // Iterate directly since _sessions is maintained newest-first.
+    // We use continue rather than break in case of external imports
+    // that might temporarily violate the newest-first invariant.
+    for (final session in _sessions) {
+      if (session.date.isBefore(weekAgo)) continue; 
 
       for (final log in session.exercises) {
         final exercise = exerciseMap[log.exerciseId];

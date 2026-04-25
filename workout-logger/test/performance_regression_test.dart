@@ -14,6 +14,7 @@ import 'package:repforge/services/strategies/target_calculator.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/managers/program_manager.dart';
 import 'test_utils/mock_storage_service.dart';
+import 'test_utils/mock_ml_service.dart';
 
 
 // ---------------------------------------------------------------------------
@@ -76,7 +77,7 @@ void main() {
 
     setUp(() {
       mockStorage = MockStorageService();
-      analytics = AnalyticsManager(mockStorage, _FakeMLService());
+      analytics = AnalyticsManager(mockStorage, MockMLService());
       sessions = buildFixture(exerciseIds: _exerciseIds, sessionCount: 10);
     });
 
@@ -309,27 +310,38 @@ void main() {
     });
 
     test('only counts sessions within the last 7 days', () {
-      final result = provider.getWeeklyVolumeByMuscle();
-      // bench_press activates multiple muscle groups (chest, triceps, shoulders
-      // etc.) so the total distributed volume may be > 500 kg.
-      // The recent session lifts 100kg × 5 reps = 500 kg raw; with muscle
-      // activations summed it can be up to 500 * (number of muscle groups).
-      // The old session lifts 80kg × 5 reps = 400 kg raw.
-      // Key invariant: result is positive (recent session counted) yet below
-      // the combined total of both sessions (old session excluded).
-      expect(result.isNotEmpty, isTrue);
+      // Create AnalyticsManager to use getWeeklyVolumeByMuscle with deterministic 'now'
+      final analytics = AnalyticsManager(mockStorage, MockMLService());
+      
+      // Build a controlled exercise with exact 100% activation
+      final exercises = [
+        Exercise(
+          id: 'bench_press',
+          name: 'Bench Press',
+          muscleActivations: [
+            MuscleActivation(muscleGroupId: 'chest', activationPercentage: 100),
+          ],
+          category: 'compound',
+        )
+      ];
+      final sessions = provider.sessions;
 
-      final totalVolume = result.values.reduce((a, b) => a + b);
-      // With only the recent session: max distributed volume is 500 × groups.
-      // With both sessions: it would be at least (500 + 400) = 900 baseline.
-      // Verify old session is excluded by checking total < combined maximum.
-      // bench_press raw: recent=500, old=400; combined minimum = 900.
-      expect(
-        totalVolume,
-        lessThan(900),
-        reason: 'Old session (30 days ago) should be excluded',
+      // With current date: recent session (100kg x 5 = 500 volume) is included, 
+      // old session (80kg x 5 = 400 volume) is excluded.
+      final resultWithRecent = analytics.getWeeklyVolumeByMuscle(
+        sessions,
+        exercises,
+        now: DateTime.now(),
       );
-      expect(totalVolume, greaterThan(0));
+      expect(resultWithRecent['chest'], equals(500.0));
+
+      // With shifted date (30+ days in future): both sessions are excluded.
+      final resultFuture = analytics.getWeeklyVolumeByMuscle(
+        sessions,
+        exercises,
+        now: DateTime.now().add(const Duration(days: 30)),
+      );
+      expect(resultFuture['chest'], isNull);
     });
   });
 }
@@ -338,56 +350,5 @@ void main() {
 // Minimal fake ML service — returns deterministic recommendations
 // ---------------------------------------------------------------------------
 
-class _FakeMLService implements IMLService {
-  @override
-  List<SetRecommendation> getDefaultRecommendations(int count) => [
-        for (var i = 0; i < count; i++)
-          SetRecommendation(
-            reps: 8,
-            weight: 20.0,
-            confidence: 'low',
-            reasoning: 'default',
-          ),
-      ];
 
-  @override
-  List<SetRecommendation> recommendSets({
-    required List<WorkoutSet> lastSession,
-    GrowthModel? growthModel,
-  }) =>
-      // Echo last session's sets as recommendations (deterministic)
-      lastSession
-          .map(
-            (s) => SetRecommendation(
-              reps: s.reps,
-              weight: s.weight,
-              confidence: 'high',
-              reasoning: 'echo',
-            ),
-          )
-          .toList();
-
-  @override
-  List<DataPoint> extractExerciseDataPoints(
-    String exerciseId,
-    List<WorkoutSession> sessions,
-  ) =>
-      [];
-
-  @override
-  GrowthModel trainGrowthModel(List<DataPoint> dataPoints) => GrowthModel(
-        slope: 0,
-        intercept: 0,
-        r2: 0,
-        lastTrained: DateTime(2025),
-      );
-
-  @override
-  DateTime? predictTargetCompletion({
-    required double currentValue,
-    required double targetValue,
-    required GrowthModel growthModel,
-  }) =>
-      null;
-}
 

@@ -26,9 +26,12 @@ class AnalyticsManager extends ChangeNotifier {
   // Growth models for each exercise
   final Map<String, GrowthModel> _growthModels = {};
 
-  // Pre-computed exerciseId → sorted-newest-first ExerciseLog index.
+  // Debug-only reference to track the sessions list identity and detect stale usage
+  List<WorkoutSession>? _lastIndexedSessions;
+
+  // Pre-computed exerciseId → sorted-newest-first ExerciseLog and date index.
   // Rebuilt via [buildSessionIndex] whenever the session list changes.
-  Map<String, List<ExerciseLog>> _sessionIndex = {};
+  Map<String, List<({ExerciseLog log, DateTime date})>> _sessionIndex = {};
 
   // Callback to update targets with new growth models
   final void Function(String exerciseId, GrowthModel model)?
@@ -41,12 +44,17 @@ class AnalyticsManager extends ChangeNotifier {
 
   /// Build (or rebuild) the exerciseId → sorted log index from [sessions].
   ///
-  /// Call this whenever the session list is mutated (add, delete, update).
+  /// Callers MUST call this after any session mutation (add, delete, update).
   /// The index maps each exercise id to a list of [ExerciseLog] instances
   /// ordered newest-first, which lets recommendation and progression APIs
   /// avoid repeated O(N log N) sorts and O(N²) scans on every render.
   void buildSessionIndex(List<WorkoutSession> sessions) {
-    final index = <String, List<ExerciseLog>>{};
+    assert(() {
+      _lastIndexedSessions = sessions;
+      return true;
+    }());
+
+    final index = <String, List<({ExerciseLog log, DateTime date})>>{};
 
     // Sort sessions newest-first once and iterate
     final sorted = List<WorkoutSession>.from(sessions)
@@ -55,7 +63,7 @@ class AnalyticsManager extends ChangeNotifier {
     for (final session in sorted) {
       for (final log in session.exercises) {
         if (log.sets.isNotEmpty) {
-          index.putIfAbsent(log.exerciseId, () => []).add(log);
+          index.putIfAbsent(log.exerciseId, () => []).add((log: log, date: session.date));
         }
       }
     }
@@ -134,7 +142,7 @@ class AnalyticsManager extends ChangeNotifier {
     // Fast path: use pre-built index if available.
     final logs = _sessionIndex[exerciseId];
     final lastLog = (logs != null && logs.isNotEmpty)
-        ? logs.first // already sorted newest-first
+        ? logs.first.log // already sorted newest-first
         : findMostRecentExerciseLog(exerciseId, sessions); // fallback
 
     if (lastLog == null || lastLog.sets.isEmpty) {
@@ -162,8 +170,8 @@ class AnalyticsManager extends ChangeNotifier {
     if (logs != null) {
       // Index is newest-first; progression needs oldest-first.
       return [
-        for (final log in logs.reversed)
-          (date: _logDate(log, sessions), volume: log.totalVolume),
+        for (final entry in logs.reversed)
+          (date: entry.date, volume: entry.log.totalVolume),
       ];
     }
 
@@ -183,15 +191,7 @@ class AnalyticsManager extends ChangeNotifier {
     return data;
   }
 
-  /// Look up the session date for a log from the full session list.
-  ///
-  /// Used only in the [getVolumeProgression] fallback path.
-  DateTime _logDate(ExerciseLog log, List<WorkoutSession> sessions) {
-    for (final session in sessions) {
-      if (session.exercises.contains(log)) return session.date;
-    }
-    return DateTime.now(); // should not happen
-  }
+
 
   /// Get weekly volume by muscle group.
   ///
