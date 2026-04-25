@@ -13,7 +13,10 @@
 // Following Dependency Inversion Principle: this class now depends on
 // abstractions (IStorageService, IMLService) rather than concrete implementations.
 
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../data/exercise_database.dart';
@@ -35,6 +38,13 @@ class WorkoutProvider extends ChangeNotifier {
   List<Target> _targets = [];
   List<MuscleGroup> _muscleGroups = [];
   List<Exercise> _allExercises = [];
+  bool _isFetchingRemote = false;
+  String? _lastFetchError;
+  int _lastFetchCount = 0;
+
+  static const String _remoteExercisesUrl =
+      'https://raw.githubusercontent.com/devasy/workout-logger/main/exercises.json';
+
   final Map<String, GrowthModel> _growthModels =
       {}; // exerciseId -> GrowthModel
 
@@ -53,6 +63,9 @@ class WorkoutProvider extends ChangeNotifier {
   List<Target> get targets => _targets;
   List<MuscleGroup> get muscleGroups => _muscleGroups;
   List<Exercise> get allExercises => _allExercises;
+  bool get isFetchingRemote => _isFetchingRemote;
+  String? get lastFetchError => _lastFetchError;
+  int get lastFetchCount => _lastFetchCount;
 
   bool get hasActiveWorkout =>
       _activeSession != null || _workoutStartTime != null;
@@ -248,6 +261,49 @@ class WorkoutProvider extends ChangeNotifier {
 
     notifyListeners();
     return true;
+  }
+
+  // ==================== REMOTE EXERCISES ====================
+
+  /// Fetch exercises from the remote GitHub JSON file and cache them locally.
+  ///
+  /// Sets [isFetchingRemote] during the request and updates [lastFetchCount]
+  /// or [lastFetchError] on completion.
+  Future<void> fetchRemoteExercises() async {
+    if (_isFetchingRemote) return;
+
+    _isFetchingRemote = true;
+    _lastFetchError = null;
+    notifyListeners();
+
+    try {
+      final response = await http
+          .get(Uri.parse(_remoteExercisesUrl))
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final exerciseList = decoded['exercises'] as List<dynamic>;
+      final exercises = exerciseList
+          .map((e) => Exercise.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+      await _storage.saveRemoteExercises(exercises);
+      _allExercises = await _storage.getAllExercises();
+      _lastFetchCount = exercises.length;
+    } on TimeoutException {
+      _lastFetchError = 'Request timed out. Check your connection.';
+      debugPrint('fetchRemoteExercises: timeout');
+    } catch (e) {
+      _lastFetchError = 'Failed to fetch exercises: $e';
+      debugPrint('fetchRemoteExercises error: $e');
+    } finally {
+      _isFetchingRemote = false;
+      notifyListeners();
+    }
   }
 
   // ==================== WORKOUT FLOW ====================
