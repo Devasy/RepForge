@@ -22,6 +22,7 @@ import 'interfaces/ml_service_interface.dart';
 import 'ml_service.dart';
 import 'strategies/target_calculator.dart';
 import 'managers/program_manager.dart';
+import 'utils/exercise_history.dart';
 
 class WorkoutProvider extends ChangeNotifier {
   final IStorageService _storage;
@@ -409,19 +410,12 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== RECOMMENDATIONS ====================
 
-  /// Get set recommendations for an exercise
+  /// Get set recommendations for an exercise.
+  ///
+  /// Uses the most-recently-dated session that contains this exercise as the
+  /// basis for the recommendation. Order in `_sessions` is not assumed.
   List<SetRecommendation> getRecommendations(String exerciseId) {
-    // Find last session with this exercise
-    ExerciseLog? lastLog;
-    for (var session in _sessions) {
-      for (var log in session.exercises) {
-        if (log.exerciseId == exerciseId) {
-          lastLog = log;
-          break;
-        }
-      }
-      if (lastLog != null) break;
-    }
+    final lastLog = findMostRecentExerciseLog(exerciseId, _sessions);
 
     if (lastLog == null || lastLog.sets.isEmpty) {
       return _mlService.getDefaultRecommendations(3);
@@ -433,16 +427,9 @@ class WorkoutProvider extends ChangeNotifier {
     );
   }
 
-  /// Get last session data for an exercise
+  /// Get the most recent exercise log for [exerciseId], or null if never logged.
   ExerciseLog? getLastSessionForExercise(String exerciseId) {
-    for (var session in _sessions) {
-      for (var log in session.exercises) {
-        if (log.exerciseId == exerciseId) {
-          return log;
-        }
-      }
-    }
-    return null;
+    return findMostRecentExerciseLog(exerciseId, _sessions);
   }
 
   // ==================== SESSION MANAGEMENT ====================

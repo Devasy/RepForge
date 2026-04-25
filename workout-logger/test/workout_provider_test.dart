@@ -1,6 +1,7 @@
 // Unit Tests for WorkoutProvider - Custom Exercise functionality
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:repforge/models/models.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/managers/program_manager.dart';
 import 'test_utils/mock_storage_service.dart';
@@ -172,6 +173,75 @@ void main() {
           throwsA(isA<ArgumentError>()),
         );
       });
+    });
+
+    group('getRecommendations / getLastSessionForExercise', () {
+      WorkoutSession session(String id, DateTime date, List<ExerciseLog> logs) =>
+          WorkoutSession(id: id, date: date, exercises: logs, duration: 30);
+
+      ExerciseLog log(String exerciseId, {List<WorkoutSet>? sets}) =>
+          ExerciseLog(
+            exerciseId: exerciseId,
+            sets: sets ?? [WorkoutSet(weight: 50, reps: 8)],
+          );
+
+      test(
+        'getLastSessionForExercise returns the most-recently-dated log '
+        'regardless of session insert order',
+        () async {
+          final markerSets = [WorkoutSet(weight: 100, reps: 5)];
+          // Seed storage with sessions in non-chronological order so the
+          // provider's internal _sessions list does not happen to be sorted.
+          mockStorage.addMockSession(
+            session('old', DateTime(2025, 1, 1), [log('bench')]),
+          );
+          mockStorage.addMockSession(
+            session('newest', DateTime(2025, 6, 1), [
+              log('bench', sets: markerSets),
+            ]),
+          );
+          mockStorage.addMockSession(
+            session('mid', DateTime(2025, 3, 1), [log('bench')]),
+          );
+
+          // Re-init so the provider reloads sessions from the mock.
+          await provider.init();
+
+          final last = provider.getLastSessionForExercise('bench');
+
+          expect(last, isNotNull);
+          expect(last!.sets.first.weight, 100);
+          expect(last.sets.first.reps, 5);
+        },
+      );
+
+      test('getLastSessionForExercise returns null when never logged', () {
+        expect(provider.getLastSessionForExercise('never_done'), isNull);
+      });
+
+      test(
+        'getRecommendations bases output on the most-recent log',
+        () async {
+          final marker = [WorkoutSet(weight: 120, reps: 6)];
+          mockStorage.addMockSession(
+            session('old', DateTime(2025, 1, 1), [log('bench')]),
+          );
+          mockStorage.addMockSession(
+            session('newest', DateTime(2025, 8, 1), [
+              log('bench', sets: marker),
+            ]),
+          );
+
+          await provider.init();
+
+          final recs = provider.getRecommendations('bench');
+          // Default fallback is 3 generic sets at low weight; a real
+          // recommendation derived from the marker should be non-empty and
+          // weighted near 120kg, not the default.
+          expect(recs, isNotEmpty);
+          expect(recs.first.weight, greaterThanOrEqualTo(120));
+        },
+      );
     });
 
     group('deleteCustomExercise', () {

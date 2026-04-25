@@ -23,6 +23,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isExporting = false;
   bool _isImporting = false;
 
+  // ==================== Feedback helpers ====================
+
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.error,
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.success,
+      ),
+    );
+  }
+
   // ==================== Remote Backup ====================
 
   Future<void> _performBackup() async {
@@ -37,32 +59,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await api.trackEvent('backup_triggered').catchError((_) => null);
       final success = await api.backupData(data);
 
-      if (!mounted) return;
-
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Backup successful!'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        _showSuccessSnackBar('Backup successful!');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Backup failed. Please try again.'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        _showErrorSnackBar('Backup failed. Please try again.');
       }
     } catch (e, stackTrace) {
       debugPrint('Backup error: $e\n$stackTrace');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Something went wrong. Please try again.'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      _showErrorSnackBar('Something went wrong. Please try again.');
     } finally {
       if (mounted) {
         setState(() => _isBackingUp = false);
@@ -89,26 +93,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         XFile(file.path),
       ], subject: 'RepForge Backup');
 
-      if (!mounted) return;
-
       if (result.status == ShareResultStatus.success ||
           result.status == ShareResultStatus.dismissed) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Backup file exported successfully!'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        _showSuccessSnackBar('Backup file exported successfully!');
       }
     } catch (e, stackTrace) {
       debugPrint('Export error: $e\n$stackTrace');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Export failed. Please try again.'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      _showErrorSnackBar('Export failed. Please try again.');
     } finally {
       if (mounted) {
         setState(() => _isExporting = false);
@@ -179,42 +170,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Basic validation: ensure it's valid JSON with expected keys
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
       if (!data.containsKey('sessions') && !data.containsKey('routines')) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid backup file. Expected a RepForge backup.'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        _showErrorSnackBar('Invalid backup file. Expected a RepForge backup.');
         return;
       }
 
       final provider = context.read<WorkoutProvider>();
       await provider.importData(jsonString);
 
-      if (!mounted) return;
-
       final itemCount = (data['sessions'] as List?)?.length ?? 0;
       final routineCount = (data['routines'] as List?)?.length ?? 0;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Import complete! Processed $itemCount sessions, $routineCount routines.',
-          ),
-          backgroundColor: AppTheme.success,
-        ),
+      _showSuccessSnackBar(
+        'Import complete! Processed $itemCount sessions, $routineCount routines.',
       );
     } catch (e, stackTrace) {
       debugPrint('Import error: $e\n$stackTrace');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Import failed. Make sure you selected a valid backup file.',
-          ),
-          backgroundColor: AppTheme.error,
-        ),
+      _showErrorSnackBar(
+        'Import failed. Make sure you selected a valid backup file.',
       );
     } finally {
       if (mounted) {

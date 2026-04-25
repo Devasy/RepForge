@@ -115,10 +115,12 @@ class MockStorageService implements IStorageService {
     DateTime start,
     DateTime end,
   ) async {
+    final lo = start.isAfter(end) ? end : start;
+    final hi = start.isAfter(end) ? start : end;
     return _sessions
         .where(
           (session) =>
-              !session.date.isBefore(start) && !session.date.isAfter(end),
+              !session.date.isBefore(lo) && !session.date.isAfter(hi),
         )
         .toList();
   }
