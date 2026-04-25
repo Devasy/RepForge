@@ -429,7 +429,7 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Day of Week (optional)',
                   ),
-                  value: dow,
+                  initialValue: dow,
                   items: [
                     const DropdownMenuItem(value: null, child: Text('Unscheduled')),
                     ...List.generate(7, (i) => i + 1).map((d) => DropdownMenuItem(

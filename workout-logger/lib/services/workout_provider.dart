@@ -208,43 +208,31 @@ class WorkoutProvider extends ChangeNotifier {
       return false;
     }
 
-    // Check for references in Sessions
-    for (var session in _sessions) {
-      if (session.exercises.any((e) => e.exerciseId == exerciseId)) {
-        debugPrint(
-          'Cannot delete custom exercise: Used in session ${session.id}',
-        );
-        return false;
-      }
+    // Build a set of referenced exercise IDs in a single pass over
+    // sessions, routines, targets, and the active workout.
+    final referencedIds = <String>{};
+    final referenceReasons = <String, Set<String>>{};
+
+    void addReference(String id, String reason) {
+      referencedIds.add(id);
+      referenceReasons.putIfAbsent(id, () => {}).add(reason);
     }
 
-    // Check for references in Routines
-    for (var routine in _routines) {
-      if (routine.exerciseIds.contains(exerciseId)) {
-        debugPrint(
-          'Cannot delete custom exercise: Used in routine ${routine.name}',
-        );
-        return false;
-      }
+    for (final s in _sessions) {
+      for (final e in s.exercises) addReference(e.exerciseId, '_sessions');
+    }
+    for (final r in _routines) {
+      for (final id in r.exerciseIds) addReference(id, '_routines');
+    }
+    for (final t in _targets) addReference(t.exerciseId, '_targets');
+    for (final l in _currentExerciseLogs) addReference(l.exerciseId, '_currentExerciseLogs');
+    if (_activeRoutine != null) {
+      for (final id in _activeRoutine!.exerciseIds) addReference(id, '_activeRoutine');
     }
 
-    // Check for references in Targets
-    for (var target in _targets) {
-      if (target.exerciseId == exerciseId) {
-        debugPrint(
-          'Cannot delete custom exercise: Used in target ${target.id}',
-        );
-        return false;
-      }
-    }
-
-    // Check for references in active workout
-    if (_currentExerciseLogs.any((l) => l.exerciseId == exerciseId)) {
-      debugPrint('Cannot delete custom exercise: Used in active workout');
-      return false;
-    }
-    if (_activeRoutine?.exerciseIds.contains(exerciseId) ?? false) {
-      debugPrint('Cannot delete custom exercise: Used in active routine');
+    if (referencedIds.contains(exerciseId)) {
+      final reasons = referenceReasons[exerciseId]?.join(', ') ?? 'unknown';
+      debugPrint('Cannot delete custom exercise $exerciseId: still referenced in $reasons');
       return false;
     }
 
@@ -693,19 +681,31 @@ class WorkoutProvider extends ChangeNotifier {
     return data;
   }
 
-  /// Get weekly volume by muscle group
+  /// Get weekly volume by muscle group.
+  ///
+  /// Sessions are traversed newest-first and the loop breaks once we reach
+  /// a session older than 7 days, so only in-range sessions are visited.
+  /// An exercise map is built once at the top for O(1) per-set lookup.
   Map<String, double> getWeeklyVolumeByMuscle() {
     final volumeByMuscle = <String, double>{};
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));
 
-    for (var session in _sessions) {
-      if (session.date.isBefore(weekAgo)) continue;
+    // Pre-build exercise map for O(1) lookup
+    final exerciseMap = <String, Exercise>{
+      for (final e in _allExercises) e.id: e,
+    };
 
-      for (var log in session.exercises) {
-        final exercise = getExercise(log.exerciseId);
+    // Iterate directly since _sessions is maintained newest-first.
+    // We use continue rather than break in case of external imports
+    // that might temporarily violate the newest-first invariant.
+    for (final session in _sessions) {
+      if (session.date.isBefore(weekAgo)) continue; 
+
+      for (final log in session.exercises) {
+        final exercise = exerciseMap[log.exerciseId];
         if (exercise == null) continue;
 
-        for (var activation in exercise.muscleActivations) {
+        for (final activation in exercise.muscleActivations) {
           final muscleVolume =
               log.totalVolume * (activation.activationPercentage / 100);
           volumeByMuscle[activation.muscleGroupId] =
