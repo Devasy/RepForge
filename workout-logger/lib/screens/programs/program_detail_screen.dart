@@ -6,7 +6,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'dart:ui' show FontFeature;
 
 import '../../models/models.dart';
 import '../../services/workout_provider.dart';
