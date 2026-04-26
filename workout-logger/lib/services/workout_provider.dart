@@ -13,6 +13,9 @@
 // Following Dependency Inversion Principle: this class now depends on
 // abstractions (IStorageService, IMLService) rather than concrete implementations.
 
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
@@ -23,6 +26,12 @@ import 'ml_service.dart';
 import 'strategies/target_calculator.dart';
 import 'managers/program_manager.dart';
 import 'utils/exercise_history.dart';
+
+enum StartWorkoutConflictAction { resume, discardAndStart, cancel }
+
+class WorkoutInProgressError extends StateError {
+  WorkoutInProgressError() : super('A workout is already in progress.');
+}
 
 class WorkoutProvider extends ChangeNotifier {
   final IStorageService _storage;
@@ -43,9 +52,15 @@ class WorkoutProvider extends ChangeNotifier {
   // Active workout state
   WorkoutSession? _activeSession;
   Routine? _activeRoutine;
+  ProgramDay? _activeProgramDay;
+  ProgramWeek? _activeProgramWeek;
   int _currentExerciseIndex = 0;
   List<ExerciseLog> _currentExerciseLogs = [];
   DateTime? _workoutStartTime;
+  static const String _draftKey = 'active_workout_draft';
+  static const int _draftSchemaVersion = 1;
+  bool _draftRestoreInProgress = false;
+  Future<void> _draftWriteQueue = Future.value();
 
   // Getters
   List<WorkoutSession> get sessions => _sessions;
@@ -57,6 +72,8 @@ class WorkoutProvider extends ChangeNotifier {
   bool get hasActiveWorkout =>
       _activeSession != null || _workoutStartTime != null;
   Routine? get activeRoutine => _activeRoutine;
+  ProgramDay? get activeProgramDay => _activeProgramDay;
+  ProgramWeek? get activeProgramWeek => _activeProgramWeek;
   int get currentExerciseIndex => _currentExerciseIndex;
   List<ExerciseLog> get currentExerciseLogs => _currentExerciseLogs;
   DateTime? get workoutStartTime => _workoutStartTime;
@@ -78,6 +95,7 @@ class WorkoutProvider extends ChangeNotifier {
     await _storage.init();
     await loadAllData();
     await _trainAllGrowthModels();
+    await _restoreDraftIfAny();
   }
 
   Future<void> loadAllData() async {
@@ -116,6 +134,143 @@ class WorkoutProvider extends ChangeNotifier {
     } else {
       // Remove stale model if not enough data to train (e.g. after deletion)
       _growthModels.remove(exerciseId);
+    }
+  }
+
+  Future<void> _persistDraft() async {
+    if (_draftRestoreInProgress) {
+      return;
+    }
+
+    if (!hasActiveWorkout || _workoutStartTime == null) {
+      await _clearDraft();
+      return;
+    }
+
+    final draft = jsonEncode({
+      'schemaVersion': _draftSchemaVersion,
+      'startTime': _workoutStartTime!.toIso8601String(),
+      'routineId': _activeRoutine?.id,
+      'programDay': _activeProgramDay?.toJson(),
+      'programWeek': _activeProgramWeek?.toJson(),
+      'currentExerciseIndex': _currentExerciseIndex,
+      'currentExerciseLogs': _currentExerciseLogs
+          .map((log) => log.toJson())
+          .toList(),
+    });
+
+    await _enqueueDraftWrite(() async {
+      try {
+        await _storage.saveSetting(_draftKey, draft);
+      } catch (e) {
+        debugPrint('Failed to persist active workout draft: $e');
+      }
+    });
+  }
+
+  Future<void> _enqueueDraftWrite(Future<void> Function() writeOperation) {
+    _draftWriteQueue = _draftWriteQueue
+        .catchError((_) {})
+        .then((_) => writeOperation());
+    return _draftWriteQueue;
+  }
+
+  Future<void> _clearDraft() async {
+    await _enqueueDraftWrite(() async {
+      try {
+        await _storage.saveSetting(_draftKey, '');
+      } catch (e) {
+        debugPrint('Failed to clear active workout draft: $e');
+      }
+    });
+  }
+
+  Future<void> _restoreDraftIfAny() async {
+    String? rawDraft;
+    try {
+      rawDraft = await _storage.getSetting(_draftKey);
+    } catch (e) {
+      debugPrint('Failed to read active workout draft: $e');
+      return;
+    }
+
+    if (rawDraft == null || rawDraft.isEmpty) {
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(rawDraft);
+      if (decoded is! Map) {
+        throw const FormatException('Draft payload must be a JSON object.');
+      }
+      final draft = Map<String, dynamic>.from(decoded);
+
+      final schemaVersion = draft['schemaVersion'];
+      if (schemaVersion != _draftSchemaVersion) {
+        debugPrint(
+          'Unsupported active workout draft schema: $schemaVersion. Clearing draft.',
+        );
+        await _clearDraft();
+        return;
+      }
+
+      final startTimeRaw = draft['startTime'] as String?;
+      final logsRaw = draft['currentExerciseLogs'];
+      if (startTimeRaw == null || logsRaw is! List) {
+        throw const FormatException('Draft is missing required fields.');
+      }
+
+      final restoredLogs = logsRaw
+          .map(
+            (log) =>
+                ExerciseLog.fromJson(Map<String, dynamic>.from(log as Map)),
+          )
+          .toList();
+
+      final programDayRaw = draft['programDay'];
+      ProgramDay? restoredProgramDay;
+      if (programDayRaw is Map) {
+        restoredProgramDay = ProgramDay.fromJson(
+          Map<String, dynamic>.from(programDayRaw),
+        );
+      }
+
+      final programWeekRaw = draft['programWeek'];
+      ProgramWeek? restoredProgramWeek;
+      if (programWeekRaw is Map) {
+        restoredProgramWeek = ProgramWeek.fromJson(
+          Map<String, dynamic>.from(programWeekRaw),
+        );
+      }
+
+      final routineId = draft['routineId'] as String?;
+      Routine? restoredRoutine;
+      if (routineId != null) {
+        try {
+          restoredRoutine = _routines.firstWhere((r) => r.id == routineId);
+        } catch (_) {
+          restoredRoutine = null;
+        }
+      }
+
+      final indexFromDraft =
+          (draft['currentExerciseIndex'] as num?)?.toInt() ?? 0;
+      final maxIndex = restoredLogs.isEmpty ? 0 : restoredLogs.length - 1;
+
+      _draftRestoreInProgress = true;
+      _activeSession = null;
+      _workoutStartTime = DateTime.parse(startTimeRaw);
+      _activeRoutine = restoredRoutine;
+      _activeProgramDay = restoredProgramDay;
+      _activeProgramWeek = restoredProgramWeek;
+      _currentExerciseLogs = restoredLogs;
+      _currentExerciseIndex = indexFromDraft.clamp(0, maxIndex).toInt();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to restore active workout draft: $e');
+      await _clearDraft();
+    } finally {
+      _draftRestoreInProgress = false;
     }
   }
 
@@ -219,20 +374,32 @@ class WorkoutProvider extends ChangeNotifier {
     }
 
     for (final s in _sessions) {
-      for (final e in s.exercises) addReference(e.exerciseId, '_sessions');
+      for (final e in s.exercises) {
+        addReference(e.exerciseId, '_sessions');
+      }
     }
     for (final r in _routines) {
-      for (final id in r.exerciseIds) addReference(id, '_routines');
+      for (final id in r.exerciseIds) {
+        addReference(id, '_routines');
+      }
     }
-    for (final t in _targets) addReference(t.exerciseId, '_targets');
-    for (final l in _currentExerciseLogs) addReference(l.exerciseId, '_currentExerciseLogs');
+    for (final t in _targets) {
+      addReference(t.exerciseId, '_targets');
+    }
+    for (final l in _currentExerciseLogs) {
+      addReference(l.exerciseId, '_currentExerciseLogs');
+    }
     if (_activeRoutine != null) {
-      for (final id in _activeRoutine!.exerciseIds) addReference(id, '_activeRoutine');
+      for (final id in _activeRoutine!.exerciseIds) {
+        addReference(id, '_activeRoutine');
+      }
     }
 
     if (referencedIds.contains(exerciseId)) {
       final reasons = referenceReasons[exerciseId]?.join(', ') ?? 'unknown';
-      debugPrint('Cannot delete custom exercise $exerciseId: still referenced in $reasons');
+      debugPrint(
+        'Cannot delete custom exercise $exerciseId: still referenced in $reasons',
+      );
       return false;
     }
 
@@ -253,9 +420,20 @@ class WorkoutProvider extends ChangeNotifier {
   // ==================== WORKOUT FLOW ====================
 
   /// Start a new workout with a routine
-  void startWorkout({Routine? routine, List<String>? exerciseIds}) {
+  void startWorkout({
+    Routine? routine,
+    List<String>? exerciseIds,
+    ProgramDay? programDay,
+    ProgramWeek? programWeek,
+  }) {
+    if (hasActiveWorkout) {
+      throw WorkoutInProgressError();
+    }
+
     _workoutStartTime = DateTime.now();
     _activeRoutine = routine;
+    _activeProgramDay = programDay;
+    _activeProgramWeek = programWeek;
     _currentExerciseIndex = 0;
     _currentExerciseLogs = [];
 
@@ -266,6 +444,39 @@ class WorkoutProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+    unawaited(_persistDraft());
+  }
+
+  Future<bool> startWorkoutSafely({
+    Routine? routine,
+    List<String>? exerciseIds,
+    ProgramDay? programDay,
+    ProgramWeek? programWeek,
+    required Future<StartWorkoutConflictAction> Function() onConflict,
+  }) async {
+    if (!hasActiveWorkout) {
+      startWorkout(
+        routine: routine,
+        exerciseIds: exerciseIds,
+        programDay: programDay,
+        programWeek: programWeek,
+      );
+      return true;
+    }
+
+    final action = await onConflict();
+    if (action == StartWorkoutConflictAction.discardAndStart) {
+      await cancelWorkout();
+      startWorkout(
+        routine: routine,
+        exerciseIds: exerciseIds,
+        programDay: programDay,
+        programWeek: programWeek,
+      );
+      return true;
+    }
+
+    return false;
   }
 
   /// Get current exercise being performed
@@ -297,6 +508,7 @@ class WorkoutProvider extends ChangeNotifier {
         notes: currentLog.notes,
       );
       notifyListeners();
+      unawaited(_persistDraft());
     }
   }
 
@@ -312,6 +524,7 @@ class WorkoutProvider extends ChangeNotifier {
           notes: currentLog.notes,
         );
         notifyListeners();
+        unawaited(_persistDraft());
       }
     }
   }
@@ -321,6 +534,7 @@ class WorkoutProvider extends ChangeNotifier {
     if (_currentExerciseIndex < _currentExerciseLogs.length - 1) {
       _currentExerciseIndex++;
       notifyListeners();
+      unawaited(_persistDraft());
       return true;
     }
     return false; // No more exercises
@@ -331,6 +545,7 @@ class WorkoutProvider extends ChangeNotifier {
     if (_currentExerciseIndex > 0) {
       _currentExerciseIndex--;
       notifyListeners();
+      unawaited(_persistDraft());
       return true;
     }
     return false;
@@ -338,9 +553,12 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Jump directly to an exercise by index
   void goToExercise(int index) {
-    if (index >= 0 && index < _currentExerciseLogs.length) {
+    if (index >= 0 &&
+        index < _currentExerciseLogs.length &&
+        index != _currentExerciseIndex) {
       _currentExerciseIndex = index;
       notifyListeners();
+      unawaited(_persistDraft());
     }
   }
 
@@ -365,6 +583,7 @@ class WorkoutProvider extends ChangeNotifier {
     );
 
     await _storage.saveWorkoutSession(session);
+    await _clearDraft();
     _sessions.insert(0, session);
 
     // Update growth models for performed exercises
@@ -378,6 +597,8 @@ class WorkoutProvider extends ChangeNotifier {
     // Clear active workout state
     _activeSession = null;
     _activeRoutine = null;
+    _activeProgramDay = null;
+    _activeProgramWeek = null;
     _currentExerciseIndex = 0;
     _currentExerciseLogs = [];
     _workoutStartTime = null;
@@ -387,13 +608,16 @@ class WorkoutProvider extends ChangeNotifier {
   }
 
   /// Cancel workout without saving
-  void cancelWorkout() {
+  Future<void> cancelWorkout() async {
     _activeSession = null;
     _activeRoutine = null;
+    _activeProgramDay = null;
+    _activeProgramWeek = null;
     _currentExerciseIndex = 0;
     _currentExerciseLogs = [];
     _workoutStartTime = null;
     notifyListeners();
+    await _clearDraft();
   }
 
   // ==================== RECOMMENDATIONS ====================
@@ -699,7 +923,7 @@ class WorkoutProvider extends ChangeNotifier {
     // We use continue rather than break in case of external imports
     // that might temporarily violate the newest-first invariant.
     for (final session in _sessions) {
-      if (session.date.isBefore(weekAgo)) continue; 
+      if (session.date.isBefore(weekAgo)) continue;
 
       for (final log in session.exercises) {
         final exercise = exerciseMap[log.exerciseId];

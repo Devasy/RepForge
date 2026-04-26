@@ -11,6 +11,7 @@ import '../../models/models.dart';
 import '../../services/workout_provider.dart';
 import '../../theme/app_theme.dart';
 import '../workout_flow_screen.dart';
+import '../widgets/workout_conflict_dialog.dart';
 
 class ProgramDetailScreen extends StatefulWidget {
   final TrainingProgram program;
@@ -82,6 +83,46 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _startProgramDayWorkout(ProgramDay day, ProgramWeek week) async {
+    final provider = context.read<WorkoutProvider>();
+    StartWorkoutConflictAction conflictAction =
+        StartWorkoutConflictAction.cancel;
+
+    final started = await provider.startWorkoutSafely(
+      exerciseIds: day.exercises.map((slot) => slot.exerciseId).toList(),
+      programDay: day,
+      programWeek: week,
+      onConflict: () async {
+        final action = await showWorkoutConflictDialog(
+          context,
+          workoutStartTime: provider.workoutStartTime ?? DateTime.now(),
+        );
+        conflictAction = action ?? StartWorkoutConflictAction.cancel;
+        return conflictAction;
+      },
+    );
+
+    if (!mounted) return;
+    if (started || conflictAction == StartWorkoutConflictAction.resume) {
+      final resumeProgramDay = provider.hasActiveWorkout
+          ? provider.activeProgramDay
+          : day;
+      final resumeProgramWeek = provider.hasActiveWorkout
+          ? provider.activeProgramWeek
+          : week;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => WorkoutFlowScreen(
+            programDay: resumeProgramDay,
+            programWeek: resumeProgramWeek,
+          ),
+        ),
+      );
+    }
   }
 
   // ── Header ──────────────────────────────────────────────────────────────
@@ -234,8 +275,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                 final phase = entry.value;
                 final fraction =
                     (phase.endWeek - phase.startWeek + 1) / _program.totalWeeks;
-                final color =
-                    _phaseColors[entry.key % _phaseColors.length];
+                final color = _phaseColors[entry.key % _phaseColors.length];
                 return Expanded(
                   flex: ((fraction * 100).round()).clamp(1, 100),
                   child: Container(
@@ -412,9 +452,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
               indent: AppSpacing.md,
               endIndent: AppSpacing.md,
             ),
-            ...week.days.map(
-              (day) => _buildDaySection(day, week),
-            ),
+            ...week.days.map((day) => _buildDaySection(day, week)),
             if (week.notes != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -551,15 +589,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => WorkoutFlowScreen(
-                    programDay: day,
-                    programWeek: week,
-                  ),
-                ),
-              ),
+              onPressed: () => _startProgramDayWorkout(day, week),
               icon: const Icon(Icons.play_arrow, size: 18),
               label: Text('Start ${day.name}'),
               style: ElevatedButton.styleFrom(
@@ -627,8 +657,9 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
     final name = exercise?.name ?? slot.exerciseId;
 
     // Apply deload adjustments for display
-    final displaySets =
-        week.isDeload ? (slot.sets - week.deloadSetReduction).clamp(1, 99) : slot.sets;
+    final displaySets = week.isDeload
+        ? (slot.sets - week.deloadSetReduction).clamp(1, 99)
+        : slot.sets;
     final displayIntensity = week.isDeload ? week.deloadIntensityFactor : 1.0;
 
     final repRange = slot.minReps == slot.maxReps
@@ -682,8 +713,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                       Icons.timer_outlined,
                       '${slot.restSeconds}s rest',
                     ),
-                    if (slot.tempo != null)
-                      _infoChip(Icons.speed, slot.tempo!),
+                    if (slot.tempo != null) _infoChip(Icons.speed, slot.tempo!),
                     if (slot.weightPercentage != null)
                       _infoChip(
                         Icons.fitness_center,

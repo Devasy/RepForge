@@ -29,6 +29,8 @@ class WorkoutFlowScreen extends StatefulWidget {
   State<WorkoutFlowScreen> createState() => _WorkoutFlowScreenState();
 }
 
+enum _LeaveAction { discard, keep, cancel }
+
 class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   // Rest timer state
   bool _isResting = false;
@@ -61,17 +63,31 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     });
   }
 
-  ProgramExerciseSlot? _slotForIndex(int idx) {
-    if (widget.programDay == null) return null;
-    final slots = widget.programDay!.exercises;
+  ProgramDay? _resolvedProgramDay(WorkoutProvider provider) =>
+      widget.programDay ?? provider.activeProgramDay;
+
+  ProgramWeek? _resolvedProgramWeek(WorkoutProvider provider) =>
+      widget.programWeek ?? provider.activeProgramWeek;
+
+  ProgramExerciseSlot? _slotForIndex(int idx, {WorkoutProvider? provider}) {
+    final resolvedProvider = provider ?? context.read<WorkoutProvider>();
+    final day = _resolvedProgramDay(resolvedProvider);
+    if (day == null) return null;
+    final slots = day.exercises;
     return idx < slots.length ? slots[idx] : null;
   }
 
   /// Finds the index of the first exercise in the same superset group, scanning
   /// backward from [fromIdx].
-  int _supersetGroupStart(int fromIdx, String groupId) {
+  int _supersetGroupStart(
+    int fromIdx,
+    String groupId, {
+    WorkoutProvider? provider,
+  }) {
     int start = fromIdx;
-    while (start > 0 && _slotForIndex(start - 1)?.supersetGroupId == groupId) {
+    while (start > 0 &&
+        _slotForIndex(start - 1, provider: provider)?.supersetGroupId ==
+            groupId) {
       start--;
     }
     return start;
@@ -84,15 +100,13 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     required int endIdx,
     required WorkoutProvider provider,
   }) {
+    final week = _resolvedProgramWeek(provider);
     for (int i = startIdx; i <= endIdx; i++) {
-      final slot = _slotForIndex(i);
+      final slot = _slotForIndex(i, provider: provider);
       if (slot == null) continue;
       if (i >= provider.currentExerciseLogs.length) continue;
-      final targetSets = (widget.programWeek?.isDeload == true)
-          ? (slot.sets - (widget.programWeek?.deloadSetReduction ?? 0)).clamp(
-              1,
-              99,
-            )
+      final targetSets = (week?.isDeload == true)
+          ? (slot.sets - (week?.deloadSetReduction ?? 0)).clamp(1, 99)
           : slot.sets;
       final logged = provider.currentExerciseLogs[i].sets.length;
       if (logged < targetSets) return true;
@@ -105,11 +119,12 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     required int index,
     required WorkoutProvider provider,
   }) {
-    final slot = _slotForIndex(index);
+    final slot = _slotForIndex(index, provider: provider);
     if (slot == null) return false;
     if (index >= provider.currentExerciseLogs.length) return false;
-    final targetSets = (widget.programWeek?.isDeload == true)
-        ? (slot.sets - (widget.programWeek?.deloadSetReduction ?? 0)).clamp(1, 99)
+    final week = _resolvedProgramWeek(provider);
+    final targetSets = (week?.isDeload == true)
+        ? (slot.sets - (week?.deloadSetReduction ?? 0)).clamp(1, 99)
         : slot.sets;
     final logged = provider.currentExerciseLogs[index].sets.length;
     return logged < targetSets;
@@ -117,13 +132,32 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _initializeWorkout() {
     final provider = context.read<WorkoutProvider>();
+    final programDay = _resolvedProgramDay(provider);
+    final programWeek = _resolvedProgramWeek(provider);
 
-    if (widget.programDay != null) {
-      final exerciseIds =
-          widget.programDay!.exercises.map((s) => s.exerciseId).toList();
-      provider.startWorkout(exerciseIds: exerciseIds);
+    if (provider.hasActiveWorkout) {
+      final slot = _slotForIndex(
+        provider.currentExerciseIndex,
+        provider: provider,
+      );
+      if (slot != null) {
+        _restSeconds = slot.restSeconds;
+      }
+      _loadLastSessionData();
+      return;
+    }
+
+    if (programDay != null) {
+      final exerciseIds = programDay.exercises
+          .map((s) => s.exerciseId)
+          .toList();
+      provider.startWorkout(
+        exerciseIds: exerciseIds,
+        programDay: programDay,
+        programWeek: programWeek,
+      );
       // Set initial rest time from first slot
-      final firstSlot = _slotForIndex(0);
+      final firstSlot = _slotForIndex(0, provider: provider);
       if (firstSlot != null) _restSeconds = firstSlot.restSeconds;
       _loadLastSessionData();
     } else if (widget.routine != null) {
@@ -149,7 +183,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
         _currentReps = lastSet.reps;
         // Sync controllers using display unit
         final displayWeight = settings.toDisplay(_currentWeight);
-        _mainWeightController.text = displayWeight == displayWeight.truncateToDouble()
+        _mainWeightController.text =
+            displayWeight == displayWeight.truncateToDouble()
             ? displayWeight.toStringAsFixed(0)
             : displayWeight.toStringAsFixed(1);
         _mainRepsController.text = _currentReps.toString();
@@ -185,10 +220,17 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       return _buildExerciseSelector();
     }
 
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
-        child: _isResting ? _buildRestTimerView() : _buildWorkoutView(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        unawaited(_handleSystemBack());
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        body: SafeArea(
+          child: _isResting ? _buildRestTimerView() : _buildWorkoutView(),
+        ),
       ),
     );
   }
@@ -209,12 +251,12 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     );
   }
 
-  void _startWithSelectedExercises(List<String> exerciseIds) {
+  Future<void> _startWithSelectedExercises(List<String> exerciseIds) async {
     if (exerciseIds.isEmpty) return;
 
     final provider = context.read<WorkoutProvider>();
     // Restart workout with selected exercises
-    provider.cancelWorkout();
+    await provider.cancelWorkout();
     provider.startWorkout(exerciseIds: exerciseIds);
   }
 
@@ -360,6 +402,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     if (currentSetIndex >= recommendations.length) return const SizedBox();
 
     final rec = recommendations[currentSetIndex];
+    final settings = context.watch<SettingsProvider>();
+    final displayWeight = settings.toDisplay(rec.weight);
+    final displayWeightText = displayWeight == displayWeight.truncateToDouble()
+        ? displayWeight.toStringAsFixed(0)
+        : displayWeight.toStringAsFixed(1);
     final confidenceColor = rec.confidence == 'high'
         ? AppTheme.success
         : (rec.confidence == 'medium' ? AppTheme.warning : AppTheme.textMuted);
@@ -401,7 +448,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                 ),
                 Text(
-                  '${rec.weight}kg × ${rec.reps} reps',
+                  '$displayWeightText ${settings.unitLabel} × ${rec.reps} reps',
                   style: const TextStyle(
                     color: AppTheme.textPrimary,
                     fontSize: 18,
@@ -1051,13 +1098,16 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   // ==================== Program Meta Banner ====================
 
   Widget _buildProgramMetaBanner(WorkoutProvider provider) {
-    if (widget.programDay == null || widget.programWeek == null) {
+    final week = _resolvedProgramWeek(provider);
+    if (_resolvedProgramDay(provider) == null || week == null) {
       return const SizedBox.shrink();
     }
-    final slot = _slotForIndex(provider.currentExerciseIndex);
+    final slot = _slotForIndex(
+      provider.currentExerciseIndex,
+      provider: provider,
+    );
     if (slot == null) return const SizedBox.shrink();
 
-    final week = widget.programWeek!;
     final displaySets = week.isDeload
         ? (slot.sets - week.deloadSetReduction).clamp(1, 99)
         : slot.sets;
@@ -1120,7 +1170,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 color: AppTheme.textSecondary,
               ),
               if (slot.tempo != null)
-                _programChip(icon: Icons.speed, label: 'Tempo ${slot.tempo}', color: AppTheme.secondaryColor),
+                _programChip(
+                  icon: Icons.speed,
+                  label: 'Tempo ${slot.tempo}',
+                  color: AppTheme.secondaryColor,
+                ),
               if (slot.weightPercentage != null)
                 _programChip(
                   icon: Icons.fitness_center,
@@ -1130,7 +1184,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   color: AppTheme.primaryColor,
                 ),
               if (slot.supersetGroupId != null)
-                _programChip(icon: Icons.link, label: 'Superset', color: AppTheme.secondaryColor),
+                _programChip(
+                  icon: Icons.link,
+                  label: 'Superset',
+                  color: AppTheme.secondaryColor,
+                ),
             ],
           ),
           if (slot.notes != null) ...[
@@ -1265,8 +1323,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   void _completeSet() {
     final provider = context.read<WorkoutProvider>();
     final currentIdx = provider.currentExerciseIndex;
-    final currentSlot = _slotForIndex(currentIdx);
-    final nextSlot = _slotForIndex(currentIdx + 1);
+    final currentSlot = _slotForIndex(currentIdx, provider: provider);
+    final nextSlot = _slotForIndex(currentIdx + 1, provider: provider);
 
     final set = WorkoutSet(
       weight: _currentWeight,
@@ -1300,7 +1358,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
     // Superset auto-advance: if next exercise is in the same superset group
     // AND the next slot still needs more sets, advance immediately.
-    final isSupersetPair = currentSlot?.supersetGroupId != null &&
+    final isSupersetPair =
+        currentSlot?.supersetGroupId != null &&
         nextSlot?.supersetGroupId == currentSlot?.supersetGroupId;
 
     if (isSupersetPair &&
@@ -1308,14 +1367,21 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       provider.nextExercise();
       _loadLastSessionData();
       // Apply the next slot's rest time so the subsequent rest is correct
-      final newSlot = _slotForIndex(provider.currentExerciseIndex);
+      final newSlot = _slotForIndex(
+        provider.currentExerciseIndex,
+        provider: provider,
+      );
       if (newSlot != null) setState(() => _restSeconds = newSlot.restSeconds);
     } else {
       // Detect if we just finished the last exercise in a superset group.
       // If the group still needs more sets, schedule a return after rest.
       final groupId = currentSlot?.supersetGroupId;
       if (groupId != null) {
-        final groupStart = _supersetGroupStart(currentIdx, groupId);
+        final groupStart = _supersetGroupStart(
+          currentIdx,
+          groupId,
+          provider: provider,
+        );
         if (_supersetNeedsMoreSets(
           startIdx: groupStart,
           endIdx: currentIdx,
@@ -1357,7 +1423,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       final provider = context.read<WorkoutProvider>();
       provider.goToExercise(returnIdx);
       _loadLastSessionData();
-      final slot = _slotForIndex(returnIdx);
+      final slot = _slotForIndex(returnIdx, provider: provider);
       if (slot != null) setState(() => _restSeconds = slot.restSeconds);
     }
 
@@ -1459,22 +1525,69 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     );
   }
 
+  Future<void> _handleSystemBack() async {
+    final action = await _showLeaveDialog();
+    if (!mounted) return;
+
+    if (action == _LeaveAction.discard) {
+      await context.read<WorkoutProvider>().cancelWorkout();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    if (action == _LeaveAction.keep) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<_LeaveAction> _showLeaveDialog() async {
+    final action = await showDialog<_LeaveAction>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Leave workout?'),
+        content: const Text(
+          'Your progress is saved. You can resume it next time you start a workout.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_LeaveAction.discard),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+            child: const Text('Discard workout'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_LeaveAction.keep),
+            child: const Text('Keep & exit'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_LeaveAction.cancel),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    return action ?? _LeaveAction.cancel;
+  }
+
   void _showCancelDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Cancel Workout?'),
         content: const Text('Your progress will not be saved.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Continue Workout'),
           ),
           TextButton(
-            onPressed: () {
-              context.read<WorkoutProvider>().cancelWorkout();
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close workout screen
+            onPressed: () async {
+              await context.read<WorkoutProvider>().cancelWorkout();
+              if (!mounted) return;
+              Navigator.pop(dialogContext); // Close dialog
+              Navigator.pop(this.context); // Close workout screen
             },
             child: const Text(
               'Cancel Workout',

@@ -9,6 +9,35 @@ import '../theme/app_theme.dart';
 import '../data/exercise_database.dart';
 import 'workout_flow_screen.dart';
 import 'programs/programs_screen.dart';
+import 'widgets/workout_conflict_dialog.dart';
+
+Future<void> _startRoutineWorkoutFlow(
+  BuildContext context,
+  Routine routine,
+) async {
+  final provider = context.read<WorkoutProvider>();
+  StartWorkoutConflictAction conflictAction = StartWorkoutConflictAction.cancel;
+
+  final started = await provider.startWorkoutSafely(
+    routine: routine,
+    onConflict: () async {
+      final action = await showWorkoutConflictDialog(
+        context,
+        workoutStartTime: provider.workoutStartTime ?? DateTime.now(),
+      );
+      conflictAction = action ?? StartWorkoutConflictAction.cancel;
+      return conflictAction;
+    },
+  );
+
+  if (!context.mounted) return;
+  if (started || conflictAction == StartWorkoutConflictAction.resume) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => WorkoutFlowScreen(routine: routine)),
+    );
+  }
+}
 
 class RoutinesScreen extends StatelessWidget {
   const RoutinesScreen({super.key});
@@ -27,12 +56,7 @@ class RoutinesScreen extends StatelessWidget {
             ],
           ),
         ),
-        body: const TabBarView(
-          children: [
-            _RoutinesTab(),
-            ProgramsScreen(),
-          ],
-        ),
+        body: const TabBarView(children: [_RoutinesTab(), ProgramsScreen()]),
       ),
     );
   }
@@ -168,14 +192,7 @@ class _RoutineCard extends StatelessWidget {
                     icon: const Icon(Icons.play_circle_fill),
                     color: AppTheme.primaryColor,
                     iconSize: 40,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => WorkoutFlowScreen(routine: routine),
-                        ),
-                      );
-                    },
+                    onPressed: () => _startRoutineWorkoutFlow(context, routine),
                   ),
                 ],
               ),
@@ -737,12 +754,7 @@ class RoutineDetailScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => WorkoutFlowScreen(routine: routine),
-            ),
-          );
+          _startRoutineWorkoutFlow(context, routine);
         },
         icon: const Icon(Icons.play_arrow),
         label: const Text('Start Workout'),
