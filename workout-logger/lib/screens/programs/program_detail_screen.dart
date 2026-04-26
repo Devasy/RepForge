@@ -92,6 +92,8 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
 
     final started = await provider.startWorkoutSafely(
       exerciseIds: day.exercises.map((slot) => slot.exerciseId).toList(),
+      programDay: day,
+      programWeek: week,
       onConflict: () async {
         final action = await showWorkoutConflictDialog(
           context,
@@ -104,10 +106,20 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
 
     if (!mounted) return;
     if (started || conflictAction == StartWorkoutConflictAction.resume) {
+      final resumeProgramDay = provider.hasActiveWorkout
+          ? provider.activeProgramDay
+          : day;
+      final resumeProgramWeek = provider.hasActiveWorkout
+          ? provider.activeProgramWeek
+          : week;
+
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => WorkoutFlowScreen(programDay: day, programWeek: week),
+          builder: (_) => WorkoutFlowScreen(
+            programDay: resumeProgramDay,
+            programWeek: resumeProgramWeek,
+          ),
         ),
       );
     }

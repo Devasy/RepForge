@@ -52,12 +52,15 @@ class WorkoutProvider extends ChangeNotifier {
   // Active workout state
   WorkoutSession? _activeSession;
   Routine? _activeRoutine;
+  ProgramDay? _activeProgramDay;
+  ProgramWeek? _activeProgramWeek;
   int _currentExerciseIndex = 0;
   List<ExerciseLog> _currentExerciseLogs = [];
   DateTime? _workoutStartTime;
   static const String _draftKey = 'active_workout_draft';
   static const int _draftSchemaVersion = 1;
   bool _draftRestoreInProgress = false;
+  Future<void> _draftWriteQueue = Future.value();
 
   // Getters
   List<WorkoutSession> get sessions => _sessions;
@@ -69,6 +72,8 @@ class WorkoutProvider extends ChangeNotifier {
   bool get hasActiveWorkout =>
       _activeSession != null || _workoutStartTime != null;
   Routine? get activeRoutine => _activeRoutine;
+  ProgramDay? get activeProgramDay => _activeProgramDay;
+  ProgramWeek? get activeProgramWeek => _activeProgramWeek;
   int get currentExerciseIndex => _currentExerciseIndex;
   List<ExerciseLog> get currentExerciseLogs => _currentExerciseLogs;
   DateTime? get workoutStartTime => _workoutStartTime;
@@ -146,25 +151,38 @@ class WorkoutProvider extends ChangeNotifier {
       'schemaVersion': _draftSchemaVersion,
       'startTime': _workoutStartTime!.toIso8601String(),
       'routineId': _activeRoutine?.id,
+      'programDay': _activeProgramDay?.toJson(),
+      'programWeek': _activeProgramWeek?.toJson(),
       'currentExerciseIndex': _currentExerciseIndex,
       'currentExerciseLogs': _currentExerciseLogs
           .map((log) => log.toJson())
           .toList(),
     });
 
-    try {
-      await _storage.saveSetting(_draftKey, draft);
-    } catch (e) {
-      debugPrint('Failed to persist active workout draft: $e');
-    }
+    await _enqueueDraftWrite(() async {
+      try {
+        await _storage.saveSetting(_draftKey, draft);
+      } catch (e) {
+        debugPrint('Failed to persist active workout draft: $e');
+      }
+    });
+  }
+
+  Future<void> _enqueueDraftWrite(Future<void> Function() writeOperation) {
+    _draftWriteQueue = _draftWriteQueue
+        .catchError((_) {})
+        .then((_) => writeOperation());
+    return _draftWriteQueue;
   }
 
   Future<void> _clearDraft() async {
-    try {
-      await _storage.saveSetting(_draftKey, '');
-    } catch (e) {
-      debugPrint('Failed to clear active workout draft: $e');
-    }
+    await _enqueueDraftWrite(() async {
+      try {
+        await _storage.saveSetting(_draftKey, '');
+      } catch (e) {
+        debugPrint('Failed to clear active workout draft: $e');
+      }
+    });
   }
 
   Future<void> _restoreDraftIfAny() async {
@@ -209,6 +227,22 @@ class WorkoutProvider extends ChangeNotifier {
           )
           .toList();
 
+      final programDayRaw = draft['programDay'];
+      ProgramDay? restoredProgramDay;
+      if (programDayRaw is Map) {
+        restoredProgramDay = ProgramDay.fromJson(
+          Map<String, dynamic>.from(programDayRaw),
+        );
+      }
+
+      final programWeekRaw = draft['programWeek'];
+      ProgramWeek? restoredProgramWeek;
+      if (programWeekRaw is Map) {
+        restoredProgramWeek = ProgramWeek.fromJson(
+          Map<String, dynamic>.from(programWeekRaw),
+        );
+      }
+
       final routineId = draft['routineId'] as String?;
       Routine? restoredRoutine;
       if (routineId != null) {
@@ -227,6 +261,8 @@ class WorkoutProvider extends ChangeNotifier {
       _activeSession = null;
       _workoutStartTime = DateTime.parse(startTimeRaw);
       _activeRoutine = restoredRoutine;
+      _activeProgramDay = restoredProgramDay;
+      _activeProgramWeek = restoredProgramWeek;
       _currentExerciseLogs = restoredLogs;
       _currentExerciseIndex = indexFromDraft.clamp(0, maxIndex).toInt();
       notifyListeners();
@@ -384,13 +420,20 @@ class WorkoutProvider extends ChangeNotifier {
   // ==================== WORKOUT FLOW ====================
 
   /// Start a new workout with a routine
-  void startWorkout({Routine? routine, List<String>? exerciseIds}) {
+  void startWorkout({
+    Routine? routine,
+    List<String>? exerciseIds,
+    ProgramDay? programDay,
+    ProgramWeek? programWeek,
+  }) {
     if (hasActiveWorkout) {
       throw WorkoutInProgressError();
     }
 
     _workoutStartTime = DateTime.now();
     _activeRoutine = routine;
+    _activeProgramDay = programDay;
+    _activeProgramWeek = programWeek;
     _currentExerciseIndex = 0;
     _currentExerciseLogs = [];
 
@@ -407,17 +450,29 @@ class WorkoutProvider extends ChangeNotifier {
   Future<bool> startWorkoutSafely({
     Routine? routine,
     List<String>? exerciseIds,
+    ProgramDay? programDay,
+    ProgramWeek? programWeek,
     required Future<StartWorkoutConflictAction> Function() onConflict,
   }) async {
     if (!hasActiveWorkout) {
-      startWorkout(routine: routine, exerciseIds: exerciseIds);
+      startWorkout(
+        routine: routine,
+        exerciseIds: exerciseIds,
+        programDay: programDay,
+        programWeek: programWeek,
+      );
       return true;
     }
 
     final action = await onConflict();
     if (action == StartWorkoutConflictAction.discardAndStart) {
       await cancelWorkout();
-      startWorkout(routine: routine, exerciseIds: exerciseIds);
+      startWorkout(
+        routine: routine,
+        exerciseIds: exerciseIds,
+        programDay: programDay,
+        programWeek: programWeek,
+      );
       return true;
     }
 
@@ -542,6 +597,8 @@ class WorkoutProvider extends ChangeNotifier {
     // Clear active workout state
     _activeSession = null;
     _activeRoutine = null;
+    _activeProgramDay = null;
+    _activeProgramWeek = null;
     _currentExerciseIndex = 0;
     _currentExerciseLogs = [];
     _workoutStartTime = null;
@@ -554,6 +611,8 @@ class WorkoutProvider extends ChangeNotifier {
   Future<void> cancelWorkout() async {
     _activeSession = null;
     _activeRoutine = null;
+    _activeProgramDay = null;
+    _activeProgramWeek = null;
     _currentExerciseIndex = 0;
     _currentExerciseLogs = [];
     _workoutStartTime = null;

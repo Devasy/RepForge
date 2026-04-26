@@ -63,17 +63,31 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     });
   }
 
-  ProgramExerciseSlot? _slotForIndex(int idx) {
-    if (widget.programDay == null) return null;
-    final slots = widget.programDay!.exercises;
+  ProgramDay? _resolvedProgramDay(WorkoutProvider provider) =>
+      widget.programDay ?? provider.activeProgramDay;
+
+  ProgramWeek? _resolvedProgramWeek(WorkoutProvider provider) =>
+      widget.programWeek ?? provider.activeProgramWeek;
+
+  ProgramExerciseSlot? _slotForIndex(int idx, {WorkoutProvider? provider}) {
+    final resolvedProvider = provider ?? context.read<WorkoutProvider>();
+    final day = _resolvedProgramDay(resolvedProvider);
+    if (day == null) return null;
+    final slots = day.exercises;
     return idx < slots.length ? slots[idx] : null;
   }
 
   /// Finds the index of the first exercise in the same superset group, scanning
   /// backward from [fromIdx].
-  int _supersetGroupStart(int fromIdx, String groupId) {
+  int _supersetGroupStart(
+    int fromIdx,
+    String groupId, {
+    WorkoutProvider? provider,
+  }) {
     int start = fromIdx;
-    while (start > 0 && _slotForIndex(start - 1)?.supersetGroupId == groupId) {
+    while (start > 0 &&
+        _slotForIndex(start - 1, provider: provider)?.supersetGroupId ==
+            groupId) {
       start--;
     }
     return start;
@@ -86,15 +100,13 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     required int endIdx,
     required WorkoutProvider provider,
   }) {
+    final week = _resolvedProgramWeek(provider);
     for (int i = startIdx; i <= endIdx; i++) {
-      final slot = _slotForIndex(i);
+      final slot = _slotForIndex(i, provider: provider);
       if (slot == null) continue;
       if (i >= provider.currentExerciseLogs.length) continue;
-      final targetSets = (widget.programWeek?.isDeload == true)
-          ? (slot.sets - (widget.programWeek?.deloadSetReduction ?? 0)).clamp(
-              1,
-              99,
-            )
+      final targetSets = (week?.isDeload == true)
+          ? (slot.sets - (week?.deloadSetReduction ?? 0)).clamp(1, 99)
           : slot.sets;
       final logged = provider.currentExerciseLogs[i].sets.length;
       if (logged < targetSets) return true;
@@ -107,14 +119,12 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     required int index,
     required WorkoutProvider provider,
   }) {
-    final slot = _slotForIndex(index);
+    final slot = _slotForIndex(index, provider: provider);
     if (slot == null) return false;
     if (index >= provider.currentExerciseLogs.length) return false;
-    final targetSets = (widget.programWeek?.isDeload == true)
-        ? (slot.sets - (widget.programWeek?.deloadSetReduction ?? 0)).clamp(
-            1,
-            99,
-          )
+    final week = _resolvedProgramWeek(provider);
+    final targetSets = (week?.isDeload == true)
+        ? (slot.sets - (week?.deloadSetReduction ?? 0)).clamp(1, 99)
         : slot.sets;
     final logged = provider.currentExerciseLogs[index].sets.length;
     return logged < targetSets;
@@ -122,9 +132,14 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _initializeWorkout() {
     final provider = context.read<WorkoutProvider>();
+    final programDay = _resolvedProgramDay(provider);
+    final programWeek = _resolvedProgramWeek(provider);
 
     if (provider.hasActiveWorkout) {
-      final slot = _slotForIndex(provider.currentExerciseIndex);
+      final slot = _slotForIndex(
+        provider.currentExerciseIndex,
+        provider: provider,
+      );
       if (slot != null) {
         _restSeconds = slot.restSeconds;
       }
@@ -132,13 +147,17 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       return;
     }
 
-    if (widget.programDay != null) {
-      final exerciseIds = widget.programDay!.exercises
+    if (programDay != null) {
+      final exerciseIds = programDay.exercises
           .map((s) => s.exerciseId)
           .toList();
-      provider.startWorkout(exerciseIds: exerciseIds);
+      provider.startWorkout(
+        exerciseIds: exerciseIds,
+        programDay: programDay,
+        programWeek: programWeek,
+      );
       // Set initial rest time from first slot
-      final firstSlot = _slotForIndex(0);
+      final firstSlot = _slotForIndex(0, provider: provider);
       if (firstSlot != null) _restSeconds = firstSlot.restSeconds;
       _loadLastSessionData();
     } else if (widget.routine != null) {
@@ -1079,13 +1098,16 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   // ==================== Program Meta Banner ====================
 
   Widget _buildProgramMetaBanner(WorkoutProvider provider) {
-    if (widget.programDay == null || widget.programWeek == null) {
+    final week = _resolvedProgramWeek(provider);
+    if (_resolvedProgramDay(provider) == null || week == null) {
       return const SizedBox.shrink();
     }
-    final slot = _slotForIndex(provider.currentExerciseIndex);
+    final slot = _slotForIndex(
+      provider.currentExerciseIndex,
+      provider: provider,
+    );
     if (slot == null) return const SizedBox.shrink();
 
-    final week = widget.programWeek!;
     final displaySets = week.isDeload
         ? (slot.sets - week.deloadSetReduction).clamp(1, 99)
         : slot.sets;
@@ -1301,8 +1323,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   void _completeSet() {
     final provider = context.read<WorkoutProvider>();
     final currentIdx = provider.currentExerciseIndex;
-    final currentSlot = _slotForIndex(currentIdx);
-    final nextSlot = _slotForIndex(currentIdx + 1);
+    final currentSlot = _slotForIndex(currentIdx, provider: provider);
+    final nextSlot = _slotForIndex(currentIdx + 1, provider: provider);
 
     final set = WorkoutSet(
       weight: _currentWeight,
@@ -1345,14 +1367,21 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       provider.nextExercise();
       _loadLastSessionData();
       // Apply the next slot's rest time so the subsequent rest is correct
-      final newSlot = _slotForIndex(provider.currentExerciseIndex);
+      final newSlot = _slotForIndex(
+        provider.currentExerciseIndex,
+        provider: provider,
+      );
       if (newSlot != null) setState(() => _restSeconds = newSlot.restSeconds);
     } else {
       // Detect if we just finished the last exercise in a superset group.
       // If the group still needs more sets, schedule a return after rest.
       final groupId = currentSlot?.supersetGroupId;
       if (groupId != null) {
-        final groupStart = _supersetGroupStart(currentIdx, groupId);
+        final groupStart = _supersetGroupStart(
+          currentIdx,
+          groupId,
+          provider: provider,
+        );
         if (_supersetNeedsMoreSets(
           startIdx: groupStart,
           endIdx: currentIdx,
@@ -1394,7 +1423,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       final provider = context.read<WorkoutProvider>();
       provider.goToExercise(returnIdx);
       _loadLastSessionData();
-      final slot = _slotForIndex(returnIdx);
+      final slot = _slotForIndex(returnIdx, provider: provider);
       if (slot != null) setState(() => _restSeconds = slot.restSeconds);
     }
 

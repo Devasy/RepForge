@@ -348,6 +348,52 @@ void main() {
         expect(sets.length, equals(1));
       });
 
+      test('persists program context in draft payload', () async {
+        final day = ProgramDay(
+          id: 'day_push',
+          name: 'Push',
+          exercises: [
+            ProgramExerciseSlot(
+              exerciseId: 'bench_press',
+              sets: 4,
+              minReps: 6,
+              maxReps: 10,
+              restSeconds: 120,
+            ),
+          ],
+        );
+        final week = ProgramWeek(
+          weekNumber: 3,
+          isDeload: true,
+          deloadIntensityFactor: 0.9,
+          deloadSetReduction: 1,
+          days: [day],
+        );
+
+        provider.startWorkout(
+          exerciseIds: const ['bench_press'],
+          programDay: day,
+          programWeek: week,
+        );
+        provider.addSet(WorkoutSet(weight: 100, reps: 5));
+
+        await flushAsync();
+
+        final rawDraft = mockStorage.settings[draftKey];
+        expect(rawDraft, isNotNull);
+        final draft = Map<String, dynamic>.from(jsonDecode(rawDraft!) as Map);
+
+        final draftProgramDay = Map<String, dynamic>.from(
+          draft['programDay'] as Map,
+        );
+        final draftProgramWeek = Map<String, dynamic>.from(
+          draft['programWeek'] as Map,
+        );
+
+        expect(draftProgramDay['id'], equals(day.id));
+        expect(draftProgramWeek['weekNumber'], equals(week.weekNumber));
+      });
+
       test('persists currentExerciseIndex when navigating', () async {
         provider.startWorkout(exerciseIds: const ['bench_press', 'squat']);
 
@@ -383,18 +429,53 @@ void main() {
         expect(mockStorage.settings[draftKey], equals(''));
       });
 
+      test(
+        'clear waits for pending draft writes to avoid stale payload',
+        () async {
+          mockStorage.saveSettingDelayResolver = (_, value) {
+            return value.isEmpty
+                ? const Duration(milliseconds: 1)
+                : const Duration(milliseconds: 30);
+          };
+
+          provider.startWorkout(exerciseIds: const ['bench_press']);
+          provider.addSet(WorkoutSet(weight: 80, reps: 8));
+
+          await provider.cancelWorkout();
+          await Future<void>.delayed(const Duration(milliseconds: 80));
+
+          expect(mockStorage.settings[draftKey], equals(''));
+        },
+      );
+
       test('restores draft during init without extra writes', () async {
         final routine = Routine(
           id: 'routine_1',
           name: 'Push Day',
           exerciseIds: const ['bench_press'],
         );
+        final day = ProgramDay(
+          id: 'day_1',
+          name: 'Push',
+          exercises: [
+            ProgramExerciseSlot(
+              exerciseId: 'bench_press',
+              sets: 4,
+              minReps: 6,
+              maxReps: 10,
+              restSeconds: 90,
+            ),
+          ],
+        );
+        final week = ProgramWeek(weekNumber: 1, days: [day]);
         await mockStorage.saveRoutine(routine);
 
         final draft = jsonEncode({
           'schemaVersion': 1,
           'startTime': DateTime(2026, 4, 26, 18, 43, 11).toIso8601String(),
           'routineId': routine.id,
+          'programDay': day.toJson(),
+          'programWeek': week.toJson(),
           'currentExerciseIndex': 0,
           'currentExerciseLogs': [
             ExerciseLog(
@@ -413,6 +494,11 @@ void main() {
 
         expect(restoringProvider.hasActiveWorkout, isTrue);
         expect(restoringProvider.activeRoutine?.id, equals(routine.id));
+        expect(restoringProvider.activeProgramDay?.id, equals(day.id));
+        expect(
+          restoringProvider.activeProgramWeek?.weekNumber,
+          equals(week.weekNumber),
+        );
         expect(restoringProvider.currentExerciseLogs.length, equals(1));
         expect(
           restoringProvider.currentExerciseLogs.first.sets.length,

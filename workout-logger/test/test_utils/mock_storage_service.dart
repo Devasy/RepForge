@@ -24,6 +24,8 @@ class MockStorageService implements IStorageService {
   bool saveCustomExerciseCalled = false;
   Exercise? lastSavedExercise;
   int saveSettingCallCount = 0;
+  Duration saveSettingDelay = Duration.zero;
+  Duration Function(String key, String value)? saveSettingDelayResolver;
 
   // Public getters for test assertions
   List<Exercise> get customExercises => _customExercises;
@@ -223,6 +225,11 @@ class MockStorageService implements IStorageService {
 
   @override
   Future<void> saveSetting(String key, String value) async {
+    final delay =
+        saveSettingDelayResolver?.call(key, value) ?? saveSettingDelay;
+    if (delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+    }
     saveSettingCallCount++;
     _settings[key] = value;
   }
