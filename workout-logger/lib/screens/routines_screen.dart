@@ -107,7 +107,7 @@ class _RoutinesTab extends StatelessWidget {
           ),
         ],
       ),
-    ).then((_) => controller.dispose());
+    );
   }
 
   Widget _buildRoutineList(
@@ -313,7 +313,7 @@ class _RoutineCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
   void _confirmDelete(BuildContext context) {
