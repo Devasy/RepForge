@@ -31,19 +31,26 @@ RepForge is a comprehensive workout logging application built with Flutter that 
 
 ## 📦 Installation
 
-The release APK is available at:
+The release APKs are available in:
 ```
-build/app/outputs/flutter-apk/app-release.apk
+build/app/outputs/flutter-apk/
 ```
 
-Simply transfer this APK to your Android device and install it.
+Choose the APK that matches your device architecture:
+- `app-arm64-v8a-release.apk`
+- `app-armeabi-v7a-release.apk`
+- `app-x86_64-release.apk`
+
+Transfer the correct APK to your Android device and install it.
 
 ## 🏗️ Building from Source
 
 1. Ensure you have Flutter installed
 2. Clone this repository
 3. Run `flutter pub get` to install dependencies
-4. Run `flutter build apk --release` to build the production APK
+4. Run `flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/debug-info` to build smaller, architecture-specific production APKs
+
+Keep `build/debug-info/` safe for deobfuscating production crash stack traces.
 
 ## 📄 License
 

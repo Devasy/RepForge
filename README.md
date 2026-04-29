@@ -66,9 +66,15 @@ Want to take RepForge for a spin or contribute? Follow these steps to build the 
 ### Building for Production
 To build a release APK for Android:
 ```bash
-flutter build apk --release
+flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/debug-info
 ```
-The APK will be available in `build/app/outputs/flutter-apk/app-release.apk`.
+This generates smaller APKs in `build/app/outputs/flutter-apk/`:
+- `app-arm64-v8a-release.apk`
+- `app-armeabi-v7a-release.apk`
+- `app-x86_64-release.apk`
+
+It also writes Dart symbol files to `build/debug-info/`.
+Keep this directory for deobfuscating crash stack traces.
 
 ---
 

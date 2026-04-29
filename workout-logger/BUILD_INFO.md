@@ -3,7 +3,7 @@
 ## Build Details
 - **Build Date:** January 22, 2026
 - **Build Type:** Release APK
-- **Build Location:** build/app/outputs/flutter-apk/app-release.apk
+- **Build Location:** build/app/outputs/flutter-apk/
 - **APK Size:** 47.4 MB
 
 ## App Configuration
@@ -27,7 +27,7 @@
 - **Target SDK:** Android (as configured by Flutter)
 - **Min SDK:** As configured by Flutter
 - **Compile SDK:** As configured by Flutter
-- **Architecture:** Universal APK (supports all architectures)
+- **Architecture:** Split APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`)
 
 ## Next Steps
 1. Transfer the APK to your Android device

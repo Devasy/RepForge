@@ -9,13 +9,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 
-const String _appVersion = '1.0.12';
 const String _createdBy = 'Devasy Patel';
 
 class ProfileScreen extends StatefulWidget {
@@ -29,6 +29,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isExporting = false;
   bool _isImporting = false;
   bool _isBackingUp = false;
+  String _appVersion = '--';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _appVersion = info.version);
+    } catch (_) {
+      // Keep fallback '--' if package info is unavailable.
+    }
+  }
 
   // ==================== Data Actions ====================
 

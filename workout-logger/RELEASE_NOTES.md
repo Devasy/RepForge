@@ -21,17 +21,21 @@ Your workout logging app has been successfully built and configured with the fol
 
 ### 📦 Build Artifacts
 
-#### Main Release APK
+#### Release APKs (Split by ABI)
 - **Location:** `RepForge-v1.0.0-release.apk` (root directory)
 - **Size:** 47.4 MB
-- **Type:** Universal APK (all architectures)
-- **Also available at:** `build/app/outputs/flutter-apk/app-release.apk`
+- **Type:** Architecture-specific APKs (smaller size)
+- **Available at:** `build/app/outputs/flutter-apk/`
+- **Files:**
+   - `app-arm64-v8a-release.apk`
+   - `app-armeabi-v7a-release.apk`
+   - `app-x86_64-release.apk`
 
 ### 🚀 Installation Instructions
 
 1. **Transfer the APK** to your Android device:
    - Use USB cable, email, cloud storage, or any file transfer method
-   - File to transfer: `RepForge-v1.0.0-release.apk`
+   - File to transfer: Choose the APK matching your device architecture
 
 2. **Enable Installation from Unknown Sources** (if needed):
    - Go to Settings → Security

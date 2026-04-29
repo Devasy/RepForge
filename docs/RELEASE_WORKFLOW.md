@@ -1,14 +1,20 @@
 # Automated Release Workflow
 
-This repository uses GitHub Actions to automatically create releases when PRs are merged to the `main` branch.
+This repository uses GitHub Actions to automatically create releases when PRs are merged to the `main` branch and run scheduled production builds.
+
+## ⏰ Scheduled Builds
+
+- A scheduled build runs daily at `03:00 UTC`.
+- Scheduled runs build split, obfuscated APKs and upload them as workflow artifacts.
+- Scheduled runs do not bump version or publish a GitHub Release.
 
 ## 🚀 How It Works
 
 1. **PR Merge**: When a pull request is merged to `main`, the workflow triggers automatically
 2. **Version Bump**: The script increments the patch version and build number in `pubspec.yaml`
 3. **Commit & Tag**: Changes are committed and a new git tag is created (e.g., `v1.0.3`)
-4. **Build APK**: Flutter builds a release APK for Android
-5. **Create Release**: A GitHub release is created with the APK attached
+4. **Build APKs**: Flutter builds split, obfuscated release APKs (`--split-per-abi --obfuscate --split-debug-info`)
+5. **Create Release**: A GitHub release is created with all ABI APKs and the symbol archive attached
 
 ## 📋 Version Bumping Strategy
 
@@ -65,16 +71,26 @@ To trigger your first automated release:
 
 4. Check the **Actions** tab to see the workflow running
 
-5. Once complete, check the **Releases** section for your new release with APK
+5. Once complete, check the **Releases** section for your new release with split APKs
+
+For scheduled runs, download APKs from the **Actions run artifacts** section.
 
 ## 📱 Installing the APK
 
 After each release:
 1. Go to **Releases** in your GitHub repository
-2. Download the latest `repforge-vX.X.X.apk` file
-3. Transfer to your Android device
+2. Download the latest APK matching your device ABI:
+       - `repforge-vX.X.X-arm64-v8a.apk` (most modern Android phones)
+       - `repforge-vX.X.X-armeabi-v7a.apk` (older 32-bit ARM phones)
+       - `repforge-vX.X.X-x86_64.apk` (emulators/Intel targets)
+3. Transfer the selected APK to your Android device
 4. Enable "Install from unknown sources" in Android settings
 5. Install the APK
+
+### 🧭 Symbol Files (Important)
+
+Each release also includes `repforge-vX.X.X-symbols.tar.gz`.
+Keep this file private and store it safely. It is required to deobfuscate Dart stack traces from crash reports.
 
 ## 🔐 Production Signing (Recommended)
 
@@ -127,10 +143,10 @@ The workflow will still increment from whatever version you set.
 - Check that workflow permissions are set to "Read and write"
 - Verify branch protection settings allow `github-actions[bot]` to push
 
-### APK not attached to release
+### APKs not attached to release
 - Check the workflow logs in the Actions tab
 - Verify the build step completed successfully
-- Ensure the APK path in the workflow matches the actual build output
+- Ensure the APK glob path in the workflow matches the actual build output
 
 ### Version not bumping
 - Check that `scripts/bump_version.dart` has execute permissions
@@ -158,11 +174,11 @@ Commit & push version change
        ↓
 Create git tag (v1.0.3)
        ↓
-Build release APK
+Build obfuscated APKs (split per ABI)
        ↓
 Create GitHub Release
        ↓
-Upload APK to release
+Upload APKs + symbol archive to release
        ↓
 ✅ Done!
 ```

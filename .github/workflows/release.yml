@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Runs every day at 03:00 UTC
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 jobs:
@@ -115,25 +118,38 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: Build APK
+      - name: Build APKs (split per ABI + obfuscation)
         working-directory: ./workout-logger
-        run: flutter build apk --release
-
-      - name: Rename APK
         run: |
-          mv workout-logger/build/app/outputs/flutter-apk/app-release.apk \
-             workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}.apk
+          SYMBOLS_DIR="build/debug-info/${{ steps.version.outputs.value }}"
+          mkdir -p "$SYMBOLS_DIR"
+          flutter build apk --release --split-per-abi --obfuscate --split-debug-info="$SYMBOLS_DIR"
+
+      - name: Rename APKs
+        run: |
+          APK_DIR="workout-logger/build/app/outputs/flutter-apk"
+          for ABI in armeabi-v7a arm64-v8a x86_64; do
+            mv "${APK_DIR}/app-${ABI}-release.apk" \
+               "${APK_DIR}/repforge-v${{ steps.version.outputs.value }}-${ABI}.apk"
+          done
+
+      - name: Archive obfuscation symbols
+        run: |
+          SYMBOLS_DIR="workout-logger/build/debug-info/${{ steps.version.outputs.value }}"
+          tar -czf "workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}-symbols.tar.gz" -C "$SYMBOLS_DIR" .
 
       - name: Sanitize ref name for artifact
         id: sanitize_ref
         run: echo "ref_name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> $GITHUB_OUTPUT
 
-      - name: Upload APK artifact (manual run)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Upload APK artifact (manual/scheduled run)
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         uses: actions/upload-artifact@v4
         with:
           name: repforge-v${{ steps.version.outputs.value }}-${{ steps.sanitize_ref.outputs.ref_name }}
-          path: workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}.apk
+          path: |
+            workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}-*.apk
+            workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}-symbols.tar.gz
           retention-days: 7
 
       - name: Create GitHub Release
@@ -146,7 +162,12 @@ jobs:
             ## RepForge v${{ steps.version.outputs.value }}
 
             ### 📱 Download
-            Download the APK file below to install on your Android device.
+            Download the APK that matches your device ABI:
+            - `arm64-v8a` for most modern Android devices
+            - `armeabi-v7a` for older 32-bit ARM devices
+            - `x86_64` for emulators/Intel-based targets
+
+            Also attached: `repforge-v${{ steps.version.outputs.value }}-symbols.tar.gz` for deobfuscating stack traces in crash reports.
 
             ### 🔀 Merged Pull Requests
             ${{ steps.merged_prs.outputs.list }}
@@ -156,7 +177,8 @@ jobs:
             - **Build Date**: ${{ github.event.head_commit.timestamp }}
             - **Commit**: ${{ github.sha }}
           files: |
-            workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}.apk
+            workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}-*.apk
+            workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}-symbols.tar.gz
           draft: false
           prerelease: false
         env:
