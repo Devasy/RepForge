@@ -234,9 +234,9 @@ class _RoutineCard extends StatelessWidget {
     );
   }
 
-  void _showRoutineOptions(BuildContext context) {
+  void _showRoutineOptions(BuildContext parentContext) {
     showModalBottomSheet(
-      context: context,
+      context: parentContext,
       backgroundColor: AppTheme.cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -252,7 +252,7 @@ class _RoutineCard extends StatelessWidget {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
-                  context,
+                  parentContext,
                   MaterialPageRoute(
                     builder: (_) => CreateRoutineScreen(routine: routine),
                   ),
@@ -264,7 +264,7 @@ class _RoutineCard extends StatelessWidget {
               title: const Text('Clone Routine'),
               onTap: () {
                 Navigator.pop(context);
-                _showCloneDialog(context);
+                _showCloneDialog(parentContext);
               },
             ),
             ListTile(
@@ -275,7 +275,7 @@ class _RoutineCard extends StatelessWidget {
               ),
               onTap: () {
                 Navigator.pop(context);
-                _confirmDelete(context);
+                _confirmDelete(parentContext);
               },
             ),
           ],
@@ -289,7 +289,7 @@ class _RoutineCard extends StatelessWidget {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Clone Routine'),
         content: TextField(
           controller: controller,
@@ -298,15 +298,20 @@ class _RoutineCard extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               final newName = controller.text.trim();
               if (newName.isNotEmpty) {
-                provider.createRoutine(newName, routine.exerciseIds);
-                Navigator.pop(context);
+                await provider.createRoutine(
+                  newName,
+                  List.from(routine.exerciseIds),
+                );
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
               }
             },
             child: const Text('Clone'),
