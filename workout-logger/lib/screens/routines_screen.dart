@@ -107,7 +107,7 @@ class _RoutinesTab extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
   Widget _buildRoutineList(
@@ -260,6 +260,14 @@ class _RoutineCard extends StatelessWidget {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.copy),
+              title: const Text('Clone Routine'),
+              onTap: () {
+                Navigator.pop(context);
+                _showCloneDialog(context);
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.delete, color: AppTheme.error),
               title: const Text(
                 'Delete Routine',
@@ -272,6 +280,38 @@ class _RoutineCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showCloneDialog(BuildContext context) {
+    final controller = TextEditingController(text: routine.name);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clone Routine'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'New Routine Name'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final newName = controller.text.trim();
+              if (newName.isNotEmpty) {
+                provider.createRoutine(newName, routine.exerciseIds);
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Clone'),
+          ),
+        ],
       ),
     );
   }
