@@ -22,6 +22,7 @@ import '../models/models.dart';
 import '../data/exercise_database.dart';
 import 'interfaces/storage_service_interface.dart';
 import 'interfaces/ml_service_interface.dart';
+import 'interfaces/health_connect_service_interface.dart';
 import 'ml_service.dart';
 import 'strategies/target_calculator.dart';
 import 'managers/program_manager.dart';
@@ -36,6 +37,7 @@ class WorkoutInProgressError extends StateError {
 class WorkoutProvider extends ChangeNotifier {
   final IStorageService _storage;
   final IMLService _mlService;
+  final IHealthConnectService? _healthConnect;
   final Uuid _uuid = const Uuid();
 
   // State
@@ -86,8 +88,10 @@ class WorkoutProvider extends ChangeNotifier {
   WorkoutProvider(
     this._storage, {
     IMLService? mlService,
+    IHealthConnectService? healthConnectService,
     required this.programManager,
-  }) : _mlService = mlService ?? MLService();
+  })  : _mlService = mlService ?? MLService(),
+        _healthConnect = healthConnectService;
 
   // ==================== INITIALIZATION ====================
 
@@ -585,6 +589,15 @@ class WorkoutProvider extends ChangeNotifier {
     await _storage.saveWorkoutSession(session);
     await _clearDraft();
     _sessions.insert(0, session);
+
+    // Fire-and-forget Health Connect sync if enabled
+    final hcEnabled = await _storage.getSetting('healthConnectEnabled');
+    if (hcEnabled == 'true' && _healthConnect != null) {
+      _healthConnect.syncWorkoutSession(session).catchError((e) {
+        debugPrint('Health Connect sync error: $e');
+        return false;
+      });
+    }
 
     // Update growth models for performed exercises
     for (var log in completedExercises) {

@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../services/api_service.dart';
+import '../services/interfaces/health_connect_service_interface.dart';
 import '../theme/app_theme.dart';
 
 const String _appVersion = '1.0.12';
@@ -29,6 +30,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isExporting = false;
   bool _isImporting = false;
   bool _isBackingUp = false;
+  bool _isRequestingHcPermission = false;
+
+  Future<void> _requestHealthConnectPermission() async {
+    setState(() => _isRequestingHcPermission = true);
+    try {
+      final hc = context.read<IHealthConnectService>();
+      final available = await hc.isAvailable();
+      if (!available) {
+        if (mounted) _showSnack('Health Connect is not available on this device.', AppTheme.error);
+        return;
+      }
+      final granted = await hc.requestPermissions();
+      if (!mounted) return;
+      if (granted) {
+        final settings = context.read<SettingsProvider>();
+        await settings.setHealthConnectEnabled(true);
+        _showSnack('Health Connect connected!', AppTheme.success);
+      } else {
+        _showSnack('Permission denied. Grant it in Health Connect settings.', AppTheme.warning);
+      }
+    } catch (e) {
+      if (mounted) _showSnack('Could not connect to Health Connect.', AppTheme.error);
+    } finally {
+      if (mounted) setState(() => _isRequestingHcPermission = false);
+    }
+  }
 
   // ==================== Data Actions ====================
 
@@ -168,6 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _buildPreferencesSection(settings),
+                const SizedBox(height: AppSpacing.lg),
+                _buildHealthConnectSection(settings),
                 const SizedBox(height: AppSpacing.lg),
                 _buildDataSection(),
                 const SizedBox(height: AppSpacing.lg),
@@ -312,6 +341,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
               );
             }).toList(),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== Health Connect ====================
+
+  Widget _buildHealthConnectSection(SettingsProvider settings) {
+    final enabled = settings.healthConnectEnabled;
+    return _ProfileSection(
+      icon: Icons.monitor_heart_outlined,
+      iconColor: const Color(0xFF00BFA5),
+      title: 'Health Connect',
+      subtitle: 'Sync workouts to Android Health Connect',
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sync workouts after finishing',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Writes session + per-set reps to Health Connect',
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: enabled,
+                onChanged: _isRequestingHcPermission
+                    ? null
+                    : (value) async {
+                        if (value) {
+                          await _requestHealthConnectPermission();
+                        } else {
+                          await settings.setHealthConnectEnabled(false);
+                        }
+                      },
+                activeThumbColor: const Color(0xFF00BFA5),
+                activeTrackColor: const Color(0xFF00BFA5).withValues(alpha: 0.4),
+              ),
+            ],
+          ),
+          if (enabled) ...[
+            const SizedBox(height: AppSpacing.sm),
+            const Divider(color: AppTheme.surfaceColor, height: 1),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                const Icon(Icons.check_circle_outline,
+                    color: Color(0xFF00BFA5), size: 16),
+                const SizedBox(width: 8),
+                const Text(
+                  'Connected — syncing after each workout',
+                  style: TextStyle(
+                    color: Color(0xFF00BFA5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

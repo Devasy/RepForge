@@ -9,8 +9,10 @@ import 'package:provider/provider.dart';
 
 import 'services/storage_service.dart';
 import 'services/ml_service.dart';
+import 'services/health_connect_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
+import 'services/interfaces/health_connect_service_interface.dart';
 import 'services/workout_provider.dart';
 import 'services/settings_provider.dart';
 import 'services/api_service.dart';
@@ -45,6 +47,7 @@ class WorkoutLoggerApp extends StatelessWidget {
   // This ensures the same instances are used throughout the app lifecycle
   static final IStorageService _storageService = StorageService();
   static final IMLService _mlService = MLService();
+  static final IHealthConnectService _healthConnectService = HealthConnectService();
   static final ProgramManager _programManager = ProgramManager(_storageService);
   static final SettingsProvider _settingsProvider = SettingsProvider(_storageService);
 
@@ -61,6 +64,7 @@ class WorkoutLoggerApp extends StatelessWidget {
         Provider<IStorageService>.value(value: _storageService),
         // Provide the ML service interface for direct access if needed
         Provider<IMLService>.value(value: _mlService),
+        Provider<IHealthConnectService>.value(value: _healthConnectService),
         // Provide the ApiService singleton via DI
         Provider<ApiService>.value(value: ApiService()),
         // ProgramManager passed to tree directly
@@ -72,6 +76,7 @@ class WorkoutLoggerApp extends StatelessWidget {
           create: (_) => WorkoutProvider(
             _storageService,
             mlService: _mlService,
+            healthConnectService: _healthConnectService,
             programManager: _programManager,
           ),
         ),
