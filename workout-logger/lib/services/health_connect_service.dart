@@ -94,7 +94,7 @@ class HealthConnectService implements IHealthConnectService {
   }
 
   @override
-  Future<bool> syncWorkoutSession(WorkoutSession session) async {
+  Future<bool> syncWorkoutSession(WorkoutSession session, {String? title}) async {
     try {
       _connector ??= await HealthConnector.create();
 
@@ -108,6 +108,7 @@ class HealthConnectService implements IHealthConnectService {
         endTime: sessionEnd,
         exerciseType: ExerciseType.strengthTraining,
         metadata: Metadata.manualEntry(),
+        title: title?.isNotEmpty == true ? title : null,
         notes: session.notes?.isNotEmpty == true ? session.notes : null,
         events: segments,
       );

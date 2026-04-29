@@ -41,14 +41,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) _showSnack('Health Connect is not available on this device.', AppTheme.error);
         return;
       }
-      final granted = await hc.requestPermissions();
+
+      // Check if permissions were already granted (e.g. via HC settings).
+      bool granted = await hc.hasPermissions();
+
+      if (!granted) {
+        // Try to show the in-app permission dialog.
+        try {
+          granted = await hc.requestPermissions();
+        } catch (_) {
+          // requestPermissions can fail if the plugin loses its activity reference
+          // during the async gap (known issue with health_connector on some devices).
+          // Re-check hasPermissions in case the user already granted via HC settings.
+          granted = await hc.hasPermissions();
+        }
+      }
+
       if (!mounted) return;
       if (granted) {
         final settings = context.read<SettingsProvider>();
         await settings.setHealthConnectEnabled(true);
         _showSnack('Health Connect connected!', AppTheme.success);
       } else {
-        _showSnack('Permission denied. Grant it in Health Connect settings.', AppTheme.warning);
+        _showSnack(
+          'Open Health Connect → App permissions → RepForge and enable Exercise.',
+          AppTheme.warning,
+        );
       }
     } catch (e) {
       if (mounted) _showSnack('Could not connect to Health Connect.', AppTheme.error);
