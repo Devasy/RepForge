@@ -123,14 +123,10 @@ void main() {
       hc = _MockHcService(shouldThrow: true);
       final manager = HealthSyncManager(hc, settings);
 
-      // Must complete without throwing
-      expect(
-        () async {
-          manager.syncSession(_makeSession());
-          await Future<void>.delayed(Duration.zero);
-        },
-        returnsNormally,
-      );
+      // Must complete without throwing — just run and let test fail on exception.
+      manager.syncSession(_makeSession());
+      await Future<void>.delayed(Duration.zero);
+      // If we reach here, no exception propagated.
     });
   });
 }
