@@ -153,12 +153,16 @@ class HealthConnectService implements IHealthConnectService {
     // Sort by recorded timestamp so segments follow real workout order.
     allSets.sort((a, b) => a.$3.compareTo(b.$3));
 
-    // Check whether timestamps are meaningful: if every set has the exact same
-    // timestamp it almost certainly means they were created with DateTime.now()
-    // at the same instant (legacy data or unit-test stubs).  In that case fall
-    // back to the original even-distribution algorithm.
-    final allSameTimestamp = allSets.every((s) => s.$3 == allSets.first.$3);
-    if (allSameTimestamp) {
+    // Fall back to evenly-spaced distribution whenever timestamps are not fully
+    // unique.  Duplicate timestamps arise when:
+    //   • All sets share the same instant (legacy data / unit-test stubs).
+    //   • Two or more sets were logged within the same DateTime resolution tick
+    //     (common on devices where DateTime.now() resolution is ~1 ms).
+    // In either case the real-timestamp path would produce overlapping or
+    // zero-duration segments, which ExerciseSessionRecord's constructor rejects
+    // with an ArgumentError, silently aborting the sync.
+    final uniqueTimestamps = allSets.map((s) => s.$3).toSet();
+    if (uniqueTimestamps.length < allSets.length) {
       final totalMs = sessionEnd.difference(sessionStart).inMilliseconds;
       final slotMs = totalMs ~/ allSets.length;
       return List.generate(allSets.length, (i) {

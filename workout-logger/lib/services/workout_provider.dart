@@ -592,7 +592,7 @@ class WorkoutProvider extends ChangeNotifier {
       // Delegate persistence + HC sync to HistoryManager.
       await _historyManager.addSession(
         session,
-        routineName: _activeRoutine?.name,
+        routineName: _activeRoutine?.name ?? _activeProgramDay?.name,
       );
     } else {
       // Fallback: persist directly (no HC sync) when historyManager is absent.
