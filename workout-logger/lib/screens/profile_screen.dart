@@ -10,13 +10,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 
+import 'package:package_info_plus/package_info_plus.dart';
+
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../services/api_service.dart';
 import '../services/interfaces/health_connect_service_interface.dart';
 import '../theme/app_theme.dart';
 
-const String _appVersion = '1.0.12';
 const String _createdBy = 'Devasy Patel';
 
 class ProfileScreen extends StatefulWidget {
@@ -32,11 +33,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isImporting = false;
   bool _isBackingUp = false;
   bool _isRequestingHcPermission = false;
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() => _appVersion = info.version);
+    });
     // Reconcile stored HC flag against runtime state on screen load.
     WidgetsBinding.instance.addPostFrameCallback((_) => _reconcileHealthConnectState());
   }
