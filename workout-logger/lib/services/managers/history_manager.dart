@@ -83,13 +83,15 @@ class HistoryManager extends ChangeNotifier {
   }
 
   // Called by HealthSyncManager on successful sync.
-  // Patches the in-memory session and re-persists it.
+  // Merges only hcSyncedAt into the current in-memory session so that any
+  // edits made between sync being triggered and this callback firing are not
+  // overwritten, then re-persists.
   void _onHcSynced(WorkoutSession updated) {
     final index = _sessions.indexWhere((s) => s.id == updated.id);
     if (index == -1) return;
-    _sessions[index] = updated;
-    // Re-persist so hcSyncedAt survives app restarts.
-    _storage.saveWorkoutSession(updated).catchError((Object e) {
+    final merged = _sessions[index].copyWith(hcSyncedAt: updated.hcSyncedAt);
+    _sessions[index] = merged;
+    _storage.saveWorkoutSession(merged).catchError((Object e) {
       debugPrint('HistoryManager: failed to persist hcSyncedAt: $e');
     });
     notifyListeners();

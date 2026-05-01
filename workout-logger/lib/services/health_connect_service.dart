@@ -153,63 +153,57 @@ class HealthConnectService implements IHealthConnectService {
     // Sort by recorded timestamp so segments follow real workout order.
     allSets.sort((a, b) => a.$3.compareTo(b.$3));
 
-    // Fall back to evenly-spaced distribution whenever timestamps are not fully
-    // unique.  Duplicate timestamps arise when:
+    // Clamp all set timestamps to [sessionStart, sessionEnd] before the
+    // uniqueness check.  Without this, timestamps recorded after the session
+    // window ends (e.g. the last set logged slightly past the stored duration)
+    // all collapse to sessionEnd after clamping in the segment-build loop,
+    // producing zero-duration segments that Health Connect rejects silently.
+    final clampedSets = allSets
+        .map((s) {
+          var ts = s.$3;
+          if (ts.isBefore(sessionStart)) ts = sessionStart;
+          if (ts.isAfter(sessionEnd)) ts = sessionEnd;
+          return (s.$1, s.$2, ts);
+        })
+        .toList();
+
+    // Fall back to evenly-spaced distribution whenever clamped timestamps are
+    // not fully unique.  Duplicate timestamps arise when:
     //   • All sets share the same instant (legacy data / unit-test stubs).
     //   • Two or more sets were logged within the same DateTime resolution tick
     //     (common on devices where DateTime.now() resolution is ~1 ms).
-    // In either case the real-timestamp path would produce overlapping or
+    //   • One or more timestamps were clamped to the same boundary value.
+    // In any of these cases the real-timestamp path would produce overlapping or
     // zero-duration segments, which ExerciseSessionRecord's constructor rejects
     // with an ArgumentError, silently aborting the sync.
-    final uniqueTimestamps = allSets.map((s) => s.$3).toSet();
-    if (uniqueTimestamps.length < allSets.length) {
+    final uniqueTimestamps = clampedSets.map((s) => s.$3).toSet();
+    if (uniqueTimestamps.length < clampedSets.length) {
       final totalMs = sessionEnd.difference(sessionStart).inMilliseconds;
-      final slotMs = totalMs ~/ allSets.length;
-      return List.generate(allSets.length, (i) {
+      final slotMs = totalMs ~/ clampedSets.length;
+      return List.generate(clampedSets.length, (i) {
         final start = sessionStart.add(Duration(milliseconds: slotMs * i));
-        final end = i < allSets.length - 1
+        final end = i < clampedSets.length - 1
             ? sessionStart.add(Duration(milliseconds: slotMs * (i + 1)))
             : sessionEnd;
         return ExerciseSessionSegmentEvent(
           startTime: start,
           endTime: end,
-          segmentType: allSets[i].$1,
-          repetitions: allSets[i].$2,
+          segmentType: clampedSets[i].$1,
+          repetitions: clampedSets[i].$2,
         );
       });
     }
 
-    // Build segments using real timestamps.
-    // Each segment's startTime is the set's timestamp clamped to [sessionStart, sessionEnd].
-    // endTime is the next set's timestamp (or sessionEnd for the last set),
-    // clamped so start <= end <= sessionEnd.
+    // Build segments using clamped timestamps (already within [sessionStart, sessionEnd]).
     final segments = <ExerciseSessionSegmentEvent>[];
-    for (var i = 0; i < allSets.length; i++) {
-      final rawStart = allSets[i].$3;
-      final start = rawStart.isBefore(sessionStart)
-          ? sessionStart
-          : rawStart.isAfter(sessionEnd)
-              ? sessionEnd
-              : rawStart;
-
-      final DateTime rawEnd;
-      if (i < allSets.length - 1) {
-        rawEnd = allSets[i + 1].$3;
-      } else {
-        rawEnd = sessionEnd;
-      }
-      // Clamp: end must be >= start and <= sessionEnd.
-      final end = rawEnd.isBefore(start)
-          ? start
-          : rawEnd.isAfter(sessionEnd)
-              ? sessionEnd
-              : rawEnd;
-
+    for (var i = 0; i < clampedSets.length; i++) {
+      final start = clampedSets[i].$3;
+      final end = i < clampedSets.length - 1 ? clampedSets[i + 1].$3 : sessionEnd;
       segments.add(ExerciseSessionSegmentEvent(
         startTime: start,
         endTime: end,
-        segmentType: allSets[i].$1,
-        repetitions: allSets[i].$2,
+        segmentType: clampedSets[i].$1,
+        repetitions: clampedSets[i].$2,
       ));
     }
     return segments;
