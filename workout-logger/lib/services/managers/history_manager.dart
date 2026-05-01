@@ -186,6 +186,27 @@ class HistoryManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Cache-only mutations (no storage I/O) ─────────────────────────────────
+  // Called by WorkoutProvider after it has already handled storage, so that
+  // HistoryManager's in-memory list stays in sync without a double-write.
+
+  /// Remove a session from the in-memory list without touching storage.
+  void evictSession(String sessionId) {
+    final index = _sessions.indexWhere((s) => s.id == sessionId);
+    if (index == -1) return;
+    _sessions = List.from(_sessions)..removeAt(index);
+    notifyListeners();
+  }
+
+  /// Replace a session in the in-memory list without touching storage.
+  void patchSession(WorkoutSession updated) {
+    final index = _sessions.indexWhere((s) => s.id == updated.id);
+    if (index == -1) return;
+    _sessions = List.from(_sessions)..[index] = updated;
+    _sessions.sort((a, b) => b.date.compareTo(a.date));
+    notifyListeners();
+  }
+
   /// Get last session containing a specific exercise
   ExerciseLog? getLastSessionForExercise(String exerciseId) {
     for (var session in _sessions) {

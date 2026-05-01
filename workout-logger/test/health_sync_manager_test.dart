@@ -1,6 +1,5 @@
 // Unit tests for HealthSyncManager
 
-import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
