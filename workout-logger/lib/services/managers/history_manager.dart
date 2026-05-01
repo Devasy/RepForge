@@ -5,12 +5,15 @@
 // - Loading/saving workout sessions
 // - Updating and deleting sessions
 // - Querying session history
+// - Triggering Health Connect sync after a new session is persisted
+//   (via the optional IHealthSyncManager dependency).
 //
 // It does NOT handle active workout state or analytics calculations.
 
 import 'package:flutter/foundation.dart';
 import '../../models/models.dart';
 import '../interfaces/storage_service_interface.dart';
+import '../interfaces/health_sync_manager_interface.dart';
 
 /// Manages workout session history.
 ///
@@ -18,13 +21,18 @@ import '../interfaces/storage_service_interface.dart';
 /// historical session data, not active workouts or analytics.
 class HistoryManager extends ChangeNotifier {
   final IStorageService _storage;
+  final IHealthSyncManager? _healthSync;
 
   List<WorkoutSession> _sessions = [];
 
   // Callback for when sessions change (to notify other managers like AnalyticsManager)
   final void Function(Set<String> affectedExerciseIds)? onSessionsChanged;
 
-  HistoryManager(this._storage, {this.onSessionsChanged});
+  HistoryManager(
+    this._storage, {
+    IHealthSyncManager? healthSyncManager,
+    this.onSessionsChanged,
+  }) : _healthSync = healthSyncManager;
 
   // Getters
   List<WorkoutSession> get sessions => List.unmodifiable(_sessions);
@@ -38,14 +46,54 @@ class HistoryManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Add a new session to history
+  /// Add a new session to history.
   ///
-  /// Persists the session to storage and updates in-memory state.
-  Future<void> addSession(WorkoutSession session) async {
+  /// Persists the session, updates in-memory state, then triggers a
+  /// best-effort Health Connect sync if [healthSyncManager] is provided.
+  /// [routineName] is forwarded as the HC exercise session title.
+  Future<void> addSession(
+    WorkoutSession session, {
+    String? routineName,
+  }) async {
     _sessions.insert(0, session);
+    await _storage.saveWorkoutSession(session);
+
     final exerciseIds = session.exercises.map((e) => e.exerciseId).toSet();
     onSessionsChanged?.call(exerciseIds);
-    await _storage.saveWorkoutSession(session);
+    notifyListeners();
+
+    // Fire-and-forget HC sync — runs after UI is already updated.
+    _healthSync?.syncSession(
+      session,
+      routineName: routineName,
+      onSynced: _onHcSynced,
+    );
+  }
+
+  /// Manually trigger a Health Connect sync for an existing session.
+  ///
+  /// Called from the ⋮ menu in the history UI when a session is unsynced.
+  /// No-op when [healthSyncManager] was not provided.
+  void syncSession(WorkoutSession session, {String? routineName}) {
+    _healthSync?.syncSession(
+      session,
+      routineName: routineName,
+      onSynced: _onHcSynced,
+    );
+  }
+
+  // Called by HealthSyncManager on successful sync.
+  // Merges only hcSyncedAt into the current in-memory session so that any
+  // edits made between sync being triggered and this callback firing are not
+  // overwritten, then re-persists.
+  void _onHcSynced(WorkoutSession updated) {
+    final index = _sessions.indexWhere((s) => s.id == updated.id);
+    if (index == -1) return;
+    final merged = _sessions[index].copyWith(hcSyncedAt: updated.hcSyncedAt);
+    _sessions[index] = merged;
+    _storage.saveWorkoutSession(merged).catchError((Object e) {
+      debugPrint('HistoryManager: failed to persist hcSyncedAt: $e');
+    });
     notifyListeners();
   }
 
@@ -137,6 +185,27 @@ class HistoryManager extends ChangeNotifier {
     _sessions.sort((a, b) => b.date.compareTo(a.date));
 
     onSessionsChanged?.call(allAffectedExerciseIds);
+    notifyListeners();
+  }
+
+  // ── Cache-only mutations (no storage I/O) ─────────────────────────────────
+  // Called by WorkoutProvider after it has already handled storage, so that
+  // HistoryManager's in-memory list stays in sync without a double-write.
+
+  /// Remove a session from the in-memory list without touching storage.
+  void evictSession(String sessionId) {
+    final index = _sessions.indexWhere((s) => s.id == sessionId);
+    if (index == -1) return;
+    _sessions = List.from(_sessions)..removeAt(index);
+    notifyListeners();
+  }
+
+  /// Replace a session in the in-memory list without touching storage.
+  void patchSession(WorkoutSession updated) {
+    final index = _sessions.indexWhere((s) => s.id == updated.id);
+    if (index == -1) return;
+    _sessions = List.from(_sessions)..[index] = updated;
+    _sessions.sort((a, b) => b.date.compareTo(a.date));
     notifyListeners();
   }
 

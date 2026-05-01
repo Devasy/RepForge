@@ -24,7 +24,11 @@ android {
         applicationId = "com.devasy.repforge"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // MIGRATION NOTE: minSdk is intentionally set to 26 (Android 8.0 Oreo).
+        // Health Connect requires API 26+. Devices running API <26 are no longer
+        // supported. If downgrading, remove the health_connector dependency and
+        // all HealthConnectService usages, then restore minSdk to flutter.minSdkVersion.
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

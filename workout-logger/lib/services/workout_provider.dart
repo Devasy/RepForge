@@ -25,6 +25,7 @@ import 'interfaces/ml_service_interface.dart';
 import 'ml_service.dart';
 import 'strategies/target_calculator.dart';
 import 'managers/program_manager.dart';
+import 'managers/history_manager.dart';
 import 'utils/exercise_history.dart';
 
 enum StartWorkoutConflictAction { resume, discardAndStart, cancel }
@@ -36,6 +37,7 @@ class WorkoutInProgressError extends StateError {
 class WorkoutProvider extends ChangeNotifier {
   final IStorageService _storage;
   final IMLService _mlService;
+  final HistoryManager? _historyManager;
   final Uuid _uuid = const Uuid();
 
   // State
@@ -83,11 +85,15 @@ class WorkoutProvider extends ChangeNotifier {
   /// Following Dependency Inversion Principle: accepts abstractions
   /// rather than concrete implementations. [programManager] defaults to a
   /// new ProgramManager backed by the same storage if not provided.
+  /// [historyManager] is optional; when provided, session persistence and
+  /// Health Connect sync are delegated to it rather than handled inline.
   WorkoutProvider(
     this._storage, {
     IMLService? mlService,
+    HistoryManager? historyManager,
     required this.programManager,
-  }) : _mlService = mlService ?? MLService();
+  })  : _mlService = mlService ?? MLService(),
+        _historyManager = historyManager;
 
   // ==================== INITIALIZATION ====================
 
@@ -582,7 +588,16 @@ class WorkoutProvider extends ChangeNotifier {
       notes: notes,
     );
 
-    await _storage.saveWorkoutSession(session);
+    if (_historyManager != null) {
+      // Delegate persistence + HC sync to HistoryManager.
+      await _historyManager.addSession(
+        session,
+        routineName: _activeRoutine?.name ?? _activeProgramDay?.name,
+      );
+    } else {
+      // Fallback: persist directly (no HC sync) when historyManager is absent.
+      await _storage.saveWorkoutSession(session);
+    }
     await _clearDraft();
     _sessions.insert(0, session);
 
@@ -669,6 +684,9 @@ class WorkoutProvider extends ChangeNotifier {
     // Remove from local list
     _sessions = List.from(_sessions)..removeWhere((s) => s.id == sessionId);
 
+    // Keep HistoryManager's cache in sync so HistoryScreen rebuilds.
+    _historyManager?.evictSession(sessionId);
+
     // Retrain growth models for all affected exercises
     // (their data has changed because a session was removed)
     for (var exerciseId in affectedExerciseIds) {
@@ -712,6 +730,9 @@ class WorkoutProvider extends ChangeNotifier {
 
     // Sort sessions by date (most recent first)
     _sessions.sort((a, b) => b.date.compareTo(a.date));
+
+    // Keep HistoryManager's cache in sync so HistoryScreen rebuilds.
+    _historyManager?.patchSession(updatedSession);
 
     // Retrain growth models for ALL affected exercises
     // (both exercises that were in the old session and exercises in the new session)
