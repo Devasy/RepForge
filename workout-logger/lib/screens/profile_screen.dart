@@ -26,11 +26,63 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with WidgetsBindingObserver {
   bool _isExporting = false;
   bool _isImporting = false;
   bool _isBackingUp = false;
   bool _isRequestingHcPermission = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Reconcile stored HC flag against runtime state on screen load.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reconcileHealthConnectState());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-check HC state when the user returns from background
+    // (e.g. after visiting Health Connect settings).
+    if (state == AppLifecycleState.resumed) {
+      _reconcileHealthConnectState();
+    }
+  }
+
+  /// Reconciles the persisted [SettingsProvider.healthConnectEnabled] flag
+  /// with the actual runtime HC availability and permission state.
+  /// If HC is unavailable or permissions are revoked, the flag is cleared
+  /// so the toggle and status row reflect reality.
+  Future<void> _reconcileHealthConnectState() async {
+    if (!mounted) return;
+    final settings = context.read<SettingsProvider>();
+    // Only run the runtime checks when the flag is currently enabled —
+    // avoids unnecessary plugin calls when HC is already off.
+    if (!settings.healthConnectEnabled) return;
+    try {
+      final hc = context.read<IHealthConnectService>();
+      final available = await hc.isAvailable();
+      if (!available) {
+        if (mounted) await settings.setHealthConnectEnabled(false);
+        return;
+      }
+      final hasPerms = await hc.hasPermissions();
+      if (!hasPerms) {
+        if (mounted) await settings.setHealthConnectEnabled(false);
+      }
+    } catch (e) {
+      // If we can't determine state, fail-safe: disable the flag.
+      debugPrint('HC reconciliation error: $e');
+      if (mounted) await settings.setHealthConnectEnabled(false);
+    }
+  }
 
   Future<void> _requestHealthConnectPermission() async {
     setState(() => _isRequestingHcPermission = true);

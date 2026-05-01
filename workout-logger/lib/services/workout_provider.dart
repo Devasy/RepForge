@@ -590,16 +590,22 @@ class WorkoutProvider extends ChangeNotifier {
     await _clearDraft();
     _sessions.insert(0, session);
 
-    // Fire-and-forget Health Connect sync if enabled
-    final hcEnabled = await _storage.getSetting('healthConnectEnabled');
-    if (hcEnabled == 'true' && _healthConnect != null) {
-      _healthConnect.syncWorkoutSession(
-        session,
-        title: _activeRoutine?.name,
-      ).catchError((e) {
-        debugPrint('Health Connect sync error: $e');
-        return false;
-      });
+    // Best-effort Health Connect sync — errors must never abort finishWorkout.
+    try {
+      final hcEnabled = await _storage.getSetting('healthConnectEnabled');
+      if (hcEnabled == 'true' && _healthConnect != null) {
+        _healthConnect
+            .syncWorkoutSession(
+              session,
+              title: _activeRoutine?.name,
+            )
+            .catchError((e) {
+          debugPrint('Health Connect sync error: $e');
+          return false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Health Connect pre-sync error (setting read failed): $e');
     }
 
     // Update growth models for performed exercises
