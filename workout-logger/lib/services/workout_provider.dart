@@ -22,10 +22,10 @@ import '../models/models.dart';
 import '../data/exercise_database.dart';
 import 'interfaces/storage_service_interface.dart';
 import 'interfaces/ml_service_interface.dart';
-import 'interfaces/health_connect_service_interface.dart';
 import 'ml_service.dart';
 import 'strategies/target_calculator.dart';
 import 'managers/program_manager.dart';
+import 'managers/history_manager.dart';
 import 'utils/exercise_history.dart';
 
 enum StartWorkoutConflictAction { resume, discardAndStart, cancel }
@@ -37,7 +37,7 @@ class WorkoutInProgressError extends StateError {
 class WorkoutProvider extends ChangeNotifier {
   final IStorageService _storage;
   final IMLService _mlService;
-  final IHealthConnectService? _healthConnect;
+  final HistoryManager? _historyManager;
   final Uuid _uuid = const Uuid();
 
   // State
@@ -85,13 +85,15 @@ class WorkoutProvider extends ChangeNotifier {
   /// Following Dependency Inversion Principle: accepts abstractions
   /// rather than concrete implementations. [programManager] defaults to a
   /// new ProgramManager backed by the same storage if not provided.
+  /// [historyManager] is optional; when provided, session persistence and
+  /// Health Connect sync are delegated to it rather than handled inline.
   WorkoutProvider(
     this._storage, {
     IMLService? mlService,
-    IHealthConnectService? healthConnectService,
+    HistoryManager? historyManager,
     required this.programManager,
   })  : _mlService = mlService ?? MLService(),
-        _healthConnect = healthConnectService;
+        _historyManager = historyManager;
 
   // ==================== INITIALIZATION ====================
 
@@ -586,27 +588,18 @@ class WorkoutProvider extends ChangeNotifier {
       notes: notes,
     );
 
-    await _storage.saveWorkoutSession(session);
+    if (_historyManager != null) {
+      // Delegate persistence + HC sync to HistoryManager.
+      await _historyManager.addSession(
+        session,
+        routineName: _activeRoutine?.name,
+      );
+    } else {
+      // Fallback: persist directly (no HC sync) when historyManager is absent.
+      await _storage.saveWorkoutSession(session);
+    }
     await _clearDraft();
     _sessions.insert(0, session);
-
-    // Best-effort Health Connect sync — errors must never abort finishWorkout.
-    try {
-      final hcEnabled = await _storage.getSetting('healthConnectEnabled');
-      if (hcEnabled == 'true' && _healthConnect != null) {
-        _healthConnect
-            .syncWorkoutSession(
-              session,
-              title: _activeRoutine?.name,
-            )
-            .catchError((e) {
-          debugPrint('Health Connect sync error: $e');
-          return false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Health Connect pre-sync error (setting read failed): $e');
-    }
 
     // Update growth models for performed exercises
     for (var log in completedExercises) {

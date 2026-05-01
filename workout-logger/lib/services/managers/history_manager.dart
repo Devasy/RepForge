@@ -5,12 +5,15 @@
 // - Loading/saving workout sessions
 // - Updating and deleting sessions
 // - Querying session history
+// - Triggering Health Connect sync after a new session is persisted
+//   (via the optional IHealthSyncManager dependency).
 //
 // It does NOT handle active workout state or analytics calculations.
 
 import 'package:flutter/foundation.dart';
 import '../../models/models.dart';
 import '../interfaces/storage_service_interface.dart';
+import '../interfaces/health_sync_manager_interface.dart';
 
 /// Manages workout session history.
 ///
@@ -18,13 +21,18 @@ import '../interfaces/storage_service_interface.dart';
 /// historical session data, not active workouts or analytics.
 class HistoryManager extends ChangeNotifier {
   final IStorageService _storage;
+  final IHealthSyncManager? _healthSync;
 
   List<WorkoutSession> _sessions = [];
 
   // Callback for when sessions change (to notify other managers like AnalyticsManager)
   final void Function(Set<String> affectedExerciseIds)? onSessionsChanged;
 
-  HistoryManager(this._storage, {this.onSessionsChanged});
+  HistoryManager(
+    this._storage, {
+    IHealthSyncManager? healthSyncManager,
+    this.onSessionsChanged,
+  }) : _healthSync = healthSyncManager;
 
   // Getters
   List<WorkoutSession> get sessions => List.unmodifiable(_sessions);
@@ -38,14 +46,52 @@ class HistoryManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Add a new session to history
+  /// Add a new session to history.
   ///
-  /// Persists the session to storage and updates in-memory state.
-  Future<void> addSession(WorkoutSession session) async {
+  /// Persists the session, updates in-memory state, then triggers a
+  /// best-effort Health Connect sync if [healthSyncManager] is provided.
+  /// [routineName] is forwarded as the HC exercise session title.
+  Future<void> addSession(
+    WorkoutSession session, {
+    String? routineName,
+  }) async {
     _sessions.insert(0, session);
+    await _storage.saveWorkoutSession(session);
+
     final exerciseIds = session.exercises.map((e) => e.exerciseId).toSet();
     onSessionsChanged?.call(exerciseIds);
-    await _storage.saveWorkoutSession(session);
+    notifyListeners();
+
+    // Fire-and-forget HC sync — runs after UI is already updated.
+    _healthSync?.syncSession(
+      session,
+      routineName: routineName,
+      onSynced: _onHcSynced,
+    );
+  }
+
+  /// Manually trigger a Health Connect sync for an existing session.
+  ///
+  /// Called from the ⋮ menu in the history UI when a session is unsynced.
+  /// No-op when [healthSyncManager] was not provided.
+  void syncSession(WorkoutSession session, {String? routineName}) {
+    _healthSync?.syncSession(
+      session,
+      routineName: routineName,
+      onSynced: _onHcSynced,
+    );
+  }
+
+  // Called by HealthSyncManager on successful sync.
+  // Patches the in-memory session and re-persists it.
+  void _onHcSynced(WorkoutSession updated) {
+    final index = _sessions.indexWhere((s) => s.id == updated.id);
+    if (index == -1) return;
+    _sessions[index] = updated;
+    // Re-persist so hcSyncedAt survives app restarts.
+    _storage.saveWorkoutSession(updated).catchError((Object e) {
+      debugPrint('HistoryManager: failed to persist hcSyncedAt: $e');
+    });
     notifyListeners();
   }
 

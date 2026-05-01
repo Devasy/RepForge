@@ -53,6 +53,8 @@ class HealthConnectService implements IHealthConnectService {
     'overhead_tricep_extension': ExerciseSegmentType.doubleArmTricepsExtension,
     'plank': ExerciseSegmentType.plank,
     'crunches': ExerciseSegmentType.crunch,
+    'cable_crunch': ExerciseSegmentType.crunch,
+    'russian_twist': ExerciseSegmentType.crunch,
     'leg_raises': ExerciseSegmentType.legRaise,
   };
 
@@ -121,40 +123,91 @@ class HealthConnectService implements IHealthConnectService {
     }
   }
 
-  // Builds non-overlapping ExerciseSessionSegmentEvents distributed evenly
-  // across the session time window. Each set becomes one segment.
+  // Builds non-overlapping ExerciseSessionSegmentEvents using per-set timestamps
+  // from WorkoutSet.timestamp. Sets are sorted by their recorded timestamp so
+  // that each segment's startTime reflects when the set was actually performed.
+  //
+  // Fallback: if all timestamps are identical (e.g. fabricated via DateTime.now()
+  // default on legacy data) the method falls back to the original evenly-spaced
+  // distribution so callers always receive valid, non-empty output.
   List<ExerciseSessionSegmentEvent> _buildSegments(
     WorkoutSession session,
     DateTime sessionStart,
     DateTime sessionEnd,
   ) {
-    final allSets = <(ExerciseSegmentType, int)>[];
+    // Collect (segmentType, reps, timestamp) for every valid set.
+    final allSets = <(ExerciseSegmentType, int, DateTime)>[];
 
     for (final log in session.exercises) {
-      final type = _segmentTypeMap[log.exerciseId] ?? ExerciseSegmentType.otherWorkout;
+      final type =
+          _segmentTypeMap[log.exerciseId] ?? ExerciseSegmentType.otherWorkout;
       for (final set in log.sets) {
         if (set.reps > 0) {
-          allSets.add((type, set.reps));
+          allSets.add((type, set.reps, set.timestamp));
         }
       }
     }
 
     if (allSets.isEmpty) return [];
 
-    final totalMs = sessionEnd.difference(sessionStart).inMilliseconds;
-    final slotMs = totalMs ~/ allSets.length;
+    // Sort by recorded timestamp so segments follow real workout order.
+    allSets.sort((a, b) => a.$3.compareTo(b.$3));
 
-    return List.generate(allSets.length, (i) {
-      final start = sessionStart.add(Duration(milliseconds: slotMs * i));
-      final end = i < allSets.length - 1
-          ? sessionStart.add(Duration(milliseconds: slotMs * (i + 1)))
-          : sessionEnd;
-      return ExerciseSessionSegmentEvent(
+    // Check whether timestamps are meaningful: if every set has the exact same
+    // timestamp it almost certainly means they were created with DateTime.now()
+    // at the same instant (legacy data or unit-test stubs).  In that case fall
+    // back to the original even-distribution algorithm.
+    final allSameTimestamp = allSets.every((s) => s.$3 == allSets.first.$3);
+    if (allSameTimestamp) {
+      final totalMs = sessionEnd.difference(sessionStart).inMilliseconds;
+      final slotMs = totalMs ~/ allSets.length;
+      return List.generate(allSets.length, (i) {
+        final start = sessionStart.add(Duration(milliseconds: slotMs * i));
+        final end = i < allSets.length - 1
+            ? sessionStart.add(Duration(milliseconds: slotMs * (i + 1)))
+            : sessionEnd;
+        return ExerciseSessionSegmentEvent(
+          startTime: start,
+          endTime: end,
+          segmentType: allSets[i].$1,
+          repetitions: allSets[i].$2,
+        );
+      });
+    }
+
+    // Build segments using real timestamps.
+    // Each segment's startTime is the set's timestamp clamped to [sessionStart, sessionEnd].
+    // endTime is the next set's timestamp (or sessionEnd for the last set),
+    // clamped so start <= end <= sessionEnd.
+    final segments = <ExerciseSessionSegmentEvent>[];
+    for (var i = 0; i < allSets.length; i++) {
+      final rawStart = allSets[i].$3;
+      final start = rawStart.isBefore(sessionStart)
+          ? sessionStart
+          : rawStart.isAfter(sessionEnd)
+              ? sessionEnd
+              : rawStart;
+
+      final DateTime rawEnd;
+      if (i < allSets.length - 1) {
+        rawEnd = allSets[i + 1].$3;
+      } else {
+        rawEnd = sessionEnd;
+      }
+      // Clamp: end must be >= start and <= sessionEnd.
+      final end = rawEnd.isBefore(start)
+          ? start
+          : rawEnd.isAfter(sessionEnd)
+              ? sessionEnd
+              : rawEnd;
+
+      segments.add(ExerciseSessionSegmentEvent(
         startTime: start,
         endTime: end,
         segmentType: allSets[i].$1,
         repetitions: allSets[i].$2,
-      );
-    });
+      ));
+    }
+    return segments;
   }
 }
