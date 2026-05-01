@@ -9,12 +9,16 @@ import 'package:provider/provider.dart';
 
 import 'services/storage_service.dart';
 import 'services/ml_service.dart';
+import 'services/health_connect_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
+import 'services/interfaces/health_connect_service_interface.dart';
 import 'services/workout_provider.dart';
 import 'services/settings_provider.dart';
 import 'services/api_service.dart';
 import 'services/managers/program_manager.dart';
+import 'services/managers/history_manager.dart';
+import 'services/managers/health_sync_manager.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
@@ -45,8 +49,15 @@ class WorkoutLoggerApp extends StatelessWidget {
   // This ensures the same instances are used throughout the app lifecycle
   static final IStorageService _storageService = StorageService();
   static final IMLService _mlService = MLService();
+  static final IHealthConnectService _healthConnectService = HealthConnectService();
   static final ProgramManager _programManager = ProgramManager(_storageService);
   static final SettingsProvider _settingsProvider = SettingsProvider(_storageService);
+  // HealthSyncManager uses the in-memory settings flag — no storage I/O on sync.
+  static final HealthSyncManager _healthSyncManager =
+      HealthSyncManager(_healthConnectService, _settingsProvider);
+  // HistoryManager is the single owner of session history + HC sync trigger.
+  static final HistoryManager _historyManager =
+      HistoryManager(_storageService, healthSyncManager: _healthSyncManager);
 
   const WorkoutLoggerApp({super.key});
 
@@ -61,17 +72,23 @@ class WorkoutLoggerApp extends StatelessWidget {
         Provider<IStorageService>.value(value: _storageService),
         // Provide the ML service interface for direct access if needed
         Provider<IMLService>.value(value: _mlService),
+        // IHealthConnectService stays in tree for ProfileScreen permission flow
+        Provider<IHealthConnectService>.value(value: _healthConnectService),
         // Provide the ApiService singleton via DI
         Provider<ApiService>.value(value: ApiService()),
         // ProgramManager passed to tree directly
         ChangeNotifierProvider<ProgramManager>.value(value: _programManager),
         // SettingsProvider for user preferences (weight unit, increments)
         ChangeNotifierProvider<SettingsProvider>.value(value: _settingsProvider),
+        // HistoryManager is the single source of truth for session history.
+        // Provided as ChangeNotifier so HistoryScreen rebuilds on sync badge changes.
+        ChangeNotifierProvider<HistoryManager>.value(value: _historyManager),
         // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
           create: (_) => WorkoutProvider(
             _storageService,
             mlService: _mlService,
+            historyManager: _historyManager,
             programManager: _programManager,
           ),
         ),
@@ -110,6 +127,10 @@ class _AppInitializerState extends State<AppInitializer> {
 
       final settings = context.read<SettingsProvider>();
       await settings.init();
+
+      // Load HistoryManager session list (independent of WorkoutProvider).
+      final historyManager = context.read<HistoryManager>();
+      await historyManager.loadSessions();
 
       // Fire-and-forget analytics in background
       final api = context.read<ApiService>();

@@ -46,4 +46,10 @@ jobs:
 
       - name: Run tests
         working-directory: ./workout-logger
-        run: flutter test
+        run: flutter test --coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: workout-logger/coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
