@@ -77,8 +77,8 @@ flutter test test/workout_provider_test.dart
 # Check lint / static analysis
 flutter analyze
 
-# Build release APKs (split per ABI)
-flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/debug-info
+# Build release APK
+flutter build apk --release
 
 # Generate Mockito mocks (after modifying interfaces)
 dart run build_runner build --delete-conflicting-outputs

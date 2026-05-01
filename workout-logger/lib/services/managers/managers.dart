@@ -16,4 +16,3 @@ export 'exercise_manager.dart';
 export 'target_manager.dart';
 export 'analytics_manager.dart';
 export 'program_manager.dart';
-export 'health_sync_manager.dart';

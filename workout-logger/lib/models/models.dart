@@ -225,8 +225,6 @@ class WorkoutSession {
   final List<ExerciseLog> exercises;
   final int duration; // minutes
   final String? notes;
-  /// Non-null when this session was successfully synced to Health Connect.
-  final DateTime? hcSyncedAt;
 
   WorkoutSession({
     required this.id,
@@ -235,7 +233,6 @@ class WorkoutSession {
     required this.exercises,
     required this.duration,
     this.notes,
-    this.hcSyncedAt,
   });
 
   double get totalVolume =>
@@ -248,7 +245,6 @@ class WorkoutSession {
     'exercises': exercises.map((e) => e.toJson()).toList(),
     'duration': duration,
     'notes': notes,
-    'hcSyncedAt': hcSyncedAt?.toIso8601String(),
   };
 
   factory WorkoutSession.fromJson(Map<String, dynamic> json) => WorkoutSession(
@@ -260,9 +256,6 @@ class WorkoutSession {
         .toList(),
     duration: json['duration'],
     notes: json['notes'],
-    hcSyncedAt: json['hcSyncedAt'] != null
-        ? DateTime.parse(json['hcSyncedAt'] as String)
-        : null,
   );
 
   WorkoutSession copyWith({
@@ -272,7 +265,6 @@ class WorkoutSession {
     Object? exercises = _sentinel,
     Object? duration = _sentinel,
     Object? notes = _sentinel,
-    Object? hcSyncedAt = _sentinel,
   }) => WorkoutSession(
     id: id == _sentinel ? this.id : id as String,
     date: date == _sentinel ? this.date : date as DateTime,
@@ -282,9 +274,6 @@ class WorkoutSession {
         : exercises as List<ExerciseLog>,
     duration: duration == _sentinel ? this.duration : duration as int,
     notes: notes == _sentinel ? this.notes : notes as String?,
-    hcSyncedAt: hcSyncedAt == _sentinel
-        ? this.hcSyncedAt
-        : hcSyncedAt as DateTime?,
   );
 }
 

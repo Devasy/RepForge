@@ -10,12 +10,10 @@ class SettingsProvider extends ChangeNotifier {
 
   WeightUnit _weightUnit = WeightUnit.kg;
   double _weightIncrement = 2.5;
-  bool _healthConnectEnabled = false;
 
   WeightUnit get weightUnit => _weightUnit;
   double get weightIncrement => _weightIncrement;
   String get unitLabel => _weightUnit == WeightUnit.kg ? 'kg' : 'lbs';
-  bool get healthConnectEnabled => _healthConnectEnabled;
 
   SettingsProvider(this._storage);
 
@@ -27,9 +25,6 @@ class SettingsProvider extends ChangeNotifier {
     _weightIncrement = increment != null
         ? (double.tryParse(increment) ?? _defaultIncrement)
         : _defaultIncrement;
-
-    final hcEnabled = await _storage.getSetting('healthConnectEnabled');
-    _healthConnectEnabled = hcEnabled == 'true';
   }
 
   double get _defaultIncrement => _weightUnit == WeightUnit.kg ? 2.5 : 5.0;
@@ -45,12 +40,6 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setWeightIncrement(double increment) async {
     _weightIncrement = increment;
     await _storage.saveSetting('weightIncrement', increment.toString());
-    notifyListeners();
-  }
-
-  Future<void> setHealthConnectEnabled(bool enabled) async {
-    _healthConnectEnabled = enabled;
-    await _storage.saveSetting('healthConnectEnabled', enabled.toString());
     notifyListeners();
   }
 

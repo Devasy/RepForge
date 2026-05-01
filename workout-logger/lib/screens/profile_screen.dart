@@ -10,14 +10,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 
-import 'package:package_info_plus/package_info_plus.dart';
-
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../services/api_service.dart';
-import '../services/interfaces/health_connect_service_interface.dart';
 import '../theme/app_theme.dart';
 
+const String _appVersion = '1.0.12';
 const String _createdBy = 'Devasy Patel';
 
 class ProfileScreen extends StatefulWidget {
@@ -27,110 +25,10 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
-    with WidgetsBindingObserver {
+class _ProfileScreenState extends State<ProfileScreen> {
   bool _isExporting = false;
   bool _isImporting = false;
   bool _isBackingUp = false;
-  bool _isRequestingHcPermission = false;
-  String _appVersion = '';
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    PackageInfo.fromPlatform().then((info) {
-      if (mounted) setState(() => _appVersion = info.version);
-    });
-    // Reconcile stored HC flag against runtime state on screen load.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reconcileHealthConnectState());
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Re-check HC state when the user returns from background
-    // (e.g. after visiting Health Connect settings).
-    if (state == AppLifecycleState.resumed) {
-      _reconcileHealthConnectState();
-    }
-  }
-
-  /// Reconciles the persisted [SettingsProvider.healthConnectEnabled] flag
-  /// with the actual runtime HC availability and permission state.
-  /// If HC is unavailable or permissions are revoked, the flag is cleared
-  /// so the toggle and status row reflect reality.
-  Future<void> _reconcileHealthConnectState() async {
-    if (!mounted) return;
-    final settings = context.read<SettingsProvider>();
-    // Only run the runtime checks when the flag is currently enabled —
-    // avoids unnecessary plugin calls when HC is already off.
-    if (!settings.healthConnectEnabled) return;
-    try {
-      final hc = context.read<IHealthConnectService>();
-      final available = await hc.isAvailable();
-      if (!available) {
-        if (mounted) await settings.setHealthConnectEnabled(false);
-        return;
-      }
-      final hasPerms = await hc.hasPermissions();
-      if (!hasPerms) {
-        if (mounted) await settings.setHealthConnectEnabled(false);
-      }
-    } catch (e) {
-      // If we can't determine state, fail-safe: disable the flag.
-      debugPrint('HC reconciliation error: $e');
-      if (mounted) await settings.setHealthConnectEnabled(false);
-    }
-  }
-
-  Future<void> _requestHealthConnectPermission() async {
-    setState(() => _isRequestingHcPermission = true);
-    try {
-      final hc = context.read<IHealthConnectService>();
-      final available = await hc.isAvailable();
-      if (!available) {
-        if (mounted) _showSnack('Health Connect is not available on this device.', AppTheme.error);
-        return;
-      }
-
-      // Check if permissions were already granted (e.g. via HC settings).
-      bool granted = await hc.hasPermissions();
-
-      if (!granted) {
-        // Try to show the in-app permission dialog.
-        try {
-          granted = await hc.requestPermissions();
-        } catch (_) {
-          // requestPermissions can fail if the plugin loses its activity reference
-          // during the async gap (known issue with health_connector on some devices).
-          // Re-check hasPermissions in case the user already granted via HC settings.
-          granted = await hc.hasPermissions();
-        }
-      }
-
-      if (!mounted) return;
-      if (granted) {
-        final settings = context.read<SettingsProvider>();
-        await settings.setHealthConnectEnabled(true);
-        _showSnack('Health Connect connected!', AppTheme.success);
-      } else {
-        _showSnack(
-          'Open Health Connect → App permissions → RepForge and enable Exercise.',
-          AppTheme.warning,
-        );
-      }
-    } catch (e) {
-      if (mounted) _showSnack('Could not connect to Health Connect.', AppTheme.error);
-    } finally {
-      if (mounted) setState(() => _isRequestingHcPermission = false);
-    }
-  }
 
   // ==================== Data Actions ====================
 
@@ -270,8 +168,6 @@ class _ProfileScreenState extends State<ProfileScreen>
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _buildPreferencesSection(settings),
-                const SizedBox(height: AppSpacing.lg),
-                _buildHealthConnectSection(settings),
                 const SizedBox(height: AppSpacing.lg),
                 _buildDataSection(),
                 const SizedBox(height: AppSpacing.lg),
@@ -416,80 +312,6 @@ class _ProfileScreenState extends State<ProfileScreen>
               );
             }).toList(),
           ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== Health Connect ====================
-
-  Widget _buildHealthConnectSection(SettingsProvider settings) {
-    final enabled = settings.healthConnectEnabled;
-    return _ProfileSection(
-      icon: Icons.monitor_heart_outlined,
-      iconColor: const Color(0xFF00BFA5),
-      title: 'Health Connect',
-      subtitle: 'Sync workouts to Android Health Connect',
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Sync workouts after finishing',
-                      style: const TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      'Writes session + per-set reps to Health Connect',
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: enabled,
-                onChanged: _isRequestingHcPermission
-                    ? null
-                    : (value) async {
-                        if (value) {
-                          await _requestHealthConnectPermission();
-                        } else {
-                          await settings.setHealthConnectEnabled(false);
-                        }
-                      },
-                activeThumbColor: const Color(0xFF00BFA5),
-                activeTrackColor: const Color(0xFF00BFA5).withValues(alpha: 0.4),
-              ),
-            ],
-          ),
-          if (enabled) ...[
-            const SizedBox(height: AppSpacing.sm),
-            const Divider(color: AppTheme.surfaceColor, height: 1),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                const Icon(Icons.check_circle_outline,
-                    color: Color(0xFF00BFA5), size: 16),
-                const SizedBox(width: 8),
-                const Text(
-                  'Connected — syncing after each workout',
-                  style: TextStyle(
-                    color: Color(0xFF00BFA5),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );

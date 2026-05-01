@@ -1587,7 +1587,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               await context.read<WorkoutProvider>().cancelWorkout();
               if (!mounted) return;
               Navigator.pop(dialogContext); // Close dialog
-              Navigator.pop(context); // Close workout screen
+              Navigator.pop(this.context); // Close workout screen
             },
             child: const Text(
               'Cancel Workout',
