@@ -82,6 +82,20 @@ class HistoryManager extends ChangeNotifier {
     );
   }
 
+  /// Trigger a Health Connect sync for every session that has not yet been synced.
+  ///
+  /// Fires all syncs concurrently (fire-and-forget). Each successful sync
+  /// stamps hcSyncedAt and persists via the normal _onHcSynced path.
+  /// No-op when [healthSyncManager] was not provided.
+  void syncAllUnsynced() {
+    if (_healthSync == null) return;
+    for (final session in _sessions) {
+      if (session.hcSyncedAt == null) {
+        _healthSync.syncSession(session, onSynced: _onHcSynced);
+      }
+    }
+  }
+
   // Called by HealthSyncManager on successful sync.
   // Merges only hcSyncedAt into the current in-memory session so that any
   // edits made between sync being triggered and this callback firing are not

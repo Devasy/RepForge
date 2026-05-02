@@ -22,10 +22,33 @@ class HistoryScreen extends StatelessWidget {
     // Watch HistoryManager so the list rebuilds when hcSyncedAt changes.
     final historyManager = context.watch<HistoryManager>();
     final provider = context.read<WorkoutProvider>();
+    final settings = context.watch<SettingsProvider>();
     final sessions = historyManager.sessions;
 
+    final hasUnsynced = settings.healthConnectEnabled &&
+        sessions.any((s) => s.hcSyncedAt == null);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Workout History')),
+      appBar: AppBar(
+        title: const Text('Workout History'),
+        actions: [
+          if (hasUnsynced)
+            IconButton(
+              icon: const Icon(Icons.monitor_heart_outlined, color: _hcColor),
+              tooltip: 'Sync all to Health Connect',
+              onPressed: () {
+                historyManager.syncAllUnsynced();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Syncing all unsynced workouts…'),
+                    backgroundColor: AppTheme.cardColor,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
       body: sessions.isEmpty
           ? _buildEmptyState(context)
           : _buildSessionList(context, sessions, provider, historyManager),
