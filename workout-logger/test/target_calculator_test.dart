@@ -111,6 +111,15 @@ void main() {
 
       expect(calculator.calculate('ex1', sessions), 2880);
     });
+
+    test('ignores sessions for other exercises', () {
+      final sessions = [
+        _session('s1', 'ex1', sets: [WorkoutSet(weight: 100, reps: 10)]), // 1000
+        _session('s2', 'ex2', sets: [WorkoutSet(weight: 200, reps: 20)]), // 4000 — must be ignored
+      ];
+
+      expect(calculator.calculate('ex1', sessions), 1000);
+    });
   });
 
   group('TargetCalculatorFactory', () {
