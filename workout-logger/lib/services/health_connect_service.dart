@@ -167,17 +167,19 @@ class HealthConnectService implements IHealthConnectService {
         })
         .toList();
 
-    // Fall back to evenly-spaced distribution whenever clamped timestamps are
-    // not fully unique.  Duplicate timestamps arise when:
-    //   • All sets share the same instant (legacy data / unit-test stubs).
-    //   • Two or more sets were logged within the same DateTime resolution tick
-    //     (common on devices where DateTime.now() resolution is ~1 ms).
-    //   • One or more timestamps were clamped to the same boundary value.
-    // In any of these cases the real-timestamp path would produce overlapping or
-    // zero-duration segments, which ExerciseSessionRecord's constructor rejects
-    // with an ArgumentError, silently aborting the sync.
+    // Fall back to evenly-spaced distribution whenever the clamped timestamps
+    // would produce an invalid segment layout.  This happens when:
+    //   • Timestamps are not fully unique (legacy data, sub-ms resolution, or
+    //     multiple sets clamped to the same boundary).
+    //   • The last clamped timestamp equals sessionEnd, which makes the final
+    //     segment zero-duration (start == end == sessionEnd) — the common case
+    //     where exactly one set was logged a few seconds after the stored
+    //     duration ended and was clamped to sessionEnd.
+    // Zero-duration / overlapping segments cause ExerciseSessionRecord's
+    // constructor to throw an ArgumentError, silently aborting the sync.
     final uniqueTimestamps = clampedSets.map((s) => s.$3).toSet();
-    if (uniqueTimestamps.length < clampedSets.length) {
+    if (uniqueTimestamps.length < clampedSets.length ||
+        clampedSets.last.$3 == sessionEnd) {
       final totalMs = sessionEnd.difference(sessionStart).inMilliseconds;
       final slotMs = totalMs ~/ clampedSets.length;
       return List.generate(clampedSets.length, (i) {
