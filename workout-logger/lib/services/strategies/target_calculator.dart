@@ -55,12 +55,9 @@ class WeightTargetCalculator implements TargetCalculatorStrategy {
   double calculate(String exerciseId, List<WorkoutSession> sessions) {
     double bestValue = 0;
 
-    for (var log in _getExerciseLogsForExercise(exerciseId, sessions)) {
-      final maxWeight = log.sets
-          .map((s) => s.weight)
-          .reduce((a, b) => a > b ? a : b);
-      if (maxWeight > bestValue) {
-        bestValue = maxWeight;
+    for (final log in _getExerciseLogsForExercise(exerciseId, sessions)) {
+      for (final set in log.sets) {
+        if (set.weight > bestValue) bestValue = set.weight;
       }
     }
 

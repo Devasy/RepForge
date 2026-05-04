@@ -58,6 +58,13 @@ void main() {
       expect(calculator.calculate('ex1', []), 0);
     });
 
+    test('returns 0 for session with empty sets', () {
+      final sessions = [
+        _session('s1', 'ex1', sets: []),
+      ];
+      expect(calculator.calculate('ex1', sessions), 0);
+    });
+
     test('returns maximum weight across all sets and sessions', () {
       final sessions = [
         _session('s1', 'ex1', sets: [
@@ -159,7 +166,7 @@ void main() {
     });
 
     test('registerCalculator adds a new strategy', () {
-      final custom = _AlwaysReturns42();
+      const custom = _AlwaysReturns42();
       TargetCalculatorFactory.registerCalculator('custom', custom);
 
       final result = TargetCalculatorFactory.calculateCurrentValue(
@@ -173,7 +180,7 @@ void main() {
     });
 
     test('reset restores default strategies only', () {
-      TargetCalculatorFactory.registerCalculator('extra', _AlwaysReturns42());
+      TargetCalculatorFactory.registerCalculator('extra', const _AlwaysReturns42());
       TargetCalculatorFactory.reset();
 
       expect(TargetCalculatorFactory.getCalculator('extra'), isNull);
@@ -183,6 +190,8 @@ void main() {
 }
 
 class _AlwaysReturns42 implements TargetCalculatorStrategy {
+  const _AlwaysReturns42();
+
   @override
   double calculate(String exerciseId, List<WorkoutSession> sessions) => 42;
 }

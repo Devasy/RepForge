@@ -4,9 +4,9 @@ import 'package:repforge/services/managers/analytics_manager.dart';
 import 'test_utils/mock_storage_service.dart';
 import 'test_utils/mock_ml_service.dart';
 
-WorkoutSession _session(
-  String id,
-  String exerciseId, {
+WorkoutSession _session({
+  required String id,
+  required String exerciseId,
   double weight = 100,
   int reps = 10,
   int sets = 3,
@@ -25,7 +25,11 @@ WorkoutSession _session(
   );
 }
 
-Exercise _exercise(String id, String muscleGroupId, {String category = 'compound'}) {
+Exercise _exercise({
+  required String id,
+  required String muscleGroupId,
+  String category = 'compound',
+}) {
   return Exercise(
     id: id,
     name: id,
@@ -50,8 +54,8 @@ void main() {
   group('AnalyticsManager - buildSessionIndex', () {
     test('indexes logs by exerciseId newest-first', () {
       final sessions = [
-        _session('s1', 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
-        _session('s2', 'ex1', weight: 100, date: DateTime(2024, 1, 10)),
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's2', exerciseId: 'ex1', weight: 100, date: DateTime(2024, 1, 10)),
       ];
 
       manager.buildSessionIndex(sessions);
@@ -71,7 +75,7 @@ void main() {
         exercises: [ExerciseLog(exerciseId: 'ex1', sets: [])],
       );
       final sessions = [
-        _session('s1', 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
         emptyLog,
       ];
 
@@ -85,8 +89,8 @@ void main() {
   group('AnalyticsManager - updateGrowthModel', () {
     test('trains model when two or more data points exist', () async {
       final sessions = [
-        _session('s1', 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
-        _session('s2', 'ex1', weight: 90, date: DateTime(2024, 1, 8)),
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's2', exerciseId: 'ex1', weight: 90, date: DateTime(2024, 1, 8)),
       ];
 
       await manager.updateGrowthModel('ex1', sessions);
@@ -99,15 +103,15 @@ void main() {
     test('removes stale model when fewer than two data points', () async {
       // Seed a model first
       final twoSessions = [
-        _session('s1', 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
-        _session('s2', 'ex1', weight: 90, date: DateTime(2024, 1, 8)),
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's2', exerciseId: 'ex1', weight: 90, date: DateTime(2024, 1, 8)),
       ];
       await manager.updateGrowthModel('ex1', twoSessions);
       expect(manager.getGrowthModel('ex1'), isNotNull);
 
       // Now only one session — should clear the model
       final oneSession = [
-        _session('s1', 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
       ];
       await manager.updateGrowthModel('ex1', oneSession);
 
@@ -127,8 +131,8 @@ void main() {
       );
 
       final sessions = [
-        _session('s1', 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
-        _session('s2', 'ex1', weight: 90, date: DateTime(2024, 1, 8)),
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's2', exerciseId: 'ex1', weight: 90, date: DateTime(2024, 1, 8)),
       ];
       await mgr.updateGrowthModel('ex1', sessions);
 
@@ -140,8 +144,8 @@ void main() {
   group('AnalyticsManager - trainAllGrowthModels', () {
     test('trains a model for every exercise present in sessions', () async {
       final sessions = [
-        _session('s1', 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
-        _session('s2', 'ex1', weight: 90, date: DateTime(2024, 1, 8)),
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's2', exerciseId: 'ex1', weight: 90, date: DateTime(2024, 1, 8)),
         WorkoutSession(
           id: 's3',
           date: DateTime(2024, 1, 5),
@@ -174,13 +178,15 @@ void main() {
 
       // ex1 has 2 sessions → model trained
       expect(manager.getGrowthModel('ex1'), isNotNull);
+      // ex2 has 2 sessions → model trained
+      expect(manager.getGrowthModel('ex2'), isNotNull);
     });
   });
 
   group('AnalyticsManager - getRecommendations', () {
     test('returns mock recommendations for exercise with history', () {
       final sessions = [
-        _session('s1', 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
       ];
       manager.buildSessionIndex(sessions);
 
@@ -202,7 +208,7 @@ void main() {
 
     test('falls back to scan when index is stale', () {
       final sessions = [
-        _session('s1', 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
       ];
       // Build index on a different list instance (stale)
       manager.buildSessionIndex([...sessions]);
@@ -218,9 +224,9 @@ void main() {
   group('AnalyticsManager - getVolumeProgression', () {
     test('returns progression oldest-first via index', () {
       final sessions = [
-        _session('s1', 'ex1', weight: 50, sets: 3, date: DateTime(2024, 1, 1)),
-        _session('s2', 'ex1', weight: 60, sets: 3, date: DateTime(2024, 1, 8)),
-        _session('s3', 'ex1', weight: 70, sets: 3, date: DateTime(2024, 1, 15)),
+        _session(id: 's1', exerciseId: 'ex1', weight: 50, sets: 3, date: DateTime(2024, 1, 1)),
+        _session(id: 's2', exerciseId: 'ex1', weight: 60, sets: 3, date: DateTime(2024, 1, 8)),
+        _session(id: 's3', exerciseId: 'ex1', weight: 70, sets: 3, date: DateTime(2024, 1, 15)),
       ];
       manager.buildSessionIndex(sessions);
 
@@ -234,8 +240,14 @@ void main() {
 
     test('volume values match session totals', () {
       final sessions = [
-        _session('s1', 'ex1', weight: 100, reps: 10, sets: 3,
-            date: DateTime(2024, 1, 1)),
+        _session(
+          id: 's1',
+          exerciseId: 'ex1',
+          weight: 100,
+          reps: 10,
+          sets: 3,
+          date: DateTime(2024, 1, 1),
+        ),
       ];
       manager.buildSessionIndex(sessions);
 
@@ -246,7 +258,7 @@ void main() {
 
     test('returns empty list when exercise has no sessions', () {
       final sessions = [
-        _session('s1', 'ex2', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's1', exerciseId: 'ex2', weight: 80, date: DateTime(2024, 1, 1)),
       ];
       manager.buildSessionIndex(sessions);
 
@@ -258,12 +270,24 @@ void main() {
     test('sums volume for sessions within last 7 days', () {
       final now = DateTime(2024, 2, 10);
       final sessions = [
-        _session('s1', 'ex1', weight: 100, reps: 10, sets: 1,
-            date: DateTime(2024, 2, 8)), // within 7 days
-        _session('s2', 'ex1', weight: 100, reps: 10, sets: 1,
-            date: DateTime(2024, 2, 1)), // older than 7 days
+        _session(
+          id: 's1',
+          exerciseId: 'ex1',
+          weight: 100,
+          reps: 10,
+          sets: 1,
+          date: DateTime(2024, 2, 8),
+        ), // within 7 days
+        _session(
+          id: 's2',
+          exerciseId: 'ex1',
+          weight: 100,
+          reps: 10,
+          sets: 1,
+          date: DateTime(2024, 2, 1),
+        ), // older than 7 days
       ];
-      final exercises = [_exercise('ex1', 'chest')];
+      final exercises = [_exercise(id: 'ex1', muscleGroupId: 'chest')];
 
       final result = manager.getWeeklyVolumeByMuscle(
         sessions,
@@ -310,10 +334,16 @@ void main() {
     test('returns empty map when no sessions in window', () {
       final now = DateTime(2024, 2, 10);
       final sessions = [
-        _session('s1', 'ex1', weight: 100, reps: 10, sets: 1,
-            date: DateTime(2024, 1, 1)),
+        _session(
+          id: 's1',
+          exerciseId: 'ex1',
+          weight: 100,
+          reps: 10,
+          sets: 1,
+          date: DateTime(2024, 1, 1),
+        ),
       ];
-      final exercises = [_exercise('ex1', 'chest')];
+      final exercises = [_exercise(id: 'ex1', muscleGroupId: 'chest')];
 
       final result = manager.getWeeklyVolumeByMuscle(
         sessions,
@@ -327,10 +357,16 @@ void main() {
     test('uses provided exerciseMap for O(1) lookup', () {
       final now = DateTime(2024, 2, 10);
       final sessions = [
-        _session('s1', 'ex1', weight: 50, reps: 5, sets: 2,
-            date: DateTime(2024, 2, 9)),
+        _session(
+          id: 's1',
+          exerciseId: 'ex1',
+          weight: 50,
+          reps: 5,
+          sets: 2,
+          date: DateTime(2024, 2, 9),
+        ),
       ];
-      final exercises = [_exercise('ex1', 'back')];
+      final exercises = [_exercise(id: 'ex1', muscleGroupId: 'back')];
       final exerciseMap = {for (final e in exercises) e.id: e};
 
       final result = manager.getWeeklyVolumeByMuscle(
@@ -347,7 +383,7 @@ void main() {
   group('AnalyticsManager - getQuickStats', () {
     test('returns stats map from storage', () async {
       mockStorage.addMockSession(
-        _session('s1', 'ex1', date: DateTime.now()),
+        _session(id: 's1', exerciseId: 'ex1', date: DateTime(2024, 1, 15)),
       );
 
       final stats = await manager.getQuickStats();

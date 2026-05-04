@@ -96,6 +96,7 @@ void main() {
 
       expect(manager.routines.length, 1);
       expect(manager.routines.first.id, 'orphan');
+      expect(mockStorage.routines.any((r) => r.id == 'orphan'), isTrue);
     });
   });
 

@@ -125,8 +125,8 @@ void main() {
     });
 
     test('throws ArgumentError for empty name', () async {
-      expect(
-        () => manager.addCustomExercise(
+      await expectLater(
+        manager.addCustomExercise(
           name: '',
           category: 'compound',
           primaryMuscleGroupId: 'chest',
@@ -136,8 +136,8 @@ void main() {
     });
 
     test('throws ArgumentError for invalid category', () async {
-      expect(
-        () => manager.addCustomExercise(
+      await expectLater(
+        manager.addCustomExercise(
           name: 'Test',
           category: 'cardio',
           primaryMuscleGroupId: 'legs',
