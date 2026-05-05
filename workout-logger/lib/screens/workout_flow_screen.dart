@@ -1,8 +1,9 @@
-// Workout Flow Screen - Samsung Health-style minimal workout interface
+// Workout Flow Screen — soft-futurist exercise stepper
 
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
@@ -10,6 +11,8 @@ import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import 'exercise_library_screen.dart';
+import 'widgets/rf_widgets.dart';
+import 'workout_summary_screen.dart';
 
 class WorkoutFlowScreen extends StatefulWidget {
   final Routine? routine;
@@ -329,28 +332,22 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   Widget _buildHeader(WorkoutProvider provider, Exercise? exercise) {
     final totalExercises = provider.currentExerciseLogs.length;
-    final currentIndex = provider.currentExerciseIndex + 1;
+    final currentIndex = provider.currentExerciseIndex;
     final currentLog = provider.currentExerciseLog;
     final setNumber = (currentLog?.sets.length ?? 0) + 1;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+      decoration: const BoxDecoration(
+        color: AppColors.bg1,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Column(
         children: [
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.close),
+                icon: const Icon(Icons.close, color: AppColors.fg3),
                 onPressed: _showCancelDialog,
               ),
               Expanded(
@@ -358,37 +355,40 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   children: [
                     Text(
                       exercise?.name ?? 'Select Exercise',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
+                      style: GoogleFonts.geist(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.fg,
+                        letterSpacing: -0.02,
                       ),
                       textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
-                      'Exercise $currentIndex of $totalExercises • Set $setNumber',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppTheme.textSecondary,
+                      'Set $setNumber',
+                      style: GoogleFonts.geist(
+                        fontSize: 12,
+                        color: AppColors.fg3,
                       ),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.more_vert),
+                icon: const Icon(Icons.more_vert, color: AppColors.fg3),
                 onPressed: _showOptionsMenu,
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          // Progress bar
-          LinearProgressIndicator(
-            value: currentIndex / totalExercises,
-            backgroundColor: AppTheme.cardColor,
-            valueColor: const AlwaysStoppedAnimation(AppTheme.primaryColor),
-            borderRadius: BorderRadius.circular(4),
+          const SizedBox(height: 10),
+          // Segmented progress bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: totalExercises > 0
+                ? SegmentedProgressBar(total: totalExercises, current: currentIndex)
+                : const SizedBox.shrink(),
           ),
         ],
       ),
@@ -407,52 +407,41 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final displayWeightText = displayWeight == displayWeight.truncateToDouble()
         ? displayWeight.toStringAsFixed(0)
         : displayWeight.toStringAsFixed(1);
-    final confidenceColor = rec.confidence == 'high'
-        ? AppTheme.success
-        : (rec.confidence == 'medium' ? AppTheme.warning : AppTheme.textMuted);
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryColor.withOpacity(0.2),
-            AppTheme.secondaryColor.withOpacity(0.1),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
-      ),
+    return GlassCard(
+      gradientStart: AppColors.accent.withValues(alpha: 0.12),
+      gradientEnd: AppColors.data.withValues(alpha: 0.06),
+      borderColor: AppColors.accent.withValues(alpha: 0.30),
+      padding: const EdgeInsets.all(14),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
+              color: AppColors.accentSoft,
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
-              Icons.lightbulb_outline,
-              color: AppTheme.primaryColor,
-            ),
+            child: const Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Suggested',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                Text(
+                  'AI Suggestion',
+                  style: GoogleFonts.geist(fontSize: 10, color: AppColors.fg3, fontWeight: FontWeight.w600, letterSpacing: 0.3),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   '$displayWeightText ${settings.unitLabel} × ${rec.reps} reps',
-                  style: const TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                  style: GoogleFonts.geistMono(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.fg,
+                    letterSpacing: -0.02,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],
@@ -466,7 +455,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               });
               HapticFeedback.lightImpact();
             },
-            child: const Text('Apply'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+            child: Text('Apply', style: GoogleFonts.geist(fontSize: 13, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -519,24 +509,29 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     required double step,
     required int decimals,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
+    final displayText = decimals == 0
+        ? value.toInt().toString()
+        : value.toStringAsFixed(decimals);
+
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       child: Column(
         children: [
           Text(
-            label,
-            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+            label.toUpperCase(),
+            style: GoogleFonts.geist(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: AppColors.fg4,
+              letterSpacing: 0.4,
+            ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildCircleButton(
-                icon: Icons.remove,
+                icon: Icons.remove_rounded,
                 onPressed: () {
                   onChanged((value - step).clamp(0, 999));
                   HapticFeedback.selectionClick();
@@ -546,20 +541,20 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 child: GestureDetector(
                   onTap: () => _showNumberPicker(value, decimals, onChanged),
                   child: Text(
-                    decimals == 0
-                        ? value.toInt().toString()
-                        : value.toStringAsFixed(decimals),
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                    displayText,
+                    style: GoogleFonts.geistMono(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w300,
+                      color: AppColors.fg,
+                      letterSpacing: -0.04,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                     textAlign: TextAlign.center,
                   ),
                 ),
               ),
               _buildCircleButton(
-                icon: Icons.add,
+                icon: Icons.add_rounded,
                 onPressed: () {
                   onChanged((value + step).clamp(0, 999));
                   HapticFeedback.selectionClick();
@@ -577,19 +572,19 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     required VoidCallback onPressed,
   }) {
     return Material(
-      color: AppTheme.surfaceColor,
-      borderRadius: BorderRadius.circular(20),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         child: Container(
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.primaryColor.withOpacity(0.5)),
+            shape: BoxShape.circle,
+            color: AppColors.surface2,
+            border: Border.all(color: AppColors.borderStrong),
           ),
-          child: Icon(icon, color: AppTheme.primaryColor),
+          child: Icon(icon, color: AppColors.accent, size: 20),
         ),
       ),
     );
@@ -857,24 +852,45 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     return SizedBox(
       width: double.infinity,
       height: 60,
-      child: ElevatedButton(
-        onPressed: _completeSet,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.success,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.accent, Color(0xFF6D28D9)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, size: 28),
-            SizedBox(width: 12),
-            Text(
-              'SET DONE',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.accent.withValues(alpha: 0.40),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
             ),
           ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _completeSet,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.check_circle_outline_rounded,
+                    color: Colors.white, size: 22),
+                const SizedBox(width: 10),
+                Text(
+                  'COMPLETE SET',
+                  style: GoogleFonts.geist(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1225,61 +1241,46 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   // ==================== Rest Timer View ====================
 
   Widget _buildRestTimerView() {
-    final minutes = _remainingSeconds ~/ 60;
-    final seconds = _remainingSeconds % 60;
-
     return Container(
       width: double.infinity,
-      color: AppTheme.backgroundColor,
+      color: AppColors.bg,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text(
-            'REST TIME',
-            style: TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 16,
-              letterSpacing: 2,
-            ),
+          RestTimerRing(
+            remaining: _remainingSeconds,
+            total: _restSeconds,
+            size: 220,
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-            style: const TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 72,
-              fontWeight: FontWeight.w200,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: 40),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildTimerButton(
-                icon: Icons.remove_circle_outline,
-                label: '-30s',
-                onPressed: () => _adjustRestTime(-30),
-              ),
-              const SizedBox(width: AppSpacing.lg),
-              _buildTimerButton(
-                icon: Icons.add_circle_outline,
-                label: '+30s',
-                onPressed: () => _adjustRestTime(30),
-              ),
+              _buildTimerChip(label: '-30s', onPressed: () => _adjustRestTime(-30)),
+              const SizedBox(width: 16),
+              _buildTimerChip(label: '+30s', onPressed: () => _adjustRestTime(30)),
             ],
           ),
-          const SizedBox(height: AppSpacing.xxl),
+          const SizedBox(height: 32),
           SizedBox(
-            width: 200,
-            child: ElevatedButton(
+            width: 160,
+            height: 48,
+            child: OutlinedButton(
               onPressed: _skipRest,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.fg,
+                side: const BorderSide(color: AppColors.borderStrong),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
               ),
-              child: const Text(
-                'SKIP',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              child: Text(
+                'SKIP REST',
+                style: GoogleFonts.geist(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
               ),
             ),
           ),
@@ -1288,8 +1289,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     );
   }
 
-  Widget _buildTimerButton({
-    required IconData icon,
+  Widget _buildTimerChip({
     required String label,
     required VoidCallback onPressed,
   }) {
@@ -1298,21 +1298,17 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: AppTheme.cardColor,
+          color: AppColors.surface2,
           borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.border),
         ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppTheme.textSecondary),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+        child: Text(
+          label,
+          style: GoogleFonts.geistMono(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppColors.fg2,
+          ),
         ),
       ),
     );
@@ -1612,14 +1608,14 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context); // Close dialog
-              await context.read<WorkoutProvider>().finishWorkout();
+              final nav = Navigator.of(context);
+              nav.pop(); // Close dialog
+              final session =
+                  await context.read<WorkoutProvider>().finishWorkout();
               if (mounted) {
-                Navigator.pop(context); // Close workout screen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Workout saved! Great job! 💪'),
-                    backgroundColor: AppTheme.success,
+                nav.pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => WorkoutSummaryScreen(session: session),
                   ),
                 );
               }

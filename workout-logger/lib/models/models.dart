@@ -241,6 +241,9 @@ class WorkoutSession {
   double get totalVolume =>
       exercises.fold(0.0, (sum, ex) => sum + ex.totalVolume);
 
+  // Placeholder for upcoming PR tracking; keeps UI safe when accessed.
+  List<Object?> get personalRecords => const [];
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'date': date.toIso8601String(),

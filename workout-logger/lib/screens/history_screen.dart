@@ -1,6 +1,7 @@
-// History Screen - View past workout sessions
+// History Screen — session timeline with lifetime banner
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -10,6 +11,7 @@ import '../services/managers/history_manager.dart';
 import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import 'edit_workout_session_screen.dart';
+import 'widgets/rf_widgets.dart';
 
 // Teal color shared by the HC badge and sync status indicators.
 const Color _hcColor = Color(0xFF00BFA5);
@@ -60,16 +62,20 @@ class HistoryScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history, size: 64, color: AppTheme.textMuted),
+          const Icon(Icons.history_rounded, size: 56, color: AppColors.fg4),
           const SizedBox(height: 16),
           Text(
             'No Workout History',
-            style: Theme.of(context).textTheme.titleLarge,
+            style: GoogleFonts.geist(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.fg,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'Complete a workout to see it here',
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: GoogleFonts.geist(fontSize: 13, color: AppColors.fg3),
           ),
         ],
       ),
@@ -82,44 +88,153 @@ class HistoryScreen extends StatelessWidget {
     WorkoutProvider provider,
     HistoryManager historyManager,
   ) {
+    // Lifetime stats for the banner
+    final totalVolume =
+        sessions.fold<double>(0, (s, w) => s + w.totalVolume);
+    final totalSets = sessions.fold<int>(
+      0,
+      (s, w) => s + w.exercises.fold<int>(0, (a, e) => a + e.sets.length),
+    );
     // Group sessions by month
     final groupedSessions = <String, List<WorkoutSession>>{};
-    for (var session in sessions) {
-      final monthKey = DateFormat('MMMM yyyy').format(session.date);
-      groupedSessions.putIfAbsent(monthKey, () => []).add(session);
+    for (final session in sessions) {
+      final key = DateFormat('MMMM yyyy').format(session.date);
+      groupedSessions.putIfAbsent(key, () => []).add(session);
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      itemCount: groupedSessions.length,
-      itemBuilder: (context, index) {
-        final month = groupedSessions.keys.elementAt(index);
-        final monthSessions = groupedSessions[month]!;
+    return CustomScrollView(
+      slivers: [
+        // ── Lifetime summary banner ──
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: GlassCard(
+              padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+              child: Row(
+                children: [
+                  _LifetimeStat(
+                    label: 'SESSIONS',
+                    value: '${sessions.length}',
+                    color: AppColors.accent,
+                  ),
+                  _LifetimeDivider(),
+                  _LifetimeStat(
+                    label: 'TOTAL SETS',
+                    value: '$totalSets',
+                    color: AppColors.data,
+                  ),
+                  _LifetimeDivider(),
+                  _LifetimeStat(
+                    label: totalVolume >= 1000000 ? 'VOLUME (t)' : 'VOLUME (k)',
+                    value: totalVolume >= 1000000
+                        ? (totalVolume / 1000000).toStringAsFixed(1)
+                        : (totalVolume / 1000).toStringAsFixed(1),
+                    color: AppColors.success,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-              child: Text(
-                month,
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+        // ── Month-grouped session list ──
+        for (final entry in groupedSessions.entries) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Text(
+                    entry.key.toUpperCase(),
+                    style: GoogleFonts.geist(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.fg4,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${entry.value.length}',
+                    style: GoogleFonts.geist(fontSize: 10, color: AppColors.fg4),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) => _SessionCard(
+                  session: entry.value[i],
+                  provider: provider,
+                  historyManager: historyManager,
                 ),
+                childCount: entry.value.length,
               ),
             ),
-            ...monthSessions.map(
-              (session) => _SessionCard(
-                session: session,
-                provider: provider,
-                historyManager: historyManager,
-              ),
+          ),
+        ],
+
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+      ],
+    );
+  }
+}
+
+class _LifetimeStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _LifetimeStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: GoogleFonts.geistMono(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: color,
+              letterSpacing: -0.04,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
-          ],
-        );
-      },
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: GoogleFonts.geist(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: AppColors.fg4,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LifetimeDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 36,
+      color: AppColors.border,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
     );
   }
 }
@@ -137,127 +252,159 @@ class _SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('EEEE, MMM d');
-    final timeFormat = DateFormat('h:mm a');
     final settings = context.watch<SettingsProvider>();
     final isSynced = session.hcSyncedAt != null;
     final showSyncOption = !isSynced && settings.healthConnectEnabled;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: InkWell(
+    final dayStr = DateFormat('EEE').format(session.date).toUpperCase();
+    final dateNum = DateFormat('d').format(session.date);
+    final monthStr = DateFormat('MMM').format(session.date);
+    final vol = session.totalVolume;
+    final volStr = vol >= 1000
+        ? '${(vol / 1000).toStringAsFixed(1)}k'
+        : vol.toStringAsFixed(0);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GlassCard(
         onTap: () => _showSessionDetails(context),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header row ────────────────────────────────────────
-              Row(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Date column
+            SizedBox(
+              width: 36,
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      dateFormat.format(session.date),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                      ),
+                  Text(
+                    dayStr,
+                    style: GoogleFonts.geist(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.fg4,
+                      letterSpacing: 0.3,
                     ),
                   ),
-                  // HC synced badge
-                  if (isSynced)
-                    Tooltip(
-                      message: 'Synced to Health Connect',
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: Icon(
-                          Icons.monitor_heart,
-                          color: _hcColor,
-                          size: 16,
+                  const SizedBox(height: 1),
+                  Text(
+                    dateNum,
+                    style: GoogleFonts.geistMono(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accent,
+                      letterSpacing: -0.04,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  Text(
+                    monthStr,
+                    style: GoogleFonts.geist(fontSize: 9, color: AppColors.fg3),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 52,
+              color: AppColors.border,
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            // Main content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Text(
+                              '${session.exercises.length} exercises · ${session.duration} min',
+                              style: GoogleFonts.geist(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.fg,
+                              ),
+                            ),
+                            if (isSynced) ...[
+                              const SizedBox(width: 6),
+                              Tooltip(
+                                message: 'Synced to Health Connect',
+                                child: Icon(Icons.monitor_heart,
+                                    color: _hcColor, size: 13),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                    ),
-                  Text(
-                    timeFormat.format(session.date),
-                    style: const TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 12,
-                    ),
+                      // Volume
+                      Text(
+                        '$volStr kg',
+                        style: GoogleFonts.geistMono(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                          letterSpacing: -0.02,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      _SessionMenu(
+                        session: session,
+                        provider: provider,
+                        historyManager: historyManager,
+                        showSyncOption: showSyncOption,
+                        onDetailRequested: () => _showSessionDetails(context),
+                      ),
+                    ],
                   ),
-                  // ⋮ popup menu
-                  _SessionMenu(
-                    session: session,
-                    provider: provider,
-                    historyManager: historyManager,
-                    showSyncOption: showSyncOption,
-                    onDetailRequested: () => _showSessionDetails(context),
+                  const SizedBox(height: 6),
+                  // Exercise pill tags
+                  Wrap(
+                    spacing: 5,
+                    runSpacing: 4,
+                    children: [
+                      ...session.exercises.take(3).map((log) {
+                        final name = provider.getExerciseName(log.exerciseId);
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface2,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Text(
+                            name,
+                            style: GoogleFonts.geist(
+                                fontSize: 10, color: AppColors.fg3),
+                          ),
+                        );
+                      }),
+                      if (session.exercises.length > 3)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface2,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Text(
+                            '+${session.exercises.length - 3}',
+                            style: GoogleFonts.geist(
+                                fontSize: 10, color: AppColors.fg4),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                children: [
-                  _buildStat(
-                    Icons.fitness_center,
-                    '${session.exercises.length} exercises',
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  _buildStat(Icons.timer_outlined, '${session.duration} min'),
-                  const SizedBox(width: AppSpacing.md),
-                  _buildStat(
-                    Icons.trending_up,
-                    '${(session.totalVolume / 1000).toStringAsFixed(1)}k kg',
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              const Divider(),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: session.exercises.take(4).map((log) {
-                  final exerciseName = provider.getExerciseName(log.exerciseId);
-                  return Chip(
-                    label: Text(
-                      exerciseName,
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  );
-                }).toList(),
-              ),
-              if (session.exercises.length > 4)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '+${session.exercises.length - 4} more',
-                    style: const TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildStat(IconData icon, String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: AppTheme.textSecondary),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-        ),
-      ],
     );
   }
 
