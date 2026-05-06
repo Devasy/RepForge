@@ -1,4 +1,4 @@
-﻿// Edit Workout Session Screen - Modify recorded workout sessions
+// edit_workout_session_screen.dart — Edit a recorded workout session
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,11 +8,12 @@ import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../theme/app_theme.dart';
+import 'widgets/rf_widgets.dart';
+import 'widgets/editable_exercise_card.dart';
 
 class EditWorkoutSessionScreen extends StatefulWidget {
-  final WorkoutSession session;
-
   const EditWorkoutSessionScreen({super.key, required this.session});
+  final WorkoutSession session;
 
   @override
   State<EditWorkoutSessionScreen> createState() =>
@@ -22,9 +23,9 @@ class EditWorkoutSessionScreen extends StatefulWidget {
 class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
   late DateTime _selectedDate;
   late TimeOfDay _selectedTime;
-  late TextEditingController _notesController;
-  late TextEditingController _durationController;
-  late List<_EditableExerciseLog> _editableExercises;
+  late TextEditingController _notesCtrl;
+  late TextEditingController _durationCtrl;
+  late List<EditableExerciseLog> _exercises;
   bool _isSubmitting = false;
   bool _hasChanges = false;
 
@@ -33,24 +34,22 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
     super.initState();
     _selectedDate = widget.session.date;
     _selectedTime = TimeOfDay.fromDateTime(widget.session.date);
-    _notesController = TextEditingController(text: widget.session.notes ?? '');
-    _durationController = TextEditingController(
+    _notesCtrl = TextEditingController(text: widget.session.notes ?? '');
+    _durationCtrl = TextEditingController(
       text: widget.session.duration.toString(),
     );
-
-    // Convert to editable structure, preserving all set metadata
-    _editableExercises = widget.session.exercises.map((log) {
-      return _EditableExerciseLog(
+    _exercises = widget.session.exercises.map((log) {
+      return EditableExerciseLog(
         exerciseId: log.exerciseId,
         sets: log.sets
             .map(
-              (set) => _EditableSet(
-                weight: set.weight,
-                reps: set.reps,
-                isDropset: set.isDropset,
-                drops: set.drops,
-                timeTaken: set.timeTaken,
-                timestamp: set.timestamp,
+              (s) => EditableSet(
+                weight: s.weight,
+                reps: s.reps,
+                isDropset: s.isDropset,
+                drops: s.drops,
+                timeTaken: s.timeTaken,
+                timestamp: s.timestamp,
               ),
             )
             .toList(),
@@ -61,15 +60,13 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
 
   @override
   void dispose() {
-    _notesController.dispose();
-    _durationController.dispose();
+    _notesCtrl.dispose();
+    _durationCtrl.dispose();
     super.dispose();
   }
 
   void _markChanged() {
-    if (!_hasChanges) {
-      setState(() => _hasChanges = true);
-    }
+    if (!_hasChanges) setState(() => _hasChanges = true);
   }
 
   Future<void> _selectDate() async {
@@ -78,28 +75,24 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 1)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppTheme.primaryColor,
-              surface: AppTheme.cardColor,
-            ),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.primary,
+            surface: AppColors.cardHigh,
           ),
-          child: child!,
-        );
-      },
+        ),
+        child: child!,
+      ),
     );
     if (picked != null) {
-      setState(() {
-        _selectedDate = DateTime(
-          picked.year,
-          picked.month,
-          picked.day,
-          _selectedTime.hour,
-          _selectedTime.minute,
-        );
-      });
+      setState(() => _selectedDate = DateTime(
+            picked.year,
+            picked.month,
+            picked.day,
+            _selectedTime.hour,
+            _selectedTime.minute,
+          ));
       _markChanged();
     }
   }
@@ -108,17 +101,15 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
     final picked = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppTheme.primaryColor,
-              surface: AppTheme.cardColor,
-            ),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.primary,
+            surface: AppColors.cardHigh,
           ),
-          child: child!,
-        );
-      },
+        ),
+        child: child!,
+      ),
     );
     if (picked != null) {
       setState(() {
@@ -137,70 +128,43 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
 
   void _addSet(int exerciseIndex) {
     setState(() {
-      // Copy last set values or use defaults
-      final lastSet = _editableExercises[exerciseIndex].sets.isNotEmpty
-          ? _editableExercises[exerciseIndex].sets.last
+      final last = _exercises[exerciseIndex].sets.isNotEmpty
+          ? _exercises[exerciseIndex].sets.last
           : null;
-      _editableExercises[exerciseIndex].sets.add(
-        _EditableSet(
-          weight: lastSet?.weight ?? 0,
-          reps: lastSet?.reps ?? 0,
-          isDropset: false,
-          drops: null,
-          timeTaken: null,
-          timestamp: DateTime.now(),
-        ),
-      );
+      _exercises[exerciseIndex].sets.add(EditableSet(
+        weight: last?.weight ?? 0,
+        reps: last?.reps ?? 0,
+        timestamp: DateTime.now(),
+      ));
     });
     _markChanged();
   }
 
-  void _deleteSet(int exerciseIndex, int setIndex) {
-    setState(() {
-      _editableExercises[exerciseIndex].sets.removeAt(setIndex);
-    });
+  void _deleteSet(int exIdx, int setIdx) {
+    setState(() => _exercises[exIdx].sets.removeAt(setIdx));
     _markChanged();
   }
 
-  void _deleteExercise(int exerciseIndex) {
-    setState(() {
-      _editableExercises.removeAt(exerciseIndex);
-    });
+  void _deleteExercise(int exIdx) {
+    setState(() => _exercises.removeAt(exIdx));
     _markChanged();
   }
 
-  Future<void> _saveChanges() async {
-    // Validate duration
-    final duration = int.tryParse(_durationController.text);
+  Future<void> _save() async {
+    final duration = int.tryParse(_durationCtrl.text);
     if (duration == null || duration < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid duration'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      _snack('Please enter a valid duration', isError: true);
       return;
     }
-
-    // Validate that there's at least one exercise with sets
-    final exercisesWithSets = _editableExercises
-        .where((e) => e.sets.isNotEmpty)
-        .toList();
-    if (exercisesWithSets.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Workout must have at least one exercise with sets'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+    final withSets = _exercises.where((e) => e.sets.isNotEmpty).toList();
+    if (withSets.isEmpty) {
+      _snack('Workout must have at least one exercise with sets', isError: true);
       return;
     }
 
     setState(() => _isSubmitting = true);
-
     try {
-      // Convert editable exercises back to ExerciseLog, preserving metadata
-      final updatedExercises = exercisesWithSets.map((e) {
+      final updatedExercises = withSets.map((e) {
         return ExerciseLog(
           exerciseId: e.exerciseId,
           sets: e.sets
@@ -219,69 +183,55 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
         );
       }).toList();
 
-      // Create updated session
-      final updatedSession = widget.session.copyWith(
+      final updated = widget.session.copyWith(
         date: _selectedDate,
         duration: duration,
-        notes: _notesController.text.isEmpty ? null : _notesController.text,
+        notes: _notesCtrl.text.isEmpty ? null : _notesCtrl.text,
         exercises: updatedExercises,
       );
 
-      // Save via provider
-      final provider = context.read<WorkoutProvider>();
-      await provider.updateWorkoutSession(updatedSession);
+      await context.read<WorkoutProvider>().updateWorkoutSession(updated);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: const [
-                Icon(Icons.check_circle, color: AppTheme.success),
-                SizedBox(width: 8),
-                Text('Workout updated successfully'),
-              ],
-            ),
-            backgroundColor: AppTheme.cardColor,
-          ),
-        );
-        Navigator.of(context).pop(true); // Return success
+        _snack('Workout updated');
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
-      debugPrint('Failed to save workout session: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to save workout. Please try again.'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
-      }
+      debugPrint('Save failed: $e');
+      if (mounted) _snack('Failed to save. Please try again.', isError: true);
     } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   Future<bool> _onWillPop() async {
     if (!_hasChanges) return true;
-
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.cardColor,
-        title: const Text('Discard Changes?'),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardHigh,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        title: const Text(
+          'Discard Changes?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
         content: const Text(
-          'You have unsaved changes. Are you sure you want to discard them?',
+          'You have unsaved changes. Discard them?',
+          style: TextStyle(color: AppColors.textSoft),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSoft),
+            ),
           ),
           TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('Discard'),
           ),
         ],
@@ -290,418 +240,264 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
     return result ?? false;
   }
 
+  void _snack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: const TextStyle(color: AppColors.textPrimary)),
+        backgroundColor: isError ? AppColors.error : AppColors.cardHigh,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.read<WorkoutProvider>();
-    final dateFormat = DateFormat('EEEE, MMMM d, yyyy');
-    final timeFormat = DateFormat('h:mm a');
 
     return PopScope(
       canPop: !_hasChanges,
-      onPopInvokedWithResult: (didPop, result) async {
+      onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        final shouldPop = await _onWillPop();
-        if (shouldPop && context.mounted) {
+        if (await _onWillPop() && context.mounted) {
           Navigator.of(context).pop();
         }
       },
       child: Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('Edit Workout'),
+          backgroundColor: AppColors.surface,
+          title: const Text(
+            'Edit Workout',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          iconTheme: const IconThemeData(color: AppColors.textSoft),
           actions: [
             TextButton(
-              onPressed: _isSubmitting ? null : _saveChanges,
+              onPressed: _isSubmitting ? null : _save,
               child: _isSubmitting
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
                     )
-                  : const Text('Save'),
+                  : const Text(
+                      'Save',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ],
         ),
         body: ListView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
-            // Date & Time Section
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.calendar_today,
-                          size: 20,
-                          color: AppTheme.primaryColor,
+            // Date & Time
+            _SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel(context, Icons.calendar_today_rounded,
+                      AppColors.primary, 'Date & Time'),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TapField(
+                          label: 'Date',
+                          value: DateFormat('EEE, MMM d, yyyy')
+                              .format(_selectedDate),
+                          onTap: _selectDate,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Date & Time',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: _selectDate,
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                            child: Container(
-                              padding: const EdgeInsets.all(AppSpacing.md),
-                              decoration: BoxDecoration(
-                                color: AppTheme.surfaceColor,
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.md,
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Date',
-                                    style: TextStyle(
-                                      color: AppTheme.textMuted,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    dateFormat.format(_selectedDate),
-                                    style: const TextStyle(
-                                      color: AppTheme.textPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        InkWell(
-                          onTap: _selectTime,
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                          child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surfaceColor,
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Time',
-                                  style: TextStyle(
-                                    color: AppTheme.textMuted,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  timeFormat.format(_selectedDate),
-                                  style: const TextStyle(
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      _TapField(
+                        label: 'Time',
+                        value: DateFormat('h:mm a').format(_selectedDate),
+                        onTap: _selectTime,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
 
             const SizedBox(height: AppSpacing.md),
 
-            // Duration & Notes Section
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.timer_outlined,
-                          size: 20,
-                          color: AppTheme.secondaryColor,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Duration (minutes)',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    TextField(
-                      controller: _durationController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        hintText: 'Duration in minutes',
-                      ),
-                      onChanged: (_) => _markChanged(),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.notes,
-                          size: 20,
-                          color: AppTheme.warning,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Notes',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    TextField(
-                      controller: _notesController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        hintText: 'Optional workout notes...',
-                      ),
-                      onChanged: (_) => _markChanged(),
-                    ),
-                  ],
-                ),
+            // Duration & Notes
+            _SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel(context, Icons.timer_outlined,
+                      AppColors.secondary, 'Duration (minutes)'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _StyledField(
+                    controller: _durationCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    hint: 'Minutes',
+                    onChanged: (_) => _markChanged(),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _sectionLabel(context, Icons.notes_rounded,
+                      AppColors.warning, 'Notes'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _StyledField(
+                    controller: _notesCtrl,
+                    hint: 'Optional workout notes…',
+                    maxLines: 3,
+                    onChanged: (_) => _markChanged(),
+                  ),
+                ],
               ),
             ),
 
             const SizedBox(height: AppSpacing.lg),
 
-            // Exercises Header
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                const RFSectionHeader('Exercises'),
+                const Spacer(),
                 Text(
-                  'Exercises',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                Text(
-                  '${_editableExercises.length} exercises',
-                  style: const TextStyle(color: AppTheme.textMuted),
+                  '${_exercises.length} exercises',
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
 
             const SizedBox(height: AppSpacing.md),
 
-            // Exercise Cards
-            ..._editableExercises.asMap().entries.map((entry) {
-              final exerciseIndex = entry.key;
-              final editableLog = entry.value;
-              final exercise = provider.getExercise(editableLog.exerciseId);
-
-              return _EditableExerciseCard(
-                key: ValueKey('exercise_$exerciseIndex'),
-                exerciseName: exercise?.name ?? 'Unknown Exercise',
-                editableLog: editableLog,
-                onSetChanged: (setIndex, weight, reps, isDropset, drops) {
+            ..._exercises.asMap().entries.map((entry) {
+              final i = entry.key;
+              final log = entry.value;
+              final ex = provider.getExercise(log.exerciseId);
+              return EditableExerciseCard(
+                key: ValueKey('exercise_$i'),
+                exerciseName: ex?.name ?? 'Unknown Exercise',
+                editableLog: log,
+                onSetChanged: (si, w, r, d, drops) {
                   setState(() {
-                    editableLog.sets[setIndex].weight = weight;
-                    editableLog.sets[setIndex].reps = reps;
-                    if (editableLog.sets[setIndex].isDropset != isDropset) {
-                      editableLog.sets[setIndex].isDropset = isDropset;
-                      if (isDropset &&
-                          editableLog.sets[setIndex].drops == null) {
-                        editableLog.sets[setIndex].drops = [];
-                      }
-                    }
-                    if (drops != null) {
-                      editableLog.sets[setIndex].drops = drops;
-                    }
+                    log.sets[si].weight = w;
+                    log.sets[si].reps = r;
+                    log.sets[si].isDropset = d;
+                    if (drops != null) log.sets[si].drops = drops;
                   });
                   _markChanged();
                 },
-                onAddSet: () => _addSet(exerciseIndex),
-                onDeleteSet: (setIndex) => _deleteSet(exerciseIndex, setIndex),
-                onDeleteExercise: () => _deleteExercise(exerciseIndex),
+                onAddSet: () => _addSet(i),
+                onDeleteSet: (si) => _deleteSet(i, si),
+                onDeleteExercise: () => _deleteExercise(i),
               );
             }),
 
-            if (_editableExercises.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: Center(
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.fitness_center,
-                        size: 48,
-                        color: AppTheme.textMuted,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      const Text(
-                        'No exercises in this workout',
-                        style: TextStyle(color: AppTheme.textMuted),
-                      ),
-                    ],
-                  ),
-                ),
+            if (_exercises.isEmpty)
+              RFEmptyState(
+                icon: Icons.fitness_center_rounded,
+                title: 'No exercises',
+                subtitle: 'All exercises have been removed',
               ),
 
-            const SizedBox(height: 80), // Space for bottom
+            const SizedBox(height: 80),
           ],
         ),
       ),
     );
   }
+
+  Widget _sectionLabel(
+    BuildContext context,
+    IconData icon,
+    Color color,
+    String label,
+  ) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textSoft,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-// Helper class for editable exercise data
-class _EditableExerciseLog {
-  final String exerciseId;
-  final List<_EditableSet> sets;
-  final String? notes;
-
-  _EditableExerciseLog({
-    required this.exerciseId,
-    required this.sets,
-    this.notes,
-  });
-}
-
-class _EditableSet {
-  double weight;
-  int reps;
-  bool isDropset;
-  List<DropsetEntry>? drops;
-  int? timeTaken;
-  DateTime timestamp;
-
-  _EditableSet({
-    required this.weight,
-    required this.reps,
-    required this.timestamp,
-    this.isDropset = false,
-    this.drops,
-    this.timeTaken,
-  });
-}
-
-// Editable Exercise Card Widget
-class _EditableExerciseCard extends StatelessWidget {
-  final String exerciseName;
-  final _EditableExerciseLog editableLog;
-  final Function(
-    int setIndex,
-    double weight,
-    int reps,
-    bool isDropset,
-    List<DropsetEntry>? drops,
-  )
-  onSetChanged;
-  final VoidCallback onAddSet;
-  final Function(int setIndex) onDeleteSet;
-  final VoidCallback onDeleteExercise;
-
-  const _EditableExerciseCard({
-    super.key,
-    required this.exerciseName,
-    required this.editableLog,
-    required this.onSetChanged,
-    required this.onAddSet,
-    required this.onDeleteSet,
-    required this.onDeleteExercise,
-  });
+// ── Section card ──────────────────────────────────────────────────────────────
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.child});
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Padding(
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.glassBorder),
+      ),
+      child: child,
+    );
+  }
+}
+
+// ── Tappable date/time display field ──────────────────────────────────────────
+class _TapField extends StatelessWidget {
+  const _TapField({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.glassBorder),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    exerciseName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => _confirmDeleteExercise(context),
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                  color: AppTheme.error,
-                  tooltip: 'Remove exercise',
-                ),
-              ],
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
             ),
-
-            const Divider(),
-
-            // Sets
-            ...editableLog.sets.asMap().entries.map((entry) {
-              final setIndex = entry.key;
-              final set = entry.value;
-
-              return _EditableSetRow(
-                setNumber: setIndex + 1,
-                weight: set.weight,
-                reps: set.reps,
-                isDropset: set.isDropset,
-                drops: set.drops,
-                onWeightChanged: (weight) => onSetChanged(
-                  setIndex,
-                  weight,
-                  set.reps,
-                  set.isDropset,
-                  set.drops,
-                ),
-                onRepsChanged: (reps) => onSetChanged(
-                  setIndex,
-                  set.weight,
-                  reps,
-                  set.isDropset,
-                  set.drops,
-                ),
-                onDropsChanged: (drops) => onSetChanged(
-                  setIndex,
-                  set.weight,
-                  set.reps,
-                  set.isDropset,
-                  drops,
-                ),
-                onIsDropsetChanged: (val) => onSetChanged(
-                  setIndex,
-                  set.weight,
-                  set.reps,
-                  val,
-                  set.drops,
-                ),
-                onDelete: () => onDeleteSet(setIndex),
-              );
-            }),
-
-            // Add Set Button
-            Center(
-              child: TextButton.icon(
-                onPressed: onAddSet,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Set'),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 13,
               ),
             ),
           ],
@@ -709,484 +505,50 @@ class _EditableExerciseCard extends StatelessWidget {
       ),
     );
   }
-
-  void _confirmDeleteExercise(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.cardColor,
-        title: const Text('Remove Exercise?'),
-        content: Text('Remove "$exerciseName" from this workout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              onDeleteExercise();
-            },
-            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-// Editable Set Row Widget
-class _EditableSetRow extends StatefulWidget {
-  final int setNumber;
-  final double weight;
-  final int reps;
-  final bool isDropset;
-  final List<DropsetEntry>? drops;
-  final Function(double) onWeightChanged;
-  final Function(int) onRepsChanged;
-  final Function(List<DropsetEntry>) onDropsChanged;
-  final Function(bool) onIsDropsetChanged;
-  final VoidCallback onDelete;
-
-  const _EditableSetRow({
-    required this.setNumber,
-    required this.weight,
-    required this.reps,
-    this.isDropset = false,
-    this.drops,
-    required this.onWeightChanged,
-    required this.onRepsChanged,
-    required this.onDropsChanged,
-    required this.onIsDropsetChanged,
-    required this.onDelete,
+// ── Styled text field ─────────────────────────────────────────────────────────
+class _StyledField extends StatelessWidget {
+  const _StyledField({
+    required this.controller,
+    required this.hint,
+    this.keyboardType,
+    this.inputFormatters,
+    this.maxLines = 1,
+    this.onChanged,
   });
 
-  @override
-  State<_EditableSetRow> createState() => _EditableSetRowState();
-}
-
-class _EditableSetRowState extends State<_EditableSetRow> {
-  late TextEditingController _weightController;
-  late TextEditingController _repsController;
-  final FocusNode _weightFocus = FocusNode();
-  final FocusNode _repsFocus = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    _weightController = TextEditingController(text: widget.weight.toString());
-    _repsController = TextEditingController(text: widget.reps.toString());
-  }
-
-  @override
-  void didUpdateWidget(covariant _EditableSetRow oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.weight != oldWidget.weight && !_weightFocus.hasFocus) {
-      if (double.tryParse(_weightController.text) != widget.weight) {
-        _weightController.text = widget.weight.toString();
-      }
-    }
-    if (widget.reps != oldWidget.reps && !_repsFocus.hasFocus) {
-      if (int.tryParse(_repsController.text) != widget.reps) {
-        _repsController.text = widget.reps.toString();
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _weightController.dispose();
-    _repsController.dispose();
-    _weightFocus.dispose();
-    _repsFocus.dispose();
-    super.dispose();
-  }
+  final TextEditingController controller;
+  final String hint;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final int maxLines;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Set number
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Center(
-                  child: Text(
-                    '${widget.setNumber}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryColor,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-
-              // Weight input
-              SizedBox(
-                width: 80,
-                child: TextField(
-                  controller: _weightController,
-                  focusNode: _weightFocus,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14),
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                    suffixText: 'kg',
-                    suffixStyle: const TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 12,
-                    ),
-                    filled: true,
-                    fillColor: AppTheme.surfaceColor,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onChanged: (value) {
-                    final weight = double.tryParse(value) ?? 0;
-                    widget.onWeightChanged(weight);
-                  },
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-
-              // × symbol
-              const Text('×', style: TextStyle(color: AppTheme.textMuted)),
-              const SizedBox(width: AppSpacing.sm),
-
-              // Reps input
-              SizedBox(
-                width: 70,
-                child: TextField(
-                  controller: _repsController,
-                  focusNode: _repsFocus,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14),
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                    suffixText: 'reps',
-                    suffixStyle: const TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 12,
-                    ),
-                    filled: true,
-                    fillColor: AppTheme.surfaceColor,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onChanged: (value) {
-                    final reps = int.tryParse(value) ?? 0;
-                    widget.onRepsChanged(reps);
-                  },
-                ),
-              ),
-
-              const Spacer(),
-
-              // Toggle Dropset button
-              IconButton(
-                onPressed: () => widget.onIsDropsetChanged(!widget.isDropset),
-                icon: Icon(
-                  widget.isDropset ? Icons.layers : Icons.layers_outlined,
-                  size: 18,
-                ),
-                color: widget.isDropset
-                    ? AppTheme.primaryColor
-                    : AppTheme.textMuted,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                tooltip: widget.isDropset
-                    ? 'Remove drops'
-                    : 'Convert to dropset',
-              ),
-
-              // Delete button
-              IconButton(
-                onPressed: widget.onDelete,
-                icon: const Icon(Icons.close, size: 18),
-                color: AppTheme.textMuted,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                tooltip: 'Delete set',
-              ),
-            ],
-          ),
-
-          // Dropset Rows
-          if (widget.isDropset) ...[
-            if (widget.drops != null) ...[
-              const SizedBox(height: 4),
-              ...widget.drops!.asMap().entries.map((entry) {
-                final index = entry.key;
-                final drop = entry.value;
-                return _EditableDropRow(
-                  key: ValueKey('drop_${widget.setNumber}_$index'),
-                  dropNumber: index + 1,
-                  weight: drop.weight,
-                  reps: drop.reps,
-                  onWeightChanged: (val) {
-                    final newDrops = List<DropsetEntry>.from(widget.drops!);
-                    newDrops[index] = DropsetEntry(
-                      weight: val,
-                      reps: drop.reps,
-                    );
-                    widget.onDropsChanged(newDrops);
-                  },
-                  onRepsChanged: (val) {
-                    final newDrops = List<DropsetEntry>.from(widget.drops!);
-                    newDrops[index] = DropsetEntry(
-                      weight: drop.weight,
-                      reps: val,
-                    );
-                    widget.onDropsChanged(newDrops);
-                  },
-                  onDelete: () {
-                    final newDrops = List<DropsetEntry>.from(widget.drops!)
-                      ..removeAt(index);
-                    widget.onDropsChanged(newDrops);
-                  },
-                );
-              }),
-            ],
-
-            // Add drop button
-            Padding(
-              padding: const EdgeInsets.only(left: 32, top: 4, bottom: 4),
-              child: InkWell(
-                onTap: () {
-                  final newDrops = List<DropsetEntry>.from(widget.drops ?? []);
-                  // Default to 80% of last weight or current weight
-                  double initialWeight = widget.weight * 0.8;
-                  if (newDrops.isNotEmpty) {
-                    initialWeight = newDrops.last.weight * 0.8;
-                  }
-                  // Round to nearest 0.5
-                  initialWeight = (initialWeight * 2).round() / 2;
-
-                  newDrops.add(
-                    DropsetEntry(weight: initialWeight, reps: widget.reps),
-                  );
-                  widget.onDropsChanged(newDrops);
-                },
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.add_circle_outline,
-                      size: 14,
-                      color: AppTheme.primaryColor.withOpacity(0.7),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Add Drop',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.primaryColor.withOpacity(0.7),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.glassBorder),
       ),
-    );
-  }
-}
-
-class _EditableDropRow extends StatefulWidget {
-  final int dropNumber;
-  final double weight;
-  final int reps;
-  final Function(double) onWeightChanged;
-  final Function(int) onRepsChanged;
-  final VoidCallback onDelete;
-
-  const _EditableDropRow({
-    super.key,
-    required this.dropNumber,
-    required this.weight,
-    required this.reps,
-    required this.onWeightChanged,
-    required this.onRepsChanged,
-    required this.onDelete,
-  });
-
-  @override
-  State<_EditableDropRow> createState() => _EditableDropRowState();
-}
-
-class _EditableDropRowState extends State<_EditableDropRow> {
-  late TextEditingController _weightController;
-  late TextEditingController _repsController;
-  final FocusNode _weightFocus = FocusNode();
-  final FocusNode _repsFocus = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    _weightController = TextEditingController(text: widget.weight.toString());
-    _repsController = TextEditingController(text: widget.reps.toString());
-  }
-
-  @override
-  void didUpdateWidget(covariant _EditableDropRow oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.weight != oldWidget.weight && !_weightFocus.hasFocus) {
-      if (double.tryParse(_weightController.text) != widget.weight) {
-        _weightController.text = widget.weight.toString();
-      }
-    }
-    if (widget.reps != oldWidget.reps && !_repsFocus.hasFocus) {
-      if (int.tryParse(_repsController.text) != widget.reps) {
-        _repsController.text = widget.reps.toString();
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _weightController.dispose();
-    _repsController.dispose();
-    _weightFocus.dispose();
-    _repsFocus.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 32, top: 4, bottom: 4),
-      child: Row(
-        children: [
-          Icon(
-            Icons.subdirectory_arrow_right,
-            size: 16,
-            color: AppTheme.textMuted.withOpacity(0.5),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
+        maxLines: maxLines,
+        onChanged: onChanged,
+        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm + 2,
           ),
-          const SizedBox(width: 8),
-
-          Text(
-            'Drop ${widget.dropNumber}',
-            style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-
-          // Weight input
-          SizedBox(
-            width: 70,
-            height: 32,
-            child: TextField(
-              controller: _weightController,
-              focusNode: _weightFocus,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 0,
-                ),
-                suffixText: 'kg',
-                suffixStyle: const TextStyle(
-                  fontSize: 10,
-                  color: AppTheme.textMuted,
-                ),
-                filled: true,
-                fillColor: AppTheme.surfaceColor.withOpacity(0.7),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              onChanged: (value) {
-                final weight = double.tryParse(value) ?? 0;
-                widget.onWeightChanged(weight);
-              },
-            ),
-          ),
-
-          const SizedBox(width: 8),
-          const Text(
-            '×',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-          ),
-          const SizedBox(width: 8),
-
-          // Reps input
-          SizedBox(
-            width: 60,
-            height: 32,
-            child: TextField(
-              controller: _repsController,
-              focusNode: _repsFocus,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 0,
-                ),
-                suffixText: 'reps',
-                suffixStyle: const TextStyle(
-                  fontSize: 10,
-                  color: AppTheme.textMuted,
-                ),
-                filled: true,
-                fillColor: AppTheme.surfaceColor.withOpacity(0.7),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              onChanged: (value) {
-                final reps = int.tryParse(value) ?? 0;
-                widget.onRepsChanged(reps);
-              },
-            ),
-          ),
-
-          const Spacer(),
-
-          IconButton(
-            onPressed: widget.onDelete,
-            icon: const Icon(Icons.close, size: 16),
-            color: AppTheme.textMuted,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            tooltip: 'Remove drop',
-          ),
-        ],
+        ),
       ),
     );
   }

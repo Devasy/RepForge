@@ -1,16 +1,16 @@
-// Analytics Screen - Visualize progress with charts
+// analytics_screen.dart — Analytics screen with Overview, Exercises, Targets tabs
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
-import '../models/models.dart';
 import '../services/workout_provider.dart';
-import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import '../data/exercise_database.dart';
+import 'widgets/rf_widgets.dart';
+import 'widgets/exercise_progress_view.dart';
+import 'widgets/targets_tab.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -38,31 +38,85 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Analytics'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Overview'),
-            Tab(text: 'Exercises'),
-            Tab(text: 'Targets'),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _AnalyticsHeader(tabController: _tabController),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: const [
+                  _OverviewTab(),
+                  ExerciseProgressView(),
+                  TargetsTab(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          _OverviewTab(),
-          _ExercisesTab(),
-          _TargetsTab(),
+    );
+  }
+}
+
+// ── Header with title + tab bar ───────────────────────────────────────────────
+class _AnalyticsHeader extends StatelessWidget {
+  const _AnalyticsHeader({required this.tabController});
+  final TabController tabController;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.glassBorder)),
+      ),
+      child: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Analytics',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+          ),
+          TabBar(
+            controller: tabController,
+            indicatorColor: AppColors.primary,
+            indicatorWeight: 2,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: AppColors.textMuted,
+            labelStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+            tabs: const [
+              Tab(text: 'Overview'),
+              Tab(text: 'Exercises'),
+              Tab(text: 'Targets'),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-// ==================== Overview Tab ====================
-
+// ── Overview Tab ──────────────────────────────────────────────────────────────
 class _OverviewTab extends StatelessWidget {
   const _OverviewTab();
 
@@ -71,1042 +125,310 @@ class _OverviewTab extends StatelessWidget {
     final provider = context.watch<WorkoutProvider>();
 
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildVolumeChart(context, provider),
-          const SizedBox(height: AppSpacing.lg),
-          _buildMuscleVolumeChart(context, provider),
-          const SizedBox(height: AppSpacing.lg),
-          _buildWorkoutFrequency(context, provider),
+          _VolumeChart(provider: provider),
+          const SizedBox(height: AppSpacing.md),
+          _MuscleVolumeChart(provider: provider),
+          const SizedBox(height: AppSpacing.md),
+          _FrequencyGrid(provider: provider),
+          const SizedBox(height: AppSpacing.xxl),
         ],
       ),
     );
   }
+}
 
-  Widget _buildVolumeChart(BuildContext context, WorkoutProvider provider) {
+// ── Volume progression line chart ─────────────────────────────────────────────
+class _VolumeChart extends StatelessWidget {
+  const _VolumeChart({required this.provider});
+  final WorkoutProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
     final sessions = provider.sessions.take(14).toList().reversed.toList();
-    
-    if (sessions.isEmpty) {
-      return _buildEmptyChart(context, 'Volume Progression');
-    }
 
-    final spots = sessions.asMap().entries.map((entry) {
-      return FlSpot(entry.key.toDouble(), entry.value.totalVolume / 1000);
-    }).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Volume Progression (kg)',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          Text(
-            'Last ${sessions.length} workouts',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            height: 200,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: 1,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: AppTheme.surfaceColor,
-                    strokeWidth: 1,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      interval: 1,
-                      getTitlesWidget: (value, meta) {
-                        final index = value.toInt();
-                        if (index >= 0 && index < sessions.length) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              DateFormat('d/M').format(sessions[index].date),
-                              style: const TextStyle(
-                                color: AppTheme.textMuted,
-                                fontSize: 10,
-                              ),
-                            ),
-                          );
-                        }
-                        return const Text('');
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 40,
-                      getTitlesWidget: (value, meta) => Text(
-                        '${value.toStringAsFixed(0)}k',
-                        style: const TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    curveSmoothness: 0.3,
-                    color: AppTheme.primaryColor,
-                    barWidth: 3,
-                    isStrokeCapRound: true,
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, percent, barData, index) =>
-                          FlDotCirclePainter(
-                        radius: 4,
-                        color: AppTheme.primaryColor,
-                        strokeWidth: 2,
-                        strokeColor: AppTheme.cardColor,
-                      ),
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primaryColor.withOpacity(0.3),
-                          AppTheme.primaryColor.withOpacity(0.0),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                ],
+    return _ChartCard(
+      title: 'Volume Progression',
+      subtitle: 'Last ${sessions.length} workouts (tonnes)',
+      isEmpty: sessions.isEmpty,
+      child: SizedBox(
+        height: 180,
+        child: LineChart(
+          LineChartData(
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: 1,
+              getDrawingHorizontalLine: (_) => FlLine(
+                color: AppColors.glassBorder,
+                strokeWidth: 1,
               ),
             ),
+            titlesData: FlTitlesData(
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 28,
+                  interval: 1,
+                  getTitlesWidget: (v, _) {
+                    final i = v.toInt();
+                    if (i < 0 || i >= sessions.length) return const Text('');
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        DateFormat('d/M').format(sessions[i].date),
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 36,
+                  getTitlesWidget: (v, _) => Text(
+                    '${v.toStringAsFixed(0)}t',
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
+                  ),
+                ),
+              ),
+            ),
+            borderData: FlBorderData(show: false),
+            lineBarsData: [
+              LineChartBarData(
+                spots: sessions.asMap().entries.map((e) {
+                  return FlSpot(e.key.toDouble(), e.value.totalVolume / 1000);
+                }).toList(),
+                isCurved: true,
+                curveSmoothness: 0.3,
+                color: AppColors.primary,
+                barWidth: 2.5,
+                isStrokeCapRound: true,
+                dotData: FlDotData(
+                  show: true,
+                  getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                    radius: 3.5,
+                    color: AppColors.primary,
+                    strokeWidth: 1.5,
+                    strokeColor: AppColors.surface,
+                  ),
+                ),
+                belowBarData: BarAreaData(
+                  show: true,
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.25),
+                      AppColors.primary.withValues(alpha: 0.0),
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildMuscleVolumeChart(BuildContext context, WorkoutProvider provider) {
-    final volumeByMuscle = provider.getWeeklyVolumeByMuscle();
-    
-    if (volumeByMuscle.isEmpty) {
-      return _buildEmptyChart(context, 'Weekly Muscle Volume');
+// ── Muscle volume horizontal bars ─────────────────────────────────────────────
+class _MuscleVolumeChart extends StatelessWidget {
+  const _MuscleVolumeChart({required this.provider});
+  final WorkoutProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final byMuscle = provider.getWeeklyVolumeByMuscle();
+
+    if (byMuscle.isEmpty) {
+      return _ChartCard(
+        title: 'Weekly Muscle Volume',
+        isEmpty: true,
+        child: const SizedBox.shrink(),
+      );
     }
 
-    // Sort by volume and take top 8
-    final sorted = volumeByMuscle.entries.toList()
+    final sorted = byMuscle.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final top = sorted.take(8).toList();
-    final maxVolume = top.first.value;
+    final maxVol = top.first.value;
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
+    return _ChartCard(
+      title: 'Weekly Muscle Volume',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Weekly Muscle Volume',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          ...top.map((entry) {
-            final muscleName = MuscleGroups.names[entry.key] ?? entry.key;
-            final color = AppTheme.getMuscleColor(entry.key);
-            final percentage = entry.value / maxVolume;
+        children: top.map((entry) {
+          final name = MuscleGroups.names[entry.key] ?? entry.key;
+          final color = AppColors.muscle(entry.key);
+          final pct = entry.value / maxVol;
+          final volStr = entry.value >= 1000
+              ? '${(entry.value / 1000).toStringAsFixed(1)}k'
+              : entry.value.toStringAsFixed(0);
 
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        muscleName,
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 13,
-                        ),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: AppColors.textSoft,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
-                      Text(
-                        '${(entry.value / 1000).toStringAsFixed(1)}k kg',
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                        ),
+                    ),
+                    Text(
+                      '$volStr kg',
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  LinearProgressIndicator(
-                    value: percentage,
-                    backgroundColor: AppTheme.surfaceColor,
-                    valueColor: AlwaysStoppedAnimation(color),
-                    borderRadius: BorderRadius.circular(4),
-                    minHeight: 8,
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                RFProgressBar(value: pct, color: color, height: 6, showGlow: false),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
+}
 
-  Widget _buildWorkoutFrequency(BuildContext context, WorkoutProvider provider) {
-    // Calculate workouts per week for last 4 weeks
+// ── Weekly frequency grid ──────────────────────────────────────────────────────
+class _FrequencyGrid extends StatelessWidget {
+  const _FrequencyGrid({required this.provider});
+  final WorkoutProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
     final now = DateTime.now();
-    final weeks = <int, int>{};
-    
-    for (int i = 0; i < 4; i++) {
-      weeks[i] = 0;
+    final weeks = {0: 0, 1: 0, 2: 0, 3: 0};
+    for (final s in provider.sessions) {
+      final w = now.difference(s.date).inDays ~/ 7;
+      if (w < 4) weeks[w] = (weeks[w] ?? 0) + 1;
     }
 
-    for (var session in provider.sessions) {
-      final weeksAgo = now.difference(session.date).inDays ~/ 7;
-      if (weeksAgo < 4) {
-        weeks[weeksAgo] = (weeks[weeksAgo] ?? 0) + 1;
-      }
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Workout Frequency',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: weeks.entries.map((entry) {
-              final label = entry.key == 0 
-                  ? 'This Week' 
-                  : '${entry.key} week${entry.key > 1 ? 's' : ''} ago';
-              return Column(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(
-                        entry.value > 0 ? 0.2 + (entry.value * 0.15) : 0.1
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${entry.value}',
-                        style: TextStyle(
-                          color: entry.value > 0 
-                              ? AppTheme.primaryColor 
-                              : AppTheme.textMuted,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
+    return _ChartCard(
+      title: 'Workout Frequency',
+      subtitle: 'Sessions per week',
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: weeks.entries.map((e) {
+          final count = e.value;
+          final label = e.key == 0 ? 'This' : '-${e.key}w';
+          final active = count > 0;
+          return Column(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: active
+                      ? AppColors.primary.withValues(alpha: 0.12 + count * 0.06)
+                      : AppColors.card,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(
+                    color: active
+                        ? AppColors.primary.withValues(alpha: 0.4)
+                        : AppColors.glassBorder,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      color: active ? AppColors.primary : AppColors.textMuted,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    entry.key == 0 ? 'This' : '-${entry.key}w',
-                    style: const TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
-          ),
-        ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+              ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
+}
 
-  Widget _buildEmptyChart(BuildContext context, String title) {
+// ── Reusable chart card wrapper ───────────────────────────────────────────────
+class _ChartCard extends StatelessWidget {
+  const _ChartCard({
+    required this.title,
+    required this.child,
+    this.subtitle,
+    this.isEmpty = false,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget child;
+  final bool isEmpty;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppTheme.cardColor,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.glassBorder),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Icon(
-            Icons.show_chart,
-            size: 48,
-            color: AppTheme.textMuted,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const Text(
-            'No data yet',
-            style: TextStyle(color: AppTheme.textSecondary),
-          ),
-          const Text(
-            'Complete workouts to see your progress',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================== Exercises Tab ====================
-
-class _ExercisesTab extends StatefulWidget {
-  const _ExercisesTab();
-
-  @override
-  State<_ExercisesTab> createState() => _ExercisesTabState();
-}
-
-class _ExercisesTabState extends State<_ExercisesTab> {
-  String? _selectedExerciseId;
-
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<WorkoutProvider>();
-    
-    // Get exercises that have been performed
-    final performedExercises = <String>{};
-    for (var session in provider.sessions) {
-      for (var log in session.exercises) {
-        performedExercises.add(log.exerciseId);
-      }
-    }
-
-    if (performedExercises.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.fitness_center,
-              size: 64,
-              color: AppTheme.textMuted,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(height: 16),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
             Text(
-              'No Exercise Data',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Complete workouts to track exercises',
-              style: TextStyle(color: AppTheme.textSecondary),
+              subtitle!,
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
             ),
           ],
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        // Exercise selector
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: DropdownButtonFormField<String>(
-            initialValue: _selectedExerciseId,
-            decoration: const InputDecoration(
-              labelText: 'Select Exercise',
-              prefixIcon: Icon(Icons.fitness_center),
+          if (isEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Center(
+              child: RFEmptyState(
+                icon: Icons.show_chart_rounded,
+                title: 'No data yet',
+                subtitle: 'Complete workouts to see progress',
+              ),
             ),
-            items: performedExercises.map((id) {
-              final name = provider.getExerciseName(id);
-              return DropdownMenuItem(value: id, child: Text(name));
-            }).toList(),
-            onChanged: (value) => setState(() => _selectedExerciseId = value),
-          ),
-        ),
-        
-        // Exercise stats
-        if (_selectedExerciseId != null)
-          Expanded(
-            child: _ExerciseProgressView(
-              exerciseId: _selectedExerciseId!,
-              provider: provider,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ExerciseProgressView extends StatelessWidget {
-  final String exerciseId;
-  final WorkoutProvider provider;
-
-  const _ExerciseProgressView({
-    required this.exerciseId,
-    required this.provider,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final progression = provider.getVolumeProgression(exerciseId);
-    final growthModel = provider.getGrowthModel(exerciseId);
-    final exercise = provider.getExercise(exerciseId);
-
-    final settings = context.watch<SettingsProvider>();
-    final bestOneRM = provider.getBestOneRM(exerciseId);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1RM card
-          if (bestOneRM != null)
-            _buildOneRMCard(context, bestOneRM, settings),
-
-          if (bestOneRM != null) const SizedBox(height: AppSpacing.md),
-
-          // Growth rate card
-          if (growthModel != null)
-            _buildGrowthCard(context, growthModel),
-
-          const SizedBox(height: AppSpacing.md),
-          
-          // Volume chart
-          _buildVolumeChart(context, progression),
-          
-          const SizedBox(height: AppSpacing.md),
-          
-          // Session history
-          _buildSessionHistory(context, progression),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOneRMCard(
-    BuildContext context,
-    double bestOneRMkg,
-    SettingsProvider settings,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryColor.withOpacity(0.2),
-            AppTheme.primaryColor.withOpacity(0.1),
+          ] else ...[
+            const SizedBox(height: AppSpacing.md),
+            child,
           ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: const Icon(
-              Icons.emoji_events_rounded,
-              color: AppTheme.primaryColor,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Estimated 1RM',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                Text(
-                  settings.formatWeight(bestOneRMkg),
-                  style: const TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'Epley formula',
-                style: TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 10,
-                ),
-              ),
-              Text(
-                'Best across all sets',
-                style: TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
-  }
-
-  Widget _buildGrowthCard(BuildContext context, GrowthModel model) {
-    final isGrowing = model.slope > 0;
-    final slopeFormatted = model.slope.abs().toStringAsFixed(1);
-    
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isGrowing
-              ? [AppTheme.success.withOpacity(0.2), AppTheme.success.withOpacity(0.1)]
-              : [AppTheme.warning.withOpacity(0.2), AppTheme.warning.withOpacity(0.1)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isGrowing ? Icons.trending_up : Icons.trending_down,
-            color: isGrowing ? AppTheme.success : AppTheme.warning,
-            size: 40,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isGrowing ? 'Growing!' : 'Plateau',
-                  style: TextStyle(
-                    color: isGrowing ? AppTheme.success : AppTheme.warning,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                Text(
-                  isGrowing
-                      ? '+$slopeFormatted kg volume per session'
-                      : 'Volume trend is flat or declining',
-                  style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'R² = ${(model.r2 * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-              Text(
-                'Model Fit',
-                style: TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVolumeChart(
-    BuildContext context,
-    List<({DateTime date, double volume})> data,
-  ) {
-    if (data.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: AppTheme.cardColor,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        child: const Center(
-          child: Text('No data', style: TextStyle(color: AppTheme.textMuted)),
-        ),
-      );
-    }
-
-    final spots = data.asMap().entries.map((entry) {
-      return FlSpot(entry.key.toDouble(), entry.value.volume / 100);
-    }).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Volume Progression',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            height: 180,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: AppTheme.surfaceColor,
-                    strokeWidth: 1,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 40,
-                      getTitlesWidget: (value, meta) => Text(
-                        (value * 100).toStringAsFixed(0),
-                        style: const TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    curveSmoothness: 0.3,
-                    color: AppTheme.secondaryColor,
-                    barWidth: 3,
-                    dotData: const FlDotData(show: true),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.secondaryColor.withOpacity(0.3),
-                          AppTheme.secondaryColor.withOpacity(0.0),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSessionHistory(
-    BuildContext context,
-    List<({DateTime date, double volume})> data,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Session History',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Builder(
-            builder: (context) {
-              final settings = context.watch<SettingsProvider>();
-              return Column(
-                children: data.take(10).map((entry) {
-                  final displayVolume = settings.toDisplay(entry.volume);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          DateFormat('MMM d, yyyy').format(entry.date),
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        Text(
-                          '${displayVolume.toStringAsFixed(0)} ${settings.unitLabel}',
-                          style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================== Targets Tab ====================
-
-class _TargetsTab extends StatelessWidget {
-  const _TargetsTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<WorkoutProvider>();
-    final targets = provider.targets;
-    final activeTargets = targets.where((t) => !t.isCompleted).toList();
-    final completedTargets = targets.where((t) => t.isCompleted).toList();
-
-    return Scaffold(
-      body: targets.isEmpty
-          ? _buildEmptyState(context)
-          : ListView(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              children: [
-                if (activeTargets.isNotEmpty) ...[
-                  Text(
-                    'Active Targets',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  ...activeTargets.map((t) => _TargetCard(target: t, provider: provider)),
-                ],
-                if (completedTargets.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    'Completed',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  ...completedTargets.map((t) => _TargetCard(target: t, provider: provider)),
-                ],
-              ],
-            ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateTargetDialog(context),
-        icon: const Icon(Icons.add),
-        label: const Text('New Target'),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.flag,
-            size: 64,
-            color: AppTheme.textMuted,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Targets Set',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Set a target to track your progress',
-            style: TextStyle(color: AppTheme.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showCreateTargetDialog(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.cardColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => const _CreateTargetSheet(),
-    );
-  }
-}
-
-class _TargetCard extends StatelessWidget {
-  final Target target;
-  final WorkoutProvider provider;
-
-  const _TargetCard({
-    required this.target,
-    required this.provider,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final exerciseName = provider.getExerciseName(target.exerciseId);
-    final progress = target.progressPercentage;
-    final isCompleted = target.isCompleted;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  isCompleted ? Icons.check_circle : Icons.flag,
-                  color: isCompleted ? AppTheme.success : AppTheme.warning,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    exerciseName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () => provider.deleteTarget(target.id),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              '${target.targetType}: ${target.currentValue.toStringAsFixed(0)} / ${target.targetValue.toStringAsFixed(0)}',
-              style: const TextStyle(color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            LinearProgressIndicator(
-              value: progress / 100,
-              backgroundColor: AppTheme.surfaceColor,
-              valueColor: AlwaysStoppedAnimation(
-                isCompleted ? AppTheme.success : AppTheme.primaryColor,
-              ),
-              borderRadius: BorderRadius.circular(4),
-              minHeight: 8,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${progress.toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    color: isCompleted ? AppTheme.success : AppTheme.primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (target.estimatedCompletionDate != null && !isCompleted)
-                  Text(
-                    'Est: ${DateFormat('MMM d').format(target.estimatedCompletionDate!)}',
-                    style: const TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CreateTargetSheet extends StatefulWidget {
-  const _CreateTargetSheet();
-
-  @override
-  State<_CreateTargetSheet> createState() => _CreateTargetSheetState();
-}
-
-class _CreateTargetSheetState extends State<_CreateTargetSheet> {
-  String? _selectedExerciseId;
-  String _targetType = 'reps';
-  final _valueController = TextEditingController();
-
-  @override
-  void dispose() {
-    _valueController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final exercises = ExerciseDatabase.getAll();
-
-    return Padding(
-      padding: EdgeInsets.only(
-        left: AppSpacing.lg,
-        right: AppSpacing.lg,
-        top: AppSpacing.lg,
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Create Target',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          
-          DropdownButtonFormField<String>(
-            initialValue: _selectedExerciseId,
-            decoration: const InputDecoration(
-              labelText: 'Exercise',
-            ),
-            items: exercises.map((e) => DropdownMenuItem(
-              value: e.id,
-              child: Text(e.name),
-            )).toList(),
-            onChanged: (val) => setState(() => _selectedExerciseId = val),
-          ),
-          
-          const SizedBox(height: AppSpacing.md),
-          
-          DropdownButtonFormField<String>(
-            initialValue: _targetType,
-            decoration: const InputDecoration(
-              labelText: 'Target Type',
-            ),
-            items: const [
-              DropdownMenuItem(value: 'reps', child: Text('Max Reps')),
-              DropdownMenuItem(value: 'weight', child: Text('Max Weight (kg)')),
-              DropdownMenuItem(value: 'volume', child: Text('Total Volume (kg)')),
-            ],
-            onChanged: (val) => setState(() => _targetType = val!),
-          ),
-          
-          const SizedBox(height: AppSpacing.md),
-          
-          TextField(
-            controller: _valueController,
-            decoration: const InputDecoration(
-              labelText: 'Target Value',
-            ),
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-            ],
-          ),
-          
-          const SizedBox(height: AppSpacing.lg),
-          
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _createTarget,
-              child: const Text('Create Target'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _createTarget() async {
-    if (_selectedExerciseId == null || _valueController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
-      return;
-    }
-
-    final value = double.tryParse(_valueController.text);
-    if (value == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid target value')),
-      );
-      return;
-    }
-
-    await context.read<WorkoutProvider>().createTarget(
-      exerciseId: _selectedExerciseId!,
-      type: _targetType,
-      targetValue: value,
-    );
-
-    if (mounted) Navigator.pop(context);
   }
 }
