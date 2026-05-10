@@ -91,6 +91,11 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+        },
+      ),
       scaffoldBackgroundColor: AppColors.background,
       colorScheme: const ColorScheme.dark(
         primary: AppColors.primary,
