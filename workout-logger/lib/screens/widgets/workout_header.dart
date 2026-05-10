@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 
@@ -80,15 +81,12 @@ class _WorkoutHeaderState extends State<WorkoutHeader> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF0C0C12), Color(0x000C0C12)],
+        ),
         border: Border(bottom: BorderSide(color: AppColors.glassBorder)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: SafeArea(
         bottom: false,
@@ -111,10 +109,11 @@ class _WorkoutHeaderState extends State<WorkoutHeader> {
                       children: [
                         Text(
                           widget.exerciseName,
-                          style: const TextStyle(
+                          style: GoogleFonts.geist(
                             color: AppColors.textPrimary,
                             fontSize: 17,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.3,
                           ),
                           textAlign: TextAlign.center,
                           maxLines: 1,
@@ -125,28 +124,10 @@ class _WorkoutHeaderState extends State<WorkoutHeader> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              '${widget.currentExerciseIndex + 1}/${widget.totalExercises}',
-                              style: const TextStyle(
+                              'Exercise ${widget.currentExerciseIndex + 1} of ${widget.totalExercises} · Set ${widget.setNumber}',
+                              style: GoogleFonts.geist(
                                 color: AppColors.textMuted,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 3,
-                              height: 3,
-                              decoration: const BoxDecoration(
-                                color: AppColors.textMuted,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Set ${widget.setNumber}',
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 11,
                               ),
                             ),
                           ],
@@ -170,18 +151,13 @@ class _WorkoutHeaderState extends State<WorkoutHeader> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.timer_outlined,
-                              size: 12,
-                              color: AppColors.textMuted,
-                            ),
+                            const Icon(Icons.timer_outlined, size: 12, color: AppColors.textMuted),
                             const SizedBox(width: 4),
                             Text(
                               _elapsedLabel,
-                              style: const TextStyle(
+                              style: GoogleFonts.geistMono(
                                 color: AppColors.textSoft,
                                 fontSize: 12,
-                                fontFeatures: [FontFeature.tabularFigures()],
                               ),
                             ),
                           ],

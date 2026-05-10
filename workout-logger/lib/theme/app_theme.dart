@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 // ── AppColors ──────────────────────────────────────────────────────────────
 // Single source of truth for all colour tokens. Never use hex literals in
@@ -6,31 +7,35 @@ import 'package:flutter/material.dart';
 class AppColors {
   const AppColors._();
 
-  // Backgrounds
-  static const background = Color(0xFF080B10);
-  static const surface = Color(0xFF0F1318);
-  static const card = Color(0xFF161B22);
-  static const cardHigh = Color(0xFF1C2333);
+  // Backgrounds — soft-futurist dark
+  static const background = Color(0xFF07070A); // --bg
+  static const surface = Color(0xFF0C0C12);    // --bg-1
+  static const card = Color(0xFF11111A);        // --bg-2
+  static const cardHigh = Color(0xFF1A1A24);   // slightly elevated
 
-  // Glassmorphism
-  static const glass = Color(0x0AFFFFFF); // 4 % white
-  static const glassBorder = Color(0x14FFFFFF); // 8 % white
-  static const divider = Color(0x0FFFFFFF); // 6 % white
+  // Glassmorphism surfaces
+  static const glass = Color(0x0AFFFFFF);           // --surface  4%
+  static const glass2 = Color(0x0FFFFFFF);          // --surface-2 6%
+  static const glass3 = Color(0x17FFFFFF);          // --surface-3 9%
+  static const glassBorder = Color(0x12FFFFFF);     // --border 7%
+  static const glassBorderStrong = Color(0x21FFFFFF); // --border-strong 13%
+  static const divider = Color(0x0FFFFFFF);         // 6% white
 
-  // Brand
-  static const primary = Color(0xFF6C5CE7);
-  static const secondary = Color(0xFF00D9FF);
-  static const accent = Color(0xFFFF6B6B);
+  // Brand — electric violet primary, cyan data
+  static const primary = Color(0xFF7C3AED);         // --accent oklch(0.68 0.18 285)
+  static const secondary = Color(0xFF00C2D4);       // --data  oklch(0.78 0.14 200)
+  static const accent = Color(0xFF7C3AED);          // alias for primary
 
   // Semantic
-  static const success = Color(0xFF00D26A);
-  static const warning = Color(0xFFFFB800);
-  static const error = Color(0xFFFF4757);
+  static const success = Color(0xFF00C89B);         // --success oklch(0.78 0.16 155)
+  static const warning = Color(0xFFDBA520);         // --warn   oklch(0.78 0.14 60)
+  static const error = Color(0xFFE05040);           // --danger  oklch(0.68 0.20 25)
 
-  // Text
-  static const textPrimary = Color(0xFFE6EDF3);
-  static const textSoft = Color(0xFF8B949E);
-  static const textMuted = Color(0xFF484F58);
+  // Text — opacity levels over the near-white base #F4F4F8
+  static const textPrimary = Color(0xFFF4F4F8);     // --fg
+  static const textSoft = Color(0xB8F4F4F8);        // --fg-2 72%
+  static const textMuted = Color(0x7AF4F4F8);       // --fg-3 48%
+  static const textFaint = Color(0x52F4F4F8);       // --fg-4 32%
 
   // Glow helpers (use in BoxShadow)
   static Color primaryGlow([double opacity = 0.35]) =>
@@ -39,6 +44,10 @@ class AppColors {
       secondary.withValues(alpha: opacity);
   static Color accentGlow([double opacity = 0.35]) =>
       accent.withValues(alpha: opacity);
+  static Color successGlow([double opacity = 0.35]) =>
+      success.withValues(alpha: opacity);
+  static Color warningGlow([double opacity = 0.35]) =>
+      warning.withValues(alpha: opacity);
 
   // Muscle group palette
   static Color muscle(String id) => _muscleColors[id] ?? primary;
@@ -49,7 +58,7 @@ class AppColors {
     'back': Color(0xFF4ECDC4),
     'lats': Color(0xFF45B7AA),
     'lower_back': Color(0xFF3D9D94),
-    'shoulders': Color(0xFF6C5CE7),
+    'shoulders': Color(0xFF7C3AED),
     'front_delts': Color(0xFF8B7FE8),
     'side_delts': Color(0xFF9D93EA),
     'rear_delts': Color(0xFFAFA6EC),
@@ -66,11 +75,10 @@ class AppColors {
 }
 
 // ── AppTheme ───────────────────────────────────────────────────────────────
-// Backward-compat aliases + ThemeData builder.
 class AppTheme {
   const AppTheme._();
 
-  // Aliases (keep existing callsites compiling during migration)
+  // Backward-compat aliases
   static const Color primaryColor = AppColors.primary;
   static const Color secondaryColor = AppColors.secondary;
   static const Color accentColor = AppColors.accent;
@@ -88,8 +96,8 @@ class AppTheme {
   static Color getMuscleColor(String id) => AppColors.muscle(id);
 
   static ThemeData get darkTheme {
-    return ThemeData(
-      useMaterial3: true,
+    final base = ThemeData.dark(useMaterial3: true);
+    return base.copyWith(
       brightness: Brightness.dark,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
@@ -103,27 +111,28 @@ class AppTheme {
         surface: AppColors.surface,
         error: AppColors.error,
         onPrimary: Colors.white,
-        onSecondary: Colors.black,
+        onSecondary: Colors.white,
         onSurface: AppColors.textPrimary,
         onError: Colors.white,
       ),
-      appBarTheme: const AppBarTheme(
+      textTheme: _buildTextTheme(),
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.geist(
           color: AppColors.textPrimary,
           fontSize: 22,
           fontWeight: FontWeight.w700,
-          letterSpacing: -0.3,
+          letterSpacing: -0.44,
         ),
       ),
       cardTheme: CardThemeData(
         color: AppColors.card,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -131,12 +140,12 @@ class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
+          textStyle: GoogleFonts.geist(
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.2,
           ),
@@ -146,7 +155,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
           side: const BorderSide(color: AppColors.primary),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -157,7 +166,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surface,
+        fillColor: AppColors.glass,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -170,34 +179,20 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-        hintStyle: const TextStyle(color: AppColors.textMuted),
-      ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: AppColors.surface,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textSoft,
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-      ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        hintStyle: const TextStyle(color: AppColors.textFaint),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,
         thickness: 1,
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.card,
-        selectedColor: Color(0x4D6C5CE7),
-        labelStyle: const TextStyle(color: AppColors.textPrimary),
-        side: BorderSide.none,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        backgroundColor: AppColors.glass2,
+        selectedColor: Color(0x267C3AED),
+        labelStyle: const TextStyle(color: AppColors.textPrimary, fontSize: 11),
+        side: const BorderSide(color: AppColors.glassBorder),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.cardHigh,
@@ -205,48 +200,78 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
       ),
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 32,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.5,
-        ),
-        headlineMedium: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 24,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.3,
-        ),
-        headlineSmall: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-        ),
-        titleLarge: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-        ),
-        titleMedium: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-        titleSmall: TextStyle(
-          color: AppColors.textSoft,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
-        bodyLarge: TextStyle(color: AppColors.textPrimary, fontSize: 16),
-        bodyMedium: TextStyle(color: AppColors.textSoft, fontSize: 14),
-        bodySmall: TextStyle(color: AppColors.textMuted, fontSize: 12),
-        labelLarge: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.4,
-        ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+    );
+  }
+
+  static TextTheme _buildTextTheme() {
+    return TextTheme(
+      headlineLarge: GoogleFonts.geist(
+        color: AppColors.textPrimary,
+        fontSize: 32,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -1.28,
+      ),
+      headlineMedium: GoogleFonts.geist(
+        color: AppColors.textPrimary,
+        fontSize: 28,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -1.12,
+      ),
+      headlineSmall: GoogleFonts.geist(
+        color: AppColors.textPrimary,
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.88,
+      ),
+      titleLarge: GoogleFonts.geist(
+        color: AppColors.textPrimary,
+        fontSize: 17,
+        fontWeight: FontWeight.w600,
+      ),
+      titleMedium: GoogleFonts.geist(
+        color: AppColors.textPrimary,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
+      titleSmall: GoogleFonts.geist(
+        color: AppColors.textSoft,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+      ),
+      bodyLarge: GoogleFonts.geist(
+        color: AppColors.textPrimary,
+        fontSize: 16,
+      ),
+      bodyMedium: GoogleFonts.geist(
+        color: AppColors.textSoft,
+        fontSize: 14,
+      ),
+      bodySmall: GoogleFonts.geist(
+        color: AppColors.textMuted,
+        fontSize: 12,
+      ),
+      labelLarge: GoogleFonts.geist(
+        color: AppColors.textPrimary,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.4,
+      ),
+      labelMedium: GoogleFonts.geist(
+        color: AppColors.textMuted,
+        fontSize: 10,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.3,
+      ),
+      labelSmall: GoogleFonts.geist(
+        color: AppColors.textFaint,
+        fontSize: 9,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.4,
       ),
     );
   }
@@ -268,6 +293,7 @@ class AppRadius {
   static const double sm = 8;
   static const double md = 12;
   static const double lg = 16;
-  static const double xl = 24;
+  static const double xl = 18; // glass card radius
+  static const double xxl = 22; // nav pill radius
   static const double full = 999;
 }

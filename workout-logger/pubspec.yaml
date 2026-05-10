@@ -52,6 +52,9 @@ dependencies:
   http: ^1.2.1
   package_info_plus: ^8.3.1
 
+  # Fonts — Geist Sans + Geist Mono (requires ^8.0.0 for Geist support)
+  google_fonts: ^8.0.0
+
   # Health Connect integration
   health_connector: ^3.8.1
 

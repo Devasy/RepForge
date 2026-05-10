@@ -2,12 +2,14 @@
 // All widgets consume AppColors/AppSpacing/AppRadius tokens only.
 
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 
 // ── GlassCard ───────────────────────────────────────────────────────────────
-// Frosted-glass container. Use for primary content cards.
+// Soft-futurist glass card — gradient top-to-bottom + subtle inner highlight.
 class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
@@ -17,6 +19,7 @@ class GlassCard extends StatelessWidget {
     this.borderRadius,
     this.glowColor,
     this.borderColor,
+    this.accentBorder = false,
     this.onTap,
   });
 
@@ -26,19 +29,25 @@ class GlassCard extends StatelessWidget {
   final BorderRadius? borderRadius;
   final Color? glowColor;
   final Color? borderColor;
+  /// When true, uses accent colour border (e.g. Analytics exercise selector).
+  final bool accentBorder;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final radius = borderRadius ?? BorderRadius.circular(AppRadius.lg);
-    final border = Border.all(
-      color: borderColor ?? AppColors.glassBorder,
-      width: 1,
-    );
+    final radius = borderRadius ?? BorderRadius.circular(AppRadius.xl);
+    final effectiveBorderColor = accentBorder
+        ? AppColors.primary
+        : (borderColor ?? AppColors.glassBorder);
+
     final decoration = BoxDecoration(
-      color: AppColors.glass,
+      gradient: const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0x09FFFFFF), Color(0x04FFFFFF)],
+      ),
       borderRadius: radius,
-      border: border,
+      border: Border.all(color: effectiveBorderColor, width: 1),
       boxShadow: glowColor != null
           ? [
               BoxShadow(
@@ -60,10 +69,198 @@ class GlassCard extends StatelessWidget {
     if (onTap == null) return content;
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedScale(
-        scale: 1.0,
-        duration: const Duration(milliseconds: 120),
-        child: content,
+      child: content,
+    );
+  }
+}
+
+// ── AmbientGlow ──────────────────────────────────────────────────────────────
+// Decorative ambient gradient wash — place inside a Stack as first child.
+// Matches the design's rf-ambient pseudo-elements.
+class AmbientGlow extends StatelessWidget {
+  const AmbientGlow({super.key, this.showBottom = true});
+  final bool showBottom;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Stack(
+          children: [
+            // Top violet wash
+            Positioned(
+              top: -120,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  width: 480,
+                  height: 480,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF5B21B6).withValues(alpha: 0.35),
+                        Colors.transparent,
+                      ],
+                      stops: const [0, 0.6],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Bottom cyan wash
+            if (showBottom)
+              Positioned(
+                bottom: -200,
+                right: -100,
+                child: Container(
+                  width: 400,
+                  height: 400,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.secondary.withValues(alpha: 0.20),
+                        Colors.transparent,
+                      ],
+                      stops: const [0, 0.6],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── RFNavBar ─────────────────────────────────────────────────────────────────
+// Custom glassmorphic bottom navigation bar — 4 tabs, accent indicator above
+// the active icon, no FAB.
+class RFNavBar extends StatelessWidget {
+  const RFNavBar({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+    required this.items,
+  });
+
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final List<RFNavItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.transparent,
+                AppColors.background.withValues(alpha: 0.85),
+              ],
+            ),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            8,
+            16,
+            MediaQuery.of(context).padding.bottom + 8,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(AppRadius.xxl),
+              border: Border.all(color: AppColors.glassBorder),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(items.length, (i) {
+                final active = i == currentIndex;
+                return _NavItem(
+                  item: items[i],
+                  active: active,
+                  onTap: () => onTap(i),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class RFNavItem {
+  const RFNavItem({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.item,
+    required this.active,
+    required this.onTap,
+  });
+
+  final RFNavItem item;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 60,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Accent indicator above icon
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: active ? 18 : 0,
+              height: 2,
+              margin: const EdgeInsets.only(bottom: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(2),
+                color: AppColors.primary,
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.6),
+                          blurRadius: 6,
+                        ),
+                      ]
+                    : null,
+              ),
+            ),
+            Icon(
+              item.icon,
+              size: 19,
+              color: active ? AppColors.textPrimary : AppColors.textMuted,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              item.label,
+              style: GoogleFonts.geist(
+                fontSize: 10,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                color: active ? AppColors.textPrimary : AppColors.textMuted,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -155,22 +352,21 @@ class _GlowButtonState extends State<GlowButton>
             vertical: vPad,
           ),
           decoration: BoxDecoration(
-            gradient: disabled
-                ? null
-                : LinearGradient(
-                    colors: [color, Color.lerp(color, Colors.white, 0.15)!],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-            color: disabled ? AppColors.card : null,
+            color: disabled ? AppColors.glass2 : color,
             borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: disabled
+                ? Border.all(color: AppColors.glassBorder)
+                : Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    width: 1,
+                  ),
             boxShadow: disabled
                 ? null
                 : [
                     BoxShadow(
-                      color: color.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 6),
+                      color: color.withValues(alpha: 0.35),
+                      blurRadius: 32,
+                      offset: const Offset(0, 4),
                     ),
                   ],
           ),

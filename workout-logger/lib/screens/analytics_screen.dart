@@ -1,13 +1,14 @@
-// analytics_screen.dart — Analytics screen with Overview, Exercises, Targets tabs
+// analytics_screen.dart — Analytics: Overview / Exercises / Targets
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../services/workout_provider.dart';
-import '../theme/app_theme.dart';
 import '../data/exercise_database.dart';
+import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/exercise_progress_view.dart';
 import 'widgets/targets_tab.dart';
@@ -19,130 +20,160 @@ class AnalyticsScreen extends StatefulWidget {
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
 
-class _AnalyticsScreenState extends State<AnalyticsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  int _tab = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  static const _tabs = ['Overview', 'Exercises', 'Targets'];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _AnalyticsHeader(tabController: _tabController),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: const [
-                  _OverviewTab(),
-                  ExerciseProgressView(),
-                  TargetsTab(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Header with title + tab bar ───────────────────────────────────────────────
-class _AnalyticsHeader extends StatelessWidget {
-  const _AnalyticsHeader({required this.tabController});
-  final TabController tabController;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.glassBorder)),
-      ),
-      child: Column(
+      body: Stack(
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.sm,
+          const AmbientGlow(),
+          SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                _buildPillTabBar(),
+                Expanded(child: _buildTabView()),
+              ],
             ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Analytics',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ),
-          ),
-          TabBar(
-            controller: tabController,
-            indicatorColor: AppColors.primary,
-            indicatorWeight: 2,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textMuted,
-            labelStyle: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-            tabs: const [
-              Tab(text: 'Overview'),
-              Tab(text: 'Exercises'),
-              Tab(text: 'Targets'),
-            ],
           ),
         ],
       ),
     );
   }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'INSIGHTS',
+                  style: GoogleFonts.geist(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textFaint,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Analytics',
+                  style: GoogleFonts.geist(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPillTabBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.glass2,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.glassBorder),
+        ),
+        child: Row(
+          children: List.generate(_tabs.length, (i) {
+            final active = i == _tab;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _tab = i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(11),
+                    boxShadow: active
+                        ? [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.35),
+                              blurRadius: 12,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    _tabs[i],
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.geist(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: active ? Colors.white : AppColors.textMuted,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabView() {
+    switch (_tab) {
+      case 0:
+        return const _OverviewTab();
+      case 1:
+        return const ExerciseProgressView();
+      case 2:
+        return const TargetsTab();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
 }
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
+
 class _OverviewTab extends StatelessWidget {
   const _OverviewTab();
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<WorkoutProvider>();
-
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _VolumeChart(provider: provider),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 12),
           _MuscleVolumeChart(provider: provider),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 12),
           _FrequencyGrid(provider: provider),
-          const SizedBox(height: AppSpacing.xxl),
         ],
       ),
     );
   }
 }
 
-// ── Volume progression line chart ─────────────────────────────────────────────
+// ── Volume progression chart ───────────────────────────────────────────────────
+
 class _VolumeChart extends StatelessWidget {
   const _VolumeChart({required this.provider});
   final WorkoutProvider provider;
@@ -183,7 +214,7 @@ class _VolumeChart extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
                         DateFormat('d/M').format(sessions[i].date),
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
+                        style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 9),
                       ),
                     );
                   },
@@ -195,7 +226,7 @@ class _VolumeChart extends StatelessWidget {
                   reservedSize: 36,
                   getTitlesWidget: (v, _) => Text(
                     '${v.toStringAsFixed(0)}t',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
+                    style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 9),
                   ),
                 ),
               ),
@@ -240,7 +271,8 @@ class _VolumeChart extends StatelessWidget {
   }
 }
 
-// ── Muscle volume horizontal bars ─────────────────────────────────────────────
+// ── Muscle volume bars ────────────────────────────────────────────────────────
+
 class _MuscleVolumeChart extends StatelessWidget {
   const _MuscleVolumeChart({required this.provider});
   final WorkoutProvider provider;
@@ -274,32 +306,19 @@ class _MuscleVolumeChart extends StatelessWidget {
               : entry.value.toStringAsFixed(0);
 
           return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            padding: const EdgeInsets.only(bottom: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: AppColors.textSoft,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      '$volStr kg',
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
+                    Text(name, style: GoogleFonts.geist(color: AppColors.textSoft, fontSize: 12, fontWeight: FontWeight.w500)),
+                    Text('$volStr kg', style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 11)),
                   ],
                 ),
                 const SizedBox(height: 4),
-                RFProgressBar(value: pct, color: color, height: 6, showGlow: false),
+                RFProgressBar(value: pct, color: color, height: 6, showGlow: true),
               ],
             ),
           );
@@ -310,6 +329,7 @@ class _MuscleVolumeChart extends StatelessWidget {
 }
 
 // ── Weekly frequency grid ──────────────────────────────────────────────────────
+
 class _FrequencyGrid extends StatelessWidget {
   const _FrequencyGrid({required this.provider});
   final WorkoutProvider provider;
@@ -340,30 +360,35 @@ class _FrequencyGrid extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: active
                       ? AppColors.primary.withValues(alpha: 0.12 + count * 0.06)
-                      : AppColors.card,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
+                      : AppColors.glass2,
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: active
                         ? AppColors.primary.withValues(alpha: 0.4)
                         : AppColors.glassBorder,
                   ),
+                  boxShadow: active
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.2),
+                            blurRadius: 12,
+                          )
+                        ]
+                      : null,
                 ),
                 child: Center(
                   child: Text(
                     '$count',
-                    style: TextStyle(
+                    style: GoogleFonts.geistMono(
                       color: active ? AppColors.primary : AppColors.textMuted,
                       fontSize: 22,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                label,
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
-              ),
+              Text(label, style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 10)),
             ],
           );
         }).toList(),
@@ -372,7 +397,8 @@ class _FrequencyGrid extends StatelessWidget {
   }
 }
 
-// ── Reusable chart card wrapper ───────────────────────────────────────────────
+// ── Reusable chart card ────────────────────────────────────────────────────────
+
 class _ChartCard extends StatelessWidget {
   const _ChartCard({
     required this.title,
@@ -388,43 +414,37 @@ class _ChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: GoogleFonts.geist(
               color: AppColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 2),
-            Text(
-              subtitle!,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-            ),
+            Text(subtitle!, style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 11)),
           ],
           if (isEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: 24),
             Center(
-              child: RFEmptyState(
-                icon: Icons.show_chart_rounded,
-                title: 'No data yet',
-                subtitle: 'Complete workouts to see progress',
+              child: Column(
+                children: [
+                  const Icon(Icons.show_chart_rounded, size: 32, color: AppColors.textFaint),
+                  const SizedBox(height: 8),
+                  Text('No data yet', style: GoogleFonts.geist(fontSize: 13, color: AppColors.textMuted)),
+                  Text('Complete workouts to see progress', style: GoogleFonts.geist(fontSize: 11, color: AppColors.textFaint)),
+                ],
               ),
             ),
           ] else ...[
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: 14),
             child,
           ],
         ],
