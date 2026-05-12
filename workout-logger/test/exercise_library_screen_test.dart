@@ -40,8 +40,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Assert
-      expect(find.byIcon(Icons.search), findsOneWidget);
-      expect(find.text('Search exercises...'), findsOneWidget);
+      expect(find.byIcon(Icons.search_rounded), findsOneWidget);
+      expect(find.text('Search exercises…'), findsOneWidget);
     });
 
     testWidgets('should display FAB to add custom exercise', (tester) async {
@@ -56,7 +56,7 @@ void main() {
 
       // Assert
       expect(find.byType(FloatingActionButton), findsOneWidget);
-      expect(find.text('Add Exercise'), findsOneWidget);
+      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
     });
 
     testWidgets('should display custom exercises in the list', (tester) async {
@@ -97,8 +97,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Assert - Should find the CUSTOM tag
-      expect(find.text('CUSTOM'), findsOneWidget);
+      // Assert - Should find the Custom tag
+      expect(find.text('Custom'), findsOneWidget);
     });
 
     testWidgets('should display custom exercise count in header when present', (
@@ -184,7 +184,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Assert - Should navigate to AddCustomExerciseScreen
-      expect(find.text('Add Custom Exercise'), findsOneWidget);
+      expect(find.text('New Exercise'), findsOneWidget);
     });
   });
 
@@ -220,7 +220,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Assert - Should show details sheet with delete option
-      expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+      expect(find.byIcon(Icons.delete_outline_rounded), findsOneWidget);
     });
 
     testWidgets('should show confirmation dialog when delete is tapped', (
@@ -240,11 +240,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap delete button
-      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.tap(find.byIcon(Icons.delete_outline_rounded));
       await tester.pumpAndSettle();
 
       // Assert - Should show confirmation dialog
-      expect(find.text('Delete Custom Exercise?'), findsOneWidget);
+      expect(find.text('Delete Exercise?'), findsOneWidget);
       expect(find.text('Cancel'), findsOneWidget);
       expect(find.text('Delete'), findsWidgets);
     });
@@ -265,7 +265,7 @@ void main() {
       await tester.tap(find.text('Exercise To Delete'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.tap(find.byIcon(Icons.delete_outline_rounded));
       await tester.pumpAndSettle();
 
       // Tap Delete in dialog
@@ -292,7 +292,7 @@ void main() {
       // Act - Open details and tap delete
       await tester.tap(find.text('Exercise To Delete'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.tap(find.byIcon(Icons.delete_outline_rounded));
       await tester.pumpAndSettle();
 
       // Tap Cancel
