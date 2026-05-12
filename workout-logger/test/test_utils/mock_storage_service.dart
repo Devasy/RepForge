@@ -20,6 +20,7 @@ class MockStorageService implements IStorageService {
   final List<MuscleGroup> _muscleGroups = [];
   final Map<String, String> _settings = {};
   final List<TrainingProgram> _trainingPrograms = [];
+  final Map<String, PersonalRecord> _personalRecords = {};
 
   bool saveCustomExerciseCalled = false;
   Exercise? lastSavedExercise;
@@ -264,6 +265,19 @@ class MockStorageService implements IStorageService {
   Future<void> deleteTrainingProgram(String id) async {
     _trainingPrograms.removeWhere((p) => p.id == id);
   }
+
+  @override
+  Future<void> savePersonalRecord(PersonalRecord record) async {
+    _personalRecords[record.exerciseId] = record;
+  }
+
+  @override
+  Future<PersonalRecord?> getPersonalRecord(String exerciseId) async =>
+      _personalRecords[exerciseId];
+
+  @override
+  Future<List<PersonalRecord>> getAllPersonalRecords() async =>
+      List.from(_personalRecords.values);
 
   @override
   Future<String> exportAllData() async => '{}';

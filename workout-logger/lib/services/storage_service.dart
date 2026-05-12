@@ -24,6 +24,7 @@ class StorageService implements IStorageService {
   static const String _customExercisesBox = 'custom_exercises';
   static const String _settingsBox = 'settings';
   static const String _trainingProgramsBox = 'training_programs';
+  static const String _personalRecordsBox = 'personal_records';
 
   late Box<String> _sessionsBox;
   late Box<String> _routinesBoxInstance;
@@ -32,6 +33,7 @@ class StorageService implements IStorageService {
   late Box<String> _customExercisesBoxInstance;
   late Box<String> _settingsBoxInstance;
   late Box<String> _trainingProgramsBoxInstance;
+  late Box<String> _personalRecordsBoxInstance;
 
   String _appVersion = const String.fromEnvironment(
     'APP_VERSION',
@@ -67,6 +69,9 @@ class StorageService implements IStorageService {
     _settingsBoxInstance = await Hive.openBox<String>(_settingsBox);
     _trainingProgramsBoxInstance = await Hive.openBox<String>(
       _trainingProgramsBox,
+    );
+    _personalRecordsBoxInstance = await Hive.openBox<String>(
+      _personalRecordsBox,
     );
 
     // Initialize default muscle groups if empty
@@ -482,6 +487,32 @@ class StorageService implements IStorageService {
   @override
   Future<void> deleteTrainingProgram(String id) async {
     await _trainingProgramsBoxInstance.delete(id);
+  }
+
+  // ==================== PERSONAL RECORDS ====================
+
+  @override
+  Future<void> savePersonalRecord(PersonalRecord record) async {
+    await _personalRecordsBoxInstance.put(
+      record.exerciseId,
+      jsonEncode(record.toJson()),
+    );
+  }
+
+  @override
+  Future<PersonalRecord?> getPersonalRecord(String exerciseId) async {
+    final json = _personalRecordsBoxInstance.get(exerciseId);
+    if (json == null) return null;
+    return PersonalRecord.fromJson(jsonDecode(json));
+  }
+
+  @override
+  Future<List<PersonalRecord>> getAllPersonalRecords() async {
+    final records = <PersonalRecord>[];
+    for (final json in _personalRecordsBoxInstance.values) {
+      records.add(PersonalRecord.fromJson(jsonDecode(json)));
+    }
+    return records;
   }
 
   // ==================== STATS ====================

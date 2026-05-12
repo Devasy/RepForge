@@ -20,12 +20,11 @@ class RoutinesScreen extends StatelessWidget {
     final provider = context.watch<WorkoutProvider>();
     final routines = provider.routines;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          const AmbientGlow(),
-          SafeArea(
+    return Stack(
+      children: [
+        const AmbientGlow(),
+        SafeArea(
+            bottom: false,
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
@@ -52,8 +51,7 @@ class RoutinesScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildHeader(BuildContext context, List<Routine> routines) {

@@ -86,12 +86,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final totalVolume = all.fold<double>(0, (s, e) => s + e.totalVolume);
     final hasUnsynced = settings.healthConnectEnabled && all.any((s) => s.hcSyncedAt == null);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          const AmbientGlow(),
-          SafeArea(
+    return Stack(
+      children: [
+        const AmbientGlow(),
+        SafeArea(
+            bottom: false,
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
@@ -169,8 +168,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildHeader(BuildContext context, bool hasUnsynced, HistoryManager historyManager) {

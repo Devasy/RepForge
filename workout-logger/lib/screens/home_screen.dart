@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
+import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import 'workout_flow_screen.dart';
 import 'history_screen.dart';
@@ -44,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       backgroundColor: AppColors.background,
       body: IndexedStack(
         index: _currentIndex,
@@ -176,6 +178,7 @@ class _DashboardTab extends StatelessWidget {
       children: [
         const AmbientGlow(),
         SafeArea(
+          bottom: false,
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
@@ -240,8 +243,8 @@ class _DashboardTab extends StatelessWidget {
                 children: [
                   TextSpan(text: '${_greeting()}\n'),
                   TextSpan(
-                    text: 'You.',
-                    style: TextStyle(color: AppColors.textMuted),
+                    text: '${context.watch<SettingsProvider>().userName ?? 'You'}.',
+                    style: const TextStyle(color: AppColors.textMuted),
                   ),
                 ],
               ),

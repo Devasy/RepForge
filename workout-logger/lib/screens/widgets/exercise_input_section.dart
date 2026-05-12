@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
@@ -336,7 +337,7 @@ class _NumberInputCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: GoogleFonts.geist(
               color: AppColors.textMuted,
               fontSize: 11,
               fontWeight: FontWeight.w600,
@@ -354,11 +355,10 @@ class _NumberInputCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   _format(),
-                  style: const TextStyle(
+                  style: GoogleFonts.geistMono(
                     color: AppColors.textPrimary,
                     fontSize: 36,
-                    fontWeight: FontWeight.w800,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontWeight: FontWeight.w700,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -388,12 +388,12 @@ class _StepBtn extends StatelessWidget {
         HapticFeedback.selectionClick();
       },
       child: Container(
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: AppColors.glassBorder),
+          color: AppColors.primary.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
         ),
         child: Icon(icon, size: 18, color: AppColors.primary),
       ),
@@ -622,12 +622,12 @@ class _PreviousSetsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'THIS SESSION',
-          style: TextStyle(
-            color: AppColors.textMuted,
+          style: GoogleFonts.geist(
+            color: AppColors.textFaint,
             fontSize: 10,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
             letterSpacing: 1.2,
           ),
         ),
@@ -723,12 +723,12 @@ class _LastSessionSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'LAST SESSION',
-          style: TextStyle(
-            color: AppColors.textMuted,
+          style: GoogleFonts.geist(
+            color: AppColors.textFaint,
             fontSize: 10,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
             letterSpacing: 1.2,
           ),
         ),

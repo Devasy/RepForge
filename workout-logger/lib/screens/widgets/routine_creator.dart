@@ -316,6 +316,8 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                             GlowButton(
                               label: 'Add ${temp.length}',
                               icon: Icons.check_rounded,
+                              fullWidth: false,
+                              small: true,
                               onPressed: () {
                                 setState(() => _selectedIds.addAll(temp));
                                 Navigator.of(ctx).pop();

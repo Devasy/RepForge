@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'package:google_fonts/google_fonts.dart';
+
 import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
+import '../services/managers/pr_manager.dart';
 import '../theme/app_theme.dart';
 import 'exercise_library_screen.dart';
 import 'workout_summary_screen.dart';
@@ -352,61 +355,87 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   }
 
   Widget _buildBottomNav(WorkoutProvider provider, bool isFirst, bool isLast) {
+    final bottomPad = MediaQuery.of(context).padding.bottom;
     return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.sm + MediaQuery.of(context).padding.bottom,
-      ),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomPad),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.surface.withValues(alpha: 0.95),
         border: Border(top: BorderSide(color: AppColors.glassBorder)),
       ),
       child: Row(
         children: [
           if (!isFirst)
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  provider.previousExercise();
-                  _loadLastSessionData();
-                },
-                icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                label: const Text('Previous'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textSoft,
-                  side: BorderSide(color: AppColors.glassBorder),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
+            GestureDetector(
+              onTap: () {
+                provider.previousExercise();
+                _loadLastSessionData();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.glass2,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.glassBorderStrong),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.textMuted),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Prev',
+                      style: GoogleFonts.geist(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             )
           else
-            const Spacer(),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton.icon(
-              onPressed: isLast
-                  ? _finishWorkout
-                  : () {
-                      provider.nextExercise();
-                      _loadLastSessionData();
-                    },
-              icon: Icon(
-                isLast ? Icons.check_rounded : Icons.arrow_forward_rounded,
-                size: 18,
+            const SizedBox.shrink(),
+          const Spacer(),
+          GestureDetector(
+            onTap: isLast
+                ? _finishWorkout
+                : () {
+                    provider.nextExercise();
+                    _loadLastSessionData();
+                  },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              decoration: BoxDecoration(
+                color: isLast ? AppColors.success : AppColors.primary,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isLast ? AppColors.success : AppColors.primary)
+                        .withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              label: Text(isLast ? 'Finish' : 'Next'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isLast ? AppColors.success : AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    isLast ? 'Finish' : 'Next exercise',
+                    style: GoogleFonts.geist(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    isLast ? Icons.check_rounded : Icons.arrow_forward_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ],
               ),
             ),
           ),
@@ -609,13 +638,18 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           ElevatedButton(
             onPressed: () async {
               final nav = Navigator.of(context);
+              final prManager = context.read<PRManager>();
               Navigator.of(ctx).pop();
               final session =
                   await context.read<WorkoutProvider>().finishWorkout();
+              final newPRs = await prManager.checkAndUpdatePRs(session);
               if (!mounted) return;
               nav.pop();
               nav.push(MaterialPageRoute(
-                builder: (_) => WorkoutSummaryScreen(session: session),
+                builder: (_) => WorkoutSummaryScreen(
+                  session: session,
+                  newPRs: newPRs,
+                ),
               ));
             },
             style: ElevatedButton.styleFrom(

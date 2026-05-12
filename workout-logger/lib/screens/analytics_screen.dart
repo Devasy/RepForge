@@ -6,7 +6,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/models.dart';
 import '../services/workout_provider.dart';
+import '../services/managers/pr_manager.dart';
 import '../data/exercise_database.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
@@ -23,26 +25,24 @@ class AnalyticsScreen extends StatefulWidget {
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   int _tab = 0;
 
-  static const _tabs = ['Overview', 'Exercises', 'Targets'];
+  static const _tabs = ['Overview', 'Exercises', 'Targets', 'Records'];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          const AmbientGlow(),
-          SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(),
-                _buildPillTabBar(),
-                Expanded(child: _buildTabView()),
-              ],
-            ),
+    return Stack(
+      children: [
+        const AmbientGlow(),
+        SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _buildHeader(),
+              _buildPillTabBar(),
+              Expanded(child: _buildTabView()),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -141,6 +141,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         return const ExerciseProgressView();
       case 2:
         return const TargetsTab();
+      case 3:
+        return const _RecordsTab();
       default:
         return const SizedBox.shrink();
     }
@@ -392,6 +394,146 @@ class _FrequencyGrid extends StatelessWidget {
             ],
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+// ── Records Tab ───────────────────────────────────────────────────────────────
+
+class _RecordsTab extends StatelessWidget {
+  const _RecordsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final prManager = context.watch<PRManager>();
+    final provider = context.read<WorkoutProvider>();
+    final records = prManager.allRecords
+      ..sort((a, b) => b.achievedAt.compareTo(a.achievedAt));
+
+    if (records.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.emoji_events_rounded, size: 48, color: AppColors.textFaint),
+            const SizedBox(height: 12),
+            Text(
+              'No records yet',
+              style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Finish a workout to set your first PRs',
+              style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+      itemCount: records.length,
+      itemBuilder: (context, i) => _PRCard(
+        record: records[i],
+        exerciseName: provider.getExerciseName(records[i].exerciseId),
+      ),
+    );
+  }
+}
+
+class _PRCard extends StatelessWidget {
+  const _PRCard({required this.record, required this.exerciseName});
+
+  final PersonalRecord record;
+  final String exerciseName;
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr = DateFormat('MMM d, yyyy').format(record.achievedAt);
+
+    return GlassCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.emoji_events_rounded, color: AppColors.warning, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exerciseName,
+                      style: GoogleFonts.geist(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      dateStr,
+                      style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              _PRStat(label: 'Best Weight', value: '${record.bestWeight.toStringAsFixed(record.bestWeight % 1 == 0 ? 0 : 1)} kg', color: AppColors.warning),
+              const SizedBox(width: AppSpacing.sm),
+              _PRStat(label: 'Best Reps', value: '${record.bestReps}', color: AppColors.secondary),
+              const SizedBox(width: AppSpacing.sm),
+              _PRStat(label: 'Best Vol.', value: '${record.bestVolume.toStringAsFixed(0)} kg', color: AppColors.success),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PRStat extends StatelessWidget {
+  const _PRStat({required this.label, required this.value, required this.color});
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+            const SizedBox(height: 2),
+            Text(value, style: GoogleFonts.geistMono(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
+          ],
+        ),
       ),
     );
   }

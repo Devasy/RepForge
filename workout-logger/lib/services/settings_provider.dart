@@ -1,6 +1,7 @@
-// Settings Provider - User preferences (weight unit, increments)
+// Settings Provider - User preferences (weight unit, increments, user profile)
 
 import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'interfaces/storage_service_interface.dart';
 
 enum WeightUnit { kg, lbs }
@@ -11,11 +12,15 @@ class SettingsProvider extends ChangeNotifier {
   WeightUnit _weightUnit = WeightUnit.kg;
   double _weightIncrement = 2.5;
   bool _healthConnectEnabled = false;
+  String? _userName;
+  String? _lastSeenVersion;
 
   WeightUnit get weightUnit => _weightUnit;
   double get weightIncrement => _weightIncrement;
   String get unitLabel => _weightUnit == WeightUnit.kg ? 'kg' : 'lbs';
   bool get healthConnectEnabled => _healthConnectEnabled;
+  String? get userName => _userName;
+  String? get lastSeenVersion => _lastSeenVersion;
 
   SettingsProvider(this._storage);
 
@@ -30,6 +35,31 @@ class SettingsProvider extends ChangeNotifier {
 
     final hcEnabled = await _storage.getSetting('healthConnectEnabled');
     _healthConnectEnabled = hcEnabled == 'true';
+
+    _userName = await _storage.getSetting('userName');
+    _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
+  }
+
+  Future<void> setUserName(String name) async {
+    _userName = name.trim();
+    await _storage.saveSetting('userName', _userName!);
+    notifyListeners();
+  }
+
+  Future<void> markVersionSeen(String version) async {
+    _lastSeenVersion = version;
+    await _storage.saveSetting('lastSeenVersion', version);
+    notifyListeners();
+  }
+
+  /// Returns the current app version string (e.g. "1.0.19").
+  Future<String> getCurrentVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      return info.version;
+    } catch (_) {
+      return 'unknown';
+    }
   }
 
   double get _defaultIncrement => _weightUnit == WeightUnit.kg ? 2.5 : 5.0;

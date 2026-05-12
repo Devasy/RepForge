@@ -134,7 +134,7 @@ class EditableExerciseCard extends StatelessWidget {
                   onRepsChanged: (r) =>
                       onSetChanged(i, set.weight, r, set.isDropset, set.drops),
                   onIsDropsetChanged: (d) =>
-                      onSetChanged(i, set.weight, set.reps, d, set.drops),
+                      onSetChanged(i, set.weight, set.reps, d, d ? (set.drops ?? []) : set.drops),
                   onDropsChanged: (drops) =>
                       onSetChanged(i, set.weight, set.reps, set.isDropset, drops),
                   onDelete: () => onDeleteSet(i),

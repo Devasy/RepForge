@@ -19,8 +19,10 @@ import 'services/api_service.dart';
 import 'services/managers/program_manager.dart';
 import 'services/managers/history_manager.dart';
 import 'services/managers/health_sync_manager.dart';
+import 'services/managers/pr_manager.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/onboarding_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +60,7 @@ class WorkoutLoggerApp extends StatelessWidget {
   // HistoryManager is the single owner of session history + HC sync trigger.
   static final HistoryManager _historyManager =
       HistoryManager(_storageService, healthSyncManager: _healthSyncManager);
+  static final PRManager _prManager = PRManager(_storageService);
 
   const WorkoutLoggerApp({super.key});
 
@@ -83,6 +86,7 @@ class WorkoutLoggerApp extends StatelessWidget {
         // HistoryManager is the single source of truth for session history.
         // Provided as ChangeNotifier so HistoryScreen rebuilds on sync badge changes.
         ChangeNotifierProvider<HistoryManager>.value(value: _historyManager),
+        ChangeNotifierProvider<PRManager>.value(value: _prManager),
         // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
           create: (_) => WorkoutProvider(
@@ -112,6 +116,7 @@ class AppInitializer extends StatefulWidget {
 
 class _AppInitializerState extends State<AppInitializer> {
   bool _initialized = false;
+  bool _needsNamePrompt = false;
   String? _error;
 
   @override
@@ -121,32 +126,48 @@ class _AppInitializerState extends State<AppInitializer> {
   }
 
   Future<void> _initializeApp() async {
+    // Capture all providers synchronously before any awaits.
+    final provider = context.read<WorkoutProvider>();
+    final settings = context.read<SettingsProvider>();
+    final historyManager = context.read<HistoryManager>();
+    final prManager = context.read<PRManager>();
+    final api = context.read<ApiService>();
+
     try {
-      final provider = context.read<WorkoutProvider>();
       await provider.init();
-
-      final settings = context.read<SettingsProvider>();
       await settings.init();
-
-      // Load HistoryManager session list (independent of WorkoutProvider).
-      final historyManager = context.read<HistoryManager>();
       await historyManager.loadSessions();
+      await prManager.load();
+      await prManager.backfillFromSessions(historyManager.sessions);
 
-      // Fire-and-forget analytics in background
-      final api = context.read<ApiService>();
+      final version = await settings.getCurrentVersion();
+      final needsName = settings.userName == null || settings.userName!.isEmpty;
+      final versionChanged = !needsName &&
+          settings.lastSeenVersion != null &&
+          settings.lastSeenVersion != version;
+
+      // Fire-and-forget analytics in background.
       api.sendHeartbeat();
       api.trackEvent('app_open');
-      provider
-          .getQuickStats()
-          .then((stats) {
-            api.reportUsage(stats);
-          })
-          .catchError((e) {
-            debugPrint('Failed to report usage: $e');
-          });
+      provider.getQuickStats().then((stats) => api.reportUsage(stats)).catchError(
+        (Object e) => debugPrint('Failed to report usage: $e'),
+      );
 
-      setState(() => _initialized = true);
+      if (!mounted) return;
+      setState(() {
+        _initialized = true;
+        _needsNamePrompt = needsName;
+      });
+
+      if (!needsName && versionChanged) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          await showVersionUpdateSheet(context, version);
+          if (mounted) await settings.markVersionSeen(version);
+        });
+      }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = e.toString());
     }
   }
@@ -212,6 +233,12 @@ class _AppInitializerState extends State<AppInitializer> {
             ],
           ),
         ),
+      );
+    }
+
+    if (_needsNamePrompt) {
+      return WelcomePage(
+        onComplete: () => setState(() => _needsNamePrompt = false),
       );
     }
 

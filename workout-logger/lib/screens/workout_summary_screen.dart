@@ -6,14 +6,20 @@ import 'package:intl/intl.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
+import '../services/managers/pr_manager.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/rf_cards.dart';
 
 class WorkoutSummaryScreen extends StatelessWidget {
-  const WorkoutSummaryScreen({super.key, required this.session});
+  const WorkoutSummaryScreen({
+    super.key,
+    required this.session,
+    this.newPRs = const [],
+  });
 
   final WorkoutSession session;
+  final List<NewPRResult> newPRs;
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +65,10 @@ class WorkoutSummaryScreen extends StatelessWidget {
                       totalSets,
                       session.exercises.length,
                     ),
+                    if (newPRs.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.lg),
+                      _buildPRSection(newPRs, provider),
+                    ],
                     if (muscles.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.lg),
                       _buildMusclesSection(muscles, provider),
@@ -186,6 +196,69 @@ class WorkoutSummaryScreen extends StatelessWidget {
             ),
           ],
         ),
+      ],
+    );
+  }
+
+  Widget _buildPRSection(List<NewPRResult> prs, WorkoutProvider provider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const RFSectionHeader('New Personal Records'),
+        const SizedBox(height: AppSpacing.sm),
+        ...prs.map((pr) {
+          final name = provider.getExerciseName(pr.exerciseId);
+          final badges = pr.types.map((t) {
+            final (label, color) = switch (t) {
+              'weight' => ('Best Weight', AppColors.warning),
+              'reps' => ('Best Reps', AppColors.secondary),
+              _ => ('Best Volume', AppColors.success),
+            };
+            return RFChip(label: label, color: color);
+          }).toList();
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.warning.withValues(alpha: 0.08),
+                  AppColors.warning.withValues(alpha: 0.03),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(
+                color: AppColors.warning.withValues(alpha: 0.35),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.emoji_events_rounded,
+                      color: AppColors.warning,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Wrap(spacing: 6, runSpacing: 6, children: badges),
+              ],
+            ),
+          );
+        }),
       ],
     );
   }

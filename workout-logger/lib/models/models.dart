@@ -405,6 +405,53 @@ class GrowthModel {
   }
 }
 
+// ==================== Personal Record ====================
+
+class PersonalRecord {
+  final String exerciseId;
+  final double bestWeight; // heaviest weight in any single set
+  final int bestReps;      // most reps in any single set
+  final double bestVolume; // highest single-set volume (weight × reps)
+  final DateTime achievedAt;
+
+  PersonalRecord({
+    required this.exerciseId,
+    required this.bestWeight,
+    required this.bestReps,
+    required this.bestVolume,
+    required this.achievedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'exerciseId': exerciseId,
+    'bestWeight': bestWeight,
+    'bestReps': bestReps,
+    'bestVolume': bestVolume,
+    'achievedAt': achievedAt.toIso8601String(),
+  };
+
+  factory PersonalRecord.fromJson(Map<String, dynamic> json) => PersonalRecord(
+    exerciseId: json['exerciseId'] as String,
+    bestWeight: (json['bestWeight'] as num).toDouble(),
+    bestReps: json['bestReps'] as int,
+    bestVolume: (json['bestVolume'] as num).toDouble(),
+    achievedAt: DateTime.parse(json['achievedAt'] as String),
+  );
+
+  PersonalRecord copyWith({
+    double? bestWeight,
+    int? bestReps,
+    double? bestVolume,
+    DateTime? achievedAt,
+  }) => PersonalRecord(
+    exerciseId: exerciseId,
+    bestWeight: bestWeight ?? this.bestWeight,
+    bestReps: bestReps ?? this.bestReps,
+    bestVolume: bestVolume ?? this.bestVolume,
+    achievedAt: achievedAt ?? this.achievedAt,
+  );
+}
+
 // ==================== Training Program ====================
 
 /// One exercise slot inside a program day.
