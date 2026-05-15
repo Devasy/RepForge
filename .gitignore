@@ -78,3 +78,12 @@ coverage.xml
 
 # Streamlit secrets
 dashboard/.streamlit/secrets.toml
+
+# graphify knowledge graph output
+graphify-out/
+
+# Local backup exports
+repforge_backup_*.json
+
+# Claude Code project memory & session files
+.claude/
