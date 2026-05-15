@@ -66,7 +66,7 @@ class _ProgramWeekTileState extends State<ProgramWeekTile> {
       ),
       child: Column(
         children: [
-          _buildHeader(week, phase, phaseColor),
+          _buildHeader(week: week, phase: phase, phaseColor: phaseColor),
           if (_expanded) ...[
             Divider(color: AppColors.glassBorder, height: 1),
             ...week.days.map((day) => _buildDaySection(day, week)),
@@ -105,11 +105,11 @@ class _ProgramWeekTileState extends State<ProgramWeekTile> {
     );
   }
 
-  Widget _buildHeader(
-    ProgramWeek week,
-    TrainingPhase? phase,
-    Color phaseColor,
-  ) {
+  Widget _buildHeader({
+    required ProgramWeek week,
+    required TrainingPhase? phase,
+    required Color phaseColor,
+  }) {
     return InkWell(
       onTap: () => setState(() => _expanded = !_expanded),
       borderRadius: BorderRadius.circular(AppRadius.lg),

@@ -66,7 +66,7 @@ class ProgramsScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          RFEmptyState(
+          const RFEmptyState(
             icon: Icons.calendar_month_rounded,
             title: 'No Training Programs',
             subtitle: 'Create a structured multi-week program\nor import one from JSON',

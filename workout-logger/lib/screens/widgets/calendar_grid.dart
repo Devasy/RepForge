@@ -4,7 +4,7 @@ import '../../theme/app_theme.dart';
 
 class CalendarDayData {
   const CalendarDayData({required this.intensity, this.hasPr = false});
-  final int intensity; // 1–3
+  final int intensity; // 0–3: 0 = no workout, 1–3 = intensity levels
   final bool hasPr;
 }
 
@@ -94,19 +94,19 @@ class CalendarMonthGrid extends StatelessWidget {
                 Container(
                   width: 5,
                   height: 5,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.success,
                   ),
                 ),
                 const SizedBox(width: 4),
-                Text('PR',
+                const Text('PR',
                     style: TextStyle(fontSize: 10, color: AppColors.textFaint)),
               ],
             ),
             Row(
               children: [
-                Text('Less',
+                const Text('Less',
                     style: TextStyle(fontSize: 10, color: AppColors.textFaint)),
                 const SizedBox(width: 6),
                 ...List.generate(4, (i) {
@@ -134,7 +134,7 @@ class CalendarMonthGrid extends StatelessWidget {
                   );
                 }),
                 const SizedBox(width: 6),
-                Text('More',
+                const Text('More',
                     style: TextStyle(fontSize: 10, color: AppColors.textFaint)),
               ],
             ),

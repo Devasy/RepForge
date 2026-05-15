@@ -65,10 +65,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final map = <int, CalendarDayData>{};
     final monthSessions = sessions.where((s) =>
         s.date.year == _calendarMonth.year && s.date.month == _calendarMonth.month);
+    final dayVolumes = <int, double>{};
     for (final s in monthSessions) {
-      final vol = s.totalVolume;
+      dayVolumes[s.date.day] = (dayVolumes[s.date.day] ?? 0) + s.totalVolume;
+    }
+    for (final entry in dayVolumes.entries) {
+      final vol = entry.value;
       final intensity = vol > 15000 ? 3 : vol > 5000 ? 2 : 1;
-      map[s.date.day] = CalendarDayData(intensity: intensity);
+      map[entry.key] = CalendarDayData(intensity: intensity);
     }
     return map;
   }
@@ -96,7 +100,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               slivers: [
                 // Header
                 SliverToBoxAdapter(
-                  child: _buildHeader(context, hasUnsynced, historyManager),
+                  child: _buildHeader(context, hasUnsynced: hasUnsynced, historyManager: historyManager),
                 ),
 
                 // Search bar (animated)
@@ -171,7 +175,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       );
   }
 
-  Widget _buildHeader(BuildContext context, bool hasUnsynced, HistoryManager historyManager) {
+  Widget _buildHeader(BuildContext context, {required bool hasUnsynced, required HistoryManager historyManager}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       child: Row(
@@ -544,7 +548,10 @@ class _HistoryCard extends StatelessWidget {
               MaterialPageRoute(builder: (_) => EditWorkoutSessionScreen(session: session)),
             );
           },
-          onDelete: () => _confirmDelete(ctx),
+          onDelete: () async {
+            Navigator.of(ctx).pop();
+            await _confirmDelete(context);
+          },
         ),
       ),
     );
@@ -576,12 +583,10 @@ class _HistoryCard extends StatelessWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      final nav = Navigator.of(context);
       final messenger = ScaffoldMessenger.of(context);
       try {
         await provider.deleteWorkoutSession(session.id);
         if (context.mounted) {
-          nav.pop();
           messenger.showSnackBar(_snackBar('Workout deleted'));
         }
       } catch (e) {
@@ -699,10 +704,10 @@ class _HistoryCard extends StatelessWidget {
                 icon: const Icon(Icons.more_vert_rounded, color: AppColors.textMuted, size: 18),
                 onSelected: (v) => _handleMenu(context, v),
                 itemBuilder: (_) => [
-                  _menuItem('edit', Icons.edit_outlined, 'Edit', AppColors.primary),
+                  _menuItem(value: 'edit', icon: Icons.edit_outlined, label: 'Edit', color: AppColors.primary),
                   if (showSync)
-                    _menuItem('sync', Icons.favorite_outlined, 'Sync to Health Connect', _hcColor),
-                  _menuItem('delete', Icons.delete_outline, 'Delete', AppColors.error),
+                    _menuItem(value: 'sync', icon: Icons.favorite_outlined, label: 'Sync to Health Connect', color: _hcColor),
+                  _menuItem(value: 'delete', icon: Icons.delete_outline, label: 'Delete', color: AppColors.error),
                 ],
               ),
             ],
@@ -712,7 +717,7 @@ class _HistoryCard extends StatelessWidget {
     );
   }
 
-  PopupMenuItem<String> _menuItem(String value, IconData icon, String label, Color color) {
+  PopupMenuItem<String> _menuItem({required String value, required IconData icon, required String label, required Color color}) {
     return PopupMenuItem<String>(
       value: value,
       child: Row(

@@ -154,10 +154,12 @@ class _DashboardTab extends StatelessWidget {
 
   // Generate deterministic 14-week heatmap (98 cells, col-major)
   List<int> _buildHeatmapData(List<WorkoutSession> sessions) {
-    final now = DateTime.now();
+    final nowRaw = DateTime.now();
+    final now = DateTime(nowRaw.year, nowRaw.month, nowRaw.day);
     final data = List<int>.filled(98, 0);
     for (final s in sessions) {
-      final diff = now.difference(s.date).inDays;
+      final sessionDate = DateTime(s.date.year, s.date.month, s.date.day);
+      final diff = now.difference(sessionDate).inDays;
       if (diff < 0 || diff >= 98) continue;
       final col = (97 - diff) ~/ 7;
       final row = (97 - diff) % 7;
@@ -190,7 +192,7 @@ class _DashboardTab extends StatelessWidget {
                     children: [
                       _buildHeader(context, homeState),
                       const SizedBox(height: 24),
-                      _buildStreakHero(context, provider, homeState),
+                      _buildStreakHero(context: context, provider: provider, homeState: homeState),
                       const SizedBox(height: 16),
                       _buildStatsGrid(context, provider),
                       const SizedBox(height: 16),
@@ -198,7 +200,7 @@ class _DashboardTab extends StatelessWidget {
                       const SizedBox(height: 16),
                       _buildMuscleVolumeCard(context, provider),
                       const SizedBox(height: 16),
-                      _buildRecentWorkouts(context, provider, homeState),
+                      _buildRecentWorkouts(context: context, provider: provider, homeState: homeState),
                       const SizedBox(height: 100),
                     ],
                   ),
@@ -275,11 +277,11 @@ class _DashboardTab extends StatelessWidget {
     );
   }
 
-  Widget _buildStreakHero(
-    BuildContext context,
-    WorkoutProvider provider,
+  Widget _buildStreakHero({
+    required BuildContext context,
+    required WorkoutProvider provider,
     _HomeScreenState? homeState,
-  ) {
+  }) {
     final sessions = provider.sessions;
     // Calculate current streak
     int streak = 0;
@@ -779,11 +781,11 @@ class _DashboardTab extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentWorkouts(
-    BuildContext context,
-    WorkoutProvider provider,
+  Widget _buildRecentWorkouts({
+    required BuildContext context,
+    required WorkoutProvider provider,
     _HomeScreenState? homeState,
-  ) {
+  }) {
     final recentSessions = provider.sessions.take(3).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

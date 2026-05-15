@@ -30,7 +30,7 @@ class RoutinesScreen extends StatelessWidget {
               slivers: [
                 SliverToBoxAdapter(child: _buildHeader(context, routines)),
                 if (routines.isNotEmpty) ...[
-                  SliverToBoxAdapter(child: _buildQuickStartCard(context, routines.first, provider)),
+                  SliverToBoxAdapter(child: _buildQuickStartCard(context: context, routine: routines.first, provider: provider)),
                   SliverToBoxAdapter(child: _buildAllRoutinesHeader(routines)),
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
@@ -117,7 +117,7 @@ class RoutinesScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickStartCard(BuildContext context, Routine routine, WorkoutProvider provider) {
+  Widget _buildQuickStartCard({required BuildContext context, required Routine routine, required WorkoutProvider provider}) {
     final exCount = routine.exerciseIds.length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),

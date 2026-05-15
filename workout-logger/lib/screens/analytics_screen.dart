@@ -184,10 +184,11 @@ class _VolumeChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sessions = provider.sessions.take(14).toList().reversed.toList();
+    final settings = context.watch<SettingsProvider>();
 
     return _ChartCard(
       title: 'Volume Progression',
-      subtitle: 'Last ${sessions.length} workouts (tonnes)',
+      subtitle: '${settings.unitLabel} · Last ${sessions.length} workouts',
       isEmpty: sessions.isEmpty,
       child: SizedBox(
         height: 180,
@@ -228,7 +229,7 @@ class _VolumeChart extends StatelessWidget {
                   showTitles: true,
                   reservedSize: 36,
                   getTitlesWidget: (v, _) => Text(
-                    '${v.toStringAsFixed(0)}t',
+                    settings.toDisplay(v).toStringAsFixed(0),
                     style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 9),
                   ),
                 ),
@@ -238,7 +239,7 @@ class _VolumeChart extends StatelessWidget {
             lineBarsData: [
               LineChartBarData(
                 spots: sessions.asMap().entries.map((e) {
-                  return FlSpot(e.key.toDouble(), e.value.totalVolume / 1000);
+                  return FlSpot(e.key.toDouble(), settings.toDisplay(e.value.totalVolume));
                 }).toList(),
                 isCurved: true,
                 curveSmoothness: 0.3,

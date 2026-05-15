@@ -40,7 +40,7 @@ class ActivityHeatmap extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
+            const Text(
               'Less',
               style: TextStyle(
                   fontSize: 10, color: AppColors.textFaint),
@@ -61,7 +61,7 @@ class ActivityHeatmap extends StatelessWidget {
                 );
               }),
             ),
-            Text(
+            const Text(
               'More',
               style: TextStyle(
                   fontSize: 10, color: AppColors.textFaint),

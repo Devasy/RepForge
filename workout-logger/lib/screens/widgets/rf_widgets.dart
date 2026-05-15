@@ -321,12 +321,14 @@ class _GlowButtonState extends State<GlowButton>
 
   Future<void> _onTapUp(TapUpDetails _) async {
     HapticFeedback.heavyImpact();
-    widget.onPressed?.call();
     await _ctrl.forward();
+    if (!mounted) return;
+    widget.onPressed?.call();
   }
 
   Future<void> _onTapCancel() async {
     await _ctrl.forward();
+    if (!mounted) return;
   }
 
   @override

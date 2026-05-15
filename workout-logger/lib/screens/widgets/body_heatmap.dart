@@ -108,31 +108,44 @@ class _BodyPainter extends CustomPainter {
     canvas.drawPath(rightLeg, baseStroke);
 
     // ── Heat overlays ────────────────────────────────────────────
-    _drawHeat(canvas, sx, sy, 'chest',
-        _ellipse(37, 38, 13, 9, sx, sy), AppColors.primary, 0.55);
-    _drawHeat(canvas, sx, sy, 'shoulders',
-        _circle(22, 28, 5, sx, sy), AppColors.primary, 0.42);
-    _drawHeat(canvas, sx, sy, 'shoulders',
-        _circle(52, 28, 5, sx, sy), AppColors.primary, 0.42);
-    _drawHeat(canvas, sx, sy, 'biceps',
-        _ellipse(14, 46, 3.5, 8, sx, sy), AppColors.secondary, 0.45);
-    _drawHeat(canvas, sx, sy, 'biceps',
-        _ellipse(60, 46, 3.5, 8, sx, sy), AppColors.secondary, 0.45);
-    _drawHeat(canvas, sx, sy, 'quads',
-        _ellipse(28, 92, 5, 11, sx, sy), AppColors.warning, 0.18);
-    _drawHeat(canvas, sx, sy, 'quads',
-        _ellipse(46, 92, 5, 11, sx, sy), AppColors.warning, 0.18);
+    _drawHeat(canvas: canvas, sx: sx, sy: sy, muscle: 'chest',
+        path: _ellipse(cx: 37, cy: 38, rx: 13, ry: 9, sx: sx, sy: sy), color: AppColors.primary, baseOpacity: 0.55);
+    _drawHeat(canvas: canvas, sx: sx, sy: sy, muscle: 'shoulders',
+        path: _circle(cx: 22, cy: 28, r: 5, sx: sx, sy: sy), color: AppColors.primary, baseOpacity: 0.42);
+    _drawHeat(canvas: canvas, sx: sx, sy: sy, muscle: 'shoulders',
+        path: _circle(cx: 52, cy: 28, r: 5, sx: sx, sy: sy), color: AppColors.primary, baseOpacity: 0.42);
+    _drawHeat(canvas: canvas, sx: sx, sy: sy, muscle: 'biceps',
+        path: _ellipse(cx: 14, cy: 46, rx: 3.5, ry: 8, sx: sx, sy: sy), color: AppColors.secondary, baseOpacity: 0.45);
+    _drawHeat(canvas: canvas, sx: sx, sy: sy, muscle: 'biceps',
+        path: _ellipse(cx: 60, cy: 46, rx: 3.5, ry: 8, sx: sx, sy: sy), color: AppColors.secondary, baseOpacity: 0.45);
+    _drawHeat(canvas: canvas, sx: sx, sy: sy, muscle: 'quads',
+        path: _ellipse(cx: 28, cy: 92, rx: 5, ry: 11, sx: sx, sy: sy), color: AppColors.warning, baseOpacity: 0.18);
+    _drawHeat(canvas: canvas, sx: sx, sy: sy, muscle: 'quads',
+        path: _ellipse(cx: 46, cy: 92, rx: 5, ry: 11, sx: sx, sy: sy), color: AppColors.warning, baseOpacity: 0.18);
   }
 
-  void _drawHeat(Canvas canvas, double sx, double sy, String muscle,
-      Path path, Color color, double baseOpacity) {
+  void _drawHeat({
+    required Canvas canvas,
+    required double sx,
+    required double sy,
+    required String muscle,
+    required Path path,
+    required Color color,
+    required double baseOpacity,
+  }) {
     final vol = muscleVolumes[muscle] ?? 0.5;
     final opacity = (baseOpacity * (0.5 + vol * 0.5)).clamp(0.0, 1.0);
     canvas.drawPath(path, Paint()..color = color.withValues(alpha: opacity));
   }
 
-  Path _ellipse(double cx, double cy, double rx, double ry, double sx,
-      double sy) {
+  Path _ellipse({
+    required double cx,
+    required double cy,
+    required double rx,
+    required double ry,
+    required double sx,
+    required double sy,
+  }) {
     return Path()
       ..addOval(Rect.fromCenter(
         center: Offset(cx * sx, cy * sy),
@@ -141,8 +154,8 @@ class _BodyPainter extends CustomPainter {
       ));
   }
 
-  Path _circle(double cx, double cy, double r, double sx, double sy) =>
-      _ellipse(cx, cy, r, r, sx, sy);
+  Path _circle({required double cx, required double cy, required double r, required double sx, required double sy}) =>
+      _ellipse(cx: cx, cy: cy, rx: r, ry: r, sx: sx, sy: sy);
 
   @override
   bool shouldRepaint(_BodyPainter old) =>
