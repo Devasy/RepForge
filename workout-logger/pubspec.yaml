@@ -56,7 +56,7 @@ dependencies:
   google_fonts: ^8.0.0
 
   # Health Connect integration
-  health_connector: ^3.8.1
+  health_connector: ^3.9.1
 
   # Backup export/import
   file_picker: ^10.3.10

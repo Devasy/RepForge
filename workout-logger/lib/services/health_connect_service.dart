@@ -135,15 +135,15 @@ class HealthConnectService implements IHealthConnectService {
     DateTime sessionStart,
     DateTime sessionEnd,
   ) {
-    // Collect (segmentType, reps, timestamp) for every valid set.
-    final allSets = <(ExerciseSegmentType, int, DateTime)>[];
+    // Collect (segmentType, reps, timestamp, weightKg) for every valid set.
+    final allSets = <(ExerciseSegmentType, int, DateTime, double)>[];
 
     for (final log in session.exercises) {
       final type =
           _segmentTypeMap[log.exerciseId] ?? ExerciseSegmentType.otherWorkout;
       for (final set in log.sets) {
         if (set.reps > 0) {
-          allSets.add((type, set.reps, set.timestamp));
+          allSets.add((type, set.reps, set.timestamp, set.weight));
         }
       }
     }
@@ -163,7 +163,7 @@ class HealthConnectService implements IHealthConnectService {
           var ts = s.$3;
           if (ts.isBefore(sessionStart)) ts = sessionStart;
           if (ts.isAfter(sessionEnd)) ts = sessionEnd;
-          return (s.$1, s.$2, ts);
+          return (s.$1, s.$2, ts, s.$4);
         })
         .toList();
 
@@ -192,6 +192,7 @@ class HealthConnectService implements IHealthConnectService {
           endTime: end,
           segmentType: clampedSets[i].$1,
           repetitions: clampedSets[i].$2,
+          weight: clampedSets[i].$4 > 0 ? Mass.kilograms(clampedSets[i].$4) : null,
         );
       });
     }
@@ -206,6 +207,7 @@ class HealthConnectService implements IHealthConnectService {
         endTime: end,
         segmentType: clampedSets[i].$1,
         repetitions: clampedSets[i].$2,
+        weight: clampedSets[i].$4 > 0 ? Mass.kilograms(clampedSets[i].$4) : null,
       ));
     }
     return segments;
