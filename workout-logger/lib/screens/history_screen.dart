@@ -274,9 +274,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: Row(
             children: [
               _SummaryCell(label: 'WORKOUTS', value: '${all.length}', unit: 'total'),
-              _VertDivider(),
+              const _VertDivider(),
               _SummaryCell(label: 'VOLUME', value: volStr, unit: 'kg'),
-              _VertDivider(),
+              const _VertDivider(),
               _SummaryCell(label: 'THIS MONTH', value: '${all.where((s) => s.date.month == DateTime.now().month && s.date.year == DateTime.now().year).length}', unit: 'sessions'),
             ],
           ),
@@ -409,6 +409,8 @@ class _SummaryCell extends StatelessWidget {
 }
 
 class _VertDivider extends StatelessWidget {
+  const _VertDivider();
+
   @override
   Widget build(BuildContext context) {
     return Container(width: 1, color: AppColors.glassBorder);

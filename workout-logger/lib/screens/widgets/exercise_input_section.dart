@@ -189,7 +189,7 @@ class _RecommendationCard extends StatelessWidget {
               color: AppColors.primary.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            child: Icon(Icons.auto_awesome_rounded,
+            child: const Icon(Icons.auto_awesome_rounded,
                 color: AppColors.primary, size: 18),
           ),
           const SizedBox(width: AppSpacing.md),

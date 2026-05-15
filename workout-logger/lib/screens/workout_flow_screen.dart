@@ -273,6 +273,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           onFinish: _finishWorkout,
           onRemoveLastSet: provider.removeLastSet,
           onSetRestTime: (s) => setState(() => _restSeconds = s),
+          restSeconds: _restSeconds,
         ),
         Expanded(
           child: SingleChildScrollView(
@@ -460,18 +461,27 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
         _dropRepsCtrls.clear();
         _drops.clear();
       } else {
-        _mainWeightCtrl.text = _currentWeight.toString();
+        final settings = context.read<SettingsProvider>();
+        final dw = settings.toDisplay(_currentWeight);
+        _mainWeightCtrl.text = dw == dw.truncateToDouble()
+            ? dw.toStringAsFixed(0)
+            : dw.toStringAsFixed(1);
         _mainRepsCtrl.text = _currentReps.toString();
       }
     });
   }
 
   void _addDrop() {
+    final settings = context.read<SettingsProvider>();
     setState(() {
       final lastWeight = _drops.isEmpty ? _currentWeight : _drops.last.weight;
       final newWeight = (lastWeight * 0.8).roundToDouble();
       _drops.add(DropsetEntry(weight: newWeight, reps: _currentReps));
-      _dropWeightCtrls.add(TextEditingController(text: newWeight.toString()));
+      final dw = settings.toDisplay(newWeight);
+      final dwStr = dw == dw.truncateToDouble()
+          ? dw.toStringAsFixed(0)
+          : dw.toStringAsFixed(1);
+      _dropWeightCtrls.add(TextEditingController(text: dwStr));
       _dropRepsCtrls.add(
         TextEditingController(text: _currentReps.toString()),
       );

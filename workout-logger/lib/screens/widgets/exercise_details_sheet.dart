@@ -1,9 +1,11 @@
 // exercise_details_sheet.dart — Bottom sheet showing exercise detail & stats
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/workout_provider.dart';
+import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../data/exercise_database.dart';
 import 'rf_widgets.dart';
@@ -20,6 +22,7 @@ class ExerciseDetailsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final lastSession = provider.getLastSessionForExercise(exercise.id);
     final growthModel = provider.getGrowthModel(exercise.id);
     final color = exercise.isCustom ? AppColors.warning : AppColors.primary;
@@ -194,7 +197,7 @@ class ExerciseDetailsSheet extends StatelessWidget {
                     border: Border.all(color: AppColors.glassBorder),
                   ),
                   child: Text(
-                    '${s.weight}kg × ${s.reps}',
+                    '${settings.toDisplay(s.weight).toStringAsFixed(settings.toDisplay(s.weight) == settings.toDisplay(s.weight).truncateToDouble() ? 0 : 1)}${settings.unitLabel} × ${s.reps}',
                     style: const TextStyle(
                       color: AppColors.textSoft,
                       fontSize: 12,
@@ -228,7 +231,7 @@ class ExerciseDetailsSheet extends StatelessWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
-                      '+${growthModel.slope.toStringAsFixed(1)} kg volume/session',
+                      '+${settings.toDisplay(growthModel.slope).toStringAsFixed(1)} ${settings.unitLabel} volume/session',
                       style: const TextStyle(
                         color: AppColors.success,
                         fontSize: 13,
@@ -295,6 +298,17 @@ class ExerciseDetailsSheet extends StatelessWidget {
           SnackBar(
             content: Text('"${exercise.name}" deleted'),
             backgroundColor: AppColors.cardHigh,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+          ),
+        );
+      } else if (context.mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('"${exercise.name}" could not be deleted'),
+            backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.md),

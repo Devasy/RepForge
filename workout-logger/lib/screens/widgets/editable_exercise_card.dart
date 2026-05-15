@@ -94,19 +94,22 @@ class EditableExerciseCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                GestureDetector(
-                  onTap: () => _confirmDelete(context),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.1),
+                IconButton(
+                  tooltip: 'Remove exercise',
+                  onPressed: () => _confirmDelete(context),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.error.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
-                    child: const Icon(
-                      Icons.delete_outline_rounded,
-                      size: 16,
-                      color: AppColors.error,
-                    ),
+                    padding: const EdgeInsets.all(6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 16,
+                    color: AppColors.error,
                   ),
                 ),
               ],
@@ -123,7 +126,7 @@ class EditableExerciseCard extends StatelessWidget {
                 final i = entry.key;
                 final set = entry.value;
                 return EditableSetRow(
-                  key: ValueKey('set_${exerciseName}_$i'),
+                  key: ValueKey(set.timestamp),
                   setNumber: i + 1,
                   weight: set.weight,
                   reps: set.reps,

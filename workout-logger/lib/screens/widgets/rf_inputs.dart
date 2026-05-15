@@ -483,11 +483,18 @@ class NumberPickerSheet extends StatefulWidget {
 
 class _NumberPickerSheetState extends State<NumberPickerSheet> {
   late double _value;
+  Timer? _holdTimer;
 
   @override
   void initState() {
     super.initState();
     _value = widget.initial;
+  }
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    super.dispose();
   }
 
   void _step(double dir) {
@@ -535,16 +542,15 @@ class _NumberPickerSheetState extends State<NumberPickerSheet> {
                   icon: Icons.remove_rounded,
                   onTap: () => _step(-1),
                   onLongPress: () {
-                    Timer.periodic(
+                    _holdTimer?.cancel();
+                    _holdTimer = Timer.periodic(
                       const Duration(milliseconds: 100),
-                      (t) {
-                        if (!mounted) {
-                          t.cancel();
-                          return;
-                        }
-                        _step(-1);
-                      },
+                      (_) { if (mounted) _step(-1); },
                     );
+                  },
+                  onLongPressEnd: () {
+                    _holdTimer?.cancel();
+                    _holdTimer = null;
                   },
                 ),
                 const SizedBox(width: AppSpacing.xl),
@@ -562,16 +568,15 @@ class _NumberPickerSheetState extends State<NumberPickerSheet> {
                   icon: Icons.add_rounded,
                   onTap: () => _step(1),
                   onLongPress: () {
-                    Timer.periodic(
+                    _holdTimer?.cancel();
+                    _holdTimer = Timer.periodic(
                       const Duration(milliseconds: 100),
-                      (t) {
-                        if (!mounted) {
-                          t.cancel();
-                          return;
-                        }
-                        _step(1);
-                      },
+                      (_) { if (mounted) _step(1); },
                     );
+                  },
+                  onLongPressEnd: () {
+                    _holdTimer?.cancel();
+                    _holdTimer = null;
                   },
                 ),
               ],
@@ -594,17 +599,20 @@ class _StepButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     required this.onLongPress,
+    this.onLongPressEnd,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onLongPressEnd;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
+      onLongPressEnd: (_) => onLongPressEnd?.call(),
       child: Container(
         width: 56,
         height: 56,

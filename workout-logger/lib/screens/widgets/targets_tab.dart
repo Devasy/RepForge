@@ -106,6 +106,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
   String? _selectedExerciseId;
   String _targetType = 'weight';
   final _valueController = TextEditingController();
+  bool _isSubmitting = false;
 
   static const _types = [
     ('weight', 'Max Weight (kg)'),
@@ -287,7 +288,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
           GlowButton(
             label: 'Create Target',
             icon: Icons.flag_rounded,
-            onPressed: _submit,
+            onPressed: _isSubmitting ? null : _submit,
             fullWidth: true,
           ),
         ],
@@ -296,6 +297,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     if (_selectedExerciseId == null || _valueController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -316,12 +318,16 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
       return;
     }
 
-    await context.read<WorkoutProvider>().createTarget(
-          exerciseId: _selectedExerciseId!,
-          type: _targetType,
-          targetValue: value,
-        );
-
-    if (mounted) Navigator.of(context).pop();
+    setState(() => _isSubmitting = true);
+    try {
+      await context.read<WorkoutProvider>().createTarget(
+            exerciseId: _selectedExerciseId!,
+            type: _targetType,
+            targetValue: value,
+          );
+      if (mounted) Navigator.of(context).pop();
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 }

@@ -298,7 +298,7 @@ class DataManagementSection extends StatelessWidget {
             loading: isExporting,
             onTap: onExport,
           ),
-          _SectionDivider(),
+          const _SectionDivider(),
           _ActionTile(
             icon: Icons.download_rounded,
             iconColor: AppColors.secondary,
@@ -307,7 +307,7 @@ class DataManagementSection extends StatelessWidget {
             loading: isImporting,
             onTap: onImport,
           ),
-          _SectionDivider(),
+          const _SectionDivider(),
           _ActionTile(
             icon: Icons.cloud_upload_outlined,
             iconColor: AppColors.primary,
@@ -333,7 +333,7 @@ class CloudSyncSection extends StatelessWidget {
       iconColor: AppColors.warning,
       title: 'Cloud Sync',
       subtitle: 'Sync your data across devices',
-      trailing: _ComingSoonBadge(),
+      trailing: const _ComingSoonBadge(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -394,11 +394,11 @@ class AboutSection extends StatelessWidget {
       child: Column(
         children: [
           _InfoTile(label: 'Version', value: appVersion, icon: Icons.tag_rounded),
-          _SectionDivider(),
+          const _SectionDivider(),
           _InfoTile(label: 'Created by', value: _createdBy, icon: Icons.person_rounded),
-          _SectionDivider(),
+          const _SectionDivider(),
           _InfoTile(label: 'Platform', value: 'Android', icon: Icons.phone_android_rounded),
-          _SectionDivider(),
+          const _SectionDivider(),
           _InfoTile(
             label: 'Package',
             value: 'com.devasy.repforge',
@@ -566,6 +566,8 @@ class _InfoTile extends StatelessWidget {
 }
 
 class _SectionDivider extends StatelessWidget {
+  const _SectionDivider();
+
   @override
   Widget build(BuildContext context) {
     return const Divider(color: AppColors.glassBorder, height: 1, indent: 40);
@@ -573,6 +575,8 @@ class _SectionDivider extends StatelessWidget {
 }
 
 class _ComingSoonBadge extends StatelessWidget {
+  const _ComingSoonBadge();
+
   @override
   Widget build(BuildContext context) {
     return Container(

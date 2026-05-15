@@ -159,7 +159,7 @@ class _WelcomePageState extends State<WelcomePage> {
                     child: GlowButton(
                       label: _saving ? 'Setting up…' : "Let's Go!",
                       icon: Icons.arrow_forward_rounded,
-                      onPressed: _saving ? () {} : _submit,
+                      onPressed: _saving ? null : _submit,
                     ),
                   ),
                   const Spacer(flex: 1),
@@ -255,14 +255,14 @@ class _VersionUpdateSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          _WhatsNewItem(
+          const _WhatsNewItem(
             icon: Icons.emoji_events_rounded,
             color: AppColors.warning,
             title: 'Personal Records',
             description: 'Automatically tracks your best weight, reps, and volume for every exercise.',
           ),
           const SizedBox(height: 12),
-          _WhatsNewItem(
+          const _WhatsNewItem(
             icon: Icons.bar_chart_rounded,
             color: AppColors.secondary,
             title: 'Records Tab',

@@ -100,7 +100,7 @@ class _ExerciseDropdown extends StatelessWidget {
           border: Border.all(color: AppColors.glassBorder),
         ),
         child: DropdownButton<String>(
-          value: selected,
+          value: ids.contains(selected) ? selected : null,
           isExpanded: true,
           underline: const SizedBox.shrink(),
           dropdownColor: AppColors.cardHigh,

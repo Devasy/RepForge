@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/managers/pr_manager.dart';
+import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/rf_cards.dart';
@@ -24,11 +25,12 @@ class WorkoutSummaryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.read<WorkoutProvider>();
+    final settings = context.read<SettingsProvider>();
     final totalSets = session.exercises.fold<int>(
       0,
       (sum, e) => sum + e.sets.length,
     );
-    final volume = session.totalVolume;
+    final volume = settings.toDisplay(session.totalVolume);
     final volStr = volume >= 1000
         ? '${(volume / 1000).toStringAsFixed(1)}k'
         : volume.toStringAsFixed(0);
@@ -64,6 +66,7 @@ class WorkoutSummaryScreen extends StatelessWidget {
                       volStr,
                       totalSets,
                       session.exercises.length,
+                      settings.unitLabel,
                     ),
                     if (newPRs.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.lg),
@@ -150,6 +153,7 @@ class WorkoutSummaryScreen extends StatelessWidget {
     String volume,
     int sets,
     int exercises,
+    String unitLabel,
   ) {
     return Column(
       children: [
@@ -168,7 +172,7 @@ class WorkoutSummaryScreen extends StatelessWidget {
               child: StatGridCard(
                 icon: Icons.trending_up_rounded,
                 value: volume,
-                label: 'Volume (kg)',
+                label: 'Volume ($unitLabel)',
                 color: AppColors.success,
               ),
             ),

@@ -348,7 +348,7 @@ class _DashboardTab extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.local_fire_department_rounded,
                               size: 14,
                               color: AppColors.primary,
@@ -482,7 +482,7 @@ class _DashboardTab extends StatelessWidget {
                                   : isToday
                                       ? AppColors.primary.withValues(alpha: 0.3)
                                       : isFuture
-                                          ? const Color(0x0FFFFFFF)
+                                          ? const Color(0x00000000)
                                           : const Color(0x0FFFFFFF),
                               border: isToday
                                   ? Border.all(
@@ -530,7 +530,7 @@ class _DashboardTab extends StatelessWidget {
         : sessions.take(7).fold<int>(0, (s, e) => s + e.duration) ~/
             sessions.take(7).length;
 
-    // Sparkline data (last 7 weeks, workouts per week)
+    // Sparkline data (last 7 weeks)
     List<double> weeklyWorkouts = List.generate(7, (i) {
       final wStart = now.subtract(Duration(days: (6 - i) * 7 + now.weekday - 1));
       final wEnd = wStart.add(const Duration(days: 7));
@@ -542,6 +542,20 @@ class _DashboardTab extends StatelessWidget {
       return sessions
           .where((s) => s.date.isAfter(wStart) && s.date.isBefore(wEnd))
           .fold<double>(0, (s, e) => s + e.totalVolume);
+    });
+    List<double> weeklySets = List.generate(7, (i) {
+      final wStart = now.subtract(Duration(days: (6 - i) * 7 + now.weekday - 1));
+      final wEnd = wStart.add(const Duration(days: 7));
+      return sessions
+          .where((s) => s.date.isAfter(wStart) && s.date.isBefore(wEnd))
+          .fold<double>(0, (s, e) => s + e.exercises.fold(0, (a, ex) => a + ex.sets.length));
+    });
+    List<double> weeklyAvgDurations = List.generate(7, (i) {
+      final wStart = now.subtract(Duration(days: (6 - i) * 7 + now.weekday - 1));
+      final wEnd = wStart.add(const Duration(days: 7));
+      final ws = sessions.where((s) => s.date.isAfter(wStart) && s.date.isBefore(wEnd)).toList();
+      if (ws.isEmpty) return 0;
+      return ws.fold<double>(0, (s, e) => s + e.duration) / ws.length;
     });
 
     final stats = [
@@ -566,14 +580,14 @@ class _DashboardTab extends StatelessWidget {
         value: '$weekSets',
         unit: 'this week',
         color: AppColors.success,
-        spark: List.generate(7, (i) => (weekSets * (0.5 + i * 0.07)).clamp(0, weekSets + 10).toDouble()),
+        spark: weeklySets,
       ),
       _StatItem(
         label: 'Avg time',
         value: '$avgDuration',
         unit: 'min',
         color: AppColors.warning,
-        spark: List.generate(7, (i) => (avgDuration * (0.8 + i * 0.04)).toDouble()),
+        spark: weeklyAvgDurations,
       ),
     ];
 

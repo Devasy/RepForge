@@ -422,21 +422,29 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
     }
 
     final provider = context.read<WorkoutProvider>();
-    if (widget.routine != null) {
-      final updated = Routine(
-        id: widget.routine!.id,
-        name: _nameController.text.trim(),
-        exerciseIds: _selectedIds,
-        createdAt: widget.routine!.createdAt,
-      );
-      await provider.updateRoutine(updated);
-    } else {
-      await provider.createRoutine(
-        _nameController.text.trim(),
-        _selectedIds,
-      );
+    try {
+      if (widget.routine != null) {
+        final updated = Routine(
+          id: widget.routine!.id,
+          name: _nameController.text.trim(),
+          exerciseIds: _selectedIds,
+          createdAt: widget.routine!.createdAt,
+        );
+        await provider.updateRoutine(updated);
+      } else {
+        await provider.createRoutine(
+          _nameController.text.trim(),
+          _selectedIds,
+        );
+      }
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save routine: $e')),
+        );
+      }
     }
-    if (mounted) Navigator.of(context).pop();
   }
 }
 

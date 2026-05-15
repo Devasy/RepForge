@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/managers/pr_manager.dart';
+import '../services/settings_provider.dart';
 import '../data/exercise_database.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
@@ -291,10 +292,19 @@ class _MuscleVolumeChart extends StatelessWidget {
       );
     }
 
+    final settings = context.watch<SettingsProvider>();
     final sorted = byMuscle.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final top = sorted.take(8).toList();
     final maxVol = top.first.value;
+
+    if (maxVol == 0) {
+      return _ChartCard(
+        title: 'Weekly Muscle Volume',
+        isEmpty: true,
+        child: const SizedBox.shrink(),
+      );
+    }
 
     return _ChartCard(
       title: 'Weekly Muscle Volume',
@@ -303,9 +313,10 @@ class _MuscleVolumeChart extends StatelessWidget {
           final name = MuscleGroups.names[entry.key] ?? entry.key;
           final color = AppColors.muscle(entry.key);
           final pct = entry.value / maxVol;
-          final volStr = entry.value >= 1000
-              ? '${(entry.value / 1000).toStringAsFixed(1)}k'
-              : entry.value.toStringAsFixed(0);
+          final displayVal = settings.toDisplay(entry.value);
+          final volStr = displayVal >= 1000
+              ? '${(displayVal / 1000).toStringAsFixed(1)}k'
+              : displayVal.toStringAsFixed(0);
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -316,7 +327,7 @@ class _MuscleVolumeChart extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(name, style: GoogleFonts.geist(color: AppColors.textSoft, fontSize: 12, fontWeight: FontWeight.w500)),
-                    Text('$volStr kg', style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 11)),
+                    Text('$volStr ${settings.unitLabel}', style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 11)),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -342,7 +353,7 @@ class _FrequencyGrid extends StatelessWidget {
     final weeks = {0: 0, 1: 0, 2: 0, 3: 0};
     for (final s in provider.sessions) {
       final w = now.difference(s.date).inDays ~/ 7;
-      if (w < 4) weeks[w] = (weeks[w] ?? 0) + 1;
+      if (w >= 0 && w < 4) weeks[w] = (weeks[w] ?? 0) + 1;
     }
 
     return _ChartCard(
@@ -408,7 +419,7 @@ class _RecordsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final prManager = context.watch<PRManager>();
     final provider = context.read<WorkoutProvider>();
-    final records = prManager.allRecords
+    final records = [...prManager.allRecords]
       ..sort((a, b) => b.achievedAt.compareTo(a.achievedAt));
 
     if (records.isEmpty) {
@@ -452,7 +463,11 @@ class _PRCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final dateStr = DateFormat('MMM d, yyyy').format(record.achievedAt);
+    final displayWeight = settings.toDisplay(record.bestWeight);
+    final displayVol = settings.toDisplay(record.bestVolume);
+    final unit = settings.unitLabel;
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 10),
@@ -496,11 +511,11 @@ class _PRCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              _PRStat(label: 'Best Weight', value: '${record.bestWeight.toStringAsFixed(record.bestWeight % 1 == 0 ? 0 : 1)} kg', color: AppColors.warning),
+              _PRStat(label: 'Best Weight', value: '${displayWeight.toStringAsFixed(displayWeight % 1 == 0 ? 0 : 1)} $unit', color: AppColors.warning),
               const SizedBox(width: AppSpacing.sm),
               _PRStat(label: 'Best Reps', value: '${record.bestReps}', color: AppColors.secondary),
               const SizedBox(width: AppSpacing.sm),
-              _PRStat(label: 'Best Vol.', value: '${record.bestVolume.toStringAsFixed(0)} kg', color: AppColors.success),
+              _PRStat(label: 'Best Vol.', value: '${displayVol.toStringAsFixed(0)} $unit', color: AppColors.success),
             ],
           ),
         ],

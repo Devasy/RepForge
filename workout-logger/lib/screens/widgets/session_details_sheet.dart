@@ -2,9 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/workout_provider.dart';
+import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 
@@ -28,10 +30,11 @@ class SessionDetailsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final dateStr = DateFormat('EEEE, MMMM d, yyyy').format(session.date);
     final timeStr = DateFormat('h:mm a').format(session.date);
     final totalSets = session.exercises.fold<int>(0, (s, e) => s + e.sets.length);
-    final volume = session.totalVolume;
+    final volume = settings.toDisplay(session.totalVolume);
     final volStr = volume >= 1000
         ? '${(volume / 1000).toStringAsFixed(1)}k'
         : volume.toStringAsFixed(0);
@@ -145,7 +148,7 @@ class SessionDetailsSheet extends StatelessWidget {
             Expanded(
               child: _StatBannerBox(
                 value: volStr,
-                label: 'Volume kg',
+                label: 'Volume ${settings.unitLabel}',
                 color: AppColors.success,
               ),
             ),
@@ -291,6 +294,7 @@ class _ExerciseDetailCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final exercise = provider.getExercise(log.exerciseId);
     final name = exercise?.name ?? 'Unknown Exercise';
 
@@ -367,7 +371,7 @@ class _ExerciseDetailCard extends StatelessWidget {
                   style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
                 Text(
-                  '${log.totalVolume.toStringAsFixed(0)} kg',
+                  '${settings.toDisplay(log.totalVolume).toStringAsFixed(0)} ${settings.unitLabel}',
                   style: const TextStyle(
                     color: AppColors.success,
                     fontSize: 13,
@@ -391,6 +395,11 @@ class _SetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    final dw = settings.toDisplay(set.weight);
+    final wStr = dw == dw.truncateToDouble()
+        ? dw.toStringAsFixed(0)
+        : dw.toStringAsFixed(1);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: AppSpacing.sm),
       child: Row(
@@ -416,7 +425,7 @@ class _SetRow extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              '${set.weight} kg × ${set.reps} reps',
+              '$wStr ${settings.unitLabel} × ${set.reps} reps',
               style: const TextStyle(
                 color: AppColors.textSoft,
                 fontSize: 13,

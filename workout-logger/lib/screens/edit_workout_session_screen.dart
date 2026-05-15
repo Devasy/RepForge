@@ -47,7 +47,7 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
                 weight: s.weight,
                 reps: s.reps,
                 isDropset: s.isDropset,
-                drops: s.drops,
+                drops: s.drops?.toList(),
                 timeTaken: s.timeTaken,
                 timestamp: s.timestamp,
               ),

@@ -25,6 +25,7 @@ class WorkoutHeader extends StatefulWidget {
     required this.onFinish,
     required this.onRemoveLastSet,
     required this.onSetRestTime,
+    this.restSeconds = 90,
   });
 
   final String exerciseName;
@@ -41,6 +42,7 @@ class WorkoutHeader extends StatefulWidget {
   final VoidCallback onFinish;
   final VoidCallback onRemoveLastSet;
   final void Function(int seconds) onSetRestTime;
+  final int restSeconds;
 
   @override
   State<WorkoutHeader> createState() => _WorkoutHeaderState();
@@ -164,7 +166,7 @@ class _WorkoutHeaderState extends State<WorkoutHeader> {
                         ),
                       ),
                       _OptionsMenu(
-                        restSeconds: 90,
+                        restSeconds: widget.restSeconds,
                         onRemoveLastSet: widget.onRemoveLastSet,
                         onSetRestTime: widget.onSetRestTime,
                         onFinish: widget.onFinish,

@@ -1,7 +1,9 @@
 // dashboard_widgets.dart — Dashboard-specific helper widgets for home_screen.
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/models.dart';
+import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 import 'rf_cards.dart';
@@ -17,9 +19,10 @@ class WeekActivityStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final today = DateTime.now();
     // Weekday 1=Mon … 7=Sun; align strip Mon→Sun
-    final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    final todayMidnight = DateTime(today.year, today.month, today.day);
+    final startOfWeek = todayMidnight.subtract(Duration(days: today.weekday - 1));
     final trainedDays = sessions
-        .where((s) => s.date.isAfter(startOfWeek.subtract(const Duration(days: 1))))
+        .where((s) => !s.date.isBefore(startOfWeek))
         .map((s) => s.date.weekday)
         .toSet();
 
@@ -96,6 +99,7 @@ class StatGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final weeklyWorkouts = stats['weeklyWorkouts'] ?? 0;
     final weeklyVolume = (stats['weeklyVolume'] ?? 0.0).toDouble();
     final exercisesThisWeek = stats['exercisesThisWeek'] ?? 0;
@@ -117,8 +121,8 @@ class StatGrid extends StatelessWidget {
             Expanded(
               child: StatGridCard(
                 icon: Icons.trending_up_rounded,
-                value: _formatVolume(weeklyVolume),
-                label: 'Volume (kg)',
+                value: _formatVolume(settings.toDisplay(weeklyVolume)),
+                label: 'Volume (${settings.unitLabel})',
                 color: AppColors.success,
               ),
             ),
