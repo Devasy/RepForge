@@ -5,15 +5,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/screens/exercise_library_screen.dart';
 import 'package:repforge/services/workout_provider.dart';
+import 'package:repforge/services/settings_provider.dart';
 import 'package:repforge/services/managers/program_manager.dart';
 import 'test_utils/mock_storage_service.dart';
 
 Widget createTestWidget({
   required Widget child,
   required WorkoutProvider provider,
+  SettingsProvider? settingsProvider,
 }) {
-  return ChangeNotifierProvider<WorkoutProvider>.value(
-    value: provider,
+  final settings = settingsProvider ?? SettingsProvider(MockStorageService());
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<WorkoutProvider>.value(value: provider),
+      ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+    ],
     child: MaterialApp(home: child),
   );
 }
