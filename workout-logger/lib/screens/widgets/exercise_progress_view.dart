@@ -1,5 +1,7 @@
 // exercise_progress_view.dart — Analytics "Exercises" tab
 
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -158,7 +160,7 @@ class _ExerciseStats extends StatelessWidget {
             _GrowthCard(model: growthModel),
             const SizedBox(height: AppSpacing.sm),
           ],
-          _VolumeChart(progression: progression),
+          _VolumeChart(progression: progression, growthModel: growthModel),
           const SizedBox(height: AppSpacing.sm),
           _SessionHistory(progression: progression, settings: settings),
         ],
@@ -250,6 +252,7 @@ class _GrowthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.read<SettingsProvider>();
     final isGrowing = model.slope > 0;
     final color = isGrowing ? AppColors.success : AppColors.warning;
 
@@ -289,7 +292,7 @@ class _GrowthCard extends StatelessWidget {
                 ),
                 Text(
                   isGrowing
-                      ? '+${model.slope.abs().toStringAsFixed(1)} kg/session'
+                      ? '+${settings.toDisplay(model.slope.abs()).toStringAsFixed(1)} ${settings.unitLabel}/session'
                       : 'Volume trend is flat',
                   style: const TextStyle(
                     color: AppColors.textSoft,
@@ -324,11 +327,126 @@ class _GrowthCard extends StatelessWidget {
 
 // ── Volume progression line chart ─────────────────────────────────────────────
 class _VolumeChart extends StatelessWidget {
-  const _VolumeChart({required this.progression});
+  const _VolumeChart({required this.progression, this.growthModel});
   final List<({DateTime date, double volume})> progression;
+  final GrowthModel? growthModel;
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.read<SettingsProvider>();
+    final n = progression.length;
+
+    // Residual standard error for 95% confidence interval width
+    double rse = 0.0;
+    if (growthModel != null && n >= 3) {
+      double ssRes = 0.0;
+      for (int i = 0; i < n; i++) {
+        final r = progression[i].volume - growthModel!.predict(i);
+        ssRes += r * r;
+      }
+      rse = sqrt(ssRes / (n - 2));
+    }
+    final ci95 = settings.toDisplay(rse * 1.96);
+
+    final bestVol = n > 0
+        ? settings.toDisplay(progression.map((e) => e.volume).reduce(max))
+        : 0.0;
+
+    final actualSpots = List<FlSpot>.generate(
+      n,
+      (i) => FlSpot(i.toDouble(), settings.toDisplay(progression[i].volume)),
+    );
+
+    // Trend line extends 2 sessions beyond actual data
+    final trendSpots = (growthModel != null && n >= 2)
+        ? List<FlSpot>.generate(
+            n + 2,
+            (i) => FlSpot(
+              i.toDouble(),
+              settings.toDisplay(growthModel!.predict(i).clamp(0.0, double.infinity)),
+            ),
+          )
+        : <FlSpot>[];
+
+    // Upper / lower CI bounds rendered as invisible lines;
+    // BetweenBarsData fills the band between them.
+    final upperSpots = (ci95 > 0 && trendSpots.isNotEmpty)
+        ? trendSpots.map((s) => FlSpot(s.x, s.y + ci95)).toList()
+        : <FlSpot>[];
+    final lowerSpots = (ci95 > 0 && trendSpots.isNotEmpty)
+        ? trendSpots.map((s) => FlSpot(s.x, max(0.0, s.y - ci95))).toList()
+        : <FlSpot>[];
+
+    // bar indices: 0 = actual, 1 = trend, 2 = upper CI, 3 = lower CI
+    final lineBars = <LineChartBarData>[
+      LineChartBarData(
+        spots: actualSpots,
+        isCurved: true,
+        curveSmoothness: 0.3,
+        color: AppColors.secondary,
+        barWidth: 2.5,
+        dotData: FlDotData(
+          show: true,
+          getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+            radius: 3,
+            color: AppColors.secondary,
+            strokeWidth: 1.5,
+            strokeColor: AppColors.surface,
+          ),
+        ),
+        belowBarData: BarAreaData(
+          show: true,
+          gradient: LinearGradient(
+            colors: [
+              AppColors.secondary.withValues(alpha: 0.22),
+              AppColors.secondary.withValues(alpha: 0.0),
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+      ),
+      if (trendSpots.isNotEmpty)
+        LineChartBarData(
+          spots: trendSpots,
+          isCurved: false,
+          color: AppColors.primary.withValues(alpha: 0.5),
+          barWidth: 1.5,
+          dashArray: [8, 5],
+          dotData: const FlDotData(show: false),
+          belowBarData: BarAreaData(show: false),
+        ),
+      if (upperSpots.isNotEmpty)
+        LineChartBarData(
+          spots: upperSpots,
+          color: Colors.transparent,
+          barWidth: 0,
+          dotData: const FlDotData(show: false),
+          belowBarData: BarAreaData(show: false),
+        ),
+      if (lowerSpots.isNotEmpty)
+        LineChartBarData(
+          spots: lowerSpots,
+          color: Colors.transparent,
+          barWidth: 0,
+          dotData: const FlDotData(show: false),
+          belowBarData: BarAreaData(show: false),
+        ),
+    ];
+
+    // BetweenBarsData indices depend on how many bars are present
+    final hasTrend = trendSpots.isNotEmpty;
+    final hasCi = upperSpots.isNotEmpty;
+    final betweenBars = (hasTrend && hasCi)
+        ? [
+            BetweenBarsData(
+              fromIndex: 2, // upper CI
+              toIndex: 3,   // lower CI
+              color: AppColors.primary.withValues(alpha: 0.08),
+            ),
+          ]
+        : <BetweenBarsData>[];
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -339,13 +457,34 @@ class _VolumeChart extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Volume Progression',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Volume Progression',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (trendSpots.isNotEmpty) ...[
+                Container(
+                  width: 16,
+                  height: 2,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  'Trend',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: AppSpacing.md),
           if (progression.isEmpty)
@@ -363,54 +502,90 @@ class _VolumeChart extends StatelessWidget {
               height: 160,
               child: LineChart(
                 LineChartData(
+                  backgroundColor: Colors.transparent,
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
                     getDrawingHorizontalLine: (_) =>
                         FlLine(color: AppColors.glassBorder, strokeWidth: 1),
                   ),
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) => AppColors.cardHigh,
+                      getTooltipItems: (spots) => spots.map((spot) {
+                        if (spot.barIndex != 0) return null;
+                        final v = spot.y;
+                        final volStr = v >= 1000
+                            ? '${(v / 1000).toStringAsFixed(1)}k'
+                            : v.toStringAsFixed(0);
+                        final i = spot.x.toInt();
+                        final dateStr = (i >= 0 && i < n)
+                            ? DateFormat('MMM d').format(progression[i].date)
+                            : '';
+                        return LineTooltipItem(
+                          '$volStr ${settings.unitLabel}',
+                          const TextStyle(color: AppColors.secondary, fontSize: 13, fontWeight: FontWeight.w700),
+                          children: [
+                            TextSpan(
+                              text: '\n$dateStr',
+                              style: const TextStyle(color: AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.normal),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
                   titlesData: FlTitlesData(
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 38,
-                        getTitlesWidget: (v, _) => Text(
-                          v.toStringAsFixed(0),
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 9,
-                          ),
-                        ),
+                        getTitlesWidget: (v, _) {
+                          final label = v >= 1000
+                              ? '${(v / 1000).toStringAsFixed(1)}k'
+                              : v.toStringAsFixed(0);
+                          return Text(
+                            label,
+                            style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
+                          );
+                        },
                       ),
                     ),
                   ),
                   borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: progression.asMap().entries.map((e) {
-                        return FlSpot(e.key.toDouble(), e.value.volume);
-                      }).toList(),
-                      isCurved: true,
-                      curveSmoothness: 0.3,
-                      color: AppColors.secondary,
-                      barWidth: 2.5,
-                      dotData: const FlDotData(show: true),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.secondary.withValues(alpha: 0.25),
-                            AppColors.secondary.withValues(alpha: 0.0),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
+                  extraLinesData: ExtraLinesData(
+                    horizontalLines: [
+                      if (bestVol > 0)
+                        HorizontalLine(
+                          y: bestVol,
+                          color: AppColors.warning.withValues(alpha: 0.5),
+                          strokeWidth: 1,
+                          dashArray: [6, 4],
+                          label: HorizontalLineLabel(
+                            show: true,
+                            direction: LabelDirection.horizontal,
+                            alignment: Alignment.topRight,
+                            padding:
+                                const EdgeInsets.only(right: 4, bottom: 2),
+                            style: const TextStyle(
+                              color: AppColors.warning,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            labelResolver: (line) =>
+                                'BEST ${bestVol.toStringAsFixed(0)}',
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  betweenBarsData: betweenBars,
+                  lineBarsData: lineBars,
                 ),
               ),
             ),

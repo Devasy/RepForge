@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 
@@ -159,5 +160,5 @@ class _BodyPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BodyPainter old) =>
-      old.muscleVolumes != muscleVolumes;
+      !mapEquals(old.muscleVolumes, muscleVolumes);
 }

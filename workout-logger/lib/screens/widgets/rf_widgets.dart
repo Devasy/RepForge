@@ -886,7 +886,7 @@ class RestTimerRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = total > 0 ? remaining / total : 0.0;
+    final progress = total > 0 ? (remaining / total).clamp(0.0, 1.0) : 0.0;
     final mins = remaining ~/ 60;
     final secs = remaining % 60;
     final label =

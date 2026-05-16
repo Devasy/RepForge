@@ -350,7 +350,7 @@ class _NumberInputCard extends StatelessWidget {
             children: [
               _StepBtn(
                 icon: Icons.remove_rounded,
-                onTap: () => onChanged((value - step).clamp(0, 999)),
+                onTap: () => onChanged((value - step).clamp(0, 999).toDouble()),
               ),
               Expanded(
                 child: Text(
@@ -365,7 +365,7 @@ class _NumberInputCard extends StatelessWidget {
               ),
               _StepBtn(
                 icon: Icons.add_rounded,
-                onTap: () => onChanged((value + step).clamp(0, 999)),
+                onTap: () => onChanged((value + step).clamp(0, 999).toDouble()),
               ),
             ],
           ),

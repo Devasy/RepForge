@@ -642,6 +642,7 @@ class _DashboardTab extends StatelessWidget {
   }
 
   Widget _buildMuscleVolumeCard(BuildContext context, WorkoutProvider provider) {
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
     final now = DateTime.now();
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
     final weekSessions = provider.sessions
@@ -653,7 +654,7 @@ class _DashboardTab extends StatelessWidget {
       for (final el in s.exercises) {
         final ex = provider.getExercise(el.exerciseId);
         if (ex == null) continue;
-        final vol = el.totalVolume;
+        final vol = settings.toDisplay(el.totalVolume);
         for (final ma in ex.muscleActivations) {
           muscleVols[ma.muscleGroupId] =
               (muscleVols[ma.muscleGroupId] ?? 0) + vol * ma.activationPercentage / 100;
@@ -687,7 +688,7 @@ class _DashboardTab extends StatelessWidget {
                 ),
               ),
               Text(
-                'kg',
+                settings.unitLabel,
                 style: GoogleFonts.geist(
                   fontSize: 11,
                   color: AppColors.textMuted,
@@ -786,6 +787,7 @@ class _DashboardTab extends StatelessWidget {
     required WorkoutProvider provider,
     _HomeScreenState? homeState,
   }) {
+    final settings = context.read<SettingsProvider>();
     final recentSessions = provider.sessions.take(3).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -833,9 +835,10 @@ class _DashboardTab extends StatelessWidget {
         else
           ...recentSessions.map((s) {
             final dateStr = _formatSessionDate(s.date);
-            final volStr = s.totalVolume >= 1000
-                ? '${(s.totalVolume / 1000).toStringAsFixed(1)}k'
-                : s.totalVolume.toStringAsFixed(0);
+            final displayVol = settings.toDisplay(s.totalVolume);
+            final volStr = displayVol >= 1000
+                ? '${(displayVol / 1000).toStringAsFixed(1)}k'
+                : displayVol.toStringAsFixed(0);
             final exCount = s.exercises.length;
             final setCount = s.exercises.fold<int>(0, (a, e) => a + e.sets.length);
             return Padding(
@@ -896,7 +899,7 @@ class _DashboardTab extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'kg vol',
+                          '${settings.unitLabel} vol',
                           style: GoogleFonts.geist(
                             fontSize: 10,
                             color: AppColors.textFaint,

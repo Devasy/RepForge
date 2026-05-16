@@ -117,7 +117,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                 // Lifetime summary
                 SliverToBoxAdapter(
-                  child: _buildSummaryCard(all, totalVolume),
+                  child: _buildSummaryCard(all, totalVolume, settings),
                 ),
 
                 // Calendar card
@@ -263,12 +263,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildSummaryCard(List<WorkoutSession> all, double totalVolume) {
-    final volStr = totalVolume >= 1000000
-        ? '${(totalVolume / 1000000).toStringAsFixed(1)}M'
-        : totalVolume >= 1000
-            ? '${(totalVolume / 1000).toStringAsFixed(0)}k'
-            : totalVolume.toStringAsFixed(0);
+  Widget _buildSummaryCard(List<WorkoutSession> all, double totalVolume, SettingsProvider settings) {
+    final displayVol = settings.toDisplay(totalVolume);
+    final volStr = displayVol >= 1000000
+        ? '${(displayVol / 1000000).toStringAsFixed(1)}M'
+        : displayVol >= 1000
+            ? '${(displayVol / 1000).toStringAsFixed(0)}k'
+            : displayVol.toStringAsFixed(0);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -279,7 +280,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             children: [
               _SummaryCell(label: 'WORKOUTS', value: '${all.length}', unit: 'total'),
               const _VertDivider(),
-              _SummaryCell(label: 'VOLUME', value: volStr, unit: 'kg'),
+              _SummaryCell(label: 'VOLUME', value: volStr, unit: settings.unitLabel),
               const _VertDivider(),
               _SummaryCell(label: 'THIS MONTH', value: '${all.where((s) => s.date.month == DateTime.now().month && s.date.year == DateTime.now().year).length}', unit: 'sessions'),
             ],
@@ -616,7 +617,8 @@ class _HistoryCard extends StatelessWidget {
     final dayNum = session.date.day;
     final exCount = session.exercises.length;
     final setCount = session.exercises.fold(0, (s, e) => s + e.sets.length);
-    final vol = session.totalVolume;
+    final settings = context.read<SettingsProvider>();
+    final vol = settings.toDisplay(session.totalVolume);
     final volStr = vol >= 1000 ? '${(vol / 1000).toStringAsFixed(1)}k' : vol.toStringAsFixed(0);
     final duration = session.duration;
     final routineName = session.routineId != null
@@ -693,7 +695,7 @@ class _HistoryCard extends StatelessWidget {
                         color: AppColors.secondary,
                       ),
                     ),
-                    Text('kg', style: GoogleFonts.geist(fontSize: 10, color: AppColors.textMuted)),
+                    Text(settings.unitLabel, style: GoogleFonts.geist(fontSize: 10, color: AppColors.textMuted)),
                   ],
                 ),
               ),

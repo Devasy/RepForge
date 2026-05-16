@@ -131,12 +131,17 @@ class RFNumberField extends StatefulWidget {
 class _RFNumberFieldState extends State<RFNumberField> {
   bool _editing = false;
   late final TextEditingController _ctrl;
+  late final FocusNode _focusNode;
   Timer? _longPressTimer;
 
   @override
   void initState() {
     super.initState();
     _ctrl = TextEditingController(text: _format(widget.value));
+    _focusNode = FocusNode();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus && _editing) _commitEdit();
+    });
   }
 
   @override
@@ -150,6 +155,7 @@ class _RFNumberFieldState extends State<RFNumberField> {
   @override
   void dispose() {
     _ctrl.dispose();
+    _focusNode.dispose();
     _longPressTimer?.cancel();
     super.dispose();
   }
@@ -241,6 +247,7 @@ class _RFNumberFieldState extends State<RFNumberField> {
                 child: _editing
                     ? TextField(
                         controller: _ctrl,
+                        focusNode: _focusNode,
                         autofocus: true,
                         textAlign: TextAlign.center,
                         keyboardType: const TextInputType.numberWithOptions(

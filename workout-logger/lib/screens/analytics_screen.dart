@@ -1,5 +1,7 @@
 // analytics_screen.dart — Analytics: Overview / Exercises / Targets
 
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -186,6 +188,14 @@ class _VolumeChart extends StatelessWidget {
     final sessions = provider.sessions.take(14).toList().reversed.toList();
     final settings = context.watch<SettingsProvider>();
 
+    final spots = sessions.asMap().entries.map((e) {
+      return FlSpot(e.key.toDouble(), settings.toDisplay(e.value.totalVolume));
+    }).toList();
+
+    final bestVol = spots.isEmpty
+        ? 0.0
+        : spots.map((s) => s.y).reduce(max);
+
     return _ChartCard(
       title: 'Volume Progression',
       subtitle: '${settings.unitLabel} · Last ${sessions.length} workouts',
@@ -194,13 +204,38 @@ class _VolumeChart extends StatelessWidget {
         height: 180,
         child: LineChart(
           LineChartData(
+            backgroundColor: Colors.transparent,
             gridData: FlGridData(
               show: true,
               drawVerticalLine: false,
-              horizontalInterval: 1,
               getDrawingHorizontalLine: (_) => FlLine(
                 color: AppColors.glassBorder,
                 strokeWidth: 1,
+              ),
+            ),
+            lineTouchData: LineTouchData(
+              touchTooltipData: LineTouchTooltipData(
+                getTooltipColor: (_) => AppColors.cardHigh,
+                getTooltipItems: (spots) => spots.map((spot) {
+                  final i = spot.x.toInt();
+                  final v = spot.y;
+                  final volStr = v >= 1000
+                      ? '${(v / 1000).toStringAsFixed(1)}k'
+                      : v.toStringAsFixed(0);
+                  final dateStr = (i >= 0 && i < sessions.length)
+                      ? DateFormat('MMM d').format(sessions[i].date)
+                      : '';
+                  return LineTooltipItem(
+                    '$volStr ${settings.unitLabel}',
+                    GoogleFonts.geistMono(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w700),
+                    children: [
+                      TextSpan(
+                        text: '\n$dateStr',
+                        style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.normal),
+                      ),
+                    ],
+                  );
+                }).toList(),
               ),
             ),
             titlesData: FlTitlesData(
@@ -227,20 +262,44 @@ class _VolumeChart extends StatelessWidget {
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  reservedSize: 36,
-                  getTitlesWidget: (v, _) => Text(
-                    settings.toDisplay(v).toStringAsFixed(0),
-                    style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 9),
-                  ),
+                  reservedSize: 40,
+                  getTitlesWidget: (v, _) {
+                    final label = v >= 1000
+                        ? '${(v / 1000).toStringAsFixed(1)}k'
+                        : v.toStringAsFixed(0);
+                    return Text(label, style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 9));
+                  },
                 ),
               ),
             ),
             borderData: FlBorderData(show: false),
+            extraLinesData: ExtraLinesData(
+              horizontalLines: [
+                if (bestVol > 0)
+                  HorizontalLine(
+                    y: bestVol,
+                    color: AppColors.warning.withValues(alpha: 0.55),
+                    strokeWidth: 1,
+                    dashArray: [6, 4],
+                    label: HorizontalLineLabel(
+                      show: true,
+                      direction: LabelDirection.horizontal,
+                      alignment: Alignment.topRight,
+                      padding: const EdgeInsets.only(right: 6, bottom: 2),
+                      style: GoogleFonts.geistMono(
+                        color: AppColors.warning,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      labelResolver: (line) =>
+                          'BEST ${bestVol.toStringAsFixed(0)}',
+                    ),
+                  ),
+              ],
+            ),
             lineBarsData: [
               LineChartBarData(
-                spots: sessions.asMap().entries.map((e) {
-                  return FlSpot(e.key.toDouble(), settings.toDisplay(e.value.totalVolume));
-                }).toList(),
+                spots: spots,
                 isCurved: true,
                 curveSmoothness: 0.3,
                 color: AppColors.primary,
