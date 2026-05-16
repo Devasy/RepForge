@@ -11,6 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/managers/pr_manager.dart';
+import '../services/ml_service.dart' show MuscleRecoveryStatus;
 import '../services/settings_provider.dart';
 import '../data/exercise_database.dart';
 import '../theme/app_theme.dart';
@@ -169,6 +170,8 @@ class _OverviewTab extends StatelessWidget {
           _VolumeChart(provider: provider),
           const SizedBox(height: 12),
           _MuscleVolumeChart(provider: provider),
+          const SizedBox(height: 12),
+          _MuscleStatusCard(provider: provider),
           const SizedBox(height: 12),
           _FrequencyGrid(provider: provider),
         ],
@@ -397,6 +400,152 @@ class _MuscleVolumeChart extends StatelessWidget {
           );
         }).toList(),
       ),
+    );
+  }
+}
+
+// ── Muscle recovery + growth status ───────────────────────────────────────────
+
+class _MuscleStatusCard extends StatelessWidget {
+  const _MuscleStatusCard({required this.provider});
+  final WorkoutProvider provider;
+
+  static const _muscleOrder = [
+    'chest', 'back', 'shoulders', 'quads', 'hamstrings',
+    'glutes', 'biceps', 'triceps', 'abs', 'calves',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final recovery = provider.getMuscleRecoveryScores();
+    final growth = provider.getMuscleGrowthModels();
+
+    if (recovery.isEmpty) {
+      return _ChartCard(
+        title: 'Muscle Status',
+        isEmpty: true,
+        child: const SizedBox.shrink(),
+      );
+    }
+
+    // Show muscles we have recovery data for, in preferred order.
+    final muscles = [
+      ..._muscleOrder.where(recovery.containsKey),
+      ...recovery.keys.where((k) => !_muscleOrder.contains(k)),
+    ];
+
+    return _ChartCard(
+      title: 'Muscle Status',
+      subtitle: 'Recovery · Growth trend',
+      child: Column(
+        children: muscles.map((id) {
+          final status = recovery[id]!;
+          final model = growth[id];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _MuscleRow(
+              muscleId: id,
+              status: status,
+              growthModel: model,
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _MuscleRow extends StatelessWidget {
+  const _MuscleRow({
+    required this.muscleId,
+    required this.status,
+    this.growthModel,
+  });
+
+  final String muscleId;
+  final MuscleRecoveryStatus status;
+  final GrowthModel? growthModel;
+
+  Color get _recoveryColor {
+    if (status.recoveryFraction >= 0.90) return AppColors.success;
+    if (status.recoveryFraction >= 0.70) return AppColors.warning;
+    return AppColors.accent;
+  }
+
+  ({String label, Color color, IconData icon}) get _trend {
+    final model = growthModel;
+    if (model == null || model.r2 < 0.2) {
+      return (label: 'No data', color: AppColors.textFaint, icon: Icons.remove);
+    }
+    if (model.slope > 2) {
+      return (label: '+${(model.slope * 7).toStringAsFixed(0)}/wk', color: AppColors.success, icon: Icons.trending_up_rounded);
+    }
+    if (model.slope > 0) {
+      return (label: 'Slight gain', color: AppColors.secondary, icon: Icons.trending_up_rounded);
+    }
+    return (label: 'Plateau', color: AppColors.warning, icon: Icons.trending_flat_rounded);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = MuscleGroups.names[muscleId] ?? muscleId;
+    final pct = status.recoveryFraction;
+    final color = AppColors.muscle(muscleId);
+    final trend = _trend;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                name,
+                style: GoogleFonts.geist(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSoft,
+                ),
+              ),
+            ),
+            // Recovery badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _recoveryColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: _recoveryColor.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                '${status.recoveryPercent}%',
+                style: GoogleFonts.geistMono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: _recoveryColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Growth trend chip
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(trend.icon, size: 12, color: trend.color),
+                const SizedBox(width: 2),
+                Text(
+                  trend.label,
+                  style: GoogleFonts.geistMono(
+                    fontSize: 10,
+                    color: trend.color,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        RFProgressBar(value: pct, color: color, height: 5, showGlow: false),
+      ],
     );
   }
 }

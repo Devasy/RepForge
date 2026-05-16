@@ -74,6 +74,7 @@ class HealthConnectService implements IHealthConnectService {
       _connector ??= await HealthConnector.create();
       final results = await _connector!.requestPermissions([
         HealthDataType.exerciseSession.writePermission,
+        HealthDataType.exerciseSession.readPermission,
       ]);
       return results.every((r) => r.status == PermissionStatus.granted);
     } catch (e) {
@@ -116,6 +117,20 @@ class HealthConnectService implements IHealthConnectService {
       );
 
       await _connector!.writeRecords([record]);
+
+      // DEBUG: read back to verify weight is stored — remove after confirming.
+      final response = await _connector!.readRecords(
+        HealthDataType.exerciseSession.readInTimeRange(
+          startTime: sessionStart,
+          endTime: sessionEnd,
+        ),
+      );
+      for (final r in response.records.whereType<ExerciseSessionRecord>()) {
+        for (final e in r.events.whereType<ExerciseSessionSegmentEvent>()) {
+          debugPrint('[HC debug] segment=${e.segmentType} reps=${e.repetitions} weight=${e.weight}');
+        }
+      }
+
       return true;
     } catch (e) {
       debugPrint('Health Connect sync failed: $e');

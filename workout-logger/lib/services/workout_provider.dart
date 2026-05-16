@@ -962,6 +962,29 @@ class WorkoutProvider extends ChangeNotifier {
     return volumeByMuscle;
   }
 
+  /// Per-muscle recovery scores using exponential decay (recovery = 1 − e^(−t/τ)).
+  Map<String, MuscleRecoveryStatus> getMuscleRecoveryScores() {
+    final exerciseMap = {for (final e in _allExercises) e.id: e};
+    return _mlService.computeMuscleRecoveryScores(_sessions, exerciseMap);
+  }
+
+  /// Per-muscle growth models trained on aggregate weighted volume.
+  Map<String, GrowthModel> getMuscleGrowthModels() {
+    final exerciseMap = {for (final e in _allExercises) e.id: e};
+    final muscleIds = <String>{
+      for (final e in _allExercises)
+        for (final a in e.muscleActivations) a.muscleGroupId,
+    };
+    final result = <String, GrowthModel>{};
+    for (final id in muscleIds) {
+      final points = _mlService.extractMuscleDataPoints(id, _sessions, exerciseMap);
+      if (points.length >= 2) {
+        result[id] = _mlService.trainGrowthModel(points);
+      }
+    }
+    return result;
+  }
+
   /// Get growth model for an exercise
   GrowthModel? getGrowthModel(String exerciseId) => _growthModels[exerciseId];
 
