@@ -137,8 +137,8 @@ class AmbientGlow extends StatelessWidget {
 }
 
 // ── RFNavBar ─────────────────────────────────────────────────────────────────
-// Custom glassmorphic bottom navigation bar — 4 tabs, accent indicator above
-// the active icon, no FAB.
+// Premium floating glassmorphic bottom navigation bar with perfect rounded blur,
+// deep drop shadow, and clean transparent padding so it sits elegantly above the content.
 class RFNavBar extends StatelessWidget {
   const RFNavBar({
     super.key,
@@ -153,43 +153,52 @@ class RFNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.transparent,
-                AppColors.background.withValues(alpha: 0.85),
-              ],
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    return Container(
+      color: Colors.transparent, // Completely transparent outer container
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        bottomPadding > 0 ? bottomPadding + 8 : 16,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.xxl),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 28,
+              spreadRadius: -4,
+              offset: const Offset(0, 10),
             ),
-          ),
-          padding: EdgeInsets.fromLTRB(
-            16,
-            8,
-            16,
-            MediaQuery.of(context).padding.bottom + 8,
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(AppRadius.xxl),
-              border: Border.all(color: AppColors.glassBorder),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(items.length, (i) {
-                final active = i == currentIndex;
-                return _NavItem(
-                  item: items[i],
-                  active: active,
-                  onTap: () => onTap(i),
-                );
-              }),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.xxl),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.8), // Sleek transparent surface
+                borderRadius: BorderRadius.circular(AppRadius.xxl),
+                border: Border.all(
+                  color: AppColors.glassBorderStrong,
+                  width: 1.5,
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(items.length, (i) {
+                  final active = i == currentIndex;
+                  return _NavItem(
+                    item: items[i],
+                    active: active,
+                    onTap: () => onTap(i),
+                  );
+                }),
+              ),
             ),
           ),
         ),

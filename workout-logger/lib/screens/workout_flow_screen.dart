@@ -12,6 +12,7 @@ import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../services/managers/pr_manager.dart';
 import '../theme/app_theme.dart';
+import 'add_custom_exercise_screen.dart';
 import 'exercise_library_screen.dart';
 import 'workout_summary_screen.dart';
 import 'widgets/workout_header.dart';
@@ -222,6 +223,14 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       body: ExerciseSelectorScreen(
         selectionMode: true,
         onExercisesSelected: _startWithSelected,
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => const AddCustomExerciseScreen()),
+        ),
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        child: const Icon(Icons.add_rounded, color: Colors.white),
       ),
     );
   }

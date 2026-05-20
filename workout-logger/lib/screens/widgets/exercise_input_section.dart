@@ -305,7 +305,7 @@ class _InputRow extends StatelessWidget {
 }
 
 // ── Number Input Card ─────────────────────────────────────────────────────────
-class _NumberInputCard extends StatelessWidget {
+class _NumberInputCard extends StatefulWidget {
   const _NumberInputCard({
     required this.label,
     required this.value,
@@ -320,9 +320,40 @@ class _NumberInputCard extends StatelessWidget {
   final int decimals;
   final ValueChanged<double> onChanged;
 
-  String _format() => decimals > 0
-      ? value.toStringAsFixed(decimals)
-      : value.toInt().toString();
+  @override
+  State<_NumberInputCard> createState() => _NumberInputCardState();
+}
+
+class _NumberInputCardState extends State<_NumberInputCard> {
+  late final TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: _format());
+  }
+
+  @override
+  void didUpdateWidget(_NumberInputCard old) {
+    super.didUpdateWidget(old);
+    // Sync controller when value changes externally (e.g. AI apply, stepper)
+    // but don't interrupt the user while they're typing.
+    if (old.value != widget.value && !_focusNode.hasFocus) {
+      _controller.text = _format();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  String _format() => widget.decimals > 0
+      ? widget.value.toStringAsFixed(widget.decimals)
+      : widget.value.toInt().toString();
 
   @override
   Widget build(BuildContext context) {
@@ -336,7 +367,7 @@ class _NumberInputCard extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            label,
+            widget.label,
             style: GoogleFonts.geist(
               color: AppColors.textMuted,
               fontSize: 11,
@@ -350,22 +381,55 @@ class _NumberInputCard extends StatelessWidget {
             children: [
               _StepBtn(
                 icon: Icons.remove_rounded,
-                onTap: () => onChanged((value - step).clamp(0, 999).toDouble()),
+                onTap: () => widget.onChanged(
+                  (widget.value - widget.step).clamp(0, 999).toDouble(),
+                ),
               ),
               Expanded(
-                child: Text(
-                  _format(),
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
                   style: GoogleFonts.geistMono(
                     color: AppColors.textPrimary,
                     fontSize: 36,
                     fontWeight: FontWeight.w700,
                   ),
                   textAlign: TextAlign.center,
+                  keyboardType: TextInputType.numberWithOptions(
+                    decimal: widget.decimals > 0,
+                  ),
+                  inputFormatters: widget.decimals > 0
+                      ? [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d*$'),
+                          ),
+                        ]
+                      : [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                  ),
+                  onChanged: (text) {
+                    final parsed = double.tryParse(text);
+                    if (parsed != null) {
+                      widget.onChanged(parsed.clamp(0, 999).toDouble());
+                    }
+                  },
+                  onEditingComplete: () {
+                    // Reset to last valid value if field is empty/invalid
+                    if (double.tryParse(_controller.text) == null) {
+                      _controller.text = _format();
+                    }
+                    _focusNode.unfocus();
+                  },
                 ),
               ),
               _StepBtn(
                 icon: Icons.add_rounded,
-                onTap: () => onChanged((value + step).clamp(0, 999).toDouble()),
+                onTap: () => widget.onChanged(
+                  (widget.value + widget.step).clamp(0, 999).toDouble(),
+                ),
               ),
             ],
           ),
