@@ -78,6 +78,7 @@ class ProgramsScreen extends StatelessWidget {
               GlowButton(
                 label: 'Create',
                 icon: Icons.add_rounded,
+                fullWidth: false,
                 onPressed: () => _openDesigner(context, null),
               ),
               const SizedBox(width: AppSpacing.md),
