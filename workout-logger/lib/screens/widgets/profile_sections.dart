@@ -2,9 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
+import 'rf_widgets.dart';
 
 const String _createdBy = 'Devasy Patel';
 
@@ -28,25 +30,24 @@ class _ProfileSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GlassCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(
+                    color: iconColor.withValues(alpha: 0.25),
+                    width: 1,
+                  ),
                 ),
-                child: Icon(icon, color: iconColor, size: 20),
+                child: Icon(icon, color: iconColor, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -55,17 +56,19 @@ class _ProfileSection extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: GoogleFonts.geist(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 15,
+                        fontSize: 14,
+                        letterSpacing: -0.2,
                       ),
                     ),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: AppColors.textSoft,
+                      style: GoogleFonts.geist(
+                        color: AppColors.textMuted,
                         fontSize: 12,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
@@ -75,7 +78,7 @@ class _ProfileSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Divider(color: AppColors.glassBorder, height: 1),
+          const Divider(color: AppColors.glassBorder, height: 1),
           const SizedBox(height: AppSpacing.md),
           child,
         ],
@@ -157,7 +160,7 @@ class PreferencesSection extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: selected
                         ? AppColors.primary.withValues(alpha: 0.15)
-                        : AppColors.surface,
+                        : AppColors.glass,
                     borderRadius: BorderRadius.circular(AppRadius.full),
                     border: Border.all(
                       color: selected
@@ -168,10 +171,10 @@ class PreferencesSection extends StatelessWidget {
                   ),
                   child: Text(
                     label,
-                    style: TextStyle(
+                    style: GoogleFonts.geistMono(
                       color: selected ? AppColors.primary : AppColors.textSoft,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                   ),
                 ),
@@ -211,22 +214,23 @@ class HealthConnectSection extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Sync workouts after finishing',
-                      style: TextStyle(
+                      style: GoogleFonts.geist(
                         color: AppColors.textPrimary,
                         fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       'Writes session + per-set reps to Health Connect',
-                      style: TextStyle(
-                        color: AppColors.textSoft,
+                      style: GoogleFonts.geist(
+                        color: AppColors.textMuted,
                         fontSize: 12,
                       ),
                     ),
@@ -243,15 +247,15 @@ class HealthConnectSection extends StatelessWidget {
           ),
           if (enabled) ...[
             const SizedBox(height: AppSpacing.sm),
-            Divider(color: AppColors.glassBorder, height: 1),
+            const Divider(color: AppColors.glassBorder, height: 1),
             const SizedBox(height: AppSpacing.sm),
-            const Row(
+            Row(
               children: [
-                Icon(Icons.check_circle_outline, color: _hcColor, size: 16),
-                SizedBox(width: 8),
+                const Icon(Icons.check_circle_outline, color: _hcColor, size: 15),
+                const SizedBox(width: 8),
                 Text(
                   'Connected — syncing after each workout',
-                  style: TextStyle(color: _hcColor, fontSize: 12),
+                  style: GoogleFonts.geist(color: _hcColor, fontSize: 12),
                 ),
               ],
             ),
@@ -341,23 +345,29 @@ class CloudSyncSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Container(
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: AppColors.glass,
               borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border.all(color: AppColors.glassBorder),
             ),
             child: TextField(
               enabled: false,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-              decoration: const InputDecoration(
+              style: GoogleFonts.geistMono(
+                color: AppColors.textFaint,
+                fontSize: 12,
+              ),
+              decoration: InputDecoration(
                 hintText: 'mongodb+srv://user:pass@cluster.mongodb.net/db',
-                hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                prefixIcon: Icon(
+                hintStyle: GoogleFonts.geistMono(
+                  color: AppColors.textFaint,
+                  fontSize: 12,
+                ),
+                prefixIcon: const Icon(
                   Icons.link_rounded,
-                  color: AppColors.textMuted,
-                  size: 18,
+                  color: AppColors.textFaint,
+                  size: 16,
                 ),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
+                contentPadding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
                   vertical: AppSpacing.sm + 4,
                 ),
@@ -365,10 +375,10 @@ class CloudSyncSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          const Text(
+          Text(
             'Cloud sync with custom MongoDB will be available in a future update.',
-            style: TextStyle(
-              color: AppColors.textMuted,
+            style: GoogleFonts.geist(
+              color: AppColors.textFaint,
               fontSize: 11,
               fontStyle: FontStyle.italic,
             ),
@@ -393,11 +403,23 @@ class AboutSection extends StatelessWidget {
       subtitle: 'RepForge Workout Logger',
       child: Column(
         children: [
-          _InfoTile(label: 'Version', value: appVersion, icon: Icons.tag_rounded),
+          _InfoTile(
+            label: 'Version',
+            value: appVersion,
+            icon: Icons.tag_rounded,
+          ),
           const _SectionDivider(),
-          _InfoTile(label: 'Created by', value: _createdBy, icon: Icons.person_rounded),
+          _InfoTile(
+            label: 'Created by',
+            value: _createdBy,
+            icon: Icons.person_rounded,
+          ),
           const _SectionDivider(),
-          _InfoTile(label: 'Platform', value: 'Android', icon: Icons.phone_android_rounded),
+          _InfoTile(
+            label: 'Platform',
+            value: 'Android',
+            icon: Icons.phone_android_rounded,
+          ),
           const _SectionDivider(),
           _InfoTile(
             label: 'Package',
@@ -420,11 +442,11 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
-        color: AppColors.textMuted,
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1,
+      style: GoogleFonts.geistMono(
+        color: AppColors.textFaint,
+        fontSize: 9,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.4,
       ),
     );
   }
@@ -447,11 +469,11 @@ class _UnitToggleButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 11),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.15)
-              : AppColors.surface,
+              : AppColors.glass,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(
             color: selected
@@ -459,14 +481,23 @@ class _UnitToggleButton extends StatelessWidget {
                 : AppColors.glassBorder,
             width: selected ? 1.5 : 1,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryGlow(0.20),
+                    blurRadius: 12,
+                    spreadRadius: -4,
+                  ),
+                ]
+              : null,
         ),
         child: Center(
           child: Text(
             label,
-            style: TextStyle(
+            style: GoogleFonts.geist(
               color: selected ? AppColors.primary : AppColors.textSoft,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-              fontSize: 15,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 14,
             ),
           ),
         ),
@@ -494,35 +525,68 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-        ),
-        child: Icon(icon, color: iconColor, size: 20),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(color: AppColors.textSoft, fontSize: 12),
-      ),
-      trailing: loading
-          ? SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              ),
-            )
-          : const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      splashColor: AppColors.primary.withValues(alpha: 0.06),
+      highlightColor: AppColors.primary.withValues(alpha: 0.04),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                border: Border.all(
+                  color: iconColor.withValues(alpha: 0.22),
+                  width: 1,
+                ),
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.geist(
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.geist(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (loading)
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
+              )
+            else
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textFaint,
+                size: 18,
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -541,21 +605,24 @@ class _InfoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.textMuted, size: 18),
+          Icon(icon, color: AppColors.textFaint, size: 16),
           const SizedBox(width: 12),
           Text(
             label,
-            style: const TextStyle(color: AppColors.textSoft, fontSize: 13),
+            style: GoogleFonts.geist(
+              color: AppColors.textMuted,
+              fontSize: 13,
+            ),
           ),
           const Spacer(),
           Text(
             value,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 13,
+            style: GoogleFonts.geistMono(
+              color: AppColors.textSoft,
+              fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -570,7 +637,11 @@ class _SectionDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(color: AppColors.glassBorder, height: 1, indent: 40);
+    return const Divider(
+      color: AppColors.glassBorder,
+      height: 1,
+      indent: 40,
+    );
   }
 }
 
@@ -582,13 +653,13 @@ class _ComingSoonBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.warning.withValues(alpha: 0.15),
+        color: AppColors.warning.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppRadius.full),
-        border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
       ),
-      child: const Text(
-        'Coming Soon',
-        style: TextStyle(
+      child: Text(
+        'Soon',
+        style: GoogleFonts.geist(
           color: AppColors.warning,
           fontSize: 10,
           fontWeight: FontWeight.w600,

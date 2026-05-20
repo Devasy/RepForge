@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
@@ -157,27 +158,33 @@ class _ProfileScreenState extends State<ProfileScreen>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
-        title: const Text(
+        title: Text(
           'Import Backup',
-          style: TextStyle(color: AppColors.textPrimary),
+          style: GoogleFonts.geist(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+          ),
         ),
-        content: const Text(
+        content: Text(
           'This will merge the backup with your existing data. '
           'Select a .json RepForge backup file to continue.',
-          style: TextStyle(color: AppColors.textSoft),
+          style: GoogleFonts.geist(color: AppColors.textSoft),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AppColors.textSoft),
+              style: GoogleFonts.geist(color: AppColors.textMuted),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            child: const Text('Choose File'),
+            child: Text(
+              'Choose File',
+              style: GoogleFonts.geist(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -242,7 +249,10 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _showSnack(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(color: AppColors.textPrimary)),
+        content: Text(
+          message,
+          style: GoogleFonts.geist(color: AppColors.textPrimary),
+        ),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
@@ -261,16 +271,21 @@ class _ProfileScreenState extends State<ProfileScreen>
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          _buildAppBar(),
+          _buildHero(),
           SliverPadding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 PreferencesSection(
                   settings: settings,
                   onHaptic: () => HapticFeedback.selectionClick(),
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.md),
                 HealthConnectSection(
                   settings: settings,
                   isLoading: _isRequestingHcPermission,
@@ -282,7 +297,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     }
                   },
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.md),
                 DataManagementSection(
                   isExporting: _isExporting,
                   isImporting: _isImporting,
@@ -291,9 +306,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                   onImport: _isImporting ? null : _importFromFile,
                   onCloudBackup: _isBackingUp ? null : _performCloudBackup,
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.md),
                 const CloudSyncSection(),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.md),
                 AboutSection(appVersion: _appVersion),
                 const SizedBox(height: AppSpacing.xxl),
               ]),
@@ -304,67 +319,123 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildAppBar() {
-    return SliverAppBar(
-      expandedHeight: 160,
-      pinned: true,
-      backgroundColor: AppColors.surface,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.primary, Color(0xFF8B7FE8)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  Widget _buildHero() {
+    return SliverToBoxAdapter(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Ambient violet wash centred at top
+          Positioned(
+            top: -80,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 400,
+                height: 400,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.28),
+                      Colors.transparent,
+                    ],
+                    stops: const [0, 0.65],
+                  ),
+                ),
+              ),
             ),
           ),
-          child: SafeArea(
+          SafeArea(
+            bottom: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg,
-                AppSpacing.md,
+                AppSpacing.xl,
                 AppSpacing.lg,
-                AppSpacing.md,
+                AppSpacing.lg,
               ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: const Icon(
-                      Icons.fitness_center_rounded,
-                      color: Colors.white,
-                      size: 28,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Brand avatar
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          gradient: const LinearGradient(
+                            colors: [AppColors.primary, Color(0xFF5B21B6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primaryGlow(0.50),
+                              blurRadius: 24,
+                              spreadRadius: -4,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.fitness_center_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Version pill
+                      if (_appVersion.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.glass3,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                            border: Border.all(
+                              color: AppColors.glassBorderStrong,
+                            ),
+                          ),
+                          child: Text(
+                            'v$_appVersion',
+                            style: GoogleFonts.geistMono(
+                              color: AppColors.textMuted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  const Text(
-                    'RepForge',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
+                  const SizedBox(height: AppSpacing.md),
                   Text(
-                    'v$_appVersion',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 12,
+                    'RepForge',
+                    style: GoogleFonts.geist(
+                      color: AppColors.textPrimary,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Settings & preferences',
+                    style: GoogleFonts.geist(
+                      color: AppColors.textMuted,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
