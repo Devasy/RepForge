@@ -679,9 +679,12 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     final key = _ctrl.text.trim();
     final settings = context.read<SettingsProvider>();
     final gemini = context.read<GeminiService>();
-    await settings.setGeminiApiKey(key);
-    gemini.updateApiKey(key);
-    if (mounted) setState(() => _saving = false);
+    try {
+      await settings.setGeminiApiKey(key);
+      gemini.updateApiKey(key);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _selectModel(String modelId) async {
@@ -735,6 +738,9 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                   child: TextField(
                     controller: _ctrl,
                     obscureText: _obscure,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    keyboardType: TextInputType.visiblePassword,
                     style: GoogleFonts.geistMono(
                       color: AppColors.textPrimary,
                       fontSize: 12,

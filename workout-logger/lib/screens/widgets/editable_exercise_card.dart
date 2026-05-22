@@ -6,6 +6,14 @@ import 'package:flutter/services.dart';
 import '../../models/models.dart';
 import '../../theme/app_theme.dart';
 
+typedef OnSetChanged = void Function({
+  required int setIndex,
+  required double weight,
+  required int reps,
+  required bool isDropset,
+  List<DropsetEntry>? drops,
+});
+
 // ── Shared mutable data classes ───────────────────────────────────────────────
 class EditableExerciseLog {
   final String exerciseId;
@@ -51,13 +59,7 @@ class EditableExerciseCard extends StatelessWidget {
 
   final String exerciseName;
   final EditableExerciseLog editableLog;
-  final void Function(
-    int setIndex,
-    double weight,
-    int reps,
-    bool isDropset,
-    List<DropsetEntry>? drops,
-  ) onSetChanged;
+  final OnSetChanged onSetChanged;
   final VoidCallback onAddSet;
   final void Function(int setIndex) onDeleteSet;
   final VoidCallback onDeleteExercise;
@@ -132,14 +134,15 @@ class EditableExerciseCard extends StatelessWidget {
                   reps: set.reps,
                   isDropset: set.isDropset,
                   drops: set.drops,
-                  onWeightChanged: (w) =>
-                      onSetChanged(i, w, set.reps, set.isDropset, set.drops),
-                  onRepsChanged: (r) =>
-                      onSetChanged(i, set.weight, r, set.isDropset, set.drops),
-                  onIsDropsetChanged: (d) =>
-                      onSetChanged(i, set.weight, set.reps, d, d ? (set.drops ?? []) : set.drops),
-                  onDropsChanged: (drops) =>
-                      onSetChanged(i, set.weight, set.reps, set.isDropset, drops),
+                  onWeightChanged: (w) => onSetChanged(
+                      setIndex: i, weight: w, reps: set.reps, isDropset: set.isDropset, drops: set.drops),
+                  onRepsChanged: (r) => onSetChanged(
+                      setIndex: i, weight: set.weight, reps: r, isDropset: set.isDropset, drops: set.drops),
+                  onIsDropsetChanged: (d) => onSetChanged(
+                      setIndex: i, weight: set.weight, reps: set.reps, isDropset: d,
+                      drops: d ? (set.drops ?? []) : set.drops),
+                  onDropsChanged: (drops) => onSetChanged(
+                      setIndex: i, weight: set.weight, reps: set.reps, isDropset: set.isDropset, drops: drops),
                   onDelete: () => onDeleteSet(i),
                 );
               }).toList(),
@@ -385,18 +388,18 @@ class _EditableSetRowState extends State<EditableSetRow> {
               final i = e.key;
               final drop = e.value;
               return EditableDropRow(
-                key: ValueKey('drop_${widget.setNumber}_$i'),
+                key: ValueKey(drop.id),
                 dropNumber: i + 1,
                 weight: drop.weight,
                 reps: drop.reps,
                 onWeightChanged: (w) {
                   final updated = List<DropsetEntry>.from(widget.drops!);
-                  updated[i] = DropsetEntry(weight: w, reps: drop.reps);
+                  updated[i] = DropsetEntry(id: drop.id, weight: w, reps: drop.reps);
                   widget.onDropsChanged(updated);
                 },
                 onRepsChanged: (r) {
                   final updated = List<DropsetEntry>.from(widget.drops!);
-                  updated[i] = DropsetEntry(weight: drop.weight, reps: r);
+                  updated[i] = DropsetEntry(id: drop.id, weight: drop.weight, reps: r);
                   widget.onDropsChanged(updated);
                 },
                 onDelete: () {

@@ -25,11 +25,10 @@ class _ExerciseProgressViewState extends State<ExerciseProgressView> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<WorkoutProvider>();
-    final performed = <String>{
-      for (final s in provider.sessions)
-        for (final e in s.exercises) e.exerciseId,
-    };
+    final performed = context.select<WorkoutProvider, Set<String>>(
+      (p) => {for (final s in p.sessions) for (final e in s.exercises) e.exerciseId},
+    );
+    final provider = context.read<WorkoutProvider>();
 
     if (performed.isEmpty) {
       return RFEmptyState(
@@ -39,18 +38,20 @@ class _ExerciseProgressViewState extends State<ExerciseProgressView> {
       );
     }
 
+    final effectiveSelectedId = performed.contains(_selectedId) ? _selectedId : null;
+
     return Column(
       children: [
         _ExerciseDropdown(
           ids: performed,
-          selected: _selectedId,
+          selected: effectiveSelectedId,
           getExerciseName: provider.getExerciseName,
           onChanged: (id) => setState(() => _selectedId = id),
         ),
-        if (_selectedId != null)
+        if (effectiveSelectedId != null)
           Expanded(
             child: _ExerciseStats(
-              exerciseId: _selectedId!,
+              exerciseId: effectiveSelectedId,
               provider: provider,
             ),
           )

@@ -417,10 +417,8 @@ class _NumberInputCardState extends State<_NumberInputCard> {
                     }
                   },
                   onEditingComplete: () {
-                    // Reset to last valid value if field is empty/invalid
-                    if (double.tryParse(_controller.text) == null) {
-                      _controller.text = _format();
-                    }
+                    final formatted = _format();
+                    if (_controller.text != formatted) _controller.text = formatted;
                     _focusNode.unfocus();
                   },
                 ),
@@ -876,15 +874,14 @@ class _ProgramMetaBanner extends StatelessWidget {
             runSpacing: 4,
             children: [
               _metaChip(
-                Icons.timer_outlined,
-                '${slot.restSeconds}s rest',
-                AppColors.textSoft,
+                icon: Icons.timer_outlined,
+                label: '${slot.restSeconds}s rest',
+                color: AppColors.textSoft,
               ),
               if (slot.tempo != null)
-                _metaChip(Icons.speed_rounded, 'Tempo ${slot.tempo}',
-                    AppColors.secondary),
+                _metaChip(icon: Icons.speed_rounded, label: 'Tempo ${slot.tempo}', color: AppColors.secondary),
               if (slot.supersetGroupId != null)
-                _metaChip(Icons.link_rounded, 'Superset', AppColors.secondary),
+                _metaChip(icon: Icons.link_rounded, label: 'Superset', color: AppColors.secondary),
             ],
           ),
           if (slot.notes != null) ...[
@@ -902,7 +899,7 @@ class _ProgramMetaBanner extends StatelessWidget {
     );
   }
 
-  Widget _metaChip(IconData icon, String label, Color color) {
+  Widget _metaChip({required IconData icon, required String label, required Color color}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

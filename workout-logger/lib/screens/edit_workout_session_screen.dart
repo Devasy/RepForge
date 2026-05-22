@@ -305,8 +305,8 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _sectionLabel(context, Icons.calendar_today_rounded,
-                      AppColors.primary, 'Date & Time'),
+                  _sectionLabel(icon: Icons.calendar_today_rounded,
+                      color: AppColors.primary, label: 'Date & Time'),
                   const SizedBox(height: AppSpacing.md),
                   Row(
                     children: [
@@ -337,8 +337,8 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _sectionLabel(context, Icons.timer_outlined,
-                      AppColors.secondary, 'Duration (minutes)'),
+                  _sectionLabel(icon: Icons.timer_outlined,
+                      color: AppColors.secondary, label: 'Duration (minutes)'),
                   const SizedBox(height: AppSpacing.sm),
                   _StyledField(
                     controller: _durationCtrl,
@@ -348,8 +348,8 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
                     onChanged: (_) => _markChanged(),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  _sectionLabel(context, Icons.notes_rounded,
-                      AppColors.warning, 'Notes'),
+                  _sectionLabel(icon: Icons.notes_rounded,
+                      color: AppColors.warning, label: 'Notes'),
                   const SizedBox(height: AppSpacing.sm),
                   _StyledField(
                     controller: _notesCtrl,
@@ -387,12 +387,12 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
                 key: ValueKey('exercise_$i'),
                 exerciseName: ex?.name ?? 'Unknown Exercise',
                 editableLog: log,
-                onSetChanged: (si, w, r, d, drops) {
+                onSetChanged: ({required int setIndex, required double weight, required int reps, required bool isDropset, List<DropsetEntry>? drops}) {
                   setState(() {
-                    log.sets[si].weight = w;
-                    log.sets[si].reps = r;
-                    log.sets[si].isDropset = d;
-                    if (drops != null) log.sets[si].drops = drops;
+                    log.sets[setIndex].weight = weight;
+                    log.sets[setIndex].reps = reps;
+                    log.sets[setIndex].isDropset = isDropset;
+                    if (drops != null) log.sets[setIndex].drops = drops;
                   });
                   _markChanged();
                 },
@@ -416,12 +416,7 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
     );
   }
 
-  Widget _sectionLabel(
-    BuildContext context,
-    IconData icon,
-    Color color,
-    String label,
-  ) {
+  Widget _sectionLabel({required IconData icon, required Color color, required String label}) {
     return Row(
       children: [
         Icon(icon, size: 16, color: color),

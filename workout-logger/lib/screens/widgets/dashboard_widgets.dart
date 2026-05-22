@@ -21,8 +21,9 @@ class WeekActivityStrip extends StatelessWidget {
     // Weekday 1=Mon … 7=Sun; align strip Mon→Sun
     final todayMidnight = DateTime(today.year, today.month, today.day);
     final startOfWeek = todayMidnight.subtract(Duration(days: today.weekday - 1));
+    final startOfNextWeek = startOfWeek.add(const Duration(days: 7));
     final trainedDays = sessions
-        .where((s) => !s.date.isBefore(startOfWeek))
+        .where((s) => !s.date.isBefore(startOfWeek) && s.date.isBefore(startOfNextWeek))
         .map((s) => s.date.weekday)
         .toSet();
 

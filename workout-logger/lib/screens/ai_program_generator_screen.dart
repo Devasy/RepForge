@@ -44,6 +44,13 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
   Future<void> _generate() async {
     final prompt = _promptCtrl.text.trim();
     if (prompt.isEmpty) return;
+
+    final gemini = context.read<GeminiService>();
+    if (!gemini.isConfigured) {
+      setState(() { _error = 'Add your Gemini API key in Profile → AI Features first.'; });
+      return;
+    }
+
     HapticFeedback.mediumImpact();
 
     setState(() {
@@ -54,7 +61,6 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
     });
 
     try {
-      final gemini = context.read<GeminiService>();
       final wp = context.read<WorkoutProvider>();
 
       setState(() => _statusText = 'Building workout structure…');

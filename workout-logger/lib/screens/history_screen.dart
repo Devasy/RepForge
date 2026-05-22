@@ -117,7 +117,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                 // Lifetime summary
                 SliverToBoxAdapter(
-                  child: _buildSummaryCard(all, totalVolume, settings),
+                  child: _buildSummaryCard(all: all, totalVolume: totalVolume, settings: settings),
                 ),
 
                 // Calendar card
@@ -263,7 +263,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildSummaryCard(List<WorkoutSession> all, double totalVolume, SettingsProvider settings) {
+  Widget _buildSummaryCard({required List<WorkoutSession> all, required double totalVolume, required SettingsProvider settings}) {
     final displayVol = settings.toDisplay(totalVolume);
     final volStr = displayVol >= 1000000
         ? '${(displayVol / 1000000).toStringAsFixed(1)}M'
@@ -550,15 +550,15 @@ class _HistoryCard extends StatelessWidget {
             );
           },
           onDelete: () async {
-            Navigator.of(ctx).pop();
-            await _confirmDelete(context);
+            final confirmed = await _confirmDelete(context);
+            if (confirmed && ctx.mounted) Navigator.of(ctx).pop();
           },
         ),
       ),
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context) async {
+  Future<bool> _confirmDelete(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -590,12 +590,14 @@ class _HistoryCard extends StatelessWidget {
         if (context.mounted) {
           messenger.showSnackBar(_snackBar('Workout deleted'));
         }
+        return true;
       } catch (e) {
         if (context.mounted) {
           messenger.showSnackBar(_snackBar('Failed to delete workout', isError: true));
         }
       }
     }
+    return false;
   }
 
   void _handleMenu(BuildContext context, String value) {

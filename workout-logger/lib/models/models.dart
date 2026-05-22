@@ -1,7 +1,11 @@
 // Data Models for Workout Logger App
 
+import 'package:uuid/uuid.dart';
+
 // Sentinel value for copyWith methods to distinguish "not provided" from "null"
 const Object _sentinel = Object();
+
+const _uuid = Uuid();
 
 // ==================== Muscle Groups ====================
 
@@ -167,14 +171,17 @@ class WorkoutSet {
 }
 
 class DropsetEntry {
+  final String id;
   final double weight;
   final int reps;
 
-  DropsetEntry({required this.weight, required this.reps});
+  DropsetEntry({String? id, required this.weight, required this.reps})
+      : id = id ?? _uuid.v4();
 
-  Map<String, dynamic> toJson() => {'weight': weight, 'reps': reps};
+  Map<String, dynamic> toJson() => {'id': id, 'weight': weight, 'reps': reps};
 
   factory DropsetEntry.fromJson(Map<String, dynamic> json) => DropsetEntry(
+    id: json['id'] as String?,
     weight: (json['weight'] as num).toDouble(),
     reps: json['reps'],
   );

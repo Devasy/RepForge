@@ -559,12 +559,16 @@ class _DashboardTab extends StatelessWidget {
   Widget _buildStatsGrid(BuildContext context, WorkoutProvider provider) {
     final sessions = provider.sessions;
     final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final today = DateTime(now.year, now.month, now.day);
+    final weekStart = today.subtract(Duration(days: today.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 7));
     final weekSessions = sessions
-        .where((s) => s.date.isAfter(weekStart.subtract(const Duration(days: 1))))
+        .where((s) => !s.date.isBefore(weekStart) && s.date.isBefore(weekEnd))
         .toList();
 
+    final settings = context.read<SettingsProvider>();
     final weekVol = weekSessions.fold<double>(0, (s, e) => s + e.totalVolume);
+    final displayVol = settings.toDisplay(weekVol);
     final weekSets =
         weekSessions.fold<int>(0, (s, e) => s + e.exercises.fold(0, (a, ex) => a + ex.sets.length));
     final avgDuration = sessions.isEmpty
@@ -572,30 +576,31 @@ class _DashboardTab extends StatelessWidget {
         : sessions.take(7).fold<int>(0, (s, e) => s + e.duration) ~/
             sessions.take(7).length;
 
-    // Sparkline data (last 7 weeks)
+    // Sparkline data (last 7 weeks), anchored to midnight boundaries
     List<double> weeklyWorkouts = List.generate(7, (i) {
-      final wStart = now.subtract(Duration(days: (6 - i) * 7 + now.weekday - 1));
+      final wStart = today.subtract(Duration(days: (6 - i) * 7 + today.weekday - 1));
       final wEnd = wStart.add(const Duration(days: 7));
-      return sessions.where((s) => s.date.isAfter(wStart) && s.date.isBefore(wEnd)).length.toDouble();
+      return sessions.where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd)).length.toDouble();
     });
     List<double> weeklyVolumes = List.generate(7, (i) {
-      final wStart = now.subtract(Duration(days: (6 - i) * 7 + now.weekday - 1));
+      final wStart = today.subtract(Duration(days: (6 - i) * 7 + today.weekday - 1));
       final wEnd = wStart.add(const Duration(days: 7));
-      return sessions
-          .where((s) => s.date.isAfter(wStart) && s.date.isBefore(wEnd))
+      final rawVol = sessions
+          .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
           .fold<double>(0, (s, e) => s + e.totalVolume);
+      return settings.toDisplay(rawVol);
     });
     List<double> weeklySets = List.generate(7, (i) {
-      final wStart = now.subtract(Duration(days: (6 - i) * 7 + now.weekday - 1));
+      final wStart = today.subtract(Duration(days: (6 - i) * 7 + today.weekday - 1));
       final wEnd = wStart.add(const Duration(days: 7));
       return sessions
-          .where((s) => s.date.isAfter(wStart) && s.date.isBefore(wEnd))
+          .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
           .fold<double>(0, (s, e) => s + e.exercises.fold(0, (a, ex) => a + ex.sets.length));
     });
     List<double> weeklyAvgDurations = List.generate(7, (i) {
-      final wStart = now.subtract(Duration(days: (6 - i) * 7 + now.weekday - 1));
+      final wStart = today.subtract(Duration(days: (6 - i) * 7 + today.weekday - 1));
       final wEnd = wStart.add(const Duration(days: 7));
-      final ws = sessions.where((s) => s.date.isAfter(wStart) && s.date.isBefore(wEnd)).toList();
+      final ws = sessions.where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd)).toList();
       if (ws.isEmpty) return 0;
       return ws.fold<double>(0, (s, e) => s + e.duration) / ws.length;
     });
@@ -610,10 +615,10 @@ class _DashboardTab extends StatelessWidget {
       ),
       _StatItem(
         label: 'Volume',
-        value: weekVol >= 1000
-            ? '${(weekVol / 1000).toStringAsFixed(1)}k'
-            : weekVol.toStringAsFixed(0),
-        unit: 'kg',
+        value: displayVol >= 1000
+            ? '${(displayVol / 1000).toStringAsFixed(1)}k'
+            : displayVol.toStringAsFixed(0),
+        unit: settings.unitLabel,
         color: AppColors.secondary,
         spark: weeklyVolumes,
       ),
@@ -1194,17 +1199,16 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
     final exerciseMap = {for (final e in wp.allExercises) e.id: e};
 
     final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final today = DateTime(now.year, now.month, now.day);
+    final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
     final startOfLastWeek = startOfWeek.subtract(const Duration(days: 7));
 
     final thisWeek = wp.sessions
-        .where((s) => s.date.isAfter(startOfWeek) || _sameDay(s.date, startOfWeek))
+        .where((s) => !s.date.isBefore(startOfWeek) && s.date.isBefore(startOfWeek.add(const Duration(days: 7))))
         .toList();
     final lastWeek = wp.sessions
         .where(
-          (s) =>
-              (s.date.isAfter(startOfLastWeek) || _sameDay(s.date, startOfLastWeek)) &&
-              s.date.isBefore(startOfWeek),
+          (s) => !s.date.isBefore(startOfLastWeek) && s.date.isBefore(startOfWeek),
         )
         .toList();
 
@@ -1215,15 +1219,15 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
       unitLabel: settings.unitLabel,
     );
 
-    final insights = await gemini.generateWeeklyInsights(context_);
-    if (mounted) {
-      await settings.saveWeeklyInsights(insights);
-      setState(() => _loading = false);
+    try {
+      final insights = await gemini.generateWeeklyInsights(context_);
+      if (mounted) await settings.saveWeeklyInsights(insights);
+    } catch (_) {
+      // silently ignore network/API errors
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
-
-  bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 
   @override
   Widget build(BuildContext context) {

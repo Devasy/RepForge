@@ -21,6 +21,7 @@ class GlassCard extends StatelessWidget {
     this.borderColor,
     this.accentBorder = false,
     this.onTap,
+    this.semanticsLabel,
   });
 
   final Widget child;
@@ -32,6 +33,7 @@ class GlassCard extends StatelessWidget {
   /// When true, uses accent colour border (e.g. Analytics exercise selector).
   final bool accentBorder;
   final VoidCallback? onTap;
+  final String? semanticsLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -67,9 +69,13 @@ class GlassCard extends StatelessWidget {
     );
 
     if (onTap == null) return content;
-    return GestureDetector(
-      onTap: onTap,
-      child: content,
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      child: GestureDetector(
+        onTap: onTap,
+        child: content,
+      ),
     );
   }
 }
@@ -226,49 +232,53 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 60,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Accent indicator above icon
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: active ? 18 : 0,
-              height: 2,
-              margin: const EdgeInsets.only(bottom: 4),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2),
-                color: AppColors.primary,
-                boxShadow: active
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.6),
-                          blurRadius: 6,
-                        ),
-                      ]
-                    : null,
+    return Semantics(
+      button: true,
+      label: item.label,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 60,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Accent indicator above icon
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: active ? 18 : 0,
+                height: 2,
+                margin: const EdgeInsets.only(bottom: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  color: AppColors.primary,
+                  boxShadow: active
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.6),
+                            blurRadius: 6,
+                          ),
+                        ]
+                      : null,
+                ),
               ),
-            ),
-            Icon(
-              item.icon,
-              size: 19,
-              color: active ? AppColors.textPrimary : AppColors.textMuted,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              item.label,
-              style: GoogleFonts.geist(
-                fontSize: 10,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+              Icon(
+                item.icon,
+                size: 19,
                 color: active ? AppColors.textPrimary : AppColors.textMuted,
-                letterSpacing: 0.2,
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                item.label,
+                style: GoogleFonts.geist(
+                  fontSize: 10,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                  color: active ? AppColors.textPrimary : AppColors.textMuted,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -352,58 +362,62 @@ class _GlowButtonState extends State<GlowButton>
         scale: _scale.value,
         child: child,
       ),
-      child: GestureDetector(
-        onTapDown: disabled ? null : _onTapDown,
-        onTapUp: disabled ? null : _onTapUp,
-        onTapCancel: disabled ? null : _onTapCancel,
-        child: Container(
-          width: widget.fullWidth ? double.infinity : null,
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: vPad,
-          ),
-          decoration: BoxDecoration(
-            color: disabled ? AppColors.glass2 : color,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: disabled
-                ? Border.all(color: AppColors.glassBorder)
-                : Border.all(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    width: 1,
-                  ),
-            boxShadow: disabled
-                ? null
-                : [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.35),
-                      blurRadius: 32,
-                      offset: const Offset(0, 4),
+      child: Semantics(
+        button: true,
+        label: widget.label,
+        child: GestureDetector(
+          onTapDown: disabled ? null : _onTapDown,
+          onTapUp: disabled ? null : _onTapUp,
+          onTapCancel: disabled ? null : _onTapCancel,
+          child: Container(
+            width: widget.fullWidth ? double.infinity : null,
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: vPad,
+            ),
+            decoration: BoxDecoration(
+              color: disabled ? AppColors.glass2 : color,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: disabled
+                  ? Border.all(color: AppColors.glassBorder)
+                  : Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      width: 1,
                     ),
-                  ],
-          ),
-          child: Row(
-            mainAxisSize:
-                widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (widget.icon != null) ...[
-                Icon(
-                  widget.icon,
-                  color: disabled ? AppColors.textMuted : Colors.white,
-                  size: widget.small ? 18 : 20,
+              boxShadow: disabled
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.35),
+                        blurRadius: 32,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+            ),
+            child: Row(
+              mainAxisSize:
+                  widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (widget.icon != null) ...[
+                  Icon(
+                    widget.icon,
+                    color: disabled ? AppColors.textMuted : Colors.white,
+                    size: widget.small ? 18 : 20,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                ],
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: disabled ? AppColors.textMuted : Colors.white,
+                    fontSize: widget.small ? 14 : 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
               ],
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: disabled ? AppColors.textMuted : Colors.white,
-                  fontSize: widget.small ? 14 : 16,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

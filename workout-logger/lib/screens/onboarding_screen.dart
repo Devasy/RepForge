@@ -34,17 +34,20 @@ class _WelcomePageState extends State<WelcomePage> {
   }
 
   Future<void> _submit() async {
+    if (_saving) return;
     final name = _controller.text.trim();
     if (name.isEmpty) return;
 
     setState(() => _saving = true);
-    final settings = context.read<SettingsProvider>();
-    await settings.setUserName(name);
-    final version = await settings.getCurrentVersion();
-    await settings.markVersionSeen(version);
-
-    if (!mounted) return;
-    widget.onComplete();
+    try {
+      final settings = context.read<SettingsProvider>();
+      await settings.setUserName(name);
+      final version = await settings.getCurrentVersion();
+      await settings.markVersionSeen(version);
+      if (mounted) widget.onComplete();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override

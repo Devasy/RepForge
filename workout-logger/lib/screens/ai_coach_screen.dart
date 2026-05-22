@@ -13,6 +13,7 @@ import '../services/settings_provider.dart';
 import '../services/interfaces/ml_service_interface.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
+import 'profile_screen.dart';
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
@@ -94,25 +95,28 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         : <Content>[];
 
     final buffer = StringBuffer();
-    await for (final chunk in gemini.streamCoachReply(
-      userMessage: text,
-      systemPrompt: systemPrompt,
-      history: history,
-    )) {
-      buffer.write(chunk);
+    try {
+      await for (final chunk in gemini.streamCoachReply(
+        userMessage: text,
+        systemPrompt: systemPrompt,
+        history: history,
+      )) {
+        buffer.write(chunk);
+        if (mounted) {
+          setState(() => _streamingText = buffer.toString());
+          _scrollToBottom();
+        }
+      }
       if (mounted) {
-        setState(() => _streamingText = buffer.toString());
+        setState(() {
+          _messages.add(_ChatMessage(role: 'model', text: buffer.toString()));
+          _streamingText = '';
+          _loading = false;
+        });
         _scrollToBottom();
       }
-    }
-
-    if (mounted) {
-      setState(() {
-        _messages.add(_ChatMessage(role: 'model', text: buffer.toString()));
-        _streamingText = '';
-        _loading = false;
-      });
-      _scrollToBottom();
+    } catch (_) {
+      if (mounted) setState(() { _streamingText = ''; _loading = false; });
     }
   }
 
@@ -363,7 +367,10 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               label: 'Go to Profile',
               icon: Icons.person_rounded,
               fullWidth: false,
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              ),
             ),
           ],
         ),

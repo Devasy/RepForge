@@ -297,8 +297,9 @@ class _ProgramCard extends StatelessWidget {
         children: program.phases.asMap().entries.map((entry) {
           final phase = entry.value;
           final color = _phaseColors[entry.key % _phaseColors.length];
+          final safeDenominator = program.totalWeeks <= 0 ? 1 : program.totalWeeks;
           final fraction =
-              (phase.endWeek - phase.startWeek + 1) / program.totalWeeks;
+              (phase.endWeek - phase.startWeek + 1) / safeDenominator;
           return Expanded(
             flex: ((fraction * 100).round()).clamp(1, 100),
             child: Container(
