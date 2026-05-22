@@ -1,0 +1,491 @@
+package com.devasy.repforge.appfunctions
+
+import android.content.Context
+import android.content.Intent
+import androidx.appfunctions.AppFunctionContext
+import androidx.appfunctions.service.AppFunction
+import com.devasy.repforge.MainActivity
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.util.Calendar
+import kotlin.math.exp
+
+/**
+ * App functions that expose RepForge's workout data to the on-device AI agent
+ * (OS Gemini). Read functions answer queries from a JSON mirror that the Flutter
+ * app keeps in sync (`agent_mirror.json` in the app's files directory), so they
+ * work without a running Flutter engine. Write functions cannot be auto-applied:
+ * they launch RepForge to a confirmation screen the user must approve.
+ *
+ * Weights are kilograms; volume is weight x reps.
+ */
+class RepForgeAppFunctions {
+
+    /**
+     * Returns the most recent workout sessions for one exercise.
+     *
+     * @param exerciseName Name of the exercise, e.g. "Bench Press".
+     * @param limit Maximum number of sessions to return (most recent first).
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun getExerciseHistory(
+        appFunctionContext: AppFunctionContext,
+        exerciseName: String,
+        limit: Int,
+    ): String {
+        val mirror = loadMirror(appFunctionContext.context)
+            ?: return errorJson("Workout data is not available yet.")
+        val exercise = resolveExercise(mirror, exerciseName)
+            ?: return errorJson("No exercise found matching \"$exerciseName\".")
+        val sessions = sortedSessions(mirror).filter { session ->
+            logsOf(session).any { it.optString("exerciseId") == exercise.first }
+        }.take(limit.coerceAtLeast(1))
+        return JSONObject()
+            .put("exerciseId", exercise.first)
+            .put("exerciseName", exercise.second)
+            .put("sessionCount", sessions.size)
+            .put("sessions", JSONArray(sessions))
+            .toString()
+    }
+
+    /**
+     * Returns recent sessions that trained a given muscle group.
+     *
+     * @param muscleGroup Muscle group name, e.g. "Chest" or "Quads".
+     * @param limit Maximum number of sessions to return (most recent first).
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun getMuscleGroupSessions(
+        appFunctionContext: AppFunctionContext,
+        muscleGroup: String,
+        limit: Int,
+    ): String {
+        val mirror = loadMirror(appFunctionContext.context)
+            ?: return errorJson("Workout data is not available yet.")
+        val muscle = resolveMuscle(mirror, muscleGroup)
+            ?: return errorJson("No muscle group matching \"$muscleGroup\".")
+        val sessions = sortedSessions(mirror).filter { session ->
+            logsOf(session).any { log ->
+                muscleIdsOf(log).contains(muscle.first)
+            }
+        }.take(limit.coerceAtLeast(1))
+        return JSONObject()
+            .put("muscleGroupId", muscle.first)
+            .put("muscleGroupName", muscle.second)
+            .put("sessionCount", sessions.size)
+            .put("sessions", JSONArray(sessions))
+            .toString()
+    }
+
+    /**
+     * Returns recovery status per muscle group, recomputed fresh from the
+     * exponential decay model `recovery = 1 - exp(-hoursSinceTrained / tau)`.
+     *
+     * @param muscleGroup A muscle group name to scope to, or empty for all.
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun getMuscleRecovery(
+        appFunctionContext: AppFunctionContext,
+        muscleGroup: String,
+    ): String {
+        val mirror = loadMirror(appFunctionContext.context)
+            ?: return errorJson("Workout data is not available yet.")
+        val recovery = mirror.optJSONArray("recovery") ?: JSONArray()
+        val now = System.currentTimeMillis()
+        val out = JSONArray()
+        for (i in 0 until recovery.length()) {
+            val entry = recovery.getJSONObject(i)
+            val computed = recoveryEntry(entry, now)
+            if (muscleGroup.isBlank() ||
+                entry.optString("muscleGroupName").equals(muscleGroup, true) ||
+                entry.optString("muscleGroupId").equals(muscleGroup, true)
+            ) {
+                out.put(computed)
+            }
+        }
+        return JSONObject().put("muscles", out).toString()
+    }
+
+    /** Returns every workout session logged in the current calendar week. */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun getSessionsThisWeek(
+        appFunctionContext: AppFunctionContext,
+    ): String {
+        val mirror = loadMirror(appFunctionContext.context)
+            ?: return errorJson("Workout data is not available yet.")
+        val weekStart = startOfWeekIso()
+        val sessions = sortedSessions(mirror).filter {
+            it.optString("date") >= weekStart
+        }
+        var volume = 0.0
+        sessions.forEach { volume += it.optDouble("totalVolume", 0.0) }
+        return JSONObject()
+            .put("weekStart", weekStart)
+            .put("sessionCount", sessions.size)
+            .put("totalVolume", volume)
+            .put("sessions", JSONArray(sessions))
+            .toString()
+    }
+
+    /**
+     * Returns the volume trend for a muscle group: its growth-model slope plus
+     * the sessions that trained it.
+     *
+     * @param muscleGroup Muscle group name, e.g. "Back".
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun getMuscleGroupProgress(
+        appFunctionContext: AppFunctionContext,
+        muscleGroup: String,
+    ): String {
+        val mirror = loadMirror(appFunctionContext.context)
+            ?: return errorJson("Workout data is not available yet.")
+        val muscle = resolveMuscle(mirror, muscleGroup)
+            ?: return errorJson("No muscle group matching \"$muscleGroup\".")
+        val growth = mirror.optJSONObject("muscleGrowth")
+            ?.optJSONObject(muscle.first)
+        val sessions = sortedSessions(mirror).filter { session ->
+            logsOf(session).any { muscleIdsOf(it).contains(muscle.first) }
+        }
+        return JSONObject()
+            .put("muscleGroupId", muscle.first)
+            .put("muscleGroupName", muscle.second)
+            .put("trend", growth ?: JSONObject.NULL)
+            .put("sessionCount", sessions.size)
+            .put("sessions", JSONArray(sessions))
+            .toString()
+    }
+
+    /**
+     * Lists the available exercises, optionally filtered.
+     *
+     * @param muscleGroup Muscle group name to filter by, or empty for all.
+     * @param category Either "compound", "isolation", or empty for all.
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun listExercises(
+        appFunctionContext: AppFunctionContext,
+        muscleGroup: String,
+        category: String,
+    ): String {
+        val mirror = loadMirror(appFunctionContext.context)
+            ?: return errorJson("Workout data is not available yet.")
+        val muscleId = if (muscleGroup.isBlank()) null
+        else resolveMuscle(mirror, muscleGroup)?.first
+        val exercises = exercisesArray(mirror)
+        val out = JSONArray()
+        for (i in 0 until exercises.length()) {
+            val exercise = exercises.getJSONObject(i)
+            if (muscleId != null &&
+                !exerciseMuscleIds(exercise).contains(muscleId)
+            ) {
+                continue
+            }
+            if (category.isNotBlank() &&
+                !exercise.optString("category").equals(category, true)
+            ) {
+                continue
+            }
+            out.put(exercise)
+        }
+        return JSONObject().put("count", out.length()).put("exercises", out)
+            .toString()
+    }
+
+    /**
+     * Flexible session search. All filters are optional and combined with AND.
+     *
+     * @param exerciseName Restrict to sessions containing this exercise.
+     * @param muscleGroup Restrict to sessions training this muscle group.
+     * @param daysBack Only sessions within the last N days (0 = no limit).
+     * @param limit Maximum number of sessions to return (most recent first).
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun querySessions(
+        appFunctionContext: AppFunctionContext,
+        exerciseName: String,
+        muscleGroup: String,
+        daysBack: Int,
+        limit: Int,
+    ): String {
+        val mirror = loadMirror(appFunctionContext.context)
+            ?: return errorJson("Workout data is not available yet.")
+        val exerciseId = if (exerciseName.isBlank()) null
+        else resolveExercise(mirror, exerciseName)?.first
+            ?: return errorJson("No exercise found matching \"$exerciseName\".")
+        val muscleId = if (muscleGroup.isBlank()) null
+        else resolveMuscle(mirror, muscleGroup)?.first
+            ?: return errorJson("No muscle group matching \"$muscleGroup\".")
+        val cutoff = if (daysBack > 0) {
+            isoDaysAgo(daysBack)
+        } else {
+            null
+        }
+
+        var sessions = sortedSessions(mirror).filter { session ->
+            if (cutoff != null && session.optString("date") < cutoff) {
+                return@filter false
+            }
+            if (exerciseId != null && logsOf(session).none {
+                    it.optString("exerciseId") == exerciseId
+                }
+            ) {
+                return@filter false
+            }
+            if (muscleId != null && logsOf(session).none {
+                    muscleIdsOf(it).contains(muscleId)
+                }
+            ) {
+                return@filter false
+            }
+            true
+        }
+        if (limit > 0 && sessions.size > limit) {
+            sessions = sessions.take(limit)
+        }
+        return JSONObject()
+            .put("sessionCount", sessions.size)
+            .put("sessions", JSONArray(sessions))
+            .toString()
+    }
+
+    /**
+     * Proposes a new custom exercise. RepForge opens a confirmation screen the
+     * user must approve before the exercise is saved.
+     *
+     * @param name Name of the exercise.
+     * @param category Either "compound" or "isolation".
+     * @param primaryMuscle Primary muscle group name, e.g. "Chest".
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun createCustomExercise(
+        appFunctionContext: AppFunctionContext,
+        name: String,
+        category: String,
+        primaryMuscle: String,
+    ): String {
+        val payload = JSONObject()
+            .put("type", "createCustomExercise")
+            .put(
+                "data",
+                JSONObject()
+                    .put("name", name)
+                    .put("category", category)
+                    .put("primaryMuscle", primaryMuscle),
+            )
+        launchConfirmation(appFunctionContext.context, payload)
+        return JSONObject()
+            .put("status", "pending_confirmation")
+            .put("message", "Opened RepForge to confirm the new exercise.")
+            .toString()
+    }
+
+    /**
+     * Proposes a new workout routine. RepForge opens a confirmation screen the
+     * user must approve before the routine is saved.
+     *
+     * @param name Name of the routine.
+     * @param exercises Comma-separated exercise names to include.
+     */
+    @AppFunction(isDescribedByKDoc = true)
+    suspend fun createRoutine(
+        appFunctionContext: AppFunctionContext,
+        name: String,
+        exercises: String,
+    ): String {
+        val names = exercises.split(",", "\n")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        val payload = JSONObject()
+            .put("type", "createRoutine")
+            .put(
+                "data",
+                JSONObject()
+                    .put("name", name)
+                    .put("exercises", JSONArray(names)),
+            )
+        launchConfirmation(appFunctionContext.context, payload)
+        return JSONObject()
+            .put("status", "pending_confirmation")
+            .put("message", "Opened RepForge to confirm the new routine.")
+            .toString()
+    }
+
+    // ── internals ──────────────────────────────────────────────────────────
+
+    private fun loadMirror(context: Context): JSONObject? {
+        return try {
+            val file = File(context.filesDir, MIRROR_FILE)
+            if (!file.exists()) return null
+            JSONObject(file.readText())
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun exercisesArray(mirror: JSONObject): JSONArray =
+        mirror.optJSONArray("exercises") ?: JSONArray()
+
+    /** Sessions newest-first (ISO-8601 dates sort lexically). */
+    private fun sortedSessions(mirror: JSONObject): List<JSONObject> {
+        val array = mirror.optJSONArray("sessions") ?: JSONArray()
+        val list = ArrayList<JSONObject>(array.length())
+        for (i in 0 until array.length()) list.add(array.getJSONObject(i))
+        list.sortByDescending { it.optString("date") }
+        return list
+    }
+
+    private fun logsOf(session: JSONObject): List<JSONObject> {
+        val array = session.optJSONArray("exercises") ?: JSONArray()
+        return (0 until array.length()).map { array.getJSONObject(it) }
+    }
+
+    private fun muscleIdsOf(log: JSONObject): List<String> {
+        val array = log.optJSONArray("muscleGroupIds") ?: JSONArray()
+        return (0 until array.length()).map { array.getString(it) }
+    }
+
+    private fun exerciseMuscleIds(exercise: JSONObject): List<String> {
+        val array = exercise.optJSONArray("muscles") ?: JSONArray()
+        return (0 until array.length())
+            .map { array.getJSONObject(it).optString("id") }
+    }
+
+    /** Resolve a free-text exercise reference to (id, name). */
+    private fun resolveExercise(
+        mirror: JSONObject,
+        query: String,
+    ): Pair<String, String>? {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) return null
+        val exercises = exercisesArray(mirror)
+        val items = (0 until exercises.length())
+            .map { exercises.getJSONObject(it) }
+        items.firstOrNull { it.optString("id").lowercase() == q }
+            ?.let { return it.optString("id") to it.optString("name") }
+        items.firstOrNull { it.optString("name").lowercase() == q }
+            ?.let { return it.optString("id") to it.optString("name") }
+        items.firstOrNull { it.optString("name").lowercase().contains(q) }
+            ?.let { return it.optString("id") to it.optString("name") }
+        return null
+    }
+
+    /** Resolve a free-text muscle reference to (id, name). */
+    private fun resolveMuscle(
+        mirror: JSONObject,
+        query: String,
+    ): Pair<String, String>? {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) return null
+        val groups = mirror.optJSONArray("muscleGroups") ?: JSONArray()
+        val items = (0 until groups.length()).map { groups.getJSONObject(it) }
+        items.firstOrNull { it.optString("id").lowercase() == q }
+            ?.let { return it.optString("id") to it.optString("name") }
+        items.firstOrNull { it.optString("name").lowercase() == q }
+            ?.let { return it.optString("id") to it.optString("name") }
+        items.firstOrNull {
+            it.optString("name").lowercase().contains(q) ||
+                it.optString("id").lowercase().contains(q)
+        }?.let { return it.optString("id") to it.optString("name") }
+        return null
+    }
+
+    private fun recoveryEntry(entry: JSONObject, nowMillis: Long): JSONObject {
+        val tau = entry.optDouble("tauHours", 48.0)
+        val lastTrained = parseIso(entry.optString("lastTrainedAt"))
+        val out = JSONObject()
+            .put("muscleGroupId", entry.optString("muscleGroupId"))
+            .put("muscleGroupName", entry.optString("muscleGroupName"))
+        if (lastTrained == null || tau <= 0) {
+            return out.put(
+                "recoveryPercent",
+                entry.optInt("recoveryPercent", 100),
+            )
+        }
+        val hours = (nowMillis - lastTrained) / 3_600_000.0
+        val fraction = (1.0 - exp(-hours / tau)).coerceIn(0.0, 1.0)
+        return out
+            .put("recoveryPercent", (fraction * 100).toInt())
+            .put("hoursSinceLastTrained", hours.toInt())
+            .put(
+                "state",
+                when {
+                    fraction >= 0.90 -> "recovered"
+                    fraction < 0.70 -> "fatigued"
+                    else -> "recovering"
+                },
+            )
+    }
+
+    private fun launchConfirmation(context: Context, payload: JSONObject) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+            )
+            putExtra(MainActivity.EXTRA_AGENT_ACTION, payload.toString())
+        }
+        context.startActivity(intent)
+    }
+
+    private fun errorJson(message: String): String =
+        JSONObject().put("error", message).toString()
+
+    /** Parse an ISO-8601 timestamp to epoch millis, tolerating fractions. */
+    private fun parseIso(value: String): Long? {
+        if (value.isBlank()) return null
+        return try {
+            val trimmed = value.substringBefore('.').substringBefore('Z')
+            val parts = trimmed.split("T")
+            val date = parts[0].split("-")
+            val time = (parts.getOrNull(1) ?: "00:00:00").split(":")
+            Calendar.getInstance().apply {
+                set(
+                    date[0].toInt(),
+                    date[1].toInt() - 1,
+                    date[2].toInt(),
+                    time.getOrElse(0) { "0" }.toInt(),
+                    time.getOrElse(1) { "0" }.toInt(),
+                    time.getOrElse(2) { "0" }.substringBefore('.').toInt(),
+                )
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun startOfWeekIso(): String {
+        val cal = Calendar.getInstance().apply {
+            firstDayOfWeek = Calendar.MONDAY
+            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        return isoOf(cal)
+    }
+
+    private fun isoDaysAgo(days: Int): String {
+        val cal = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, -days)
+        }
+        return isoOf(cal)
+    }
+
+    private fun isoOf(cal: Calendar): String {
+        fun pad(n: Int) = n.toString().padStart(2, '0')
+        return "${cal.get(Calendar.YEAR)}-" +
+            "${pad(cal.get(Calendar.MONTH) + 1)}-" +
+            "${pad(cal.get(Calendar.DAY_OF_MONTH))}T" +
+            "${pad(cal.get(Calendar.HOUR_OF_DAY))}:" +
+            "${pad(cal.get(Calendar.MINUTE))}:" +
+            "${pad(cal.get(Calendar.SECOND))}.000"
+    }
+
+    private companion object {
+        const val MIRROR_FILE = "agent_mirror.json"
+    }
+}

@@ -32,6 +32,14 @@ class MLService implements IMLService {
   };
   static const _defaultTauHours = 48.0;
 
+  /// Per-muscle recovery time constants τ (hours), exposed so callers outside
+  /// this service (e.g. the agent data mirror) can recompute the decay model
+  /// `1 − exp(−t/τ)` themselves at query time.
+  static Map<String, double> get recoveryTimeConstantsHours => _tauHours;
+
+  /// τ used for muscle groups absent from [recoveryTimeConstantsHours].
+  static double get defaultRecoveryTimeConstantHours => _defaultTauHours;
+
   // ==================== GROWTH MODEL ====================
 
   @override

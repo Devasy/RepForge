@@ -3,6 +3,8 @@
 // Following Dependency Inversion Principle: we create concrete implementations
 // here at the composition root and inject them into high-level modules.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -17,11 +19,16 @@ import 'services/interfaces/health_connect_service_interface.dart';
 import 'services/workout_provider.dart';
 import 'services/settings_provider.dart';
 import 'services/api_service.dart';
+import 'services/agent_action.dart';
+import 'services/agent_data_service.dart';
+import 'services/agent_intent_bridge.dart';
+import 'services/agent_mirror_writer.dart';
 import 'services/managers/program_manager.dart';
 import 'services/managers/history_manager.dart';
 import 'services/managers/health_sync_manager.dart';
 import 'services/managers/pr_manager.dart';
 import 'theme/app_theme.dart';
+import 'screens/agent_confirm_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 
@@ -64,6 +71,10 @@ class WorkoutLoggerApp extends StatelessWidget {
   static final PRManager _prManager = PRManager(_storageService);
   static final GeminiService _geminiService = GeminiService();
 
+  /// Lets non-widget code (the agent intent bridge) push routes.
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   const WorkoutLoggerApp({super.key});
 
   @override
@@ -104,6 +115,7 @@ class WorkoutLoggerApp extends StatelessWidget {
         title: 'Workout Logger',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
+        navigatorKey: navigatorKey,
         home: const AppInitializer(),
       ),
     );
@@ -122,10 +134,41 @@ class _AppInitializerState extends State<AppInitializer> {
   bool _needsNamePrompt = false;
   String? _error;
 
+  // Keeps the on-disk agent data mirror in sync for the lifetime of the app.
+  AgentMirrorWriter? _agentMirror;
+
   @override
   void initState() {
     super.initState();
     _initializeApp();
+  }
+
+  @override
+  void dispose() {
+    _agentMirror?.dispose();
+    super.dispose();
+  }
+
+  /// Wire the OS-agent layer once workout data is loaded: keep the data mirror
+  /// in sync and route any confirmation-required write to [AgentConfirmScreen].
+  Future<void> _initializeAgentLayer(WorkoutProvider provider) async {
+    final agentData = AgentDataService(provider);
+    final mirror = AgentMirrorWriter(agentData, provider);
+    _agentMirror = mirror;
+    unawaited(mirror.start());
+
+    final bridge = AgentIntentBridge(onAction: _presentAgentAction);
+    unawaited(bridge.start());
+  }
+
+  void _presentAgentAction(AgentPendingAction action) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WorkoutLoggerApp.navigatorKey.currentState?.push(
+        MaterialPageRoute<void>(
+          builder: (_) => AgentConfirmScreen(action: action),
+        ),
+      );
+    });
   }
 
   Future<void> _initializeApp() async {
@@ -144,6 +187,9 @@ class _AppInitializerState extends State<AppInitializer> {
       await historyManager.loadSessions();
       await prManager.load();
       await prManager.backfillFromSessions(historyManager.sessions);
+
+      // Expose workout data to the OS AI agent (mirror + write routing).
+      await _initializeAgentLayer(provider);
 
       final version = await settings.getCurrentVersion();
       final needsName = settings.userName == null || settings.userName!.isEmpty;
