@@ -9,6 +9,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
+import '../services/gemini_service.dart';
+import '../services/gemini_context_builder.dart';
 import '../theme/app_theme.dart';
 import 'workout_flow_screen.dart';
 import 'history_screen.dart';
@@ -16,6 +18,7 @@ import 'routines_screen.dart';
 import 'analytics_screen.dart';
 import 'profile_screen.dart';
 import 'widgets/workout_conflict_dialog.dart';
+import 'ai_coach_screen.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/sparkline_painter.dart';
 import 'widgets/activity_heatmap.dart';
@@ -200,6 +203,8 @@ class _DashboardTab extends StatelessWidget {
                       const SizedBox(height: 16),
                       _buildMuscleVolumeCard(context, provider),
                       const SizedBox(height: 16),
+                      const _WeeklyInsightsCard(),
+                      const SizedBox(height: 16),
                       _buildRecentWorkouts(context: context, provider: provider, homeState: homeState),
                       const SizedBox(height: 100),
                     ],
@@ -253,25 +258,60 @@ class _DashboardTab extends StatelessWidget {
             ),
           ],
         ),
-        GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            _slide(const ProfileScreen()),
-          ),
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: AppColors.glass2,
-              border: Border.all(color: AppColors.glassBorder),
+        Row(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                _slide(const AiCoachScreen()),
+              ),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primary, Color(0xFF5B21B6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryGlow(0.35),
+                      blurRadius: 12,
+                      spreadRadius: -3,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
+              ),
             ),
-            child: const Icon(
-              Icons.person_outline_rounded,
-              size: 18,
-              color: AppColors.textSoft,
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                _slide(const ProfileScreen()),
+              ),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.glass2,
+                  border: Border.all(color: AppColors.glassBorder),
+                ),
+                child: const Icon(
+                  Icons.person_outline_rounded,
+                  size: 18,
+                  color: AppColors.textSoft,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ],
     );
@@ -1128,4 +1168,190 @@ PageRouteBuilder<T> _slide<T>(Widget page) {
     ),
     transitionDuration: const Duration(milliseconds: 300),
   );
+}
+
+// ── Weekly Insights Card ──────────────────────────────────────────────────────
+
+class _WeeklyInsightsCard extends StatefulWidget {
+  const _WeeklyInsightsCard();
+
+  @override
+  State<_WeeklyInsightsCard> createState() => _WeeklyInsightsCardState();
+}
+
+class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
+  bool _loading = false;
+
+  Future<void> _refresh() async {
+    final gemini = context.read<GeminiService>();
+    if (!gemini.isConfigured) return;
+
+    setState(() => _loading = true);
+
+    final wp = context.read<WorkoutProvider>();
+    final settings = context.read<SettingsProvider>();
+
+    final exerciseMap = {for (final e in wp.allExercises) e.id: e};
+
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfLastWeek = startOfWeek.subtract(const Duration(days: 7));
+
+    final thisWeek = wp.sessions
+        .where((s) => s.date.isAfter(startOfWeek) || _sameDay(s.date, startOfWeek))
+        .toList();
+    final lastWeek = wp.sessions
+        .where(
+          (s) =>
+              (s.date.isAfter(startOfLastWeek) || _sameDay(s.date, startOfLastWeek)) &&
+              s.date.isBefore(startOfWeek),
+        )
+        .toList();
+
+    final context_ = GeminiContextBuilder.buildWeeklyInsightsContext(
+      thisWeek: thisWeek,
+      lastWeek: lastWeek,
+      exerciseMap: exerciseMap,
+      unitLabel: settings.unitLabel,
+    );
+
+    final insights = await gemini.generateWeeklyInsights(context_);
+    if (mounted) {
+      await settings.saveWeeklyInsights(insights);
+      setState(() => _loading = false);
+    }
+  }
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  @override
+  Widget build(BuildContext context) {
+    final gemini = context.watch<GeminiService>();
+    final settings = context.watch<SettingsProvider>();
+
+    if (!gemini.isConfigured) return const SizedBox.shrink();
+
+    final insights = settings.weeklyInsights;
+    final updatedAt = settings.weeklyInsightsDate;
+    final hasInsights = insights.isNotEmpty;
+
+    return GlassCard(
+      glowColor: AppColors.primary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primary, Color(0xFF5B21B6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryGlow(0.4),
+                      blurRadius: 10,
+                      spreadRadius: -3,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'This Week\'s Insights',
+                  style: GoogleFonts.geist(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: _loading ? null : _refresh,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.30),
+                    ),
+                  ),
+                  child: _loading
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                          ),
+                        )
+                      : Text(
+                          hasInsights ? 'Refresh' : 'Generate',
+                          style: GoogleFonts.geist(
+                            color: AppColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+          if (hasInsights || _loading) ...[
+            const SizedBox(height: AppSpacing.md),
+            const Divider(color: AppColors.glassBorder, height: 1),
+            const SizedBox(height: AppSpacing.md),
+            if (_loading && !hasInsights)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: RFLoadingDots(),
+              )
+            else
+              Text(
+                insights,
+                style: GoogleFonts.geist(
+                  color: AppColors.textSoft,
+                  fontSize: 13,
+                  height: 1.6,
+                ),
+              ),
+            if (updatedAt != null && !_loading) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Updated ${DateFormat('MMM d, h:mm a').format(updatedAt)}',
+                style: GoogleFonts.geistMono(
+                  color: AppColors.textFaint,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ] else ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Tap Generate to get a personalised coaching summary for this week.',
+              style: GoogleFonts.geist(
+                color: AppColors.textMuted,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

@@ -10,6 +10,7 @@ import '../widgets/rf_widgets.dart';
 import 'program_detail_screen.dart';
 import 'program_designer_screen.dart';
 import 'import_program_screen.dart';
+import '../ai_program_generator_screen.dart';
 
 class ProgramsScreen extends StatelessWidget {
   const ProgramsScreen({super.key});
@@ -39,6 +40,17 @@ class ProgramsScreen extends StatelessWidget {
                 child: const Icon(
                   Icons.download_rounded,
                   color: AppColors.secondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              FloatingActionButton.small(
+                heroTag: 'ai_generate',
+                onPressed: () => _openAiGenerator(context),
+                backgroundColor: AppColors.card,
+                elevation: 0,
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppColors.primary,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -115,6 +127,28 @@ class ProgramsScreen extends StatelessWidget {
         builder: (_) => ProgramDesignerScreen(existing: existing),
       ),
     );
+  }
+
+  Future<void> _openAiGenerator(BuildContext context) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const AiProgramGeneratorScreen()),
+    );
+    if (result == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'AI program added!',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          backgroundColor: AppColors.cardHigh,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _openImport(BuildContext context) async {

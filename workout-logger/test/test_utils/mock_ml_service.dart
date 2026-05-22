@@ -67,9 +67,31 @@ class MockMLService implements IMLService {
   }
 
   @override
+  List<DataPoint> extractMuscleDataPoints(
+    String muscleGroupId,
+    List<WorkoutSession> sessions,
+    Map<String, Exercise> exerciseMap,
+  ) {
+    return [];
+  }
+
+  @override
+  Map<String, MuscleRecoveryStatus> computeMuscleRecoveryScores(
+    List<WorkoutSession> sessions,
+    Map<String, Exercise> exerciseMap, {
+    DateTime? asOf,
+  }) {
+    return {};
+  }
+
+  @override
   List<SetRecommendation> recommendSets({
     required List<WorkoutSet> lastSession,
     GrowthModel? growthModel,
+    int minReps = 6,
+    int maxReps = 12,
+    Map<String, MuscleRecoveryStatus>? recoveryScores,
+    List<String>? primaryMuscleIds,
   }) {
     recommendSetsCallCount++;
     lastRecommendedLastSession = lastSession;

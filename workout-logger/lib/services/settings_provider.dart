@@ -14,6 +14,10 @@ class SettingsProvider extends ChangeNotifier {
   bool _healthConnectEnabled = false;
   String? _userName;
   String? _lastSeenVersion;
+  String _geminiApiKey = '';
+  String _geminiModel = 'gemini-2.5-flash';
+  String _weeklyInsights = '';
+  DateTime? _weeklyInsightsDate;
 
   WeightUnit get weightUnit => _weightUnit;
   double get weightIncrement => _weightIncrement;
@@ -21,6 +25,10 @@ class SettingsProvider extends ChangeNotifier {
   bool get healthConnectEnabled => _healthConnectEnabled;
   String? get userName => _userName;
   String? get lastSeenVersion => _lastSeenVersion;
+  String get geminiApiKey => _geminiApiKey;
+  String get geminiModel => _geminiModel;
+  String get weeklyInsights => _weeklyInsights;
+  DateTime? get weeklyInsightsDate => _weeklyInsightsDate;
 
   SettingsProvider(this._storage);
 
@@ -38,6 +46,11 @@ class SettingsProvider extends ChangeNotifier {
 
     _userName = await _storage.getSetting('userName');
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
+    _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
+    _geminiModel = await _storage.getSetting('geminiModel') ?? 'gemini-2.5-flash';
+    _weeklyInsights = await _storage.getSetting('weeklyInsights') ?? '';
+    final dateStr = await _storage.getSetting('weeklyInsightsDate');
+    _weeklyInsightsDate = dateStr != null ? DateTime.tryParse(dateStr) : null;
   }
 
   Future<void> setUserName(String name) async {
@@ -81,6 +94,29 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setHealthConnectEnabled(bool enabled) async {
     _healthConnectEnabled = enabled;
     await _storage.saveSetting('healthConnectEnabled', enabled.toString());
+    notifyListeners();
+  }
+
+  Future<void> setGeminiModel(String model) async {
+    _geminiModel = model;
+    await _storage.saveSetting('geminiModel', model);
+    notifyListeners();
+  }
+
+  Future<void> setGeminiApiKey(String key) async {
+    _geminiApiKey = key.trim();
+    await _storage.saveSetting('geminiApiKey', _geminiApiKey);
+    notifyListeners();
+  }
+
+  Future<void> saveWeeklyInsights(String insights) async {
+    _weeklyInsights = insights;
+    _weeklyInsightsDate = DateTime.now();
+    await _storage.saveSetting('weeklyInsights', insights);
+    await _storage.saveSetting(
+      'weeklyInsightsDate',
+      _weeklyInsightsDate!.toIso8601String(),
+    );
     notifyListeners();
   }
 

@@ -3,8 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../../services/settings_provider.dart';
+import '../../services/gemini_service.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 
@@ -641,6 +643,217 @@ class _SectionDivider extends StatelessWidget {
       color: AppColors.glassBorder,
       height: 1,
       indent: 40,
+    );
+  }
+}
+
+// ── AI Features section ───────────────────────────────────────────────────────
+class AiSettingsSection extends StatefulWidget {
+  const AiSettingsSection({super.key});
+
+  @override
+  State<AiSettingsSection> createState() => _AiSettingsSectionState();
+}
+
+class _AiSettingsSectionState extends State<AiSettingsSection> {
+  late TextEditingController _ctrl;
+  bool _obscure = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(
+      text: context.read<SettingsProvider>().geminiApiKey,
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final key = _ctrl.text.trim();
+    final settings = context.read<SettingsProvider>();
+    final gemini = context.read<GeminiService>();
+    await settings.setGeminiApiKey(key);
+    gemini.updateApiKey(key);
+    if (mounted) setState(() => _saving = false);
+  }
+
+  Future<void> _selectModel(String modelId) async {
+    final settings = context.read<SettingsProvider>();
+    final gemini = context.read<GeminiService>();
+    await settings.setGeminiModel(modelId);
+    gemini.updateModel(modelId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gemini = context.watch<GeminiService>();
+    final settings = context.watch<SettingsProvider>();
+    return _ProfileSection(
+      icon: Icons.auto_awesome_rounded,
+      iconColor: AppColors.primary,
+      title: 'AI Features',
+      subtitle: 'Gemini-powered coach, program builder & insights',
+      trailing: gemini.isConfigured
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
+              ),
+              child: Text(
+                'Active',
+                style: GoogleFonts.geist(
+                  color: AppColors.success,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionLabel('GEMINI API KEY'),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.glass,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(color: AppColors.glassBorderStrong),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _ctrl,
+                    obscureText: _obscure,
+                    style: GoogleFonts.geistMono(
+                      color: AppColors.textPrimary,
+                      fontSize: 12,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'AIza…',
+                      hintStyle: GoogleFonts.geistMono(
+                        color: AppColors.textFaint,
+                        fontSize: 12,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm + 4,
+                      ),
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _obscure = !_obscure),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                    child: Icon(
+                      _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      color: AppColors.textFaint,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Get a free key at aistudio.google.com. Stored locally on-device.',
+            style: GoogleFonts.geist(
+              color: AppColors.textFaint,
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const _SectionLabel('GEMINI MODEL'),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: kGeminiModels.map(((String, String) entry) {
+              final (id, label) = entry;
+              final selected = settings.geminiModel == id;
+              return GestureDetector(
+                onTap: () => _selectModel(id),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.primary.withValues(alpha: 0.15)
+                        : AppColors.glass,
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                    border: Border.all(
+                      color: selected
+                          ? AppColors.primary.withValues(alpha: 0.5)
+                          : AppColors.glassBorder,
+                      width: selected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    style: GoogleFonts.geistMono(
+                      color: selected ? AppColors.primary : AppColors.textSoft,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+              ),
+              child: TextButton(
+                onPressed: _saving ? null : _save,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                        ),
+                      )
+                    : Text(
+                        'Save API Key',
+                        style: GoogleFonts.geist(
+                          color: AppColors.primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

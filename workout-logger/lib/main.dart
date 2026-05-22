@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'services/storage_service.dart';
 import 'services/ml_service.dart';
+import 'services/gemini_service.dart';
 import 'services/health_connect_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
@@ -61,6 +62,7 @@ class WorkoutLoggerApp extends StatelessWidget {
   static final HistoryManager _historyManager =
       HistoryManager(_storageService, healthSyncManager: _healthSyncManager);
   static final PRManager _prManager = PRManager(_storageService);
+  static final GeminiService _geminiService = GeminiService();
 
   const WorkoutLoggerApp({super.key});
 
@@ -87,6 +89,7 @@ class WorkoutLoggerApp extends StatelessWidget {
         // Provided as ChangeNotifier so HistoryScreen rebuilds on sync badge changes.
         ChangeNotifierProvider<HistoryManager>.value(value: _historyManager),
         ChangeNotifierProvider<PRManager>.value(value: _prManager),
+        ChangeNotifierProvider<GeminiService>.value(value: _geminiService),
         // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
           create: (_) => WorkoutProvider(
@@ -132,10 +135,12 @@ class _AppInitializerState extends State<AppInitializer> {
     final historyManager = context.read<HistoryManager>();
     final prManager = context.read<PRManager>();
     final api = context.read<ApiService>();
+    final gemini = context.read<GeminiService>();
 
     try {
       await provider.init();
       await settings.init();
+      gemini.init(settings.geminiApiKey, model: settings.geminiModel);
       await historyManager.loadSessions();
       await prManager.load();
       await prManager.backfillFromSessions(historyManager.sessions);

@@ -58,6 +58,9 @@ dependencies:
   # Health Connect integration
   health_connector: ^3.9.1
 
+  # AI — Gemini
+  google_generative_ai: ^0.4.3
+
   # Backup export/import
   file_picker: ^10.3.10
   path_provider: ^2.1.5

@@ -307,6 +307,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                   onCloudBackup: _isBackingUp ? null : _performCloudBackup,
                 ),
                 const SizedBox(height: AppSpacing.md),
+                const AiSettingsSection(),
+                const SizedBox(height: AppSpacing.md),
                 const CloudSyncSection(),
                 const SizedBox(height: AppSpacing.md),
                 AboutSection(appVersion: _appVersion),
