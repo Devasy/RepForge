@@ -8,7 +8,7 @@ Your workout logging app has been successfully built and configured with the fol
 - **Name:** RepForge
 - **Tagline:** Your personal workout companion to forge strength and track progress
 - **Package ID:** com.devasy.repforge
-- **Version:** 1.0.0 (Build 1)
+- **Version:** 2.0.0 (Build 21)
 
 ### 👨‍💻 Developer Information
 - **Name:** Devasy Patel
@@ -22,8 +22,7 @@ Your workout logging app has been successfully built and configured with the fol
 ### 📦 Build Artifacts
 
 #### Main Release APK
-- **Location:** `RepForge-v1.0.0-release.apk` (root directory)
-- **Size:** 47.4 MB
+- **Location:** `RepForge-v2.0.0-release.apk` (root directory)
 - **Type:** Universal APK (all architectures)
 - **Also available at:** `build/app/outputs/flutter-apk/app-release.apk`
 
@@ -31,7 +30,7 @@ Your workout logging app has been successfully built and configured with the fol
 
 1. **Transfer the APK** to your Android device:
    - Use USB cable, email, cloud storage, or any file transfer method
-   - File to transfer: `RepForge-v1.0.0-release.apk`
+   - File to transfer: `RepForge-v2.0.0-release.apk`
 
 2. **Enable Installation from Unknown Sources** (if needed):
    - Go to Settings → Security
@@ -46,19 +45,18 @@ Your workout logging app has been successfully built and configured with the fol
 
 ### 🛠️ What Was Changed
 
-1. **App Name:** Changed from "workout_logger" to "RepForge"
-2. **Package Name:** Updated to "com.devasy.repforge"
-3. **App Icon:** Created and applied custom minimal dumbbell icon
-4. **Android Configuration:** Updated namespace, application ID, and MainActivity
-5. **Release Build:** Successfully built production-ready APK
+1. **Major UI Refresh:** Cleaner layouts and improved spacing across key screens
+2. **Workout Summary Screen:** Added a recap view for completed sessions
+3. **Theme Enhancements:** Refined color palette for stronger contrast
+4. **Visual Consistency:** Standardized component styling across the app
+5. **Release Metadata:** Version bumped to 2.0.0 (Build 21)
 
-### 📋 Configuration Files Updated
+### 📋 Areas Updated
 
-- ✅ `pubspec.yaml` - App name and dependencies
-- ✅ `android/app/build.gradle.kts` - Package ID and namespace
-- ✅ `android/app/src/main/AndroidManifest.xml` - App label
-- ✅ `android/app/src/main/kotlin/com/devasy/repforge/MainActivity.kt` - New package structure
-- ✅ App icons generated for all densities
+- ✅ UI layouts and component styling
+- ✅ Workout summary flow and post-workout recap
+- ✅ Theme palette and visual hierarchy
+- ✅ Release metadata and versioning
 
 ### 🎯 Key Features
 
@@ -98,7 +96,7 @@ You're all set! Your app is ready for:
 
 ---
 
-**Built on:** January 22, 2026
+**Built on:** May 23, 2026
 **Built with:** Flutter 💙
 **Made by:** Devasy Patel
 
