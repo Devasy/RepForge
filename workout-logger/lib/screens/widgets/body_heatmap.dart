@@ -135,7 +135,7 @@ class _BodyPainter extends CustomPainter {
     required double baseOpacity,
   }) {
     final vol = muscleVolumes[muscle] ?? 0.0;
-    final opacity = (baseOpacity * vol).clamp(0.0, 1.0);
+    final opacity = (baseOpacity * vol).clamp(0.0, 1.0).toDouble();
     canvas.drawPath(path, Paint()..color = color.withValues(alpha: opacity));
   }
 
