@@ -572,5 +572,165 @@ void main() {
         expect(provider.hasActiveWorkout, isTrue);
       });
     });
+
+    group('init / loadAllData', () {
+      test('allExercises contains built-in exercises after init', () {
+        expect(provider.allExercises, isNotEmpty);
+      });
+
+      test('sessions loaded from storage after init', () async {
+        mockStorage.addMockSession(WorkoutSession(
+          id: 's1',
+          date: DateTime(2026, 1, 1),
+          exercises: [],
+          duration: 30,
+        ));
+        final p2 = WorkoutProvider(
+          mockStorage,
+          programManager: ProgramManager(mockStorage),
+        );
+        await p2.init();
+        expect(p2.sessions, hasLength(1));
+      });
+
+      test('routines loaded from storage after init', () async {
+        mockStorage.addMockRoutine(
+          Routine(id: 'r1', name: 'Push Day', exerciseIds: []),
+        );
+        final p2 = WorkoutProvider(
+          mockStorage,
+          programManager: ProgramManager(mockStorage),
+        );
+        await p2.init();
+        expect(p2.routines, hasLength(1));
+      });
+    });
+
+    group('active workout flow', () {
+      test('hasActiveWorkout is false before startWorkout', () {
+        expect(provider.hasActiveWorkout, isFalse);
+      });
+
+      test('hasActiveWorkout is true after startWorkout', () {
+        provider.startWorkout(exerciseIds: const ['bench_press']);
+        expect(provider.hasActiveWorkout, isTrue);
+      });
+
+      test('addSet increases currentExerciseLog sets count', () {
+        provider.startWorkout(exerciseIds: const ['bench_press']);
+        provider.addSet(WorkoutSet(weight: 60, reps: 10));
+        expect(provider.currentExerciseLog!.sets, hasLength(1));
+      });
+
+      test('removeLastSet decreases sets count', () {
+        provider.startWorkout(exerciseIds: const ['bench_press']);
+        provider.addSet(WorkoutSet(weight: 60, reps: 10));
+        provider.addSet(WorkoutSet(weight: 60, reps: 10));
+        provider.removeLastSet();
+        expect(provider.currentExerciseLog!.sets, hasLength(1));
+      });
+
+      test('nextExercise advances currentExerciseIndex', () {
+        provider.startWorkout(exerciseIds: const ['bench_press', 'squat']);
+        final moved = provider.nextExercise();
+        expect(moved, isTrue);
+        expect(provider.currentExerciseIndex, 1);
+      });
+
+      test('finishWorkout saves session and clears active state', () async {
+        provider.startWorkout(exerciseIds: const ['bench_press']);
+        provider.addSet(WorkoutSet(weight: 60, reps: 10));
+        await provider.finishWorkout();
+        expect(provider.hasActiveWorkout, isFalse);
+        expect(provider.sessions, hasLength(1));
+      });
+
+      test('cancelWorkout clears state without saving a session', () async {
+        provider.startWorkout(exerciseIds: const ['bench_press']);
+        provider.addSet(WorkoutSet(weight: 60, reps: 10));
+        await provider.cancelWorkout();
+        expect(provider.hasActiveWorkout, isFalse);
+        expect(provider.sessions, isEmpty);
+      });
+    });
+
+    group('startWorkoutSafely', () {
+      test('starts workout and returns true when no conflict', () async {
+        final started = await provider.startWorkoutSafely(
+          exerciseIds: const ['bench_press'],
+          onConflict: () async => StartWorkoutConflictAction.cancel,
+        );
+        expect(started, isTrue);
+        expect(provider.hasActiveWorkout, isTrue);
+      });
+
+      test('calls onConflict callback when a workout is already active',
+          () async {
+        provider.startWorkout(exerciseIds: const ['bench_press']);
+        var conflictCalled = false;
+        await provider.startWorkoutSafely(
+          exerciseIds: const ['squat'],
+          onConflict: () async {
+            conflictCalled = true;
+            return StartWorkoutConflictAction.cancel;
+          },
+        );
+        expect(conflictCalled, isTrue);
+      });
+
+      test('cancels existing and starts new when discardAndStart chosen',
+          () async {
+        provider.startWorkout(exerciseIds: const ['bench_press']);
+        final started = await provider.startWorkoutSafely(
+          exerciseIds: const ['squat'],
+          onConflict: () async => StartWorkoutConflictAction.discardAndStart,
+        );
+        expect(started, isTrue);
+        expect(
+          provider.currentExerciseLogs.first.exerciseId,
+          'squat',
+        );
+      });
+
+      test('returns false when conflict resolved with cancel', () async {
+        provider.startWorkout(exerciseIds: const ['bench_press']);
+        final started = await provider.startWorkoutSafely(
+          exerciseIds: const ['squat'],
+          onConflict: () async => StartWorkoutConflictAction.cancel,
+        );
+        expect(started, isFalse);
+      });
+    });
+
+    group('getExerciseName', () {
+      test('returns name for a known built-in exercise id', () {
+        final name = provider.getExerciseName('bench_press');
+        expect(name, isNot('Unknown Exercise'));
+        expect(name, isNotEmpty);
+      });
+
+      test('returns fallback for unknown exercise id', () {
+        expect(provider.getExerciseName('no_such_exercise'), 'Unknown Exercise');
+      });
+    });
+
+    group('deleteCustomExercise - routine guard', () {
+      test('returns false when exercise is referenced in a routine', () async {
+        await provider.addCustomExercise(
+          name: 'Cable Fly',
+          category: 'isolation',
+          primaryMuscleGroupId: 'chest',
+        );
+        final exerciseId =
+            provider.allExercises.firstWhere((e) => e.isCustom).id;
+        await provider.createRoutine('Test Routine', [exerciseId]);
+        final deleted = await provider.deleteCustomExercise(exerciseId);
+        expect(deleted, isFalse);
+        expect(
+          provider.allExercises.any((e) => e.id == exerciseId),
+          isTrue,
+        );
+      });
+    });
   });
 }

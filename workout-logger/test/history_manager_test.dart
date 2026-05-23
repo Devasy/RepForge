@@ -290,4 +290,81 @@ void main() {
       expect(storage.sessions.first.hcSyncedAt, isNotNull);
     });
   });
+
+  group('getSessionsInDateRange (inverted range tolerance)', () {
+    test('returns sessions even when start is after end', () async {
+      final s = _session(date: DateTime(2026, 3, 15));
+      await manager.addSession(s);
+
+      // Passing end before start — implementation normalises the range
+      final results = manager.getSessionsInDateRange(
+        DateTime(2026, 4, 1),
+        DateTime(2026, 3, 1),
+      );
+
+      expect(results, hasLength(1));
+      expect(results.first.id, s.id);
+    });
+
+    test('returns empty when session falls outside the normalised range',
+        () async {
+      final s = _session(date: DateTime(2026, 1, 1));
+      await manager.addSession(s);
+
+      final results = manager.getSessionsInDateRange(
+        DateTime(2026, 5, 1),
+        DateTime(2026, 3, 1), // normalised: March→May; Jan is outside
+      );
+
+      expect(results, isEmpty);
+    });
+  });
+
+  group('getRecentSessions', () {
+    test('returns only sessions within the last N days', () async {
+      final recent = _session(
+        id: 'recent',
+        date: DateTime.now().subtract(const Duration(days: 3)),
+      );
+      final old = _session(
+        id: 'old',
+        date: DateTime.now().subtract(const Duration(days: 10)),
+      );
+      await manager.addSession(recent);
+      await manager.addSession(old);
+
+      final results = manager.getRecentSessions(7);
+
+      expect(results.map((s) => s.id), contains('recent'));
+      expect(results.map((s) => s.id), isNot(contains('old')));
+    });
+
+    test('returns empty when all sessions are older than N days', () async {
+      final s = _session(
+        date: DateTime.now().subtract(const Duration(days: 30)),
+      );
+      await manager.addSession(s);
+      expect(manager.getRecentSessions(7), isEmpty);
+    });
+  });
+
+  group('addSession - storage failure propagation', () {
+    test('propagates storage exception to the caller', () async {
+      final throwingStorage = _ThrowingStorageService();
+      final m = HistoryManager(throwingStorage);
+      expect(
+        () => m.addSession(_session()),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+}
+
+// ── Throwing stub ─────────────────────────────────────────────────────────────
+
+class _ThrowingStorageService extends MockStorageService {
+  @override
+  Future<void> saveWorkoutSession(WorkoutSession session) async {
+    throw StateError('Simulated storage failure');
+  }
 }
