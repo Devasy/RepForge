@@ -92,8 +92,16 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
     if (_preview == null) return;
     HapticFeedback.mediumImpact();
     final manager = context.read<ProgramManager>();
-    await manager.saveProgram(_preview!);
-    if (mounted) Navigator.pop(context, true);
+    try {
+      await manager.saveProgram(_preview!);
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save program: $e')),
+        );
+      }
+    }
   }
 
   @override
