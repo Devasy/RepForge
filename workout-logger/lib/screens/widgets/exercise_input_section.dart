@@ -444,14 +444,15 @@ class _StepBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context).width < AppBreakpoints.narrow ? 36.0 : 40.0;
     return GestureDetector(
       onTap: () {
         onTap();
         HapticFeedback.selectionClick();
       },
       child: Container(
-        width: 40,
-        height: 40,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: AppColors.primary.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(12),
@@ -603,8 +604,8 @@ class _DropRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
         children: [
-          SizedBox(
-            width: 52,
+          Expanded(
+            flex: 3,
             child: Text(
               label,
               style: const TextStyle(
@@ -613,8 +614,8 @@ class _DropRow extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(
-            width: 64,
+          Expanded(
+            flex: 4,
             child: TextField(
               controller: weightController,
               decoration: InputDecoration(
@@ -638,8 +639,8 @@ class _DropRow extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 6),
             child: Text('×', style: TextStyle(color: AppColors.textMuted)),
           ),
-          SizedBox(
-            width: 52,
+          Expanded(
+            flex: 3,
             child: TextField(
               controller: repsController,
               decoration: const InputDecoration(

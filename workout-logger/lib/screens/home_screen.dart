@@ -184,34 +184,46 @@ class _DashboardTab extends StatelessWidget {
         const AmbientGlow(),
         SafeArea(
           bottom: false,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(context, homeState),
-                      const SizedBox(height: 24),
-                      _buildStreakHero(context: context, provider: provider, homeState: homeState),
-                      const SizedBox(height: 16),
-                      _buildStatsGrid(context, provider),
-                      const SizedBox(height: 16),
-                      _buildHeatmapCard(context, provider),
-                      const SizedBox(height: 16),
-                      _buildMuscleVolumeCard(context, provider),
-                      const SizedBox(height: 16),
-                      const _WeeklyInsightsCard(),
-                      const SizedBox(height: 16),
-                      _buildRecentWorkouts(context: context, provider: provider, homeState: homeState),
-                      const SizedBox(height: 100),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final hp = AppBreakpoints.hPadding(constraints.maxWidth);
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppBreakpoints.contentMaxWidth,
+                  ),
+                  child: CustomScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(hp, 14, hp, 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildHeader(context, homeState),
+                              const SizedBox(height: 24),
+                              _buildStreakHero(context: context, provider: provider, homeState: homeState),
+                              const SizedBox(height: 16),
+                              _buildStatsGrid(context, provider),
+                              const SizedBox(height: 16),
+                              _buildHeatmapCard(context, provider),
+                              const SizedBox(height: 16),
+                              _buildMuscleVolumeCard(context, provider),
+                              const SizedBox(height: 16),
+                              const _WeeklyInsightsCard(),
+                              const SizedBox(height: 16),
+                              _buildRecentWorkouts(context: context, provider: provider, homeState: homeState),
+                              const SizedBox(height: 100),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ],
@@ -638,17 +650,23 @@ class _DashboardTab extends StatelessWidget {
       ),
     ];
 
-    return GridView.builder(
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.4,
-      ),
-      itemCount: stats.length,
-      itemBuilder: (_, i) => _StatCard(item: stats[i]),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = AppBreakpoints.gridColumns(constraints.maxWidth);
+        final ratio = cols == 4 ? 1.8 : 1.4;
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: ratio,
+          ),
+          itemCount: stats.length,
+          itemBuilder: (_, i) => _StatCard(item: stats[i]),
+        );
+      },
     );
   }
 

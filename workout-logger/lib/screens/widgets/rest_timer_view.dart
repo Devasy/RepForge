@@ -43,45 +43,50 @@ class RestTimerView extends StatelessWidget {
             ),
             // Ring + time fills most of the screen
             Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  RestTimerRing(
-                    remaining: remainingSeconds,
-                    total: totalSeconds,
-                    size: 220,
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  // Adjust buttons
-                  Row(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final ringSize = AppBreakpoints.timerRingSize(constraints.maxWidth);
+                  return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _AdjustButton(label: '−30s', onTap: () => onAdjust(-30)),
-                      const SizedBox(width: AppSpacing.xl),
-                      _AdjustButton(label: '+30s', onTap: () => onAdjust(30)),
+                      RestTimerRing(
+                        remaining: remainingSeconds,
+                        total: totalSeconds,
+                        size: ringSize,
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      // Adjust buttons
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _AdjustButton(label: '−30s', onTap: () => onAdjust(-30)),
+                          const SizedBox(width: AppSpacing.xl),
+                          _AdjustButton(label: '+30s', onTap: () => onAdjust(30)),
+                        ],
+                      ),
+                      if (nextExerciseName != null) ...[
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          'Next up',
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 11,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          nextExerciseName!,
+                          style: const TextStyle(
+                            color: AppColors.textSoft,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ],
-                  ),
-                  if (nextExerciseName != null) ...[
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      'Next up',
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 11,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      nextExerciseName!,
-                      style: const TextStyle(
-                        color: AppColors.textSoft,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ],
+                  );
+                },
               ),
             ),
             // Skip button

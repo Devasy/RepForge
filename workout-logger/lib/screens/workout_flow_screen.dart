@@ -375,77 +375,81 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       child: Row(
         children: [
           if (!isFirst)
-            GestureDetector(
-              onTap: () {
-                provider.previousExercise();
-                _loadLastSessionData();
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.glass2,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.glassBorderStrong),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.textMuted),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Prev',
-                      style: GoogleFonts.geist(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textMuted,
+            Flexible(
+              child: GestureDetector(
+                onTap: () {
+                  provider.previousExercise();
+                  _loadLastSessionData();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.glass2,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.glassBorderStrong),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.textMuted),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Prev',
+                        style: GoogleFonts.geist(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textMuted,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             )
           else
             const SizedBox.shrink(),
           const Spacer(),
-          GestureDetector(
-            onTap: isLast
-                ? _finishWorkout
-                : () {
-                    provider.nextExercise();
-                    _loadLastSessionData();
-                  },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              decoration: BoxDecoration(
-                color: isLast ? AppColors.success : AppColors.primary,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: (isLast ? AppColors.success : AppColors.primary)
-                        .withValues(alpha: 0.35),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    isLast ? 'Finish' : 'Next exercise',
-                    style: GoogleFonts.geist(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+          Flexible(
+            child: GestureDetector(
+              onTap: isLast
+                  ? _finishWorkout
+                  : () {
+                      provider.nextExercise();
+                      _loadLastSessionData();
+                    },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                decoration: BoxDecoration(
+                  color: isLast ? AppColors.success : AppColors.primary,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isLast ? AppColors.success : AppColors.primary)
+                          .withValues(alpha: 0.35),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isLast ? 'Finish' : 'Next exercise',
+                      style: GoogleFonts.geist(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      isLast ? Icons.check_rounded : Icons.arrow_forward_rounded,
+                      size: 16,
                       color: Colors.white,
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    isLast ? Icons.check_rounded : Icons.arrow_forward_rounded,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -109,11 +109,11 @@ class ProgramsScreen extends StatelessWidget {
   Widget _buildList(BuildContext context, List<TrainingProgram> programs) {
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.md,
         AppSpacing.md,
-        100,
+        MediaQuery.of(context).padding.bottom + 100,
       ),
       itemCount: programs.length,
       itemBuilder: (context, index) => _ProgramCard(program: programs[index]),

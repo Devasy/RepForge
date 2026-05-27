@@ -161,21 +161,33 @@ class _OverviewTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<WorkoutProvider>();
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _VolumeChart(provider: provider),
-          const SizedBox(height: 12),
-          _MuscleVolumeChart(provider: provider),
-          const SizedBox(height: 12),
-          _MuscleStatusCard(provider: provider),
-          const SizedBox(height: 12),
-          _FrequencyGrid(provider: provider),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final hp = AppBreakpoints.hPadding(constraints.maxWidth);
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: AppBreakpoints.contentMaxWidth,
+            ),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(hp, 0, hp, 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _VolumeChart(provider: provider),
+                  const SizedBox(height: 12),
+                  _MuscleVolumeChart(provider: provider),
+                  const SizedBox(height: 12),
+                  _MuscleStatusCard(provider: provider),
+                  const SizedBox(height: 12),
+                  _FrequencyGrid(provider: provider),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -203,9 +215,10 @@ class _VolumeChart extends StatelessWidget {
       title: 'Volume Progression',
       subtitle: '${settings.unitLabel} · Last ${sessions.length} workouts',
       isEmpty: sessions.isEmpty,
-      child: SizedBox(
-        height: 180,
-        child: LineChart(
+      child: LayoutBuilder(
+        builder: (context, constraints) => SizedBox(
+          height: AppBreakpoints.chartHeight(constraints.maxWidth),
+          child: LineChart(
           LineChartData(
             backgroundColor: Colors.transparent,
             gridData: FlGridData(
@@ -331,6 +344,7 @@ class _VolumeChart extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -568,7 +582,10 @@ class _FrequencyGrid extends StatelessWidget {
     return _ChartCard(
       title: 'Workout Frequency',
       subtitle: 'Sessions per week',
-      child: Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final boxSize = ((constraints.maxWidth - 48) / 4).clamp(40.0, 64.0);
+          return Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: weeks.entries.map((e) {
           final count = e.value;
@@ -577,8 +594,8 @@ class _FrequencyGrid extends StatelessWidget {
           return Column(
             children: [
               Container(
-                width: 54,
-                height: 54,
+                width: boxSize,
+                height: boxSize,
                 decoration: BoxDecoration(
                   color: active
                       ? AppColors.primary.withValues(alpha: 0.12 + count * 0.06)
@@ -614,6 +631,8 @@ class _FrequencyGrid extends StatelessWidget {
             ],
           );
         }).toList(),
+      );
+        },
       ),
     );
   }

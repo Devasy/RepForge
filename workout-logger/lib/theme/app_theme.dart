@@ -297,3 +297,23 @@ class AppRadius {
   static const double xxl = 22; // nav pill radius
   static const double full = 999;
 }
+
+class AppBreakpoints {
+  const AppBreakpoints._();
+
+  static const double narrow = 360;
+  static const double compact = 600;
+  static const double contentMaxWidth = 600;
+
+  static double hPadding(double width) {
+    if (width < narrow) return 12;
+    if (width < compact) return 20;
+    return 32;
+  }
+
+  static int gridColumns(double width) => width >= compact ? 4 : 2;
+
+  static double chartHeight(double width) => width < narrow ? 140 : 180;
+
+  static double timerRingSize(double width) => (width * 0.6).clamp(160, 220);
+}

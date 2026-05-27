@@ -52,9 +52,10 @@ class SessionCard extends StatelessWidget {
         child: Row(
           children: [
             // Date column
-            Container(
-              width: 56,
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 48, maxWidth: 64),
+              child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: AppSpacing.md),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: const BorderRadius.only(
@@ -92,6 +93,7 @@ class SessionCard extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
               ),
             ),
             // Main info
