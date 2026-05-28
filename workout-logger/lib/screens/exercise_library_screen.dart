@@ -91,13 +91,16 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.of(context).push<bool>(
-          MaterialPageRoute(builder: (_) => const AddCustomExerciseScreen()),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: AppBreakpoints.navBarClearance),
+        child: FloatingActionButton(
+          onPressed: () => Navigator.of(context).push<bool>(
+            MaterialPageRoute(builder: (_) => const AddCustomExerciseScreen()),
+          ),
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          child: const Icon(Icons.add_rounded, color: Colors.white),
         ),
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        child: const Icon(Icons.add_rounded, color: Colors.white),
       ),
     );
   }

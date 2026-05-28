@@ -65,16 +65,19 @@ class TargetsTab extends StatelessWidget {
                 ],
               ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateSheet(context),
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text(
-          'New Target',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: AppBreakpoints.navBarClearance),
+        child: FloatingActionButton.extended(
+          onPressed: () => _showCreateSheet(context),
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          label: const Text(
+            'New Target',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ),

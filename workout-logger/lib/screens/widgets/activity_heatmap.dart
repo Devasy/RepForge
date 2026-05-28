@@ -17,6 +17,7 @@ class ActivityHeatmap extends StatelessWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 420),
       child: Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         GridView.builder(

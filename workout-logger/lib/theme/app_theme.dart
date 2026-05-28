@@ -316,4 +316,8 @@ class AppBreakpoints {
   static double chartHeight(double width) => width < narrow ? 140 : 180;
 
   static double timerRingSize(double width) => (width * 0.6).clamp(160, 220);
+
+  /// Vertical clearance needed to lift a Scaffold FAB above the custom RFNavBar.
+  /// Wrap the FAB in `Padding(padding: EdgeInsets.only(bottom: navBarClearance))`.
+  static const double navBarClearance = 80.0;
 }

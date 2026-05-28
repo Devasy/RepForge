@@ -488,16 +488,23 @@ class _MuscleRow extends StatelessWidget {
 
   ({String label, Color color, IconData icon}) get _trend {
     final model = growthModel;
-    if (model == null || model.r2 < 0.2) {
+    if (model == null) {
       return (label: 'No data', color: AppColors.textFaint, icon: Icons.remove);
     }
+    final confident = model.r2 >= 0.2;
     if (model.slope > 2) {
-      return (label: '+${(model.slope * 7).toStringAsFixed(0)}/wk', color: AppColors.success, icon: Icons.trending_up_rounded);
+      final label = confident
+          ? '+${(model.slope * 7).toStringAsFixed(0)}/wk'
+          : '~gaining';
+      return (label: label, color: AppColors.success, icon: Icons.trending_up_rounded);
     }
     if (model.slope > 0) {
-      return (label: 'Slight gain', color: AppColors.secondary, icon: Icons.trending_up_rounded);
+      return (label: confident ? 'Slight gain' : '~slight gain', color: AppColors.secondary, icon: Icons.trending_up_rounded);
     }
-    return (label: 'Plateau', color: AppColors.warning, icon: Icons.trending_flat_rounded);
+    if (model.slope < -2) {
+      return (label: confident ? 'Declining' : '~declining', color: AppColors.accent, icon: Icons.trending_down_rounded);
+    }
+    return (label: confident ? 'Plateau' : '~plateau', color: AppColors.warning, icon: Icons.trending_flat_rounded);
   }
 
   @override

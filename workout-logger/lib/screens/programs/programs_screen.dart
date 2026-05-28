@@ -25,10 +25,15 @@ class ProgramsScreen extends StatelessWidget {
 
         return Scaffold(
           backgroundColor: AppColors.background,
-          body: programs.isEmpty
-              ? _buildEmptyState(context)
-              : _buildList(context, programs),
-          floatingActionButton: Column(
+          body: SafeArea(
+            bottom: false,
+            child: programs.isEmpty
+                ? _buildEmptyState(context)
+                : _buildList(context, programs),
+          ),
+          floatingActionButton: Padding(
+            padding: const EdgeInsets.only(bottom: AppBreakpoints.navBarClearance),
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -66,6 +71,7 @@ class ProgramsScreen extends StatelessWidget {
                 ),
               ),
             ],
+            ),
           ),
         );
       },
