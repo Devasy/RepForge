@@ -812,3 +812,101 @@ class TrainingProgram {
         createdAt == _sentinel ? this.createdAt : createdAt as DateTime,
   );
 }
+
+// ==================== AI Coach Chat ====================
+
+/// A single message in an AI coach conversation.
+class ChatMessage {
+  final String id;
+  final String role; // 'user' | 'model'
+  final String text;
+  final DateTime timestamp;
+
+  ChatMessage({
+    String? id,
+    required this.role,
+    required this.text,
+    DateTime? timestamp,
+  })  : id = id ?? _uuid.v4(),
+        timestamp = timestamp ?? DateTime.now();
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'role': role,
+    'text': text,
+    'timestamp': timestamp.toIso8601String(),
+  };
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
+    id: json['id'] as String?,
+    role: json['role'] as String,
+    text: json['text'] as String,
+    timestamp: DateTime.parse(json['timestamp'] as String),
+  );
+
+  ChatMessage copyWith({
+    Object? role = _sentinel,
+    Object? text = _sentinel,
+    Object? timestamp = _sentinel,
+  }) => ChatMessage(
+    id: id,
+    role: role == _sentinel ? this.role : role as String,
+    text: text == _sentinel ? this.text : text as String,
+    timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime,
+  );
+}
+
+/// A persisted AI coach conversation: an ordered list of [ChatMessage]s.
+class Conversation {
+  final String id;
+  final String title;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final List<ChatMessage> messages;
+
+  Conversation({
+    String? id,
+    required this.title,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    List<ChatMessage>? messages,
+  })  : id = id ?? _uuid.v4(),
+        createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? createdAt ?? DateTime.now(),
+        messages = messages ?? const [];
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+    'messages': messages.map((m) => m.toJson()).toList(),
+  };
+
+  factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
+    id: json['id'] as String?,
+    title: json['title'] as String,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    updatedAt: json['updatedAt'] != null
+        ? DateTime.parse(json['updatedAt'] as String)
+        : DateTime.parse(json['createdAt'] as String),
+    messages: (json['messages'] as List)
+        .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
+        .toList(),
+  );
+
+  Conversation copyWith({
+    Object? title = _sentinel,
+    Object? createdAt = _sentinel,
+    Object? updatedAt = _sentinel,
+    Object? messages = _sentinel,
+  }) => Conversation(
+    id: id,
+    title: title == _sentinel ? this.title : title as String,
+    createdAt: createdAt == _sentinel ? this.createdAt : createdAt as DateTime,
+    updatedAt: updatedAt == _sentinel ? this.updatedAt : updatedAt as DateTime,
+    messages: messages == _sentinel
+        ? this.messages
+        : messages as List<ChatMessage>,
+  );
+}

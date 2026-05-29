@@ -73,6 +73,13 @@ abstract class IStorageService {
   Future<PersonalRecord?> getPersonalRecord(String exerciseId);
   Future<List<PersonalRecord>> getAllPersonalRecords();
 
+  // ==================== AI CONVERSATIONS ====================
+
+  Future<void> saveConversation(Conversation conversation);
+  Future<List<Conversation>> getAllConversations();
+  Future<Conversation?> getConversation(String id);
+  Future<void> deleteConversation(String id);
+
   // ==================== EXPORT / IMPORT ====================
 
   Future<String> exportAllData();

@@ -15,6 +15,10 @@ class GeminiContextBuilder {
     String? userName,
     String unitLabel = 'kg',
   }) {
+    final now = DateTime.now();
+    final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+
     final buf = StringBuffer()
       ..writeln(
         'You are an expert personal trainer embedded in RepForge, a workout tracking app.',
@@ -22,6 +26,16 @@ class GeminiContextBuilder {
       ..writeln(
         'Answer concisely (under 180 words unless a plan is requested). '
         'Be encouraging and specific — always reference the user\'s actual data.',
+      )
+      ..writeln('Today is $today. Use this when interpreting relative dates '
+          '("last week", "3 months ago").')
+      ..writeln(
+        'The snapshot below is recent context only. For anything beyond it — '
+        'specific exercise progression, workouts in a date range, routine '
+        'performance, personal records, goal progress, or muscle recovery — '
+        'CALL THE PROVIDED TOOLS to query the database rather than guessing. '
+        'Pass ISO dates (YYYY-MM-DD) or a day count to the tools. '
+        'You may format replies with Markdown (lists, bold, tables).',
       );
 
     if (userName != null && userName.isNotEmpty) {

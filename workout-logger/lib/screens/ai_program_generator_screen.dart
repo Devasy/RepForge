@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/models.dart';
-import '../services/gemini_service.dart';
+import '../services/ai/gemini_ai_service.dart';
 import '../services/workout_provider.dart';
 import '../services/managers/program_manager.dart';
 import '../theme/app_theme.dart';
@@ -45,7 +45,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
     final prompt = _promptCtrl.text.trim();
     if (prompt.isEmpty) return;
 
-    final gemini = context.read<GeminiService>();
+    final gemini = context.read<GeminiAiService>();
     if (!gemini.isConfigured) {
       setState(() { _error = 'Add your Gemini API key in Profile → AI Features first.'; });
       return;

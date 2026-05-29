@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/settings_provider.dart';
-import '../../services/gemini_service.dart';
+import '../../services/ai/gemini_ai_service.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 
@@ -719,7 +719,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     setState(() => _saving = true);
     final key = _ctrl.text.trim();
     final settings = context.read<SettingsProvider>();
-    final gemini = context.read<GeminiService>();
+    final gemini = context.read<GeminiAiService>();
     try {
       await settings.setGeminiApiKey(key);
       gemini.updateApiKey(key);
@@ -730,14 +730,14 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
 
   Future<void> _selectModel(String modelId) async {
     final settings = context.read<SettingsProvider>();
-    final gemini = context.read<GeminiService>();
+    final gemini = context.read<GeminiAiService>();
     await settings.setGeminiModel(modelId);
     gemini.updateModel(modelId);
   }
 
   @override
   Widget build(BuildContext context) {
-    final gemini = context.watch<GeminiService>();
+    final gemini = context.watch<GeminiAiService>();
     final settings = context.watch<SettingsProvider>();
     return _ProfileSection(
       icon: Icons.auto_awesome_rounded,

@@ -9,7 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
-import '../services/gemini_service.dart';
+import '../services/ai/gemini_ai_service.dart';
 import '../services/gemini_context_builder.dart';
 import '../theme/app_theme.dart';
 import 'workout_flow_screen.dart';
@@ -1207,7 +1207,7 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
   bool _loading = false;
 
   Future<void> _refresh() async {
-    final gemini = context.read<GeminiService>();
+    final gemini = context.read<GeminiAiService>();
     if (!gemini.isConfigured) return;
 
     setState(() => _loading = true);
@@ -1250,7 +1250,7 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
 
   @override
   Widget build(BuildContext context) {
-    final gemini = context.watch<GeminiService>();
+    final gemini = context.watch<GeminiAiService>();
     final settings = context.watch<SettingsProvider>();
 
     if (!gemini.isConfigured) return const SizedBox.shrink();

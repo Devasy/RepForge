@@ -17,7 +17,7 @@ import 'package:provider/provider.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/settings_provider.dart';
-import 'package:repforge/services/gemini_service.dart';
+import 'package:repforge/services/ai/gemini_ai_service.dart';
 import 'package:repforge/services/managers/program_manager.dart';
 import 'package:repforge/services/interfaces/ml_service_interface.dart';
 import 'package:repforge/screens/widgets/exercise_progress_view.dart';
@@ -38,7 +38,7 @@ Widget _wrap({
     providers: [
       ChangeNotifierProvider<WorkoutProvider>.value(value: provider),
       ChangeNotifierProvider<SettingsProvider>.value(value: sp),
-      ChangeNotifierProvider<GeminiService>.value(value: GeminiService()),
+      ChangeNotifierProvider<GeminiAiService>.value(value: GeminiAiService()),
       Provider<IMLService>.value(value: MockMLService()),
     ],
     child: MaterialApp(home: Scaffold(body: child)),

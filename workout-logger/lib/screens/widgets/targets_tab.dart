@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 import '../../models/models.dart';
 import '../../services/workout_provider.dart';
 import '../../services/settings_provider.dart';
-import '../../services/gemini_service.dart';
+import '../../services/ai/gemini_ai_service.dart';
 import '../../theme/app_theme.dart';
 import '../../data/exercise_database.dart';
 import 'rf_widgets.dart';
@@ -224,7 +224,7 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
 
   Future<void> _fetchNudge() async {
     setState(() => _loadingNudge = true);
-    final gemini = context.read<GeminiService>();
+    final gemini = context.read<GeminiAiService>();
     final settings = context.read<SettingsProvider>();
     final t = widget.target;
 
@@ -257,7 +257,7 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final gemini = context.watch<GeminiService>();
+    final gemini = context.watch<GeminiAiService>();
     final t = widget.target;
     final pct = t.progressPercentage.clamp(0.0, 100.0);
     final etaStr = t.estimatedCompletionDate != null
@@ -486,7 +486,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
 
     final provider = context.read<WorkoutProvider>();
     final settings = context.read<SettingsProvider>();
-    final gemini = context.read<GeminiService>();
+    final gemini = context.read<GeminiAiService>();
     final exerciseName = provider.getExerciseName(_selectedExerciseId!);
     final growth = provider.getGrowthModel(_selectedExerciseId!);
     final oneRM = provider.getBestOneRM(_selectedExerciseId!);
@@ -520,7 +520,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
   Widget build(BuildContext context) {
     final exercises = ExerciseDatabase.getAll();
     final bottom = MediaQuery.of(context).viewInsets.bottom;
-    final gemini = context.watch<GeminiService>();
+    final gemini = context.watch<GeminiAiService>();
 
     return Padding(
       padding: EdgeInsets.fromLTRB(

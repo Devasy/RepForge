@@ -1,11 +1,17 @@
-// gemini_service.dart — Gemini AI integration (coach chat, program gen, insights)
+// gemini_ai_service.dart — google_generative_ai implementation of IAiService.
+//
+// Backs the AI coach chat (streaming + tool calling), program generation, and
+// insights. Uses a user-supplied Google AI Studio API key (free-tier friendly).
+// Implements [IAiService] so the backend can be swapped (e.g. firebase_ai)
+// without touching consumers.
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:uuid/uuid.dart';
 
-import '../models/models.dart';
+import '../../models/models.dart';
+import '../interfaces/ai_service_interface.dart';
 
 // Ordered list of available Gemini models shown in the picker.
 const kGeminiModels = [
@@ -15,13 +21,21 @@ const kGeminiModels = [
   ('gemini-3.5-flash',      'Gemini 3.5 Flash'),
 ];
 
-const kDefaultGeminiModel = 'gemini-2.5-flash';
+// Default to a fast, free-tier 3.x model. gemini-3.5-flash is selectable and
+// preferable when heavy tool-calling reliability matters.
+const kDefaultGeminiModel = 'gemini-3.1-flash-lite';
 
-class GeminiService extends ChangeNotifier {
+// Upper bound on tool-resolution rounds per user turn, to bound runaway loops.
+const int _kMaxToolRounds = 5;
+
+class GeminiAiService extends ChangeNotifier implements IAiService {
   String _apiKey = '';
   String _model = kDefaultGeminiModel;
 
+  @override
   bool get isConfigured => _apiKey.isNotEmpty;
+
+  @override
   String get currentModel => _model;
 
   void init(String apiKey, {String model = kDefaultGeminiModel}) {
@@ -39,35 +53,69 @@ class GeminiService extends ChangeNotifier {
     notifyListeners();
   }
 
-  GenerativeModel _makeModel({bool jsonMode = false, String? system}) {
+  GenerativeModel _makeModel({
+    bool jsonMode = false,
+    String? system,
+    List<Tool>? tools,
+  }) {
     return GenerativeModel(
       model: _model,
       apiKey: _apiKey,
       systemInstruction: system != null ? Content.system(system) : null,
+      tools: tools,
       generationConfig: jsonMode
           ? GenerationConfig(responseMimeType: 'application/json')
           : null,
     );
   }
 
-  // ── Coach chat (streaming) ─────────────────────────────────────────────────
-  // [history] is the prior conversation as alternating user/model Content objects.
+  // ── Coach chat (streaming + optional tool-call loop) ───────────────────────
+  // [history] is the prior conversation as alternating user/model Content.
+  // When [tools] + [onToolCall] are supplied, function calls the model emits
+  // are dispatched and their results fed back until a text answer is produced.
+  @override
   Stream<String> streamCoachReply({
     required String userMessage,
     required String systemPrompt,
     required List<Content> history,
+    List<Tool>? tools,
+    Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
   }) async* {
     if (!isConfigured) {
       yield 'Please add your Gemini API key in Profile → AI Features to get started.';
       return;
     }
     try {
-      final session = _makeModel(system: systemPrompt).startChat(history: history);
-      await for (final chunk
-          in session.sendMessageStream(Content.text(userMessage))) {
-        final t = chunk.text;
-        if (t != null && t.isNotEmpty) yield t;
+      final chat = _makeModel(system: systemPrompt, tools: tools)
+          .startChat(history: history);
+
+      Content next = Content.text(userMessage);
+
+      for (var round = 0; round < _kMaxToolRounds; round++) {
+        final calls = <FunctionCall>[];
+        await for (final chunk in chat.sendMessageStream(next)) {
+          final t = chunk.text;
+          if (t != null && t.isNotEmpty) yield t;
+          calls.addAll(chunk.functionCalls);
+        }
+
+        // No tools requested (or no handler) → the streamed text is the answer.
+        if (calls.isEmpty || onToolCall == null) return;
+
+        // Resolve every requested call and feed the results back as one turn.
+        final responses = <FunctionResponse>[];
+        for (final call in calls) {
+          try {
+            final result = await onToolCall(call);
+            responses.add(FunctionResponse(call.name, result));
+          } catch (e) {
+            responses.add(FunctionResponse(call.name, {'error': '$e'}));
+          }
+        }
+        next = Content.functionResponses(responses);
       }
+      // Exhausted the tool-round budget without a final text answer.
+      yield '\n\n_(Stopped after $_kMaxToolRounds tool steps — try rephrasing.)_';
     } on GenerativeAIException catch (e) {
       yield 'AI error: ${e.message}';
     } catch (e) {
@@ -76,6 +124,7 @@ class GeminiService extends ChangeNotifier {
   }
 
   // ── Program generator (structured JSON output) ────────────────────────────
+  @override
   Future<TrainingProgram> generateProgram({
     required String userPrompt,
     required List<Exercise> allExercises,
@@ -144,7 +193,7 @@ Required JSON schema (follow exactly):
       final response = await _makeModel(jsonMode: true, system: systemPrompt)
           .generateContent([Content.text(prompt)]);
       final raw = response.text ?? '';
-      if (raw.isEmpty) throw FormatException('Empty response from Gemini.');
+      if (raw.isEmpty) throw const FormatException('Empty response from Gemini.');
 
       final data = jsonDecode(raw) as Map<String, dynamic>;
       // Ensure a fresh UUID so it never collides with an existing program.
@@ -160,6 +209,7 @@ Required JSON schema (follow exactly):
   }
 
   // ── Weekly insights (single-shot text) ────────────────────────────────────
+  @override
   Future<String> generateWeeklyInsights(String contextText) async {
     if (!isConfigured) {
       return 'Add your Gemini API key in Profile → AI Features to unlock insights.';
@@ -182,9 +232,7 @@ Required JSON schema (follow exactly):
   }
 
   // ── Generic one-shot insight (contextual) ─────────────────────────────────
-  // Thin, tool-agnostic helper for on-demand contextual insights (muscle
-  // drill-down, target suggestions, stalled-target nudges). Kept generic so a
-  // future function-calling path can be added additively over [_makeModel].
+  @override
   Future<String> generateInsight(String system, String context) async {
     if (!isConfigured) {
       return 'Add your Gemini API key in Profile → AI Features to unlock insights.';

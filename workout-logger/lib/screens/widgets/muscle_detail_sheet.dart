@@ -8,7 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../services/workout_provider.dart';
 import '../../services/settings_provider.dart';
-import '../../services/gemini_service.dart';
+import '../../services/ai/gemini_ai_service.dart';
 import '../../services/interfaces/ml_service_interface.dart';
 import '../../data/exercise_database.dart';
 import '../../theme/app_theme.dart';
@@ -252,7 +252,7 @@ class _AiInsightSectionState extends State<_AiInsightSection> {
 
   Future<void> _fetchInsight() async {
     setState(() => _loading = true);
-    final gemini = context.read<GeminiService>();
+    final gemini = context.read<GeminiAiService>();
     final settings = context.read<SettingsProvider>();
     final mlService = context.read<IMLService>();
     final provider = widget.provider;
@@ -298,7 +298,7 @@ class _AiInsightSectionState extends State<_AiInsightSection> {
 
   @override
   Widget build(BuildContext context) {
-    final gemini = context.watch<GeminiService>();
+    final gemini = context.watch<GeminiAiService>();
     if (!gemini.isConfigured) return const SizedBox.shrink();
 
     return Column(
