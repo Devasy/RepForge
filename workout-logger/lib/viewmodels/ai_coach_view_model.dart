@@ -23,12 +23,15 @@ class AiCoachViewModel extends ChangeNotifier {
   bool _loading = false;
   String _streamingText = '';
 
-  AiCoachViewModel(
-    this._ai,
-    this._coachTools,
-    this._conversations,
-    this._settings,
-  ) {
+  AiCoachViewModel({
+    required IAiService ai,
+    required CoachToolService coachTools,
+    required ConversationManager conversations,
+    required SettingsProvider settings,
+  })  : _ai = ai,
+        _coachTools = coachTools,
+        _conversations = conversations,
+        _settings = settings {
     // Forward conversation-store changes so the View only watches the VM.
     _conversations.addListener(notifyListeners);
   }
@@ -54,10 +57,16 @@ class AiCoachViewModel extends ChangeNotifier {
   Future<void> loadConversations() => _conversations.loadConversations();
 
   /// Start a fresh, unsaved conversation.
-  void newConversation() => _conversations.startNewConversation();
+  void newConversation() {
+    if (_loading) return;
+    _conversations.startNewConversation();
+  }
 
   /// Switch to an existing conversation.
-  void selectConversation(String id) => _conversations.selectConversation(id);
+  void selectConversation(String id) {
+    if (_loading) return;
+    _conversations.selectConversation(id);
+  }
 
   /// Delete a conversation.
   Future<void> deleteConversation(String id) =>
@@ -94,20 +103,25 @@ class AiCoachViewModel extends ChangeNotifier {
         _streamingText = buffer.toString();
         notifyListeners();
       }
+      final reply = buffer.toString().trim();
+      if (reply.isNotEmpty) {
+        await _conversations.appendMessage(
+          ChatMessage(role: 'model', text: reply),
+        );
+      }
     } catch (e) {
       buffer.write('\n\n_Error: ${e}_');
+      final errText = buffer.toString().trim();
+      if (errText.isNotEmpty) {
+        await _conversations.appendMessage(
+          ChatMessage(role: 'model', text: errText),
+        );
+      }
+    } finally {
+      _streamingText = '';
+      _loading = false;
+      notifyListeners();
     }
-
-    final reply = buffer.toString().trim();
-    if (reply.isNotEmpty) {
-      await _conversations.appendMessage(
-        ChatMessage(role: 'model', text: reply),
-      );
-    }
-
-    _streamingText = '';
-    _loading = false;
-    notifyListeners();
   }
 
   // ── Internals ──────────────────────────────────────────────────────────────

@@ -11,6 +11,11 @@ import '../../models/models.dart';
 import '../workout_provider.dart';
 import '../managers/pr_manager.dart';
 
+class AmbiguousMatchException implements Exception {
+  const AmbiguousMatchException(this.candidates);
+  final List<String> candidates;
+}
+
 class CoachToolService {
   final WorkoutProvider _wp;
   final PRManager _pr;
@@ -145,11 +150,20 @@ class CoachToolService {
 
   Map<String, Object?> _exercisePerformance(Map<String, Object?> args) {
     final name = (args['exercise_name'] as String?)?.trim() ?? '';
-    final exercise = _resolveExercise(name);
-    if (exercise == null) {
+    final Exercise exercise;
+    try {
+      final resolved = _resolveExercise(name);
+      if (resolved == null) {
+        return {
+          'error': 'No exercise found matching "$name".',
+          'available_examples': _exampleExerciseNames(),
+        };
+      }
+      exercise = resolved;
+    } on AmbiguousMatchException catch (e) {
       return {
-        'error': 'No exercise found matching "$name".',
-        'available_examples': _exampleExerciseNames(),
+        'error': 'Multiple exercises match "$name". Did you mean one of:',
+        'ambiguous_matches': e.candidates,
       };
     }
 
@@ -171,7 +185,9 @@ class CoachToolService {
       'session_count': progression.length,
       if (days != null) 'window_days': days,
       'volume_trend': [
-        for (final p in progression.take(40))
+        for (final p in progression.length > 40
+            ? progression.sublist(progression.length - 40)
+            : progression)
           {'date': _d(p.date), 'volume': _round(p.volume)},
       ],
       'growth': growth == null
@@ -252,11 +268,20 @@ class CoachToolService {
 
   Map<String, Object?> _routinePerformance(Map<String, Object?> args) {
     final name = (args['routine_name'] as String?)?.trim() ?? '';
-    final routine = _resolveRoutine(name);
-    if (routine == null) {
+    final Routine routine;
+    try {
+      final resolved = _resolveRoutine(name);
+      if (resolved == null) {
+        return {
+          'error': 'No routine found matching "$name".',
+          'available_routines': [for (final r in _wp.routines) r.name],
+        };
+      }
+      routine = resolved;
+    } on AmbiguousMatchException catch (e) {
       return {
-        'error': 'No routine found matching "$name".',
-        'available_routines': [for (final r in _wp.routines) r.name],
+        'error': 'Multiple routines match "$name". Did you mean one of:',
+        'ambiguous_matches': e.candidates,
       };
     }
 
@@ -280,7 +305,9 @@ class CoachToolService {
       if (days != null) 'window_days': days,
       'total_volume': _round(totalVolume),
       'volume_over_time': [
-        for (final s in sessions.take(40))
+        for (final s in sessions.length > 40
+            ? sessions.sublist(sessions.length - 40)
+            : sessions)
           {'date': _d(s.date), 'volume': _round(s.totalVolume)},
       ],
     };
@@ -289,9 +316,18 @@ class CoachToolService {
   Map<String, Object?> _personalRecords(Map<String, Object?> args) {
     final name = (args['exercise_name'] as String?)?.trim();
     if (name != null && name.isNotEmpty) {
-      final exercise = _resolveExercise(name);
-      if (exercise == null) {
-        return {'error': 'No exercise found matching "$name".'};
+      final Exercise exercise;
+      try {
+        final resolved = _resolveExercise(name);
+        if (resolved == null) {
+          return {'error': 'No exercise found matching "$name".'};
+        }
+        exercise = resolved;
+      } on AmbiguousMatchException catch (e) {
+        return {
+          'error': 'Multiple exercises match "$name". Did you mean one of:',
+          'ambiguous_matches': e.candidates,
+        };
       }
       final pr = _pr.getRecord(exercise.id);
       return {
@@ -325,9 +361,18 @@ class CoachToolService {
     final name = (args['exercise_name'] as String?)?.trim();
     Iterable<Target> targets = _wp.targets;
     if (name != null && name.isNotEmpty) {
-      final exercise = _resolveExercise(name);
-      if (exercise == null) {
-        return {'error': 'No exercise found matching "$name".'};
+      final Exercise exercise;
+      try {
+        final resolved = _resolveExercise(name);
+        if (resolved == null) {
+          return {'error': 'No exercise found matching "$name".'};
+        }
+        exercise = resolved;
+      } on AmbiguousMatchException catch (e) {
+        return {
+          'error': 'Multiple exercises match "$name". Did you mean one of:',
+          'ambiguous_matches': e.candidates,
+        };
       }
       targets = targets.where((t) => t.exerciseId == exercise.id);
     }
@@ -379,10 +424,10 @@ class CoachToolService {
     for (final e in all) {
       if (e.name.toLowerCase() == q) return e;
     }
-    for (final e in all) {
-      if (e.name.toLowerCase().contains(q)) return e;
-    }
-    return null;
+    final partials = [for (final e in all) if (e.name.toLowerCase().contains(q)) e];
+    if (partials.isEmpty) return null;
+    if (partials.length == 1) return partials.first;
+    throw AmbiguousMatchException([for (final e in partials) e.name]);
   }
 
   Routine? _resolveRoutine(String query) {
@@ -391,10 +436,12 @@ class CoachToolService {
     for (final r in _wp.routines) {
       if (r.name.toLowerCase() == q) return r;
     }
-    for (final r in _wp.routines) {
-      if (r.name.toLowerCase().contains(q)) return r;
-    }
-    return null;
+    final partials = [
+      for (final r in _wp.routines) if (r.name.toLowerCase().contains(q)) r
+    ];
+    if (partials.isEmpty) return null;
+    if (partials.length == 1) return partials.first;
+    throw AmbiguousMatchException([for (final r in partials) r.name]);
   }
 
   List<String> _exampleExerciseNames() =>

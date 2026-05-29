@@ -369,6 +369,9 @@ class StorageService implements IStorageService {
       'customExercises': _customExercisesBoxInstance.values
           .map(_normalizeExportValue)
           .toList(growable: false),
+      'conversations': _aiConversationsBoxInstance.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
       'settings': settingsMap,
       'exportDate': DateTime.now().toIso8601String(),
       'appVersion': _appVersion,
@@ -457,6 +460,20 @@ class StorageService implements IStorageService {
         final existing = _settingsBoxInstance.get(entry.key);
         if (existing == null) {
           await _settingsBoxInstance.put(entry.key, entry.value.toString());
+        }
+      }
+    }
+
+    // Import AI conversations (merge: skip if id already exists)
+    final conversations = data['conversations'];
+    if (conversations is List) {
+      for (var item in conversations) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final conversation = Conversation.fromJson(map);
+        final existing = await getConversation(conversation.id);
+        if (existing == null) {
+          await saveConversation(conversation);
         }
       }
     }

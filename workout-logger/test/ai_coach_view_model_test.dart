@@ -78,10 +78,10 @@ void main() {
       settings = SettingsProvider(storage);
       conversations = ConversationManager(storage);
       return AiCoachViewModel(
-        ai,
-        CoachToolService(provider, pr),
-        conversations,
-        settings,
+        ai: ai,
+        coachTools: CoachToolService(provider, pr),
+        conversations: conversations,
+        settings: settings,
       );
     }
 

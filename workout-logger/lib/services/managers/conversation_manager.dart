@@ -44,9 +44,9 @@ class ConversationManager extends ChangeNotifier {
 
   /// Make [id] the active conversation, if it exists.
   void selectConversation(String id) {
-    final match = _conversations.where((c) => c.id == id).toList();
-    if (match.isEmpty) return;
-    _active = match.first;
+    final idx = _conversations.indexWhere((c) => c.id == id);
+    if (idx < 0) return;
+    _active = _conversations[idx];
     notifyListeners();
   }
 
@@ -81,9 +81,9 @@ class ConversationManager extends ChangeNotifier {
 
   /// Rename a conversation.
   Future<void> renameConversation(String id, String title) async {
-    final match = _conversations.where((c) => c.id == id).toList();
-    if (match.isEmpty) return;
-    final updated = match.first.copyWith(
+    final idx = _conversations.indexWhere((c) => c.id == id);
+    if (idx < 0) return;
+    final updated = _conversations[idx].copyWith(
       title: title.trim(),
       updatedAt: DateTime.now(),
     );

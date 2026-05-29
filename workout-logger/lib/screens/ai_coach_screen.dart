@@ -31,10 +31,10 @@ class AiCoachScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<AiCoachViewModel>(
       create: (ctx) => AiCoachViewModel(
-        ctx.read<GeminiAiService>(),
-        ctx.read<CoachToolService>(),
-        ctx.read<ConversationManager>(),
-        ctx.read<SettingsProvider>(),
+        ai: ctx.read<GeminiAiService>(),
+        coachTools: ctx.read<CoachToolService>(),
+        conversations: ctx.read<ConversationManager>(),
+        settings: ctx.read<SettingsProvider>(),
       )..loadConversations(),
       child: _AiCoachView(seedPrompt: seedPrompt),
     );
