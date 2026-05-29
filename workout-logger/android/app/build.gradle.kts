@@ -33,9 +33,20 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // App display name; overridden per build type below so debug installs
+        // alongside the real app instead of replacing it.
+        manifestPlaceholders["appLabel"] = "RepForge"
     }
 
     buildTypes {
+        debug {
+            // Install debug builds as a SEPARATE app (com.devasy.repforge.debug)
+            // with its own data sandbox, so testing never touches the real app's
+            // data. Remove this block to go back to a single shared package.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["appLabel"] = "RepForge (Debug)"
+        }
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.

@@ -275,7 +275,7 @@ class _DashboardTab extends StatelessWidget {
             GestureDetector(
               onTap: () => Navigator.push(
                 context,
-                _slide(const AiCoachScreen()),
+                MaterialPageRoute(builder: (_) => const AiCoachScreen()),
               ),
               child: Container(
                 width: 40,
@@ -306,7 +306,7 @@ class _DashboardTab extends StatelessWidget {
             GestureDetector(
               onTap: () => Navigator.push(
                 context,
-                _slide(const ProfileScreen()),
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
               ),
               child: Container(
                 width: 40,
