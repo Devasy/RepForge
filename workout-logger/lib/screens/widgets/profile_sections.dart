@@ -899,10 +899,97 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
               ),
             ),
           ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              const _SectionLabel('TOKEN USAGE'),
+              const Spacer(),
+              if (gemini.aiRequestCount > 0)
+                GestureDetector(
+                  onTap: () => context.read<GeminiAiService>().resetUsage(),
+                  child: Text(
+                    'Reset',
+                    style: GoogleFonts.geist(
+                      color: AppColors.accent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.glass,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(color: AppColors.glassBorder),
+            ),
+            child: Column(
+              children: [
+                _UsageRow(label: 'Total tokens', value: _formatInt(gemini.totalTokensUsed)),
+                const SizedBox(height: 6),
+                _UsageRow(label: 'Input (prompt)', value: _formatInt(gemini.promptTokensUsed)),
+                const SizedBox(height: 6),
+                _UsageRow(label: 'Output (response)', value: _formatInt(gemini.responseTokensUsed)),
+                const SizedBox(height: 6),
+                _UsageRow(label: 'Requests', value: _formatInt(gemini.aiRequestCount)),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Cumulative billable tokens across coach, program builder & insights.',
+            style: GoogleFonts.geist(
+              color: AppColors.textFaint,
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+/// One label/value line in the token-usage card.
+class _UsageRow extends StatelessWidget {
+  const _UsageRow({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 12),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.geistMono(
+            color: AppColors.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Format an int with thousands separators (e.g. 12345 → "12,345").
+String _formatInt(int n) {
+  final s = n.toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+    buf.write(s[i]);
+  }
+  return buf.toString();
 }
 
 class _ComingSoonBadge extends StatelessWidget {

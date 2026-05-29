@@ -64,7 +64,8 @@ class WorkoutLoggerApp extends StatelessWidget {
   static final HistoryManager _historyManager =
       HistoryManager(_storageService, healthSyncManager: _healthSyncManager);
   static final PRManager _prManager = PRManager(_storageService);
-  static final GeminiAiService _geminiService = GeminiAiService();
+  static final GeminiAiService _geminiService =
+      GeminiAiService(storage: _storageService);
   static final ConversationManager _conversationManager =
       ConversationManager(_storageService);
 
@@ -160,6 +161,7 @@ class _AppInitializerState extends State<AppInitializer> {
       await provider.init();
       await settings.init();
       gemini.init(settings.geminiApiKey, model: settings.geminiModel);
+      await gemini.loadUsage();
       await historyManager.loadSessions();
       await prManager.load();
       await prManager.backfillFromSessions(historyManager.sessions);

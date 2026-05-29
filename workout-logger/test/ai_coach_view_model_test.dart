@@ -81,7 +81,6 @@ void main() {
         ai,
         CoachToolService(provider, pr),
         conversations,
-        provider,
         settings,
       );
     }

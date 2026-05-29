@@ -15,7 +15,6 @@ import '../viewmodels/ai_coach_view_model.dart';
 import '../services/ai/gemini_ai_service.dart';
 import '../services/ai/coach_tool_service.dart';
 import '../services/managers/conversation_manager.dart';
-import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
@@ -35,7 +34,6 @@ class AiCoachScreen extends StatelessWidget {
         ctx.read<GeminiAiService>(),
         ctx.read<CoachToolService>(),
         ctx.read<ConversationManager>(),
-        ctx.read<WorkoutProvider>(),
         ctx.read<SettingsProvider>(),
       )..loadConversations(),
       child: _AiCoachView(seedPrompt: seedPrompt),

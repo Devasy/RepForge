@@ -11,7 +11,6 @@ import '../models/models.dart';
 import '../services/interfaces/ai_service_interface.dart';
 import '../services/ai/coach_tool_service.dart';
 import '../services/managers/conversation_manager.dart';
-import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../services/gemini_context_builder.dart';
 
@@ -19,7 +18,6 @@ class AiCoachViewModel extends ChangeNotifier {
   final IAiService _ai;
   final CoachToolService _coachTools;
   final ConversationManager _conversations;
-  final WorkoutProvider _wp;
   final SettingsProvider _settings;
 
   bool _loading = false;
@@ -29,7 +27,6 @@ class AiCoachViewModel extends ChangeNotifier {
     this._ai,
     this._coachTools,
     this._conversations,
-    this._wp,
     this._settings,
   ) {
     // Forward conversation-store changes so the View only watches the VM.
@@ -115,21 +112,12 @@ class AiCoachViewModel extends ChangeNotifier {
 
   // ── Internals ──────────────────────────────────────────────────────────────
 
-  String _buildSystemPrompt() {
-    final exerciseMap = {for (final e in _wp.allExercises) e.id: e};
-    final allSessions = _wp.sessions;
-    final recoveryScores = _wp.getMuscleRecoveryScores();
-    final activeTargets = _wp.targets.where((t) => !t.isCompleted).toList();
-
-    return GeminiContextBuilder.buildCoachSystemPrompt(
-      recentSessions: allSessions,
-      exerciseMap: exerciseMap,
-      recoveryScores: recoveryScores,
-      activeTargets: activeTargets,
-      userName: _settings.userName,
-      unitLabel: _settings.unitLabel,
-    );
-  }
+  // Static prompt — live data is fetched by the model via the coach tools,
+  // keeping the prefix stable for implicit prompt caching.
+  String _buildSystemPrompt() => GeminiContextBuilder.buildCoachSystemPrompt(
+        userName: _settings.userName,
+        unitLabel: _settings.unitLabel,
+      );
 
   /// Prior turns (everything before the user message just appended).
   List<Content> _buildHistory() {

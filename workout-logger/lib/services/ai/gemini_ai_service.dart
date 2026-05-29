@@ -12,6 +12,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../models/models.dart';
 import '../interfaces/ai_service_interface.dart';
+import '../interfaces/storage_service_interface.dart';
 
 // Ordered list of available Gemini models shown in the picker.
 const kGeminiModels = [
@@ -29,8 +30,21 @@ const kDefaultGeminiModel = 'gemini-3.1-flash-lite';
 const int _kMaxToolRounds = 5;
 
 class GeminiAiService extends ChangeNotifier implements IAiService {
+  // Optional storage so cumulative token usage survives restarts.
+  final IStorageService? _storage;
+
+  GeminiAiService({IStorageService? storage}) : _storage = storage;
+
+  static const String _usageKey = 'aiTokenUsage';
+
   String _apiKey = '';
   String _model = kDefaultGeminiModel;
+
+  // Cumulative token usage across all AI calls (persisted).
+  int _promptTokens = 0;
+  int _responseTokens = 0;
+  int _totalTokens = 0;
+  int _requestCount = 0;
 
   @override
   bool get isConfigured => _apiKey.isNotEmpty;
@@ -38,9 +52,84 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   @override
   String get currentModel => _model;
 
+  /// Cumulative input (prompt) tokens billed across all AI calls.
+  int get promptTokensUsed => _promptTokens;
+
+  /// Cumulative output (response) tokens across all AI calls.
+  int get responseTokensUsed => _responseTokens;
+
+  /// Cumulative total tokens (prompt + response) across all AI calls.
+  int get totalTokensUsed => _totalTokens;
+
+  /// Number of AI requests recorded.
+  int get aiRequestCount => _requestCount;
+
   void init(String apiKey, {String model = kDefaultGeminiModel}) {
     _apiKey = apiKey.trim();
     _model = model;
+  }
+
+  /// Load persisted cumulative token usage (call once at startup).
+  Future<void> loadUsage() async {
+    final raw = await _storage?.getSetting(_usageKey);
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      _promptTokens = (m['prompt'] as num?)?.toInt() ?? 0;
+      _responseTokens = (m['response'] as num?)?.toInt() ?? 0;
+      _totalTokens = (m['total'] as num?)?.toInt() ?? 0;
+      _requestCount = (m['requests'] as num?)?.toInt() ?? 0;
+      notifyListeners();
+    } catch (_) {
+      // Ignore corrupt usage data.
+    }
+  }
+
+  /// Reset cumulative token usage to zero.
+  Future<void> resetUsage() async {
+    _promptTokens = 0;
+    _responseTokens = 0;
+    _totalTokens = 0;
+    _requestCount = 0;
+    await _persistUsage();
+    notifyListeners();
+  }
+
+  /// Accumulate one request's token counts. Exposed for testing; normally
+  /// fed from a response's [UsageMetadata] via [_recordUsage].
+  @visibleForTesting
+  void recordUsage({
+    required int prompt,
+    required int response,
+    required int total,
+  }) {
+    _promptTokens += prompt;
+    _responseTokens += response;
+    _totalTokens += total;
+    _requestCount += 1;
+    _persistUsage();
+    notifyListeners();
+  }
+
+  void _recordUsage(UsageMetadata? m) {
+    if (m == null) return;
+    final p = m.promptTokenCount ?? 0;
+    final r = m.candidatesTokenCount ?? 0;
+    recordUsage(prompt: p, response: r, total: m.totalTokenCount ?? (p + r));
+  }
+
+  Future<void> _persistUsage() async {
+    final storage = _storage;
+    if (storage == null) return;
+    await storage.saveSetting(
+      _usageKey,
+      jsonEncode({
+        'prompt': _promptTokens,
+        'response': _responseTokens,
+        'total': _totalTokens,
+        'requests': _requestCount,
+      }),
+    );
   }
 
   void updateApiKey(String key) {
@@ -93,11 +182,15 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
       for (var round = 0; round < _kMaxToolRounds; round++) {
         final calls = <FunctionCall>[];
+        UsageMetadata? roundUsage;
         await for (final chunk in chat.sendMessageStream(next)) {
           final t = chunk.text;
           if (t != null && t.isNotEmpty) yield t;
           calls.addAll(chunk.functionCalls);
+          if (chunk.usageMetadata != null) roundUsage = chunk.usageMetadata;
         }
+        // The final chunk of each round carries that round's cumulative usage.
+        _recordUsage(roundUsage);
 
         // No tools requested (or no handler) → the streamed text is the answer.
         if (calls.isEmpty || onToolCall == null) return;
@@ -192,6 +285,7 @@ Required JSON schema (follow exactly):
     try {
       final response = await _makeModel(jsonMode: true, system: systemPrompt)
           .generateContent([Content.text(prompt)]);
+      _recordUsage(response.usageMetadata);
       final raw = response.text ?? '';
       if (raw.isEmpty) throw const FormatException('Empty response from Gemini.');
 
@@ -223,6 +317,7 @@ Required JSON schema (follow exactly):
     try {
       final response = await _makeModel(system: systemPrompt)
           .generateContent([Content.text(contextText)]);
+      _recordUsage(response.usageMetadata);
       return response.text?.trim() ?? 'No insights generated.';
     } on GenerativeAIException catch (e) {
       return 'AI error: ${e.message}';
@@ -240,6 +335,7 @@ Required JSON schema (follow exactly):
     try {
       final response = await _makeModel(system: system)
           .generateContent([Content.text(context)]);
+      _recordUsage(response.usageMetadata);
       return response.text?.trim() ?? 'No insight generated.';
     } on GenerativeAIException catch (e) {
       return 'AI error: ${e.message}';
