@@ -698,14 +698,14 @@ class _PreviousSetsSection extends StatelessWidget {
         Wrap(
           spacing: 6,
           runSpacing: 6,
-          children: sets.asMap().entries.map((e) {
+          children: sets.asMap().entries.expand((e) {
             final i = e.key;
             final s = e.value;
             final dw = settings.toDisplay(s.weight);
             final wStr = dw == dw.truncateToDouble()
                 ? dw.toStringAsFixed(0)
                 : dw.toStringAsFixed(1);
-            return Container(
+            final setChip = Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.success.withValues(alpha: 0.12),
@@ -745,6 +745,38 @@ class _PreviousSetsSection extends StatelessWidget {
                 ],
               ),
             );
+
+            if (settings.showAdvancedMetrics && s.reps > 0 && s.weight > 0) {
+              final orm = s.reps == 1
+                  ? s.weight
+                  : s.weight * (1 + s.reps / 30.0);
+              final ormDisplay = settings.toDisplay(orm);
+              final ormStr = ormDisplay == ormDisplay.truncateToDouble()
+                  ? ormDisplay.toStringAsFixed(0)
+                  : ormDisplay.toStringAsFixed(1);
+              final ormChip = Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Text(
+                  '~$ormStr${settings.unitLabel} 1RM',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+              return [setChip, ormChip];
+            }
+
+            return [setChip];
           }).toList(),
         ),
       ],

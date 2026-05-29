@@ -18,6 +18,7 @@ class SettingsProvider extends ChangeNotifier {
   String _geminiModel = 'gemini-2.5-flash';
   String _weeklyInsights = '';
   DateTime? _weeklyInsightsDate;
+  bool _showAdvancedMetrics = false;
 
   WeightUnit get weightUnit => _weightUnit;
   double get weightIncrement => _weightIncrement;
@@ -29,6 +30,7 @@ class SettingsProvider extends ChangeNotifier {
   String get geminiModel => _geminiModel;
   String get weeklyInsights => _weeklyInsights;
   DateTime? get weeklyInsightsDate => _weeklyInsightsDate;
+  bool get showAdvancedMetrics => _showAdvancedMetrics;
 
   SettingsProvider(this._storage);
 
@@ -51,6 +53,8 @@ class SettingsProvider extends ChangeNotifier {
     _weeklyInsights = await _storage.getSetting('weeklyInsights') ?? '';
     final dateStr = await _storage.getSetting('weeklyInsightsDate');
     _weeklyInsightsDate = dateStr != null ? DateTime.tryParse(dateStr) : null;
+    final advMetrics = await _storage.getSetting('showAdvancedMetrics');
+    _showAdvancedMetrics = advMetrics == 'true';
   }
 
   Future<void> setUserName(String name) async {
@@ -106,6 +110,12 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setGeminiApiKey(String key) async {
     _geminiApiKey = key.trim();
     await _storage.saveSetting('geminiApiKey', _geminiApiKey);
+    notifyListeners();
+  }
+
+  Future<void> setShowAdvancedMetrics(bool value) async {
+    _showAdvancedMetrics = value;
+    await _storage.saveSetting('showAdvancedMetrics', value.toString());
     notifyListeners();
   }
 

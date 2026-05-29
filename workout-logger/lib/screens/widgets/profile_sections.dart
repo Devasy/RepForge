@@ -183,6 +183,47 @@ class PreferencesSection extends StatelessWidget {
               );
             }).toList(),
           ),
+          const SizedBox(height: AppSpacing.md),
+          const Divider(color: AppColors.glassBorder, height: 1),
+          const SizedBox(height: AppSpacing.md),
+          const _SectionLabel('ADVANCED METRICS'),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Show estimated 1RM',
+                      style: GoogleFonts.geist(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Display 1-rep max badge on completed sets',
+                      style: GoogleFonts.geist(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: settings.showAdvancedMetrics,
+                onChanged: (v) {
+                  onHaptic();
+                  settings.setShowAdvancedMetrics(v);
+                },
+                activeThumbColor: AppColors.primary,
+                activeTrackColor: AppColors.primary.withValues(alpha: 0.35),
+              ),
+            ],
+          ),
         ],
       ),
     );
