@@ -449,12 +449,15 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      isLast ? 'Finish' : 'Next exercise',
-                      style: GoogleFonts.geist(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                    Flexible(
+                      child: Text(
+                        isLast ? 'Finish' : 'Next exercise',
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.geist(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),

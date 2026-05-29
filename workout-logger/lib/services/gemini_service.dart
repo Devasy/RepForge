@@ -180,4 +180,23 @@ Required JSON schema (follow exactly):
       return 'Could not generate insights: $e';
     }
   }
+
+  // ── Generic one-shot insight (contextual) ─────────────────────────────────
+  // Thin, tool-agnostic helper for on-demand contextual insights (muscle
+  // drill-down, target suggestions, stalled-target nudges). Kept generic so a
+  // future function-calling path can be added additively over [_makeModel].
+  Future<String> generateInsight(String system, String context) async {
+    if (!isConfigured) {
+      return 'Add your Gemini API key in Profile → AI Features to unlock insights.';
+    }
+    try {
+      final response = await _makeModel(system: system)
+          .generateContent([Content.text(context)]);
+      return response.text?.trim() ?? 'No insight generated.';
+    } on GenerativeAIException catch (e) {
+      return 'AI error: ${e.message}';
+    } catch (e) {
+      return 'Could not generate insight: $e';
+    }
+  }
 }

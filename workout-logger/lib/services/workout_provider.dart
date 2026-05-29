@@ -1011,6 +1011,75 @@ class WorkoutProvider extends ChangeNotifier {
     return best;
   }
 
+  /// Per-exercise contribution to a muscle group's volume within a time window.
+  ///
+  /// [start]/[end] default to the last 7 days. Results are sorted by contributed
+  /// volume (desc). This is a pure, parameterized query intended to double as the
+  /// implementation surface for a future Coach agent tool.
+  List<({String exerciseId, String name, double volume, GrowthModel? growth})>
+      getMuscleExerciseBreakdown(
+    String muscleId, {
+    DateTime? start,
+    DateTime? end,
+  }) {
+    final now = DateTime.now();
+    final from = start ?? now.subtract(const Duration(days: 7));
+    final to = end ?? now;
+    final exerciseMap = <String, Exercise>{
+      for (final e in _allExercises) e.id: e,
+    };
+
+    final byExercise = <String, double>{};
+    for (final session in _sessions) {
+      if (session.date.isBefore(from) || session.date.isAfter(to)) continue;
+      for (final log in session.exercises) {
+        final exercise = exerciseMap[log.exerciseId];
+        if (exercise == null) continue;
+        for (final activation in exercise.muscleActivations) {
+          if (activation.muscleGroupId != muscleId) continue;
+          byExercise[log.exerciseId] = (byExercise[log.exerciseId] ?? 0) +
+              log.totalVolume * (activation.activationPercentage / 100);
+        }
+      }
+    }
+
+    final result = byExercise.entries
+        .map((e) => (
+              exerciseId: e.key,
+              name: getExerciseName(e.key),
+              volume: e.value,
+              growth: _growthModels[e.key],
+            ))
+        .toList()
+      ..sort((a, b) => b.volume.compareTo(a.volume));
+    return result;
+  }
+
+  /// Per-session set-by-set progression for an exercise (oldest-first).
+  ///
+  /// Optionally bounded by [start]/[end]. Each entry holds the working sets
+  /// logged for the exercise in that session, so callers can chart weight/reps
+  /// per set. Pure & parameterized — also the surface for a future agent tool.
+  List<({DateTime date, List<WorkoutSet> sets})> getSetProgression(
+    String exerciseId, {
+    DateTime? start,
+    DateTime? end,
+  }) {
+    final result = <({DateTime date, List<WorkoutSet> sets})>[];
+    // _sessions is maintained newest-first; reverse for oldest-first output.
+    for (final session in _sessions.reversed) {
+      if (start != null && session.date.isBefore(start)) continue;
+      if (end != null && session.date.isAfter(end)) continue;
+      for (final log in session.exercises) {
+        if (log.exerciseId == exerciseId && log.sets.isNotEmpty) {
+          result.add((date: session.date, sets: log.sets));
+          break;
+        }
+      }
+    }
+    return result;
+  }
+
   // ==================== QUICK STATS ====================
 
   Future<Map<String, dynamic>> getQuickStats() async {

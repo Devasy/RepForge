@@ -1,21 +1,17 @@
-// analytics_screen.dart — Analytics: Overview / Exercises / Targets
-
-import 'dart:math' show max;
+// analytics_screen.dart — Analytics: Overview / Exercises / Targets / Records
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/managers/pr_manager.dart';
-import '../services/ml_service.dart' show MuscleRecoveryStatus;
 import '../services/settings_provider.dart';
-import '../data/exercise_database.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
+import 'widgets/analytics_overview.dart';
 import 'widgets/exercise_progress_view.dart';
 import 'widgets/targets_tab.dart';
 
@@ -140,7 +136,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildTabView() {
     switch (_tab) {
       case 0:
-        return const _OverviewTab();
+        return const AnalyticsOverviewTab();
       case 1:
         return const ExerciseProgressView();
       case 2:
@@ -153,538 +149,427 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 }
 
-// ── Overview Tab ──────────────────────────────────────────────────────────────
+// ── Records Tab ────────────────────────────────────────────────────────────────
 
-class _OverviewTab extends StatelessWidget {
-  const _OverviewTab();
+enum _RecordsFilter { all, thisMonth, byExercise }
+enum _RecordsSort { recent, heaviest }
 
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<WorkoutProvider>();
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final hp = AppBreakpoints.hPadding(constraints.maxWidth);
-        return Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppBreakpoints.contentMaxWidth,
-            ),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(hp, 0, hp, 100),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _VolumeChart(provider: provider),
-                  const SizedBox(height: 12),
-                  _MuscleVolumeChart(provider: provider),
-                  const SizedBox(height: 12),
-                  _MuscleStatusCard(provider: provider),
-                  const SizedBox(height: 12),
-                  _FrequencyGrid(provider: provider),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ── Volume progression chart ───────────────────────────────────────────────────
-
-class _VolumeChart extends StatelessWidget {
-  const _VolumeChart({required this.provider});
-  final WorkoutProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    final sessions = provider.sessions.take(14).toList().reversed.toList();
-    final settings = context.watch<SettingsProvider>();
-
-    final spots = sessions.asMap().entries.map((e) {
-      return FlSpot(e.key.toDouble(), settings.toDisplay(e.value.totalVolume));
-    }).toList();
-
-    final bestVol = spots.isEmpty
-        ? 0.0
-        : spots.map((s) => s.y).reduce(max);
-
-    return _ChartCard(
-      title: 'Volume Progression',
-      subtitle: '${settings.unitLabel} · Last ${sessions.length} workouts',
-      isEmpty: sessions.isEmpty,
-      child: LayoutBuilder(
-        builder: (context, constraints) => SizedBox(
-          height: AppBreakpoints.chartHeight(constraints.maxWidth),
-          child: LineChart(
-          LineChartData(
-            backgroundColor: Colors.transparent,
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              getDrawingHorizontalLine: (_) => FlLine(
-                color: AppColors.glassBorder,
-                strokeWidth: 1,
-              ),
-            ),
-            lineTouchData: LineTouchData(
-              touchTooltipData: LineTouchTooltipData(
-                getTooltipColor: (_) => AppColors.cardHigh,
-                getTooltipItems: (spots) => spots.map((spot) {
-                  final i = spot.x.toInt();
-                  final v = spot.y;
-                  final volStr = v >= 1000
-                      ? '${(v / 1000).toStringAsFixed(1)}k'
-                      : v.toStringAsFixed(0);
-                  final dateStr = (i >= 0 && i < sessions.length)
-                      ? DateFormat('MMM d').format(sessions[i].date)
-                      : '';
-                  return LineTooltipItem(
-                    '$volStr ${settings.unitLabel}',
-                    GoogleFonts.geistMono(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w700),
-                    children: [
-                      TextSpan(
-                        text: '\n$dateStr',
-                        style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.normal),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
-            titlesData: FlTitlesData(
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 28,
-                  interval: 1,
-                  getTitlesWidget: (v, _) {
-                    final i = v.toInt();
-                    if (i < 0 || i >= sessions.length) return const Text('');
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        DateFormat('d/M').format(sessions[i].date),
-                        style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 9),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 40,
-                  getTitlesWidget: (v, _) {
-                    final label = v >= 1000
-                        ? '${(v / 1000).toStringAsFixed(1)}k'
-                        : v.toStringAsFixed(0);
-                    return Text(label, style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 9));
-                  },
-                ),
-              ),
-            ),
-            borderData: FlBorderData(show: false),
-            extraLinesData: ExtraLinesData(
-              horizontalLines: [
-                if (bestVol > 0)
-                  HorizontalLine(
-                    y: bestVol,
-                    color: AppColors.warning.withValues(alpha: 0.55),
-                    strokeWidth: 1,
-                    dashArray: [6, 4],
-                    label: HorizontalLineLabel(
-                      show: true,
-                      direction: LabelDirection.horizontal,
-                      alignment: Alignment.topRight,
-                      padding: const EdgeInsets.only(right: 6, bottom: 2),
-                      style: GoogleFonts.geistMono(
-                        color: AppColors.warning,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      labelResolver: (line) =>
-                          'BEST ${bestVol.toStringAsFixed(0)}',
-                    ),
-                  ),
-              ],
-            ),
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                isCurved: true,
-                curveSmoothness: 0.3,
-                color: AppColors.primary,
-                barWidth: 2.5,
-                isStrokeCapRound: true,
-                dotData: FlDotData(
-                  show: true,
-                  getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
-                    radius: 3.5,
-                    color: AppColors.primary,
-                    strokeWidth: 1.5,
-                    strokeColor: AppColors.surface,
-                  ),
-                ),
-                belowBarData: BarAreaData(
-                  show: true,
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.25),
-                      AppColors.primary.withValues(alpha: 0.0),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Muscle volume bars ────────────────────────────────────────────────────────
-
-class _MuscleVolumeChart extends StatelessWidget {
-  const _MuscleVolumeChart({required this.provider});
-  final WorkoutProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    final byMuscle = provider.getWeeklyVolumeByMuscle();
-
-    if (byMuscle.isEmpty) {
-      return _ChartCard(
-        title: 'Weekly Muscle Volume',
-        isEmpty: true,
-        child: const SizedBox.shrink(),
-      );
-    }
-
-    final settings = context.watch<SettingsProvider>();
-    final sorted = byMuscle.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final top = sorted.take(8).toList();
-    final maxVol = top.first.value;
-
-    if (maxVol == 0) {
-      return _ChartCard(
-        title: 'Weekly Muscle Volume',
-        isEmpty: true,
-        child: const SizedBox.shrink(),
-      );
-    }
-
-    return _ChartCard(
-      title: 'Weekly Muscle Volume',
-      child: Column(
-        children: top.map((entry) {
-          final name = MuscleGroups.names[entry.key] ?? entry.key;
-          final color = AppColors.muscle(entry.key);
-          final pct = entry.value / maxVol;
-          final displayVal = settings.toDisplay(entry.value);
-          final volStr = displayVal >= 1000
-              ? '${(displayVal / 1000).toStringAsFixed(1)}k'
-              : displayVal.toStringAsFixed(0);
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(name, style: GoogleFonts.geist(color: AppColors.textSoft, fontSize: 12, fontWeight: FontWeight.w500)),
-                    Text('$volStr ${settings.unitLabel}', style: GoogleFonts.geistMono(color: AppColors.textMuted, fontSize: 11)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                RFProgressBar(value: pct, color: color, height: 6, showGlow: true),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-// ── Muscle recovery + growth status ───────────────────────────────────────────
-
-class _MuscleStatusCard extends StatelessWidget {
-  const _MuscleStatusCard({required this.provider});
-  final WorkoutProvider provider;
-
-  static const _muscleOrder = [
-    'chest', 'back', 'shoulders', 'quads', 'hamstrings',
-    'glutes', 'biceps', 'triceps', 'abs', 'calves',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final recovery = provider.getMuscleRecoveryScores();
-    final growth = provider.getMuscleGrowthModels();
-
-    if (recovery.isEmpty) {
-      return _ChartCard(
-        title: 'Muscle Status',
-        isEmpty: true,
-        child: const SizedBox.shrink(),
-      );
-    }
-
-    // Show muscles we have recovery data for, in preferred order.
-    final muscles = [
-      ..._muscleOrder.where(recovery.containsKey),
-      ...recovery.keys.where((k) => !_muscleOrder.contains(k)),
-    ];
-
-    return _ChartCard(
-      title: 'Muscle Status',
-      subtitle: 'Recovery · Growth trend',
-      child: Column(
-        children: muscles.map((id) {
-          final status = recovery[id]!;
-          final model = growth[id];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _MuscleRow(
-              muscleId: id,
-              status: status,
-              growthModel: model,
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-class _MuscleRow extends StatelessWidget {
-  const _MuscleRow({
-    required this.muscleId,
-    required this.status,
-    this.growthModel,
-  });
-
-  final String muscleId;
-  final MuscleRecoveryStatus status;
-  final GrowthModel? growthModel;
-
-  Color get _recoveryColor {
-    if (status.recoveryFraction >= 0.90) return AppColors.success;
-    if (status.recoveryFraction >= 0.70) return AppColors.warning;
-    return AppColors.accent;
-  }
-
-  ({String label, Color color, IconData icon}) get _trend {
-    final model = growthModel;
-    if (model == null) {
-      return (label: 'No data', color: AppColors.textFaint, icon: Icons.remove);
-    }
-    final confident = model.r2 >= 0.2;
-    if (model.slope > 2) {
-      final label = confident
-          ? '+${(model.slope * 7).toStringAsFixed(0)}/wk'
-          : '~gaining';
-      return (label: label, color: AppColors.success, icon: Icons.trending_up_rounded);
-    }
-    if (model.slope > 0) {
-      return (label: confident ? 'Slight gain' : '~slight gain', color: AppColors.secondary, icon: Icons.trending_up_rounded);
-    }
-    if (model.slope < -2) {
-      return (label: confident ? 'Declining' : '~declining', color: AppColors.accent, icon: Icons.trending_down_rounded);
-    }
-    return (label: confident ? 'Plateau' : '~plateau', color: AppColors.warning, icon: Icons.trending_flat_rounded);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final name = MuscleGroups.names[muscleId] ?? muscleId;
-    final pct = status.recoveryFraction;
-    final color = AppColors.muscle(muscleId);
-    final trend = _trend;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                name,
-                style: GoogleFonts.geist(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSoft,
-                ),
-              ),
-            ),
-            // Recovery badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: _recoveryColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: _recoveryColor.withValues(alpha: 0.3)),
-              ),
-              child: Text(
-                '${status.recoveryPercent}%',
-                style: GoogleFonts.geistMono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: _recoveryColor,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Growth trend chip
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(trend.icon, size: 12, color: trend.color),
-                const SizedBox(width: 2),
-                Text(
-                  trend.label,
-                  style: GoogleFonts.geistMono(
-                    fontSize: 10,
-                    color: trend.color,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 5),
-        RFProgressBar(value: pct, color: color, height: 5, showGlow: false),
-      ],
-    );
-  }
-}
-
-// ── Weekly frequency grid ──────────────────────────────────────────────────────
-
-class _FrequencyGrid extends StatelessWidget {
-  const _FrequencyGrid({required this.provider});
-  final WorkoutProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final weeks = {0: 0, 1: 0, 2: 0, 3: 0};
-    for (final s in provider.sessions) {
-      final w = now.difference(s.date).inDays ~/ 7;
-      if (w >= 0 && w < 4) weeks[w] = (weeks[w] ?? 0) + 1;
-    }
-
-    return _ChartCard(
-      title: 'Workout Frequency',
-      subtitle: 'Sessions per week',
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final boxSize = ((constraints.maxWidth - 48) / 4).clamp(40.0, 64.0);
-          return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: weeks.entries.map((e) {
-          final count = e.value;
-          final label = e.key == 0 ? 'This' : '-${e.key}w';
-          final active = count > 0;
-          return Column(
-            children: [
-              Container(
-                width: boxSize,
-                height: boxSize,
-                decoration: BoxDecoration(
-                  color: active
-                      ? AppColors.primary.withValues(alpha: 0.12 + count * 0.06)
-                      : AppColors.glass2,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: active
-                        ? AppColors.primary.withValues(alpha: 0.4)
-                        : AppColors.glassBorder,
-                  ),
-                  boxShadow: active
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.2),
-                            blurRadius: 12,
-                          )
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    '$count',
-                    style: GoogleFonts.geistMono(
-                      color: active ? AppColors.primary : AppColors.textMuted,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(label, style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 10)),
-            ],
-          );
-        }).toList(),
-      );
-        },
-      ),
-    );
-  }
-}
-
-// ── Records Tab ───────────────────────────────────────────────────────────────
-
-class _RecordsTab extends StatelessWidget {
+class _RecordsTab extends StatefulWidget {
   const _RecordsTab();
+
+  @override
+  State<_RecordsTab> createState() => _RecordsTabState();
+}
+
+class _RecordsTabState extends State<_RecordsTab> {
+  _RecordsFilter _filter = _RecordsFilter.all;
+  _RecordsSort _sort = _RecordsSort.recent;
 
   @override
   Widget build(BuildContext context) {
     final prManager = context.watch<PRManager>();
     final provider = context.read<WorkoutProvider>();
-    final records = [...prManager.allRecords]
-      ..sort((a, b) => b.achievedAt.compareTo(a.achievedAt));
+    final allRecords = prManager.allRecords;
 
-    if (records.isEmpty) {
+    if (allRecords.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.emoji_events_rounded, size: 48, color: AppColors.textFaint),
+            const Icon(Icons.emoji_events_rounded,
+                size: 48, color: AppColors.textFaint),
             const SizedBox(height: 12),
             Text(
               'No records yet',
-              style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 15, fontWeight: FontWeight.w600),
+              style: GoogleFonts.geist(
+                color: AppColors.textMuted,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               'Finish a workout to set your first PRs',
-              style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 12),
+              style: GoogleFonts.geist(
+                  color: AppColors.textFaint, fontSize: 12),
             ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
+    // Filter
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    List<PersonalRecord> filtered = switch (_filter) {
+      _RecordsFilter.all => [...allRecords],
+      _RecordsFilter.thisMonth => allRecords
+          .where((r) => !r.achievedAt.isBefore(startOfMonth))
+          .toList(),
+      _RecordsFilter.byExercise => [...allRecords],
+    };
+
+    // Sort
+    switch (_sort) {
+      case _RecordsSort.recent:
+        filtered.sort((a, b) => b.achievedAt.compareTo(a.achievedAt));
+      case _RecordsSort.heaviest:
+        filtered.sort((a, b) => b.bestWeight.compareTo(a.bestWeight));
+    }
+
+    // Stats for summary
+    final thisMonthCount = allRecords
+        .where((r) => !r.achievedAt.isBefore(startOfMonth))
+        .length;
+    final newest = allRecords.isEmpty
+        ? null
+        : ([...allRecords]
+              ..sort((a, b) => b.achievedAt.compareTo(a.achievedAt)))
+            .first;
+
+    // Group by exercise if needed
+    Map<String, List<PersonalRecord>>? grouped;
+    if (_filter == _RecordsFilter.byExercise) {
+      grouped = {};
+      for (final r in filtered) {
+        grouped.putIfAbsent(r.exerciseId, () => []).add(r);
+      }
+    }
+
+    return CustomScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-      itemCount: records.length,
-      itemBuilder: (context, i) => _PRCard(
-        record: records[i],
-        exerciseName: provider.getExerciseName(records[i].exerciseId),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Summary header
+                Row(
+                  children: [
+                    Text(
+                      '${allRecords.length} PRs',
+                      style: GoogleFonts.geist(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (thisMonthCount > 0) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.15),
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.full),
+                          border: Border.all(
+                              color:
+                                  AppColors.warning.withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          '$thisMonthCount this month',
+                          style: GoogleFonts.geistMono(
+                            color: AppColors.warning,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                // Newest PR hero
+                if (newest != null) ...[
+                  const SizedBox(height: 12),
+                  _NewestPRHero(
+                    record: newest,
+                    exerciseName:
+                        provider.getExerciseName(newest.exerciseId),
+                  ),
+                ],
+
+                // Filter + sort bar
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _FilterChip(
+                              label: 'All',
+                              selected:
+                                  _filter == _RecordsFilter.all,
+                              onTap: () => setState(
+                                  () => _filter = _RecordsFilter.all),
+                            ),
+                            const SizedBox(width: 6),
+                            _FilterChip(
+                              label: 'This month',
+                              selected: _filter ==
+                                  _RecordsFilter.thisMonth,
+                              onTap: () => setState(() =>
+                                  _filter = _RecordsFilter.thisMonth),
+                            ),
+                            const SizedBox(width: 6),
+                            _FilterChip(
+                              label: 'By exercise',
+                              selected: _filter ==
+                                  _RecordsFilter.byExercise,
+                              onTap: () => setState(() =>
+                                  _filter = _RecordsFilter.byExercise),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => setState(() => _sort = _sort ==
+                              _RecordsSort.recent
+                          ? _RecordsSort.heaviest
+                          : _RecordsSort.recent),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.glass2,
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.sm),
+                          border:
+                              Border.all(color: AppColors.glassBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _sort == _RecordsSort.recent
+                                  ? Icons.access_time_rounded
+                                  : Icons.fitness_center_rounded,
+                              size: 13,
+                              color: AppColors.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _sort == _RecordsSort.recent
+                                  ? 'Recent'
+                                  : 'Heaviest',
+                              style: GoogleFonts.geistMono(
+                                color: AppColors.textMuted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ),
+
+        if (grouped != null)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) {
+                  final entry = grouped!.entries.elementAt(i);
+                  return _ExercisePRGroup(
+                    exerciseName: provider.getExerciseName(entry.key),
+                    records: entry.value,
+                  );
+                },
+                childCount: grouped.length,
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) => _PRCard(
+                  record: filtered[i],
+                  exerciseName:
+                      provider.getExerciseName(filtered[i].exerciseId),
+                ),
+                childCount: filtered.length,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _NewestPRHero extends StatelessWidget {
+  const _NewestPRHero({required this.record, required this.exerciseName});
+  final PersonalRecord record;
+  final String exerciseName;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    final dateStr = DateFormat('MMM d, yyyy').format(record.achievedAt);
+    final w = settings.toDisplay(record.bestWeight);
+
+    return GlassCard(
+      glowColor: AppColors.warning,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.warning, Color(0xFFFF9500)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: const Icon(Icons.emoji_events_rounded,
+                color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Latest PR',
+                  style: GoogleFonts.geist(
+                    color: AppColors.warning,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                Text(
+                  exerciseName,
+                  style: GoogleFonts.geist(
+                    color: AppColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  dateStr,
+                  style: GoogleFonts.geist(
+                    color: AppColors.textFaint,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1)} ${settings.unitLabel}',
+                style: GoogleFonts.geistMono(
+                  color: AppColors.warning,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              Text(
+                '${record.bestReps} reps',
+                style: GoogleFonts.geistMono(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExercisePRGroup extends StatelessWidget {
+  const _ExercisePRGroup(
+      {required this.exerciseName, required this.records});
+  final String exerciseName;
+  final List<PersonalRecord> records;
+
+  @override
+  Widget build(BuildContext context) {
+    final best = records.reduce(
+        (a, b) => a.bestWeight >= b.bestWeight ? a : b);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6, top: 4),
+          child: Text(
+            exerciseName,
+            style: GoogleFonts.geist(
+              color: AppColors.textSoft,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+        _PRCard(record: best, exerciseName: exerciseName),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.18)
+              : AppColors.glass2,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.5)
+                : AppColors.glassBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.geistMono(
+            color: selected ? AppColors.primary : AppColors.textMuted,
+            fontSize: 11,
+            fontWeight:
+                selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
@@ -719,7 +604,8 @@ class _PRCard extends StatelessWidget {
                   color: AppColors.warning.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.emoji_events_rounded, color: AppColors.warning, size: 18),
+                child: const Icon(Icons.emoji_events_rounded,
+                    color: AppColors.warning, size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -736,7 +622,8 @@ class _PRCard extends StatelessWidget {
                     ),
                     Text(
                       dateStr,
-                      style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11),
+                      style: GoogleFonts.geist(
+                          color: AppColors.textFaint, fontSize: 11),
                     ),
                   ],
                 ),
@@ -746,11 +633,24 @@ class _PRCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              _PRStat(label: 'Best Weight', value: '${displayWeight.toStringAsFixed(displayWeight % 1 == 0 ? 0 : 1)} $unit', color: AppColors.warning),
+              _PRStat(
+                label: 'Best Weight',
+                value:
+                    '${displayWeight.toStringAsFixed(displayWeight % 1 == 0 ? 0 : 1)} $unit',
+                color: AppColors.warning,
+              ),
               const SizedBox(width: AppSpacing.sm),
-              _PRStat(label: 'Best Reps', value: '${record.bestReps}', color: AppColors.secondary),
+              _PRStat(
+                label: 'Best Reps',
+                value: '${record.bestReps}',
+                color: AppColors.secondary,
+              ),
               const SizedBox(width: AppSpacing.sm),
-              _PRStat(label: 'Best Vol.', value: '${displayVol.toStringAsFixed(0)} $unit', color: AppColors.success),
+              _PRStat(
+                label: 'Best Vol.',
+                value: '${displayVol.toStringAsFixed(0)} $unit',
+                color: AppColors.success,
+              ),
             ],
           ),
         ],
@@ -760,7 +660,10 @@ class _PRCard extends StatelessWidget {
 }
 
 class _PRStat extends StatelessWidget {
-  const _PRStat({required this.label, required this.value, required this.color});
+  const _PRStat(
+      {required this.label,
+      required this.value,
+      required this.color});
 
   final String label;
   final String value;
@@ -770,7 +673,8 @@ class _PRStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        padding:
+            const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -779,67 +683,17 @@ class _PRStat extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+            Text(label,
+                style: GoogleFonts.geist(
+                    color: AppColors.textFaint, fontSize: 10)),
             const SizedBox(height: 2),
-            Text(value, style: GoogleFonts.geistMono(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
+            Text(value,
+                style: GoogleFonts.geistMono(
+                    color: color,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700)),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── Reusable chart card ────────────────────────────────────────────────────────
-
-class _ChartCard extends StatelessWidget {
-  const _ChartCard({
-    required this.title,
-    required this.child,
-    this.subtitle,
-    this.isEmpty = false,
-  });
-
-  final String title;
-  final String? subtitle;
-  final Widget child;
-  final bool isEmpty;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.geist(
-              color: AppColors.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 2),
-            Text(subtitle!, style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 11)),
-          ],
-          if (isEmpty) ...[
-            const SizedBox(height: 24),
-            Center(
-              child: Column(
-                children: [
-                  const Icon(Icons.show_chart_rounded, size: 32, color: AppColors.textFaint),
-                  const SizedBox(height: 8),
-                  Text('No data yet', style: GoogleFonts.geist(fontSize: 13, color: AppColors.textMuted)),
-                  Text('Complete workouts to see progress', style: GoogleFonts.geist(fontSize: 11, color: AppColors.textFaint)),
-                ],
-              ),
-            ),
-          ] else ...[
-            const SizedBox(height: 14),
-            child,
-          ],
-        ],
       ),
     );
   }

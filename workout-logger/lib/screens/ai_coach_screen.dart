@@ -26,7 +26,12 @@ class _ChatMessage {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class AiCoachScreen extends StatefulWidget {
-  const AiCoachScreen({super.key});
+  const AiCoachScreen({super.key, this.seedPrompt});
+
+  /// Optional question to auto-send on open (e.g. deep-linked from analytics).
+  /// The coach system prompt already carries the user's data, so a seed needs
+  /// no extra context.
+  final String? seedPrompt;
 
   @override
   State<AiCoachScreen> createState() => _AiCoachScreenState();
@@ -38,6 +43,20 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   final _messages = <_ChatMessage>[];
   bool _loading = false;
   String _streamingText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final seed = widget.seedPrompt?.trim();
+    if (seed != null && seed.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (!context.read<GeminiService>().isConfigured) return;
+        _controller.text = seed;
+        _send();
+      });
+    }
+  }
 
   @override
   void dispose() {
