@@ -11,7 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../services/workout_provider.dart';
 import '../../services/settings_provider.dart';
-import '../../services/gemini_service.dart';
+import '../../services/ai/gemini_ai_service.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 import '../ai_coach_screen.dart';
@@ -1489,7 +1489,7 @@ class _AskCoachButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gemini = context.watch<GeminiService>();
+    final gemini = context.watch<GeminiAiService>();
     if (!gemini.isConfigured) return const SizedBox.shrink();
 
     final isPlateauing =

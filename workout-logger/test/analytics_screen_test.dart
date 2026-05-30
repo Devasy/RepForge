@@ -11,7 +11,7 @@ import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/analytics_screen.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/settings_provider.dart';
-import 'package:repforge/services/gemini_service.dart';
+import 'package:repforge/services/ai/gemini_ai_service.dart';
 import 'package:repforge/services/managers/program_manager.dart';
 import 'package:repforge/services/managers/pr_manager.dart';
 import 'package:repforge/services/interfaces/ml_service_interface.dart';
@@ -31,7 +31,7 @@ Widget _wrap({
       ChangeNotifierProvider<WorkoutProvider>.value(value: workoutProvider),
       ChangeNotifierProvider<SettingsProvider>.value(value: sp),
       ChangeNotifierProvider<PRManager>.value(value: prManager),
-      ChangeNotifierProvider<GeminiService>.value(value: GeminiService()),
+      ChangeNotifierProvider<GeminiAiService>.value(value: GeminiAiService()),
       Provider<IMLService>.value(value: MockMLService()),
     ],
     child: const MaterialApp(home: AnalyticsScreen()),

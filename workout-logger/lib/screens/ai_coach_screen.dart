@@ -1,48 +1,58 @@
-// ai_coach_screen.dart — Conversational AI workout coach powered by Gemini
+// ai_coach_screen.dart — Conversational AI workout coach (View).
+//
+// This is a lean View: all orchestration (streaming, tool calls, persistence,
+// system-prompt building) lives in AiCoachViewModel. The widget only renders
+// state, forwards user intents, and holds UI-local controllers.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
 
-import '../services/gemini_service.dart';
-import '../services/gemini_context_builder.dart';
-import '../services/workout_provider.dart';
+import '../models/models.dart';
+import '../viewmodels/ai_coach_view_model.dart';
+import '../services/ai/gemini_ai_service.dart';
+import '../services/ai/coach_tool_service.dart';
+import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
-import '../services/interfaces/ml_service_interface.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
 import 'profile_screen.dart';
 
-// ── Data ──────────────────────────────────────────────────────────────────────
-
-class _ChatMessage {
-  const _ChatMessage({required this.role, required this.text});
-  final String role; // 'user' | 'model'
-  final String text;
-}
-
-// ── Screen ────────────────────────────────────────────────────────────────────
-
-class AiCoachScreen extends StatefulWidget {
+/// Public entry point. Owns the screen-scoped [AiCoachViewModel].
+class AiCoachScreen extends StatelessWidget {
   const AiCoachScreen({super.key, this.seedPrompt});
 
   /// Optional question to auto-send on open (e.g. deep-linked from analytics).
-  /// The coach system prompt already carries the user's data, so a seed needs
-  /// no extra context.
   final String? seedPrompt;
 
   @override
-  State<AiCoachScreen> createState() => _AiCoachScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<AiCoachViewModel>(
+      create: (ctx) => AiCoachViewModel(
+        ai: ctx.read<GeminiAiService>(),
+        coachTools: ctx.read<CoachToolService>(),
+        conversations: ctx.read<ConversationManager>(),
+        settings: ctx.read<SettingsProvider>(),
+      )..loadConversations(),
+      child: _AiCoachView(seedPrompt: seedPrompt),
+    );
+  }
 }
 
-class _AiCoachScreenState extends State<AiCoachScreen> {
+class _AiCoachView extends StatefulWidget {
+  const _AiCoachView({this.seedPrompt});
+  final String? seedPrompt;
+
+  @override
+  State<_AiCoachView> createState() => _AiCoachViewState();
+}
+
+class _AiCoachViewState extends State<_AiCoachView> {
   final _controller = TextEditingController();
   final _scrollCtrl = ScrollController();
-  final _messages = <_ChatMessage>[];
-  bool _loading = false;
-  String _streamingText = '';
+  AiCoachViewModel? _vm;
 
   @override
   void initState() {
@@ -51,92 +61,41 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     if (seed != null && seed.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        if (!context.read<GeminiService>().isConfigured) return;
-        _controller.text = seed;
-        _send();
+        final vm = context.read<AiCoachViewModel>();
+        if (!vm.isConfigured) return;
+        _controller.clear();
+        vm.sendMessage(seed);
       });
     }
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Attach a scroll-follow listener once.
+    final vm = context.read<AiCoachViewModel>();
+    if (!identical(vm, _vm)) {
+      _vm?.removeListener(_onVmChanged);
+      _vm = vm..addListener(_onVmChanged);
+    }
+  }
+
+  void _onVmChanged() => _scrollToBottom();
+
+  @override
   void dispose() {
+    _vm?.removeListener(_onVmChanged);
     _controller.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
 
-  String _buildSystemPrompt() {
-    final wp = context.read<WorkoutProvider>();
-    final settings = context.read<SettingsProvider>();
-    final mlService = context.read<IMLService>();
-
-    final exerciseMap = {for (final e in wp.allExercises) e.id: e};
-    final allSessions = wp.sessions;
-    final recoveryScores = mlService.computeMuscleRecoveryScores(
-      allSessions,
-      exerciseMap,
-    );
-    final activeTargets = wp.targets.where((t) => !t.isCompleted).toList();
-
-    return GeminiContextBuilder.buildCoachSystemPrompt(
-      recentSessions: allSessions,
-      exerciseMap: exerciseMap,
-      recoveryScores: recoveryScores,
-      activeTargets: activeTargets,
-      userName: settings.userName,
-      unitLabel: settings.unitLabel,
-    );
-  }
-
-  List<Content> _buildHistory() => _messages
-      .map((m) => Content(m.role, [TextPart(m.text)]))
-      .toList();
-
-  Future<void> _send() async {
+  void _send() {
     final text = _controller.text.trim();
-    if (text.isEmpty || _loading) return;
-
+    if (text.isEmpty) return;
     HapticFeedback.lightImpact();
     _controller.clear();
-
-    setState(() {
-      _messages.add(_ChatMessage(role: 'user', text: text));
-      _loading = true;
-      _streamingText = '';
-    });
-    _scrollToBottom();
-
-    final gemini = context.read<GeminiService>();
-    final systemPrompt = _buildSystemPrompt();
-    // Build history from all messages except the one we just added.
-    final history = _messages.length > 1
-        ? _buildHistory().sublist(0, _messages.length - 1)
-        : <Content>[];
-
-    final buffer = StringBuffer();
-    try {
-      await for (final chunk in gemini.streamCoachReply(
-        userMessage: text,
-        systemPrompt: systemPrompt,
-        history: history,
-      )) {
-        buffer.write(chunk);
-        if (mounted) {
-          setState(() => _streamingText = buffer.toString());
-          _scrollToBottom();
-        }
-      }
-      if (mounted) {
-        setState(() {
-          _messages.add(_ChatMessage(role: 'model', text: buffer.toString()));
-          _streamingText = '';
-          _loading = false;
-        });
-        _scrollToBottom();
-      }
-    } catch (_) {
-      if (mounted) setState(() { _streamingText = ''; _loading = false; });
-    }
+    context.read<AiCoachViewModel>().sendMessage(text);
   }
 
   void _scrollToBottom() {
@@ -153,7 +112,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final gemini = context.watch<GeminiService>();
+    final vm = context.watch<AiCoachViewModel>();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -163,13 +122,13 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           SafeArea(
             child: Column(
               children: [
-                _buildHeader(context),
+                _buildHeader(context, vm),
                 Expanded(
-                  child: gemini.isConfigured
-                      ? _buildChatArea()
+                  child: vm.isConfigured
+                      ? _buildChatArea(vm)
                       : _buildNoKeyState(context),
                 ),
-                if (gemini.isConfigured) _buildInputBar(),
+                if (vm.isConfigured) _buildInputBar(vm),
               ],
             ),
           ),
@@ -178,7 +137,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, AiCoachViewModel vm) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -248,34 +207,42 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               ],
             ),
           ),
-          if (_messages.isNotEmpty)
-            GestureDetector(
-              onTap: () => setState(() => _messages.clear()),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.glass,
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                  border: Border.all(color: AppColors.glassBorder),
-                ),
-                child: Text(
-                  'Clear',
-                  style: GoogleFonts.geist(
-                    color: AppColors.textMuted,
-                    fontSize: 11,
-                  ),
-                ),
-              ),
+          if (vm.isConfigured) ...[
+            _HeaderIconButton(
+              icon: Icons.history_rounded,
+              onTap: () => _openHistory(context, vm),
             ),
+            const SizedBox(width: AppSpacing.sm),
+            _HeaderIconButton(
+              icon: Icons.add_rounded,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                vm.newConversation();
+              },
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildChatArea() {
-    final hasMessages = _messages.isNotEmpty || _loading;
+  Future<void> _openHistory(BuildContext context, AiCoachViewModel vm) async {
+    HapticFeedback.lightImpact();
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (_) => _ConversationsSheet(vm: vm),
+    );
+  }
 
-    if (!hasMessages) return _buildWelcome();
+  Widget _buildChatArea(AiCoachViewModel vm) {
+    final messages = vm.messages;
+    final hasContent = messages.isNotEmpty || vm.isLoading;
+    if (!hasContent) return _buildWelcome();
 
     return ListView.builder(
       controller: _scrollCtrl,
@@ -285,20 +252,18 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         AppSpacing.md,
         AppSpacing.sm,
       ),
-      itemCount: _messages.length + (_loading ? 1 : 0),
+      itemCount: messages.length + (vm.isLoading ? 1 : 0),
       itemBuilder: (_, i) {
-        if (i == _messages.length) {
-          // Streaming bubble
-          return _StreamingBubble(text: _streamingText);
+        if (i == messages.length) {
+          return _StreamingBubble(text: vm.streamingText);
         }
-        return _MessageBubble(message: _messages[i]);
+        return _MessageBubble(message: messages[i]);
       },
     );
   }
 
   Widget _buildWelcome() {
-    final settings = context.read<SettingsProvider>();
-    final name = settings.userName;
+    final name = context.read<SettingsProvider>().userName;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
@@ -331,9 +296,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              name != null && name.isNotEmpty
-                  ? 'Hey $name 👋'
-                  : 'Your AI Coach',
+              name != null && name.isNotEmpty ? 'Hey $name 👋' : 'Your AI Coach',
               style: GoogleFonts.geist(
                 color: AppColors.textPrimary,
                 fontSize: 22,
@@ -356,11 +319,20 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
               alignment: WrapAlignment.center,
-              children: const [
-                _SuggestionChip('What should I train today?'),
-                _SuggestionChip('How\'s my recovery?'),
-                _SuggestionChip('Am I progressing on bench?'),
-                _SuggestionChip('Suggest a deload week'),
+              children: [
+                for (final s in const [
+                  'What should I train today?',
+                  'How\'s my recovery?',
+                  'Am I progressing on bench?',
+                  'Suggest a deload week',
+                ])
+                  _SuggestionChip(
+                    label: s,
+                    onTap: () {
+                      _controller.text = s;
+                      _send();
+                    },
+                  ),
               ],
             ),
           ],
@@ -397,7 +369,8 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     );
   }
 
-  Widget _buildInputBar() {
+  Widget _buildInputBar(AiCoachViewModel vm) {
+    final loading = vm.isLoading;
     return Container(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -445,22 +418,22 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           ),
           const SizedBox(width: AppSpacing.sm),
           GestureDetector(
-            onTap: _loading ? null : _send,
+            onTap: loading ? null : _send,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                gradient: _loading
+                gradient: loading
                     ? null
                     : const LinearGradient(
                         colors: [AppColors.primary, Color(0xFF5B21B6)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                color: _loading ? AppColors.glass3 : null,
+                color: loading ? AppColors.glass3 : null,
                 borderRadius: BorderRadius.circular(AppRadius.xl),
-                boxShadow: _loading
+                boxShadow: loading
                     ? null
                     : [
                         BoxShadow(
@@ -470,7 +443,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                         ),
                       ],
               ),
-              child: _loading
+              child: loading
                   ? const Center(
                       child: SizedBox(
                         width: 18,
@@ -494,21 +467,202 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   }
 }
 
-// ── Suggestion chip ───────────────────────────────────────────────────────────
+// ── Header icon button ──────────────────────────────────────────────────────
 
-class _SuggestionChip extends StatelessWidget {
-  const _SuggestionChip(this.label);
-  final String label;
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        final state = context.findAncestorStateOfType<_AiCoachScreenState>();
-        if (state == null) return;
-        state._controller.text = label;
-        state._send();
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppColors.glass,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: Border.all(color: AppColors.glassBorder),
+        ),
+        child: Icon(icon, color: AppColors.textSoft, size: 18),
+      ),
+    );
+  }
+}
+
+// ── Conversations history sheet ───────────────────────────────────────────────
+
+class _ConversationsSheet extends StatelessWidget {
+  const _ConversationsSheet({required this.vm});
+  final AiCoachViewModel vm;
+
+  @override
+  Widget build(BuildContext context) {
+    // Rebuild when the conversation list changes (delete, new message).
+    return AnimatedBuilder(
+      animation: vm,
+      builder: (context, _) {
+        final conversations = vm.conversations;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Conversations',
+                      style: GoogleFonts.geist(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () {
+                        vm.newConversation();
+                        Navigator.pop(context);
+                      },
+                      child: Row(
+                        children: [
+                          const Icon(Icons.add_rounded,
+                              color: AppColors.primary, size: 18),
+                          const SizedBox(width: 4),
+                          Text(
+                            'New chat',
+                            style: GoogleFonts.geist(
+                              color: AppColors.primary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (conversations.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                    child: Text(
+                      'No saved conversations yet.',
+                      style: GoogleFonts.geist(
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.5,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: conversations.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (_, i) {
+                        final c = conversations[i];
+                        final isActive = c.id == vm.activeConversationId;
+                        return _ConversationTile(
+                          conversation: c,
+                          isActive: isActive,
+                          onTap: () {
+                            vm.selectConversation(c.id);
+                            Navigator.pop(context);
+                          },
+                          onDelete: () => vm.deleteConversation(c.id),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
       },
+    );
+  }
+}
+
+class _ConversationTile extends StatelessWidget {
+  const _ConversationTile({
+    required this.conversation,
+    required this.isActive,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  final Conversation conversation;
+  final bool isActive;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm + 2,
+        ),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary.withValues(alpha: 0.12) : AppColors.glass3,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(
+            color: isActive ? AppColors.primary.withValues(alpha: 0.4) : AppColors.glassBorder,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.chat_bubble_outline_rounded,
+                color: AppColors.textMuted, size: 16),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                conversation.title.isEmpty ? 'New chat' : conversation.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.geist(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: onDelete,
+              child: const Padding(
+                padding: EdgeInsets.only(left: AppSpacing.sm),
+                child: Icon(Icons.delete_outline_rounded,
+                    color: AppColors.textFaint, size: 18),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Suggestion chip ───────────────────────────────────────────────────────────
+
+class _SuggestionChip extends StatelessWidget {
+  const _SuggestionChip({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
@@ -533,7 +687,7 @@ class _SuggestionChip extends StatelessWidget {
 
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message});
-  final _ChatMessage message;
+  final ChatMessage message;
 
   @override
   Widget build(BuildContext context) {
@@ -583,14 +737,16 @@ class _MessageBubble extends StatelessWidget {
                       ]
                     : null,
               ),
-              child: Text(
-                message.text,
-                style: GoogleFonts.geist(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                  height: 1.55,
-                ),
-              ),
+              child: isUser
+                  ? Text(
+                      message.text,
+                      style: GoogleFonts.geist(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.55,
+                      ),
+                    )
+                  : _CoachMarkdown(text: message.text),
             ),
           ),
         ],
@@ -630,17 +786,28 @@ class _StreamingBubble extends StatelessWidget {
               ),
               child: text.isEmpty
                   ? const RFLoadingDots()
-                  : Text(
-                      text,
-                      style: GoogleFonts.geist(
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        height: 1.55,
-                      ),
-                    ),
+                  : _CoachMarkdown(text: text),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Markdown renderer for coach replies, styled to the app theme.
+class _CoachMarkdown extends StatelessWidget {
+  const _CoachMarkdown({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return GptMarkdown(
+      text,
+      style: GoogleFonts.geist(
+        color: AppColors.textPrimary,
+        fontSize: 14,
+        height: 1.55,
       ),
     );
   }

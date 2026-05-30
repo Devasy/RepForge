@@ -9,7 +9,8 @@ import 'package:provider/provider.dart';
 
 import 'services/storage_service.dart';
 import 'services/ml_service.dart';
-import 'services/gemini_service.dart';
+import 'services/ai/gemini_ai_service.dart';
+import 'services/ai/coach_tool_service.dart';
 import 'services/health_connect_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
@@ -21,6 +22,7 @@ import 'services/managers/program_manager.dart';
 import 'services/managers/history_manager.dart';
 import 'services/managers/health_sync_manager.dart';
 import 'services/managers/pr_manager.dart';
+import 'services/managers/conversation_manager.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -62,7 +64,10 @@ class WorkoutLoggerApp extends StatelessWidget {
   static final HistoryManager _historyManager =
       HistoryManager(_storageService, healthSyncManager: _healthSyncManager);
   static final PRManager _prManager = PRManager(_storageService);
-  static final GeminiService _geminiService = GeminiService();
+  static final GeminiAiService _geminiService =
+      GeminiAiService(storage: _storageService);
+  static final ConversationManager _conversationManager =
+      ConversationManager(_storageService);
 
   const WorkoutLoggerApp({super.key});
 
@@ -89,7 +94,15 @@ class WorkoutLoggerApp extends StatelessWidget {
         // Provided as ChangeNotifier so HistoryScreen rebuilds on sync badge changes.
         ChangeNotifierProvider<HistoryManager>.value(value: _historyManager),
         ChangeNotifierProvider<PRManager>.value(value: _prManager),
-        ChangeNotifierProvider<GeminiService>.value(value: _geminiService),
+        // GeminiAiService is the single AI backend instance. It's a ChangeNotifier
+        // (settings UI watches isConfigured/model), so it's provided as such.
+        // Consumers that should depend on the abstraction (the coach ViewModel,
+        // program generator) receive it typed as IAiService at construction —
+        // the future firebase_ai swap point — without a separate provider.
+        ChangeNotifierProvider<GeminiAiService>.value(value: _geminiService),
+        ChangeNotifierProvider<ConversationManager>.value(
+          value: _conversationManager,
+        ),
         // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
           create: (_) => WorkoutProvider(
@@ -97,6 +110,13 @@ class WorkoutLoggerApp extends StatelessWidget {
             mlService: _mlService,
             historyManager: _historyManager,
             programManager: _programManager,
+          ),
+        ),
+        // CoachToolService backs AI tool calls; reads from WorkoutProvider + PRManager.
+        Provider<CoachToolService>(
+          create: (ctx) => CoachToolService(
+            ctx.read<WorkoutProvider>(),
+            ctx.read<PRManager>(),
           ),
         ),
       ],
@@ -135,12 +155,17 @@ class _AppInitializerState extends State<AppInitializer> {
     final historyManager = context.read<HistoryManager>();
     final prManager = context.read<PRManager>();
     final api = context.read<ApiService>();
-    final gemini = context.read<GeminiService>();
+    final gemini = context.read<GeminiAiService>();
 
     try {
       await provider.init();
       await settings.init();
       gemini.init(settings.geminiApiKey, model: settings.geminiModel);
+      try {
+        await gemini.loadUsage();
+      } catch (e, st) {
+        debugPrint('gemini.loadUsage failed: $e\n$st');
+      }
       await historyManager.loadSessions();
       await prManager.load();
       await prManager.backfillFromSessions(historyManager.sessions);

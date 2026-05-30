@@ -1,88 +1,49 @@
 // gemini_context_builder.dart — Builds rich context strings from app data for Gemini prompts.
 
 import '../models/models.dart';
-import 'interfaces/ml_service_interface.dart';
 
 class GeminiContextBuilder {
   const GeminiContextBuilder._();
 
   // ── Coach system prompt ────────────────────────────────────────────────────
+  //
+  // Deliberately STATIC (no per-turn workout data) so the prefix stays
+  // byte-identical across a conversation and Gemini's implicit prompt caching
+  // can engage. All live data is fetched on demand via the coach tools
+  // (see CoachToolService), not embedded here.
   static String buildCoachSystemPrompt({
-    required List<WorkoutSession> recentSessions,
-    required Map<String, Exercise> exerciseMap,
-    required Map<String, MuscleRecoveryStatus> recoveryScores,
-    required List<Target> activeTargets,
     String? userName,
     String unitLabel = 'kg',
+    DateTime? now,
   }) {
+    final n = now ?? DateTime.now();
+    final today = '${n.year}-${n.month.toString().padLeft(2, '0')}-'
+        '${n.day.toString().padLeft(2, '0')}';
+
     final buf = StringBuffer()
       ..writeln(
         'You are an expert personal trainer embedded in RepForge, a workout tracking app.',
       )
       ..writeln(
         'Answer concisely (under 180 words unless a plan is requested). '
-        'Be encouraging and specific — always reference the user\'s actual data.',
+        'Be encouraging and specific.',
+      )
+      ..writeln('Today is $today. Use this when interpreting relative dates '
+          '("last week", "3 months ago").')
+      ..writeln(
+        'This prompt contains NO workout data. To answer anything about the '
+        'user\'s training — exercise progression, workouts in a date range, '
+        'routine performance, personal records, goal progress, or muscle '
+        'recovery — CALL THE PROVIDED TOOLS rather than guessing or inventing '
+        'numbers. Pass ISO dates (YYYY-MM-DD) or a day count to the tools.',
+      )
+      ..writeln(
+        'Weights are in $unitLabel. Format replies with Markdown (lists, bold, '
+        'tables) where it aids clarity.',
       );
 
     if (userName != null && userName.isNotEmpty) {
-      buf.writeln('\nUser: $userName');
-    }
-
-    // Recent sessions
-    buf.writeln('\n--- RECENT SESSIONS (last 14 days) ---');
-    final cutoff = DateTime.now().subtract(const Duration(days: 14));
-    final recent = recentSessions
-        .where((s) => s.date.isAfter(cutoff))
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-
-    if (recent.isEmpty) {
-      buf.writeln('No sessions in the last 14 days.');
-    } else {
-      for (final s in recent.take(8)) {
-        final date = '${_weekday(s.date.weekday)} ${s.date.day}/${s.date.month}';
-        final exParts = s.exercises.map((e) {
-          final name = exerciseMap[e.exerciseId]?.name ?? e.exerciseId;
-          final sets = e.sets
-              .map((ws) => '${ws.weight}$unitLabel×${ws.reps}')
-              .join(', ');
-          return '$name [$sets]';
-        });
-        buf.writeln('$date: ${exParts.join(' | ')}');
-      }
-    }
-
-    // Muscle recovery
-    buf.writeln('\n--- MUSCLE RECOVERY ---');
-    if (recoveryScores.isEmpty) {
-      buf.writeln('No recovery data yet.');
-    } else {
-      final sorted = recoveryScores.entries.toList()
-        ..sort((a, b) => a.value.recoveryPercent.compareTo(b.value.recoveryPercent));
-      for (final e in sorted) {
-        final name = e.key.replaceAll('_', ' ');
-        final pct = e.value.recoveryPercent;
-        final tag = e.value.isRecovered
-            ? 'ready'
-            : e.value.isUnderRecovered
-                ? 'fatigued'
-                : 'recovering';
-        buf.writeln('$name: $pct% ($tag)');
-      }
-    }
-
-    // Active goals
-    buf.writeln('\n--- ACTIVE GOALS ---');
-    if (activeTargets.isEmpty) {
-      buf.writeln('No active goals set.');
-    } else {
-      for (final t in activeTargets) {
-        final name = exerciseMap[t.exerciseId]?.name ?? t.exerciseId;
-        final progress = t.progressPercentage.toStringAsFixed(0);
-        buf.writeln(
-          '$name: ${t.currentValue}$unitLabel → ${t.targetValue}$unitLabel ($progress%)',
-        );
-      }
+      buf.writeln('\nThe user\'s name is $userName.');
     }
 
     return buf.toString();

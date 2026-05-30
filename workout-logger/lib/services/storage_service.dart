@@ -25,6 +25,7 @@ class StorageService implements IStorageService {
   static const String _settingsBox = 'settings';
   static const String _trainingProgramsBox = 'training_programs';
   static const String _personalRecordsBox = 'personal_records';
+  static const String _aiConversationsBox = 'ai_conversations';
 
   late Box<String> _sessionsBox;
   late Box<String> _routinesBoxInstance;
@@ -34,6 +35,7 @@ class StorageService implements IStorageService {
   late Box<String> _settingsBoxInstance;
   late Box<String> _trainingProgramsBoxInstance;
   late Box<String> _personalRecordsBoxInstance;
+  late Box<String> _aiConversationsBoxInstance;
 
   String _appVersion = const String.fromEnvironment(
     'APP_VERSION',
@@ -72,6 +74,9 @@ class StorageService implements IStorageService {
     );
     _personalRecordsBoxInstance = await Hive.openBox<String>(
       _personalRecordsBox,
+    );
+    _aiConversationsBoxInstance = await Hive.openBox<String>(
+      _aiConversationsBox,
     );
 
     // Initialize default muscle groups if empty
@@ -364,6 +369,9 @@ class StorageService implements IStorageService {
       'customExercises': _customExercisesBoxInstance.values
           .map(_normalizeExportValue)
           .toList(growable: false),
+      'conversations': _aiConversationsBoxInstance.values
+          .map(_normalizeExportValue)
+          .toList(growable: false),
       'settings': settingsMap,
       'exportDate': DateTime.now().toIso8601String(),
       'appVersion': _appVersion,
@@ -455,6 +463,20 @@ class StorageService implements IStorageService {
         }
       }
     }
+
+    // Import AI conversations (merge: skip if id already exists)
+    final conversations = data['conversations'];
+    if (conversations is List) {
+      for (var item in conversations) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final conversation = Conversation.fromJson(map);
+        final existing = await getConversation(conversation.id);
+        if (existing == null) {
+          await saveConversation(conversation);
+        }
+      }
+    }
   }
 
   // ==================== TRAINING PROGRAMS ====================
@@ -513,6 +535,39 @@ class StorageService implements IStorageService {
       records.add(PersonalRecord.fromJson(jsonDecode(json)));
     }
     return records;
+  }
+
+  // ==================== AI CONVERSATIONS ====================
+
+  @override
+  Future<void> saveConversation(Conversation conversation) async {
+    await _aiConversationsBoxInstance.put(
+      conversation.id,
+      jsonEncode(conversation.toJson()),
+    );
+  }
+
+  @override
+  Future<List<Conversation>> getAllConversations() async {
+    final conversations = <Conversation>[];
+    for (final json in _aiConversationsBoxInstance.values) {
+      conversations.add(Conversation.fromJson(jsonDecode(json)));
+    }
+    // Most recently updated first.
+    conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return conversations;
+  }
+
+  @override
+  Future<Conversation?> getConversation(String id) async {
+    final json = _aiConversationsBoxInstance.get(id);
+    if (json == null) return null;
+    return Conversation.fromJson(jsonDecode(json));
+  }
+
+  @override
+  Future<void> deleteConversation(String id) async {
+    await _aiConversationsBoxInstance.delete(id);
   }
 
   // ==================== STATS ====================
