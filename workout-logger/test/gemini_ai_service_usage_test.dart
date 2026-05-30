@@ -32,9 +32,7 @@ void main() {
     });
 
     test('usage is persisted and reloaded by a fresh instance', () async {
-      service.recordUsage(prompt: 100, response: 40, total: 140);
-      // Let the fire-and-forget persist complete.
-      await Future<void>.delayed(Duration.zero);
+      await service.recordUsage(prompt: 100, response: 40, total: 140);
 
       final reloaded = GeminiAiService(storage: storage);
       await reloaded.loadUsage();
@@ -46,7 +44,7 @@ void main() {
     });
 
     test('resetUsage zeros counters and persists', () async {
-      service.recordUsage(prompt: 100, response: 40, total: 140);
+      await service.recordUsage(prompt: 100, response: 40, total: 140);
       await service.resetUsage();
 
       expect(service.totalTokensUsed, 0);

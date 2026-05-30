@@ -161,7 +161,11 @@ class _AppInitializerState extends State<AppInitializer> {
       await provider.init();
       await settings.init();
       gemini.init(settings.geminiApiKey, model: settings.geminiModel);
-      await gemini.loadUsage();
+      try {
+        await gemini.loadUsage();
+      } catch (e, st) {
+        debugPrint('gemini.loadUsage failed: $e\n$st');
+      }
       await historyManager.loadSessions();
       await prManager.load();
       await prManager.backfillFromSessions(historyManager.sessions);

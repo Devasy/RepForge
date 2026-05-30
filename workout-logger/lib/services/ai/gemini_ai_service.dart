@@ -98,16 +98,16 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   /// Accumulate one request's token counts. Exposed for testing; normally
   /// fed from a response's [UsageMetadata] via [_recordUsage].
   @visibleForTesting
-  void recordUsage({
+  Future<void> recordUsage({
     required int prompt,
     required int response,
     required int total,
-  }) {
+  }) async {
     _promptTokens += prompt;
     _responseTokens += response;
     _totalTokens += total;
     _requestCount += 1;
-    _persistUsage();
+    await _persistUsage();
     notifyListeners();
   }
 
