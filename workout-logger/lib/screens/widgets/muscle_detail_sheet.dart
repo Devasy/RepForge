@@ -2,9 +2,14 @@
 // Shows weekly contributing exercises (volume + growth trend) and an
 // on-demand AI insight via GeminiService.generateInsight.
 
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/widget_previews.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
 import '../../services/workout_provider.dart';
 import '../../services/settings_provider.dart';
@@ -217,6 +222,18 @@ class MuscleDetailSheet extends StatelessWidget {
               );
             }),
 
+          const SizedBox(height: AppSpacing.lg),
+          _MuscleVolumeTrendChart(
+            muscleId: muscleId,
+            provider: provider,
+          ),
+
+          const SizedBox(height: AppSpacing.lg),
+          _RecentMuscleSessionsSection(
+            muscleId: muscleId,
+            provider: provider,
+          ),
+
           const SizedBox(height: AppSpacing.md),
           _AiInsightSection(
             muscleId: muscleId,
@@ -228,6 +245,325 @@ class MuscleDetailSheet extends StatelessWidget {
     );
   }
 }
+
+// ── Volume trend chart ────────────────────────────────────────────────────────
+
+// Provider-aware shell — fetches data, delegates rendering to _VolumeTrendChartView.
+class _MuscleVolumeTrendChart extends StatelessWidget {
+  const _MuscleVolumeTrendChart({
+    required this.muscleId,
+    required this.provider,
+  });
+
+  final String muscleId;
+  final WorkoutProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    return _VolumeTrendChartView(
+      muscleId: muscleId,
+      series: provider.getMuscleWeeklyVolumeSeries(muscleId, weeks: 8),
+      toDisplay: settings.toDisplay,
+      unitLabel: settings.unitLabel,
+    );
+  }
+}
+
+// Pure presentation widget — no provider dependencies; previewable.
+class _VolumeTrendChartView extends StatelessWidget {
+  const _VolumeTrendChartView({
+    required this.muscleId,
+    required this.series,
+    required this.toDisplay,
+    required this.unitLabel,
+  });
+
+  final String muscleId;
+  final List<({DateTime weekStart, double volume})> series;
+  final double Function(double) toDisplay;
+  final String unitLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppColors.muscle(muscleId);
+    final hasData = series.any((p) => p.volume > 0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RFSectionHeader('Volume trend (8 wk)', bottomPad: false),
+        const SizedBox(height: AppSpacing.sm),
+        if (!hasData)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Text(
+              'Not enough data yet.',
+              style: GoogleFonts.geist(
+                color: AppColors.textMuted,
+                fontSize: 13,
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 96,
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: series.map((p) => toDisplay(p.volume)).fold(0.0, max) * 1.25,
+                barTouchData: BarTouchData(enabled: false),
+                titlesData: FlTitlesData(
+                  show: true,
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final i = value.toInt();
+                        if (i < 0 || i >= series.length) return const SizedBox.shrink();
+                        if (i != 0 && i != series.length - 1) return const SizedBox.shrink();
+                        return Text(
+                          DateFormat('MMM d').format(series[i].weekStart),
+                          style: GoogleFonts.geistMono(
+                            color: AppColors.textFaint,
+                            fontSize: 9,
+                          ),
+                        );
+                      },
+                      reservedSize: 16,
+                    ),
+                  ),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: series.asMap().entries.map((entry) {
+                  final vol = toDisplay(entry.value.volume);
+                  return BarChartGroupData(
+                    x: entry.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: vol,
+                        color: vol > 0
+                            ? color.withValues(alpha: 0.85)
+                            : AppColors.glass2,
+                        width: 10,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Recent sessions for this muscle ───────────────────────────────────────────
+
+// Provider-aware shell — fetches data, delegates rendering to _RecentSessionsView.
+class _RecentMuscleSessionsSection extends StatelessWidget {
+  const _RecentMuscleSessionsSection({
+    required this.muscleId,
+    required this.provider,
+  });
+
+  final String muscleId;
+  final WorkoutProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    return _RecentSessionsView(
+      sessions: provider.getRecentMuscleSessionSummaries(muscleId),
+      toDisplay: settings.toDisplay,
+      unitLabel: settings.unitLabel,
+    );
+  }
+}
+
+// Pure presentation widget — no provider dependencies; previewable.
+class _RecentSessionsView extends StatelessWidget {
+  const _RecentSessionsView({
+    required this.sessions,
+    required this.toDisplay,
+    required this.unitLabel,
+  });
+
+  final List<({DateTime date, List<String> exerciseNames, double volume})> sessions;
+  final double Function(double) toDisplay;
+  final String unitLabel;
+
+  String _relativeDate(DateTime date) {
+    final diff = DateTime.now().difference(date).inDays;
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    if (diff < 7) return '$diff days ago';
+    if (diff < 14) return '1 week ago';
+    return DateFormat('MMM d').format(date);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RFSectionHeader('Recent sessions', bottomPad: false),
+        const SizedBox(height: AppSpacing.sm),
+        if (sessions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Text(
+              'No sessions recorded for this muscle yet.',
+              style: GoogleFonts.geist(
+                color: AppColors.textMuted,
+                fontSize: 13,
+              ),
+            ),
+          )
+        else
+          ...sessions.map((s) {
+            final displayVol = toDisplay(s.volume);
+            final volStr = displayVol >= 1000
+                ? '${(displayVol / 1000).toStringAsFixed(1)}k'
+                : displayVol.toStringAsFixed(0);
+            return Container(
+              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm + 2,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: AppColors.glassBorder),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _relativeDate(s.date),
+                          style: GoogleFonts.geistMono(
+                            color: AppColors.textMuted,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          s.exerciseNames.join(' · '),
+                          style: GoogleFonts.geist(
+                            color: AppColors.textSoft,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '$volStr $unitLabel',
+                    style: GoogleFonts.geistMono(
+                      color: AppColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+      ],
+    );
+  }
+}
+
+// ── Widget previews ───────────────────────────────────────────────────────────
+
+Widget _previewScaffold(Widget child) => MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.darkTheme,
+      home: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: child,
+        ),
+      ),
+    );
+
+List<({DateTime weekStart, double volume})> _stubSeries() {
+  final now = DateTime.now();
+  const vols = [1200.0, 1450.0, 980.0, 1600.0, 1750.0, 1400.0, 1900.0, 2100.0];
+  return List.generate(
+    8,
+    (i) => (
+      weekStart: now.subtract(Duration(days: (8 - i) * 7)),
+      volume: vols[i],
+    ),
+  );
+}
+
+List<({DateTime date, List<String> exerciseNames, double volume})>
+    _stubSessions() {
+  final now = DateTime.now();
+  return [
+    (date: now, exerciseNames: ['Bench Press', 'Incline Dumbbell Press'], volume: 4200),
+    (date: now.subtract(const Duration(days: 3)), exerciseNames: ['Cable Fly'], volume: 1800),
+    (date: now.subtract(const Duration(days: 7)), exerciseNames: ['Bench Press', 'Push-Up'], volume: 3900),
+    (date: now.subtract(const Duration(days: 14)), exerciseNames: ['Bench Press'], volume: 3600),
+  ];
+}
+
+@Preview(name: 'Volume Trend – growing', group: 'MuscleDetailSheet')
+Widget previewVolumeTrend() => _previewScaffold(
+      _VolumeTrendChartView(
+        muscleId: 'chest',
+        series: _stubSeries(),
+        toDisplay: (v) => v,
+        unitLabel: 'kg',
+      ),
+    );
+
+@Preview(name: 'Volume Trend – empty', group: 'MuscleDetailSheet')
+Widget previewVolumeTrendEmpty() => _previewScaffold(
+      _VolumeTrendChartView(
+        muscleId: 'chest',
+        series: List.generate(
+          8,
+          (i) => (weekStart: DateTime.now().subtract(Duration(days: (8 - i) * 7)), volume: 0.0),
+        ),
+        toDisplay: (v) => v,
+        unitLabel: 'kg',
+      ),
+    );
+
+@Preview(name: 'Recent Sessions – with data', group: 'MuscleDetailSheet')
+Widget previewRecentSessions() => _previewScaffold(
+      _RecentSessionsView(
+        sessions: _stubSessions(),
+        toDisplay: (v) => v,
+        unitLabel: 'kg',
+      ),
+    );
+
+@Preview(name: 'Recent Sessions – empty', group: 'MuscleDetailSheet')
+Widget previewRecentSessionsEmpty() => _previewScaffold(
+      _RecentSessionsView(
+        sessions: const [],
+        toDisplay: (v) => v,
+        unitLabel: 'kg',
+      ),
+    );
 
 // ── AI insight section ─────────────────────────────────────────────────────────
 

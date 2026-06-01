@@ -1080,6 +1080,70 @@ class WorkoutProvider extends ChangeNotifier {
     return result;
   }
 
+  /// Last [limit] sessions where [muscleId] was trained (newest-first).
+  List<({DateTime date, List<String> exerciseNames, double volume})>
+      getRecentMuscleSessionSummaries(String muscleId, {int limit = 6}) {
+    final exerciseMap = <String, Exercise>{
+      for (final e in _allExercises) e.id: e,
+    };
+    final result = <({DateTime date, List<String> exerciseNames, double volume})>[];
+    for (final session in _sessions) {
+      if (result.length >= limit) break;
+      final names = <String>[];
+      double vol = 0;
+      for (final log in session.exercises) {
+        final exercise = exerciseMap[log.exerciseId];
+        if (exercise == null) continue;
+        final activation = exercise.muscleActivations
+            .where((a) => a.muscleGroupId == muscleId)
+            .firstOrNull;
+        if (activation == null) continue;
+        names.add(exercise.name);
+        vol += log.totalVolume * (activation.activationPercentage / 100);
+      }
+      if (names.isNotEmpty) {
+        result.add((date: session.date, exerciseNames: names, volume: vol));
+      }
+    }
+    return result;
+  }
+
+  /// Weekly volume for [muscleId] over the last [weeks] weeks, oldest-first.
+  List<({DateTime weekStart, double volume})> getMuscleWeeklyVolumeSeries(
+    String muscleId, {
+    int weeks = 8,
+  }) {
+    final now = DateTime.now();
+    final exerciseMap = <String, Exercise>{
+      for (final e in _allExercises) e.id: e,
+    };
+    final buckets = <int, double>{};
+    final cutoff = now.subtract(Duration(days: weeks * 7));
+
+    for (final session in _sessions) {
+      if (session.date.isBefore(cutoff)) continue;
+      final weekIndex = now.difference(session.date).inDays ~/ 7;
+      if (weekIndex >= weeks) continue;
+      for (final log in session.exercises) {
+        final exercise = exerciseMap[log.exerciseId];
+        if (exercise == null) continue;
+        for (final activation in exercise.muscleActivations) {
+          if (activation.muscleGroupId != muscleId) continue;
+          buckets[weekIndex] = (buckets[weekIndex] ?? 0) +
+              log.totalVolume * (activation.activationPercentage / 100);
+        }
+      }
+    }
+
+    // weekIndex 0 = this week, weeks-1 = oldest; return oldest-first
+    return List.generate(weeks, (i) => weeks - 1 - i)
+        .map((wi) => (
+              weekStart: now.subtract(Duration(days: (wi + 1) * 7)),
+              volume: buckets[wi] ?? 0,
+            ))
+        .toList();
+  }
+
   // ==================== QUICK STATS ====================
 
   Future<Map<String, dynamic>> getQuickStats() async {
