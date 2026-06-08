@@ -9,6 +9,7 @@ import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../theme/app_theme.dart';
 import 'programs/programs_screen.dart';
+import 'routine_optimizer_screen.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/routine_creator.dart';
 
@@ -491,7 +492,30 @@ class _RoutineCard extends StatelessWidget {
             ),
             // Optimize button
             GestureDetector(
-              onTap: () {},
+              onTap: () {
+                HapticFeedback.lightImpact();
+                final sessionCount = provider.sessions
+                    .where((s) => s.routineId == routine.id)
+                    .length;
+                if (sessionCount < 3) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Log "${routine.name}" at least 3 times so the '
+                        'optimizer has enough data to work with.',
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => RoutineOptimizerScreen(routine: routine),
+                  ),
+                );
+              },
               child: Container(
                 width: 34,
                 height: 34,
