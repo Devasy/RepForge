@@ -325,7 +325,7 @@ class _HeaderIconButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: AppColors.glass,
+          color: AppColors.glass3,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: AppColors.glassBorder),
         ),
@@ -359,7 +359,7 @@ class _MessageBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm + 2,
+                vertical: AppSpacing.sm,
               ),
               decoration: BoxDecoration(
                 gradient: isUser
@@ -424,7 +424,7 @@ class _StreamingBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm + 2,
+                vertical: AppSpacing.sm,
               ),
               decoration: BoxDecoration(
                 color: AppColors.glass3,
@@ -510,18 +510,13 @@ class _ConversationsSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'Optimization History',
-                      style: GoogleFonts.geist(
-                        color: AppColors.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Spacer(),
-                  ],
+                Text(
+                  'Optimization History',
+                  style: GoogleFonts.geist(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 if (conversations.isEmpty)
@@ -589,7 +584,7 @@ class _ConversationTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm + 2,
+          vertical: AppSpacing.sm,
         ),
         decoration: BoxDecoration(
           color: isActive
