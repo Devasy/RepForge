@@ -11,13 +11,18 @@ import '../interfaces/storage_service_interface.dart';
 
 /// Manages the lifecycle of AI coach [Conversation]s (load, create, append,
 /// rename, delete) backed by [IStorageService].
+///
+/// [kind] scopes this manager to a specific conversation category
+/// (e.g. `'coach'` or `'optimizer'`). Only conversations with a matching
+/// [Conversation.kind] are loaded or created by this instance.
 class ConversationManager extends ChangeNotifier {
   final IStorageService _storage;
+  final String kind;
 
   List<Conversation> _conversations = [];
   Conversation? _active;
 
-  ConversationManager(this._storage);
+  ConversationManager(this._storage, {this.kind = 'coach'});
 
   /// All conversations, most-recently-updated first.
   List<Conversation> get conversations => List.unmodifiable(_conversations);
@@ -30,8 +35,10 @@ class ConversationManager extends ChangeNotifier {
   List<ChatMessage> get activeMessages => _active?.messages ?? const [];
 
   /// Load all conversations from storage. Does not change the active one.
+  /// Only conversations whose [Conversation.kind] matches [kind] are loaded.
   Future<void> loadConversations() async {
-    _conversations = await _storage.getAllConversations();
+    final all = await _storage.getAllConversations();
+    _conversations = all.where((c) => c.kind == kind).toList();
     notifyListeners();
   }
 
@@ -60,6 +67,7 @@ class ConversationManager extends ChangeNotifier {
     if (current == null) {
       updated = Conversation(
         title: _deriveTitle(message),
+        kind: kind,
         messages: [message],
       );
     } else {

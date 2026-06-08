@@ -113,5 +113,36 @@ void main() {
       final stored = await storage.getConversation(id);
       expect(stored!.title, 'My chat');
     });
+
+    test('kind-scoped manager only loads matching conversations', () async {
+      // Seed two conversations directly into storage with different kinds.
+      final coachConv = Conversation(title: 'coach chat', kind: 'coach');
+      final optimizerConv =
+          Conversation(title: 'optimizer chat', kind: 'optimizer');
+      await storage.saveConversation(coachConv);
+      await storage.saveConversation(optimizerConv);
+
+      final optimizerManager = ConversationManager(storage, kind: 'optimizer');
+      await optimizerManager.loadConversations();
+
+      expect(optimizerManager.conversations, hasLength(1));
+      expect(optimizerManager.conversations.first.title, 'optimizer chat');
+    });
+
+    test('optimizer manager stamps kind on new conversations', () async {
+      final optimizerManager = ConversationManager(storage, kind: 'optimizer');
+      await optimizerManager.appendMessage(
+        ChatMessage(role: 'user', text: 'Optimize Push Day'),
+      );
+      expect(optimizerManager.active!.kind, 'optimizer');
+
+      final stored = await storage.getAllConversations();
+      expect(stored.first.kind, 'optimizer');
+    });
+
+    test('default manager uses coach kind', () async {
+      await manager.appendMessage(ChatMessage(role: 'user', text: 'hi'));
+      expect(manager.active!.kind, 'coach');
+    });
   });
 }
