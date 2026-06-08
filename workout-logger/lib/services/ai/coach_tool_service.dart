@@ -22,6 +22,51 @@ class CoachToolService {
 
   CoachToolService(this._wp, this._pr);
 
+  /// Tool declaration for the optimizer screen's `ask_user_questions` flow.
+  /// NOT included in the coach's tool list — only the optimizer adds it.
+  static FunctionDeclaration get askUserQuestionsDeclaration =>
+      FunctionDeclaration(
+        'ask_user_questions',
+        'Ask the user 1–3 clarifying questions before proceeding. '
+            'Provide an optional preamble (short context sentence shown above the '
+            'questions). Each question has 3–4 option chips; set multiSelect:true '
+            'when the user should be able to pick multiple options. '
+            'allowCustom is always treated as true.',
+        Schema.object(
+          properties: {
+            'preamble': Schema.string(
+              description:
+                  'Optional. A short sentence shown above the questions, '
+                  'e.g. "Before I analyse your routine, I have a few quick '
+                  'questions."',
+              nullable: true,
+            ),
+            'questions': Schema.array(
+              items: Schema.object(
+                properties: {
+                  'question': Schema.string(
+                    description: 'The question text, e.g. "What is your primary goal?"',
+                  ),
+                  'options': Schema.array(
+                    items: Schema.string(),
+                    description: '3–4 answer chips, e.g. ["Strength","Hypertrophy","Fat loss","Endurance"].',
+                  ),
+                  'multiSelect': Schema.boolean(
+                    description:
+                        'If true the user can select multiple chips. '
+                        'Use for confirmation questions (e.g. "Which changes should I apply?").',
+                    nullable: true,
+                  ),
+                },
+                requiredProperties: ['question', 'options'],
+              ),
+              description: '1–3 questions to display.',
+            ),
+          },
+          requiredProperties: ['questions'],
+        ),
+      );
+
   /// Tool declarations advertised to the model.
   List<Tool> buildTools() => [
         Tool(functionDeclarations: [

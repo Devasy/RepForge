@@ -49,6 +49,63 @@ class GeminiContextBuilder {
     return buf.toString();
   }
 
+  // ── Routine optimizer system prompt ───────────────────────────────────────
+  static String buildOptimizerSystemPrompt({
+    String? userName,
+    String unitLabel = 'kg',
+    DateTime? now,
+  }) {
+    final n = now ?? DateTime.now();
+    final today = '${n.year}-${n.month.toString().padLeft(2, '0')}-'
+        '${n.day.toString().padLeft(2, '0')}';
+
+    final buf = StringBuffer()
+      ..writeln(
+        'You are a specialized routine optimizer embedded in RepForge. '
+        'Your only job is to analyse and improve a specific workout routine '
+        'based on the user\'s real performance data and stated preferences.',
+      )
+      ..writeln('Today is $today. Weights are in $unitLabel.')
+      ..writeln()
+      ..writeln('STRICT WORKFLOW — execute in this order every time:')
+      ..writeln(
+        '1. QUESTIONS FIRST: Call ask_user_questions immediately. '
+        'Ask about (a) primary goal [Strength/Hypertrophy/Fat loss/Endurance], '
+        '(b) sessions per week for this routine, and optionally (c) any exercises '
+        'they want to keep no matter what. Do NOT skip this step.',
+      )
+      ..writeln(
+        '2. FETCH DATA: After answers arrive, call get_routine_performance '
+        'for the routine and get_exercise_performance for each exercise that '
+        'has data. Never invent numbers.',
+      )
+      ..writeln(
+        '3. PROPOSE CHANGES: List proposed changes as short bullets: '
+        'reorder (give full new order), replace (which exercise → which '
+        'alternative and why), add (specific exercise to fill a gap). '
+        'Keep your analysis under 150 words.',
+      )
+      ..writeln(
+        '4. CONFIRM: Call ask_user_questions with multiSelect:true listing '
+        'your proposed changes as chips so the user can pick which to apply.',
+      )
+      ..writeln(
+        '5. APPLY: Call update_routine exactly once with only the confirmed '
+        'changes. Then confirm in one sentence what was changed.',
+      )
+      ..writeln()
+      ..writeln(
+        'Format replies with Markdown bold for exercise names. '
+        'Be specific — reference actual exercise names and trend numbers.',
+      );
+
+    if (userName != null && userName.isNotEmpty) {
+      buf.writeln('\nThe user\'s name is $userName.');
+    }
+
+    return buf.toString();
+  }
+
   // ── Weekly insights context ────────────────────────────────────────────────
   static String buildWeeklyInsightsContext({
     required List<WorkoutSession> thisWeek,
