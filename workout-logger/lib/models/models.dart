@@ -867,6 +867,7 @@ class ChatMessage {
 class Conversation {
   final String id;
   final String title;
+  final String kind; // 'coach' | 'optimizer'
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<ChatMessage> messages;
@@ -874,6 +875,7 @@ class Conversation {
   Conversation({
     String? id,
     required this.title,
+    this.kind = 'coach',
     DateTime? createdAt,
     DateTime? updatedAt,
     List<ChatMessage>? messages,
@@ -885,6 +887,7 @@ class Conversation {
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
+    'kind': kind,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'messages': messages.map((m) => m.toJson()).toList(),
@@ -893,6 +896,7 @@ class Conversation {
   factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
     id: json['id'] as String?,
     title: json['title'] as String,
+    kind: json['kind'] as String? ?? 'coach',
     createdAt: DateTime.parse(json['createdAt'] as String),
     updatedAt: json['updatedAt'] != null
         ? DateTime.parse(json['updatedAt'] as String)
@@ -904,16 +908,76 @@ class Conversation {
 
   Conversation copyWith({
     Object? title = _sentinel,
+    Object? kind = _sentinel,
     Object? createdAt = _sentinel,
     Object? updatedAt = _sentinel,
     Object? messages = _sentinel,
   }) => Conversation(
     id: id,
     title: title == _sentinel ? this.title : title as String,
+    kind: kind == _sentinel ? this.kind : kind as String,
     createdAt: createdAt == _sentinel ? this.createdAt : createdAt as DateTime,
     updatedAt: updatedAt == _sentinel ? this.updatedAt : updatedAt as DateTime,
     messages: messages == _sentinel
         ? this.messages
         : messages as List<ChatMessage>,
+  );
+}
+
+// ==================== AI Question Models ====================
+
+/// One question the AI asks the user, with predefined options.
+class QuestionSpec {
+  final String question;
+  final List<String> options;
+  final bool multiSelect;
+  final bool allowCustom;
+
+  const QuestionSpec({
+    required this.question,
+    required this.options,
+    this.multiSelect = false,
+    this.allowCustom = true,
+  });
+
+  factory QuestionSpec.fromJson(Map<String, dynamic> j) => QuestionSpec(
+    question: j['question'] as String,
+    options: (j['options'] as List).cast<String>(),
+    multiSelect: j['multiSelect'] as bool? ?? false,
+    allowCustom: j['allowCustom'] as bool? ?? true,
+  );
+}
+
+/// The user's answer to one [QuestionSpec].
+class AnswerSpec {
+  final String question;
+  final List<String> selected;
+  final String? custom;
+
+  const AnswerSpec({
+    required this.question,
+    required this.selected,
+    this.custom,
+  });
+
+  Map<String, Object?> toJson() => {
+    'question': question,
+    'selected': selected,
+    if (custom != null && custom!.isNotEmpty) 'custom': custom,
+  };
+}
+
+/// The structured payload from an `ask_user_questions` tool call.
+class PendingQuestions {
+  final String? preamble;
+  final List<QuestionSpec> questions;
+
+  const PendingQuestions({this.preamble, required this.questions});
+
+  factory PendingQuestions.fromJson(Map<String, dynamic> j) => PendingQuestions(
+    preamble: j['preamble'] as String?,
+    questions: (j['questions'] as List)
+        .map((q) => QuestionSpec.fromJson(q as Map<String, dynamic>))
+        .toList(),
   );
 }

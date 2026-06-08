@@ -522,4 +522,77 @@ void main() {
       expect(copy.minReps, original.minReps);
     });
   });
+
+  // ── Conversation.kind ─────────────────────────────────────────────────────
+
+  group('Conversation.kind', () {
+    test('round-trips kind field', () {
+      final c = Conversation(title: 'test', kind: 'optimizer');
+      final json = c.toJson();
+      final restored = Conversation.fromJson(json);
+      expect(restored.kind, 'optimizer');
+    });
+
+    test('missing kind in JSON defaults to coach', () {
+      final json = <String, dynamic>{
+        'id': 'x',
+        'title': 'legacy',
+        'createdAt': DateTime.now().toIso8601String(),
+        'messages': <Map<String, dynamic>>[],
+      };
+      final c = Conversation.fromJson(json);
+      expect(c.kind, 'coach');
+    });
+  });
+
+  // ── QuestionSpec / AnswerSpec / PendingQuestions ──────────────────────────
+
+  group('QuestionSpec / AnswerSpec / PendingQuestions', () {
+    test('QuestionSpec round-trips from JSON with defaults', () {
+      final j = <String, dynamic>{
+        'question': 'What is your goal?',
+        'options': ['Strength', 'Hypertrophy'],
+      };
+      final spec = QuestionSpec.fromJson(j);
+      expect(spec.question, 'What is your goal?');
+      expect(spec.options, ['Strength', 'Hypertrophy']);
+      expect(spec.multiSelect, false);
+      expect(spec.allowCustom, true);
+    });
+
+    test('QuestionSpec reads multiSelect = true', () {
+      final j = <String, dynamic>{
+        'question': 'Pick changes',
+        'options': ['Reorder', 'Add exercise'],
+        'multiSelect': true,
+      };
+      expect(QuestionSpec.fromJson(j).multiSelect, true);
+    });
+
+    test('AnswerSpec.toJson omits null custom', () {
+      final a = AnswerSpec(question: 'q', selected: ['Strength']);
+      final json = a.toJson();
+      expect(json.containsKey('custom'), false);
+      expect(json['selected'], ['Strength']);
+    });
+
+    test('AnswerSpec.toJson includes non-empty custom', () {
+      final a = AnswerSpec(question: 'q', selected: [], custom: 'Power lifting');
+      final json = a.toJson();
+      expect(json['custom'], 'Power lifting');
+    });
+
+    test('PendingQuestions.fromJson parses preamble and questions', () {
+      final j = <String, dynamic>{
+        'preamble': 'Let me understand your goals first.',
+        'questions': [
+          {'question': 'Goal?', 'options': ['Strength', 'Size']},
+        ],
+      };
+      final pq = PendingQuestions.fromJson(j);
+      expect(pq.preamble, 'Let me understand your goals first.');
+      expect(pq.questions, hasLength(1));
+      expect(pq.questions.first.question, 'Goal?');
+    });
+  });
 }
