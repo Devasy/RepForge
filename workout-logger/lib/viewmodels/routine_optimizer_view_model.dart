@@ -85,7 +85,7 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
   }
 
   /// Submit the user's answers to the pending ask_user_questions call.
-  void submitAnswers(List<AnswerSpec> answers) {
+  Future<void> submitAnswers(List<AnswerSpec> answers) async {
     _pendingQuestions = null;
 
     final text = answers
@@ -97,7 +97,7 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
         .join(' · ');
 
     if (text.isNotEmpty) {
-      _conversations.appendMessage(ChatMessage(role: 'user', text: text));
+      await _conversations.appendMessage(ChatMessage(role: 'user', text: text));
     }
 
     _pendingCompleter?.complete(<String, Object?>{
@@ -147,9 +147,12 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
         );
       }
     } catch (e) {
-      await _conversations.appendMessage(
-        ChatMessage(role: 'model', text: 'Error: $e'),
-      );
+      // Swallow internal abort signals from dispose().
+      if (e is! StateError || e.message != 'optimizer_aborted') {
+        await _conversations.appendMessage(
+          ChatMessage(role: 'model', text: 'Error: $e'),
+        );
+      }
     } finally {
       _streamingText = '';
       _loading = false;
@@ -182,7 +185,14 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
     _pendingCompleter = completer;
     _notify();
 
-    return completer.future;
+    final result = await completer.future;
+
+    // If the session was abandoned (e.g. dispose() was called), abort cleanly.
+    if (result['aborted'] == true) {
+      throw StateError('optimizer_aborted');
+    }
+
+    return result;
   }
 
   List<Content> _buildHistory() {

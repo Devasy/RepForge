@@ -161,11 +161,11 @@ void main() {
       final ai = _SimpleAi(chunks: ['Applied.'], toolCall: questionCall);
       final vm = _buildVm(storage: storage, ai: ai);
 
-      vm.addListener(() {
+      vm.addListener(() async {
         if (vm.pendingQuestions != null && captured == null) {
           captured = vm.pendingQuestions;
           // Submit to unblock the stream
-          vm.submitAnswers([
+          await vm.submitAnswers([
             AnswerSpec(question: 'Your goal?', selected: ['Strength']),
           ]);
         }
@@ -185,10 +185,10 @@ void main() {
       final ai = _SimpleAi(chunks: ['Done.'], toolCall: questionCall);
       final vm = _buildVm(storage: storage, ai: ai);
 
-      vm.addListener(() {
+      vm.addListener(() async {
         if (vm.pendingQuestions != null && !questionsSeen) {
           questionsSeen = true;
-          vm.submitAnswers([
+          await vm.submitAnswers([
             AnswerSpec(question: 'Goal?', selected: ['Strength']),
           ]);
         }
