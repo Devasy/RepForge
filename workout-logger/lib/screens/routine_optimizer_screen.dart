@@ -27,6 +27,11 @@ class RoutineOptimizerScreen extends StatelessWidget {
 
   final Routine routine;
 
+  /// Renders only the view body with an externally provided VM.
+  /// Use this in widget tests to avoid wiring up real AI services.
+  @visibleForTesting
+  static Widget testBody(Routine routine) => _OptimizerView(routine: routine);
+
   @override
   Widget build(BuildContext context) {
     final storage = context.read<IStorageService>();
