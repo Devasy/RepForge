@@ -326,63 +326,6 @@ Required JSON schema (follow exactly):
     }
   }
 
-  // ── Routine optimizer (structured JSON output) ────────────────────────────
-  @override
-  Future<RoutineOptimizationResult> generateOptimization({
-    required String contextPayload,
-  }) async {
-    if (!isConfigured) {
-      throw StateError('Gemini API key not configured.');
-    }
-
-    const systemPrompt =
-        'You are a certified strength coach analysing a workout routine for RepForge.\n'
-        'Return ONLY raw JSON — no markdown fences, no comments, no explanation text.\n'
-        'Produce 1–3 suggestions total, at most one of each type: reorder, replace, add.\n'
-        'Base recommendations strictly on the performance data provided.\n'
-        'For reorder and remove_exercise_id use ONLY exercise IDs already present in the routine.\n'
-        'For replace_with_name and add_exercise_name use ONLY names from the Available exercises list.\n\n'
-        'Required JSON schema (follow exactly):\n'
-        '{\n'
-        '  "summary": "<1-2 sentence overall assessment>",\n'
-        '  "suggestions": [\n'
-        '    {\n'
-        '      "type": "reorder",\n'
-        '      "reasoning": "<why this order is better>",\n'
-        '      "reordered_exercise_ids": ["<id>", "<id>", ...]\n'
-        '    },\n'
-        '    {\n'
-        '      "type": "replace",\n'
-        '      "reasoning": "<why to swap>",\n'
-        '      "remove_exercise_id": "<id of exercise to drop>",\n'
-        '      "replace_with_name": "<exact name from catalogue>"\n'
-        '    },\n'
-        '    {\n'
-        '      "type": "add",\n'
-        '      "reasoning": "<why to add>",\n'
-        '      "add_exercise_name": "<exact name from catalogue>"\n'
-        '    }\n'
-        '  ]\n'
-        '}\n'
-        'Include only the suggestion types that are genuinely beneficial. '
-        'Omit a type entirely if no meaningful improvement can be made.';
-
-    try {
-      final response =
-          await _makeModel(jsonMode: true, system: systemPrompt)
-              .generateContent([Content.text(contextPayload)]);
-      _recordUsage(response.usageMetadata);
-      final raw = response.text ?? '';
-      if (raw.isEmpty) throw const FormatException('Empty response from Gemini.');
-      final data = jsonDecode(raw) as Map<String, dynamic>;
-      return RoutineOptimizationResult.fromJson(data);
-    } on GenerativeAIException catch (e) {
-      throw Exception('Gemini API error: ${e.message}');
-    } on FormatException catch (e) {
-      throw Exception('Could not parse optimization JSON: $e');
-    }
-  }
-
   // ── Generic one-shot insight (contextual) ─────────────────────────────────
   @override
   Future<String> generateInsight(String system, String context) async {

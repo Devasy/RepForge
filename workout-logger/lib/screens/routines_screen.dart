@@ -11,7 +11,6 @@ import '../theme/app_theme.dart';
 import 'programs/programs_screen.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/routine_creator.dart';
-import 'widgets/routine_optimization_sheet.dart';
 
 class RoutinesScreen extends StatelessWidget {
   const RoutinesScreen({super.key});
@@ -492,10 +491,7 @@ class _RoutineCard extends StatelessWidget {
             ),
             // Optimize button
             GestureDetector(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                showRoutineOptimizerSheet(context, routine);
-              },
+              onTap: () {},
               child: Container(
                 width: 34,
                 height: 34,

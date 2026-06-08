@@ -50,9 +50,4 @@ abstract class IAiService {
   /// [context] payload.
   Future<String> generateInsight(String system, String context);
 
-  /// Analyse a routine's performance context and return structured optimization
-  /// suggestions (reorder / replace / add exercises).
-  Future<RoutineOptimizationResult> generateOptimization({
-    required String contextPayload,
-  });
 }

@@ -59,10 +59,6 @@ class _FakeAiService implements IAiService {
   @override
   Future<String> generateInsight(String system, String context) async => '';
 
-  @override
-  Future<RoutineOptimizationResult> generateOptimization({
-    required String contextPayload,
-  }) => throw UnimplementedError();
 }
 
 void main() {
