@@ -748,7 +748,7 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== ROUTINES ====================
 
-  Future<void> createRoutine(String name, List<String> exerciseIds) async {
+  Future<Routine> createRoutine(String name, List<String> exerciseIds) async {
     final routine = Routine(
       id: _uuid.v4(),
       name: name,
@@ -757,6 +757,7 @@ class WorkoutProvider extends ChangeNotifier {
     await _storage.saveRoutine(routine);
     _routines.add(routine);
     notifyListeners();
+    return routine;
   }
 
   Future<void> updateRoutine(Routine routine) async {

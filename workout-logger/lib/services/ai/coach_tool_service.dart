@@ -122,6 +122,62 @@ class CoachToolService {
                 '"what can I train today".',
             Schema.object(properties: {}),
           ),
+          FunctionDeclaration(
+            'get_all_routines',
+            'List all saved routines with their exercise names and count. '
+                'Use when the user asks what routines they have or wants to '
+                'pick one to view or modify.',
+            Schema.object(properties: {}),
+          ),
+          FunctionDeclaration(
+            'create_routine',
+            'Create a new workout routine with a name and an ordered list of '
+                'exercises. Exercises are matched by name from the catalogue.',
+            Schema.object(
+              properties: {
+                'name': Schema.string(
+                  description: 'Name for the new routine, e.g. "Push Day".',
+                ),
+                'exercise_names': Schema.array(
+                  items: Schema.string(),
+                  description:
+                      'Ordered list of exercise names to include in the routine.',
+                ),
+              },
+              requiredProperties: ['name', 'exercise_names'],
+            ),
+          ),
+          FunctionDeclaration(
+            'update_routine',
+            'Modify an existing routine: add exercises, remove exercises, or '
+                'reorder them. Specify the routine by name. Exercises are '
+                'matched by name from the catalogue.',
+            Schema.object(
+              properties: {
+                'routine_name': Schema.string(
+                  description: 'Name of the routine to update.',
+                ),
+                'add_exercise_names': Schema.array(
+                  items: Schema.string(),
+                  description: 'Optional. Exercise names to add.',
+                  nullable: true,
+                ),
+                'remove_exercise_names': Schema.array(
+                  items: Schema.string(),
+                  description: 'Optional. Exercise names to remove.',
+                  nullable: true,
+                ),
+                'reorder_exercise_names': Schema.array(
+                  items: Schema.string(),
+                  description:
+                      'Optional. Full new ordering of all exercise names in '
+                      'the routine. Must include every exercise you want to keep.',
+                  nullable: true,
+                ),
+              },
+              requiredProperties: ['routine_name'],
+            ),
+          ),
         ]),
       ];
 
@@ -141,6 +197,12 @@ class CoachToolService {
         return _goalProgress(call.args);
       case 'get_muscle_recovery':
         return _muscleRecovery();
+      case 'get_all_routines':
+        return _getAllRoutines();
+      case 'create_routine':
+        return _createRoutine(call.args);
+      case 'update_routine':
+        return await _updateRoutine(call.args);
       default:
         return {'error': 'Unknown tool: ${call.name}'};
     }
@@ -412,6 +474,137 @@ class CoachToolService {
                     : 'recovering',
           },
       ],
+    };
+  }
+
+  // ── Routine CRUD tools ────────────────────────────────────────────────────
+
+  Map<String, Object?> _getAllRoutines() {
+    return {
+      'routines': [
+        for (final r in _wp.routines)
+          {
+            'id': r.id,
+            'name': r.name,
+            'exercise_count': r.exerciseIds.length,
+            'exercises': [for (final id in r.exerciseIds) _wp.getExerciseName(id)],
+          },
+      ],
+    };
+  }
+
+  Future<Map<String, Object?>> _createRoutine(Map<String, Object?> args) async {
+    final name = ((args['name'] as String?)?.trim()) ?? '';
+    if (name.isEmpty) return {'error': 'Routine name cannot be empty.'};
+
+    final rawNames = (args['exercise_names'] as List?)?.cast<String>() ?? [];
+    final resolvedIds = <String>[];
+    final unresolved = <String>[];
+
+    for (final n in rawNames) {
+      try {
+        final ex = _resolveExercise(n.trim());
+        if (ex == null) {
+          unresolved.add(n);
+        } else {
+          resolvedIds.add(ex.id);
+        }
+      } on AmbiguousMatchException catch (e) {
+        return {
+          'error': 'Ambiguous exercise name "$n". Did you mean one of:',
+          'candidates': e.candidates,
+        };
+      }
+    }
+
+    if (unresolved.isNotEmpty) {
+      return {
+        'error': 'Could not find exercises: $unresolved',
+        'available_examples': _exampleExerciseNames(),
+      };
+    }
+
+    await _wp.createRoutine(name, resolvedIds);
+    return {
+      'created': true,
+      'routine_name': name,
+      'exercise_count': resolvedIds.length,
+      'exercises': [for (final id in resolvedIds) _wp.getExerciseName(id)],
+    };
+  }
+
+  Future<Map<String, Object?>> _updateRoutine(Map<String, Object?> args) async {
+    final routineName = (args['routine_name'] as String?)?.trim() ?? '';
+    final Routine routine;
+    try {
+      final resolved = _resolveRoutine(routineName);
+      if (resolved == null) {
+        return {'error': 'No routine found matching "$routineName".'};
+      }
+      routine = resolved;
+    } on AmbiguousMatchException catch (e) {
+      return {
+        'error': 'Multiple routines match "$routineName". Did you mean one of:',
+        'ambiguous_matches': e.candidates,
+      };
+    }
+
+    var ids = List<String>.from(routine.exerciseIds);
+
+    // Reorder (full replacement of order)
+    final reorderNames = (args['reorder_exercise_names'] as List?)?.cast<String>();
+    if (reorderNames != null && reorderNames.isNotEmpty) {
+      final reorderedIds = <String>[];
+      for (final n in reorderNames) {
+        try {
+          final ex = _resolveExercise(n.trim());
+          if (ex != null) reorderedIds.add(ex.id);
+        } on AmbiguousMatchException {
+          // skip ambiguous entries in reorder
+        }
+      }
+      if (reorderedIds.isNotEmpty) ids = reorderedIds;
+    }
+
+    // Remove exercises
+    final removeNames = (args['remove_exercise_names'] as List?)?.cast<String>();
+    if (removeNames != null) {
+      for (final n in removeNames) {
+        try {
+          final ex = _resolveExercise(n.trim());
+          if (ex != null) ids.remove(ex.id);
+        } on AmbiguousMatchException {
+          // skip ambiguous entries
+        }
+      }
+    }
+
+    // Add exercises
+    final addNames = (args['add_exercise_names'] as List?)?.cast<String>();
+    if (addNames != null) {
+      for (final n in addNames) {
+        try {
+          final ex = _resolveExercise(n.trim());
+          if (ex != null && !ids.contains(ex.id)) ids.add(ex.id);
+        } on AmbiguousMatchException {
+          // skip ambiguous entries
+        }
+      }
+    }
+
+    final updated = Routine(
+      id: routine.id,
+      name: routine.name,
+      exerciseIds: ids,
+      createdAt: routine.createdAt,
+    );
+    await _wp.updateRoutine(updated);
+
+    return {
+      'updated': true,
+      'routine_name': routine.name,
+      'exercise_count': ids.length,
+      'exercises': [for (final id in ids) _wp.getExerciseName(id)],
     };
   }
 

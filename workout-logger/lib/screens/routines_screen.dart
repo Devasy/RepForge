@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import 'programs/programs_screen.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/routine_creator.dart';
+import 'widgets/routine_optimization_sheet.dart';
 
 class RoutinesScreen extends StatelessWidget {
   const RoutinesScreen({super.key});
@@ -487,6 +488,26 @@ class _RoutineCard extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+            // Optimize button
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                showRoutineOptimizerSheet(context, routine);
+              },
+              child: Container(
+                width: 34,
+                height: 34,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.secondary.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: const Icon(Icons.auto_fix_high_rounded, size: 15, color: AppColors.secondary),
               ),
             ),
             // Edit button
