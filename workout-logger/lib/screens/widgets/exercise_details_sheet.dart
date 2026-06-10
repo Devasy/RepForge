@@ -231,7 +231,7 @@ class ExerciseDetailsSheet extends StatelessWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
-                      '+${settings.toDisplay(growthModel.slope).toStringAsFixed(1)} ${settings.unitLabel} volume/session',
+                      '+${settings.toDisplay(growthModel.slope * 7).toStringAsFixed(1)} ${settings.unitLabel} volume/week',
                       style: const TextStyle(
                         color: AppColors.success,
                         fontSize: 13,

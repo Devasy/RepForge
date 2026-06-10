@@ -1,5 +1,7 @@
 // Data Models for Workout Logger App
 
+import 'dart:math' show log, max;
+
 import 'package:uuid/uuid.dart';
 
 // Sentinel value for copyWith methods to distinguish "not provided" from "null"
@@ -401,21 +403,61 @@ class SetRecommendation {
 
 // ==================== Growth Model ====================
 
+/// Functional form of a fitted growth curve.
+///
+/// - [linear]: steady volume gains (typical for newer lifters / new exercises)
+/// - [logarithmic]: diminishing returns, y = a + b·ln(1+x) — typical as an
+///   exercise matures and progress saturates
+enum GrowthCurve { linear, logarithmic }
+
 class GrowthModel {
-  final double slope; // Growth rate per session
-  final double intercept; // Starting baseline
+  /// Instantaneous growth rate (volume per day) at the most recent data point.
+  /// For linear fits this equals the curve coefficient; for logarithmic fits
+  /// it is the tangent slope b/(1+lastX), which decays as training history grows.
+  final double slope;
+  final double intercept; // Curve intercept a
   final double r2; // Model fit quality (0-1)
   final DateTime lastTrained;
+  final GrowthCurve curve;
+
+  /// Curve coefficient b. Equals [slope] for linear fits.
+  final double coefficient;
+
+  /// x (days since first session) of the newest point used in training.
+  final double lastX;
+
+  /// Weighted residual standard error in volume units (0 = unknown/perfect).
+  final double stdError;
 
   GrowthModel({
     required this.slope,
     required this.intercept,
     required this.r2,
     required this.lastTrained,
-  });
+    this.curve = GrowthCurve.linear,
+    double? coefficient,
+    this.lastX = 0,
+    this.stdError = 0,
+  }) : coefficient = coefficient ?? slope;
 
-  double predict(int sessionNumber) {
-    return slope * sessionNumber + intercept;
+  double predict(num x) {
+    switch (curve) {
+      case GrowthCurve.linear:
+        return intercept + coefficient * x;
+      case GrowthCurve.logarithmic:
+        return intercept + coefficient * log(1 + max(0, x.toDouble()));
+    }
+  }
+
+  /// Model's volume estimate at the newest training point ("today's level").
+  double get currentEstimate => predict(lastX);
+
+  /// Expected volume growth over the next 7 days as a percentage of the
+  /// current level. The plateau/decline signal used by recommendations.
+  double get weeklyGrowthPercent {
+    final current = currentEstimate;
+    if (current <= 0) return 0;
+    return slope * 7 / current * 100;
   }
 }
 

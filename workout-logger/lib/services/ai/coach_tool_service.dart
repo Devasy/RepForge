@@ -300,13 +300,15 @@ class CoachToolService {
       'growth': growth == null
           ? null
           : {
-              'slope_per_session': _round(growth.slope),
+              'slope_per_day': _round(growth.slope),
+              'weekly_growth_percent': _round(growth.weeklyGrowthPercent),
+              'curve': growth.curve.name,
               'r2': _round(growth.r2),
-              'trend': growth.slope > 0
+              'trend': growth.weeklyGrowthPercent > 0.5
                   ? 'improving'
-                  : growth.slope < 0
+                  : growth.weeklyGrowthPercent < -2
                       ? 'declining'
-                      : 'flat',
+                      : 'plateauing',
             },
       'best_estimated_1rm': _roundOrNull(_wp.getBestOneRM(exercise.id)),
       'last_session': lastLog == null

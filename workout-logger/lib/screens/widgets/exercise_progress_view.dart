@@ -586,7 +586,7 @@ class _GrowthCard extends StatelessWidget {
                 ),
                 Text(
                   isGrowing
-                      ? '+${settings.toDisplay(model.slope.abs()).toStringAsFixed(1)} ${settings.unitLabel}/session'
+                      ? '+${settings.toDisplay(model.slope.abs() * 7).toStringAsFixed(1)} ${settings.unitLabel}/week'
                       : 'Volume trend is flat',
                   style: GoogleFonts.geist(
                     color: AppColors.textSoft,
@@ -734,11 +734,20 @@ class _VolumeChart extends StatelessWidget {
     final settings = context.read<SettingsProvider>();
     final n = progression.length;
 
+    // Chart x is the session index, but the model is trained on days since
+    // the first session — map each index to its day offset before predicting.
+    double dayAt(int i) => progression[i]
+        .date
+        .difference(progression.first.date)
+        .inDays
+        .toDouble();
+    final avgGapDays = n > 1 ? dayAt(n - 1) / (n - 1) : 7.0;
+
     double rse = 0.0;
     if (growthModel != null && n >= 3) {
       double ssRes = 0.0;
       for (int i = 0; i < n; i++) {
-        final r = progression[i].volume - growthModel!.predict(i);
+        final r = progression[i].volume - growthModel!.predict(dayAt(i));
         ssRes += r * r;
       }
       rse = sqrt(ssRes / (n - 2));
@@ -757,8 +766,9 @@ class _VolumeChart extends StatelessWidget {
             n + 2,
             (i) => FlSpot(
               i.toDouble(),
-              settings.toDisplay(
-                  growthModel!.predict(i).clamp(0.0, double.infinity)),
+              settings.toDisplay(growthModel!
+                  .predict(i < n ? dayAt(i) : dayAt(n - 1) + avgGapDays * (i - n + 1))
+                  .clamp(0.0, double.infinity)),
             ),
           )
         : <FlSpot>[];
@@ -1493,7 +1503,7 @@ class _AskCoachButton extends StatelessWidget {
     if (!gemini.isConfigured) return const SizedBox.shrink();
 
     final isPlateauing =
-        growthModel != null && growthModel!.slope <= 0;
+        growthModel != null && growthModel!.weeklyGrowthPercent < 0.5;
     final seed = isPlateauing
         ? 'I\'ve been plateauing on $exerciseName. How can I break through and start progressing again?'
         : 'How can I continue to progress on $exerciseName and make the most of my current momentum?';
