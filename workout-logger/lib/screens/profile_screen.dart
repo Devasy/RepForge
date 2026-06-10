@@ -1,5 +1,6 @@
 // profile_screen.dart — User preferences, data management, and about
 
+import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../services/api_service.dart';
 import '../services/interfaces/health_connect_service_interface.dart';
+import '../services/managers/readiness_manager.dart';
 import '../theme/app_theme.dart';
 import 'widgets/profile_sections.dart';
 
@@ -32,6 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isImporting = false;
   bool _isBackingUp = false;
   bool _isRequestingHcPermission = false;
+  bool _isRequestingReadinessPermission = false;
   String _appVersion = '';
 
   @override
@@ -62,21 +65,31 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _reconcileHealthConnectState() async {
     if (!mounted) return;
     final settings = context.read<SettingsProvider>();
-    if (!settings.healthConnectEnabled) return;
+    if (!settings.healthConnectEnabled && !settings.readinessEnabled) return;
     try {
       final hc = context.read<IHealthConnectService>();
       final available = await hc.isAvailable();
       if (!available) {
         if (mounted) await settings.setHealthConnectEnabled(false);
+        if (mounted) await settings.setReadinessEnabled(false);
         return;
       }
-      final hasPerms = await hc.hasPermissions();
-      if (!hasPerms) {
-        if (mounted) await settings.setHealthConnectEnabled(false);
+      if (settings.healthConnectEnabled) {
+        final hasPerms = await hc.hasPermissions();
+        if (!hasPerms && mounted) {
+          await settings.setHealthConnectEnabled(false);
+        }
+      }
+      if (settings.readinessEnabled) {
+        final granted = await hc.grantedReadTypes();
+        if (granted.isEmpty && mounted) {
+          await settings.setReadinessEnabled(false);
+        }
       }
     } catch (e) {
       debugPrint('HC reconciliation error: $e');
       if (mounted) await settings.setHealthConnectEnabled(false);
+      if (mounted) await settings.setReadinessEnabled(false);
     }
   }
 
@@ -121,6 +134,56 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } finally {
       if (mounted) setState(() => _isRequestingHcPermission = false);
+    }
+  }
+
+  Future<void> _requestReadinessPermission() async {
+    setState(() => _isRequestingReadinessPermission = true);
+    try {
+      final hc = context.read<IHealthConnectService>();
+      final available = await hc.isAvailable();
+      if (!available) {
+        if (mounted) {
+          _showSnack(
+            'Health Connect is not available on this device.',
+            AppColors.error,
+          );
+        }
+        return;
+      }
+
+      // Any single granted read type is enough — readiness components
+      // degrade independently when data is missing.
+      var granted = await hc.grantedReadTypes();
+      if (granted.isEmpty) {
+        try {
+          await hc.requestReadPermissions();
+        } catch (_) {
+          // Fall through to re-check below.
+        }
+        granted = await hc.grantedReadTypes();
+      }
+
+      if (!mounted) return;
+      if (granted.isNotEmpty) {
+        final settings = context.read<SettingsProvider>();
+        await settings.setReadinessEnabled(true);
+        if (!mounted) return;
+        // Compute the first snapshot right away so the home card appears.
+        unawaited(context.read<ReadinessManager>().refresh(force: true));
+        _showSnack('Readiness insights enabled!', AppColors.success);
+      } else {
+        _showSnack(
+          'Open Health Connect → App permissions → RepForge and allow Sleep and Heart rate.',
+          AppColors.warning,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Could not connect to Health Connect.', AppColors.error);
+      }
+    } finally {
+      if (mounted) setState(() => _isRequestingReadinessPermission = false);
     }
   }
 
@@ -294,6 +357,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                       await _requestHealthConnectPermission();
                     } else {
                       await settings.setHealthConnectEnabled(false);
+                    }
+                  },
+                  isReadinessLoading: _isRequestingReadinessPermission,
+                  onReadinessToggle: (value) async {
+                    if (value) {
+                      await _requestReadinessPermission();
+                    } else {
+                      await settings.setReadinessEnabled(false);
                     }
                   },
                 ),

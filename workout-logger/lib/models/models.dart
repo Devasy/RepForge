@@ -981,3 +981,141 @@ class PendingQuestions {
         .toList(),
   );
 }
+
+// ==================== Readiness ====================
+
+/// Coarse training-readiness classification derived from [ReadinessSnapshot].
+enum ReadinessBand { high, moderate, low }
+
+/// A single point-in-time health measurement read from Health Connect.
+class HealthSample {
+  final DateTime time;
+  final double value;
+
+  const HealthSample({required this.time, required this.value});
+}
+
+/// A sleep session interval read from Health Connect.
+class SleepPeriod {
+  final DateTime start;
+  final DateTime end;
+
+  const SleepPeriod({required this.start, required this.end});
+
+  int get minutes => end.difference(start).inMinutes;
+}
+
+/// Rolling per-component averages used as the personal reference point
+/// when scoring today's readiness. Recomputed at most once per day.
+class ReadinessBaseline {
+  final String dateKey; // yyyy-MM-dd the baseline was computed for
+  final double? avgSleepMinutes;
+  final int sleepNights;
+  final double? avgRestingHr;
+  final int rhrDays;
+  final double? avgHrvMs;
+  final int hrvDays;
+
+  const ReadinessBaseline({
+    required this.dateKey,
+    this.avgSleepMinutes,
+    this.sleepNights = 0,
+    this.avgRestingHr,
+    this.rhrDays = 0,
+    this.avgHrvMs,
+    this.hrvDays = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'dateKey': dateKey,
+    'avgSleepMinutes': avgSleepMinutes,
+    'sleepNights': sleepNights,
+    'avgRestingHr': avgRestingHr,
+    'rhrDays': rhrDays,
+    'avgHrvMs': avgHrvMs,
+    'hrvDays': hrvDays,
+  };
+
+  factory ReadinessBaseline.fromJson(Map<String, dynamic> json) =>
+      ReadinessBaseline(
+        dateKey: json['dateKey'] as String,
+        avgSleepMinutes: (json['avgSleepMinutes'] as num?)?.toDouble(),
+        sleepNights: json['sleepNights'] as int? ?? 0,
+        avgRestingHr: (json['avgRestingHr'] as num?)?.toDouble(),
+        rhrDays: json['rhrDays'] as int? ?? 0,
+        avgHrvMs: (json['avgHrvMs'] as num?)?.toDouble(),
+        hrvDays: json['hrvDays'] as int? ?? 0,
+      );
+}
+
+/// One day's computed readiness with the per-component evidence behind it.
+///
+/// Any component (sleep / resting HR / HRV) may be null when the data or a
+/// reliable baseline is unavailable; [score] is null when no component could
+/// be scored at all, in which case the UI hides readiness entirely.
+class ReadinessSnapshot {
+  final String dateKey; // yyyy-MM-dd this snapshot describes
+  final int? score; // 0–100 overall, null = nothing scorable
+  final ReadinessBand? band;
+  final int? sleepMinutes;
+  final double? sleepBaselineMinutes;
+  final int? sleepScore;
+  final double? restingHr;
+  final double? rhrBaseline;
+  final int? rhrScore;
+  final double? hrvMs;
+  final double? hrvBaseline;
+  final int? hrvScore;
+  final DateTime computedAt;
+
+  ReadinessSnapshot({
+    required this.dateKey,
+    this.score,
+    this.band,
+    this.sleepMinutes,
+    this.sleepBaselineMinutes,
+    this.sleepScore,
+    this.restingHr,
+    this.rhrBaseline,
+    this.rhrScore,
+    this.hrvMs,
+    this.hrvBaseline,
+    this.hrvScore,
+    DateTime? computedAt,
+  }) : computedAt = computedAt ?? DateTime.now();
+
+  Map<String, dynamic> toJson() => {
+    'dateKey': dateKey,
+    'score': score,
+    'band': band?.name,
+    'sleepMinutes': sleepMinutes,
+    'sleepBaselineMinutes': sleepBaselineMinutes,
+    'sleepScore': sleepScore,
+    'restingHr': restingHr,
+    'rhrBaseline': rhrBaseline,
+    'rhrScore': rhrScore,
+    'hrvMs': hrvMs,
+    'hrvBaseline': hrvBaseline,
+    'hrvScore': hrvScore,
+    'computedAt': computedAt.toIso8601String(),
+  };
+
+  factory ReadinessSnapshot.fromJson(Map<String, dynamic> json) =>
+      ReadinessSnapshot(
+        dateKey: json['dateKey'] as String,
+        score: json['score'] as int?,
+        band: json['band'] != null
+            ? ReadinessBand.values.byName(json['band'] as String)
+            : null,
+        sleepMinutes: json['sleepMinutes'] as int?,
+        sleepBaselineMinutes: (json['sleepBaselineMinutes'] as num?)?.toDouble(),
+        sleepScore: json['sleepScore'] as int?,
+        restingHr: (json['restingHr'] as num?)?.toDouble(),
+        rhrBaseline: (json['rhrBaseline'] as num?)?.toDouble(),
+        rhrScore: json['rhrScore'] as int?,
+        hrvMs: (json['hrvMs'] as num?)?.toDouble(),
+        hrvBaseline: (json['hrvBaseline'] as num?)?.toDouble(),
+        hrvScore: json['hrvScore'] as int?,
+        computedAt: DateTime.parse(json['computedAt'] as String),
+      );
+}

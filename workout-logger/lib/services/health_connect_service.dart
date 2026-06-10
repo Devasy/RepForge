@@ -96,6 +96,130 @@ class HealthConnectService implements IHealthConnectService {
     }
   }
 
+  static final Map<HealthReadType, HealthDataPermission> _readPermissions = {
+    HealthReadType.sleep: HealthDataType.sleepSession.readPermission,
+    HealthReadType.heartRate: HealthDataType.heartRate.readPermission,
+    HealthReadType.restingHeartRate:
+        HealthDataType.restingHeartRate.readPermission,
+    HealthReadType.hrv: HealthDataType.heartRateVariabilityRMSSD.readPermission,
+  };
+
+  @override
+  Future<bool> requestReadPermissions() async {
+    try {
+      _connector ??= await HealthConnector.create();
+      final results = await _connector!
+          .requestPermissions(_readPermissions.values.toList());
+      return results.any((r) => r.status == PermissionStatus.granted);
+    } catch (e) {
+      debugPrint('Health Connect requestReadPermissions failed: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<Set<HealthReadType>> grantedReadTypes() async {
+    try {
+      _connector ??= await HealthConnector.create();
+      final granted = <HealthReadType>{};
+      for (final entry in _readPermissions.entries) {
+        final status = await _connector!.getPermissionStatus(entry.value);
+        if (status == PermissionStatus.granted) granted.add(entry.key);
+      }
+      return granted;
+    } catch (e) {
+      debugPrint('Health Connect grantedReadTypes failed: $e');
+      return const {};
+    }
+  }
+
+  @override
+  Future<List<SleepPeriod>> readSleepSessions(
+    DateTime start,
+    DateTime end,
+  ) async {
+    try {
+      _connector ??= await HealthConnector.create();
+      final response = await _connector!.readRecords(
+        HealthDataType.sleepSession.readInTimeRange(
+          startTime: start,
+          endTime: end,
+        ),
+      );
+      return response.records
+          .map((r) => SleepPeriod(start: r.startTime, end: r.endTime))
+          .toList();
+    } catch (e) {
+      debugPrint('Health Connect readSleepSessions failed: $e');
+      return const [];
+    }
+  }
+
+  @override
+  Future<List<HealthSample>> readRestingHeartRate(
+    DateTime start,
+    DateTime end,
+  ) async {
+    try {
+      _connector ??= await HealthConnector.create();
+      final response = await _connector!.readRecords(
+        HealthDataType.restingHeartRate.readInTimeRange(
+          startTime: start,
+          endTime: end,
+        ),
+      );
+      return response.records
+          .map((r) => HealthSample(time: r.time, value: r.rate.inPerMinute))
+          .toList();
+    } catch (e) {
+      debugPrint('Health Connect readRestingHeartRate failed: $e');
+      return const [];
+    }
+  }
+
+  @override
+  Future<List<HealthSample>> readHrvRmssd(DateTime start, DateTime end) async {
+    try {
+      _connector ??= await HealthConnector.create();
+      final response = await _connector!.readRecords(
+        HealthDataType.heartRateVariabilityRMSSD.readInTimeRange(
+          startTime: start,
+          endTime: end,
+        ),
+      );
+      return response.records
+          .map((r) => HealthSample(time: r.time, value: r.rmssd.inMilliseconds))
+          .toList();
+    } catch (e) {
+      debugPrint('Health Connect readHrvRmssd failed: $e');
+      return const [];
+    }
+  }
+
+  @override
+  Future<List<HealthSample>> readHeartRateSamples(
+    DateTime start,
+    DateTime end,
+  ) async {
+    try {
+      _connector ??= await HealthConnector.create();
+      final response = await _connector!.readRecords(
+        HealthDataType.heartRate.readInTimeRange(
+          startTime: start,
+          endTime: end,
+          // Minute-level data over a narrow morning window; one page suffices.
+          pageSize: 5000,
+        ),
+      );
+      return response.records
+          .map((r) => HealthSample(time: r.time, value: r.rate.inPerMinute))
+          .toList();
+    } catch (e) {
+      debugPrint('Health Connect readHeartRateSamples failed: $e');
+      return const [];
+    }
+  }
+
   @override
   Future<bool> syncWorkoutSession(WorkoutSession session, {String? title}) async {
     try {

@@ -237,11 +237,15 @@ class HealthConnectSection extends StatelessWidget {
     required this.settings,
     required this.isLoading,
     required this.onToggle,
+    required this.isReadinessLoading,
+    required this.onReadinessToggle,
   });
 
   final SettingsProvider settings;
   final bool isLoading;
   final Future<void> Function(bool) onToggle;
+  final bool isReadinessLoading;
+  final Future<void> Function(bool) onReadinessToggle;
 
   static const _hcColor = Color(0xFF00BFA5);
 
@@ -303,6 +307,43 @@ class HealthConnectSection extends StatelessWidget {
               ],
             ),
           ],
+          const SizedBox(height: AppSpacing.sm),
+          const Divider(color: AppColors.glassBorder, height: 1),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Readiness insights',
+                      style: GoogleFonts.geist(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Reads sleep & heart data to score daily recovery',
+                      style: GoogleFonts.geist(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: settings.readinessEnabled,
+                onChanged:
+                    isReadinessLoading ? null : (v) => onReadinessToggle(v),
+                activeThumbColor: _hcColor,
+                activeTrackColor: _hcColor.withValues(alpha: 0.35),
+              ),
+            ],
+          ),
         ],
       ),
     );
