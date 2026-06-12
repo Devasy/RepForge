@@ -1037,14 +1037,65 @@ class HealthSample {
   const HealthSample({required this.time, required this.value});
 }
 
+/// One continuous sleep-stage segment within a `SleepPeriod`.
+///
+/// Stage is one of: `'deep'`, `'rem'`, `'light'`, `'awake'`.
+class SleepStageInterval {
+  final DateTime start;
+  final DateTime end;
+  final String stage;
+
+  const SleepStageInterval({
+    required this.start,
+    required this.end,
+    required this.stage,
+  });
+}
+
 /// A sleep session interval read from Health Connect.
+///
+/// When stage data is available (from `SleepSessionRecord.samples`),
+/// `lightMinutes`, `deepMinutes`, `remMinutes`, and `awakeMinutes` are
+/// populated and `minutes` returns actual sleep time (light + deep + rem),
+/// excluding awake/out-of-bed spans. Without stage data `minutes` falls back
+/// to the raw session duration.
+///
+/// `stageTimeline` carries the ordered list of stage segments when available,
+/// used by the Sleep HR chart to colour-code each 10-minute bar.
 class SleepPeriod {
   final DateTime start;
   final DateTime end;
 
-  const SleepPeriod({required this.start, required this.end});
+  /// Minutes in light (or unspecified) sleep. Null when no stage data.
+  final int? lightMinutes;
+  final int? deepMinutes;
+  final int? remMinutes;
 
-  int get minutes => end.difference(start).inMinutes;
+  /// Awake/out-of-bed minutes within the session window.
+  final int? awakeMinutes;
+
+  /// Ordered stage segments, populated from `SleepSessionRecord.samples`.
+  /// Empty when the session record carries no stage breakdown.
+  final List<SleepStageInterval> stageTimeline;
+
+  const SleepPeriod({
+    required this.start,
+    required this.end,
+    this.lightMinutes,
+    this.deepMinutes,
+    this.remMinutes,
+    this.awakeMinutes,
+    this.stageTimeline = const [],
+  });
+
+  bool get hasStages =>
+      lightMinutes != null || deepMinutes != null || remMinutes != null;
+
+  /// Actual sleep minutes: light + deep + rem when stage data exists,
+  /// otherwise the raw session span (start → end).
+  int get minutes => hasStages
+      ? (lightMinutes ?? 0) + (deepMinutes ?? 0) + (remMinutes ?? 0)
+      : end.difference(start).inMinutes;
 }
 
 /// Rolling per-component averages used as the personal reference point

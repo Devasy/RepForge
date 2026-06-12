@@ -27,19 +27,31 @@ class ReadinessCalculator {
   static const int highBandThreshold = 75;
   static const int moderateBandThreshold = 50;
 
-  /// Picks "last night's" sleep: the longest period overlapping the window
-  /// yesterday 18:00 → today 12:00 local. Returns null when nothing overlaps.
-  SleepPeriod? lastNightSleep(DateTime today, List<SleepPeriod> periods) {
+  /// Returns total minutes of sleep in the window yesterday 18:00 → today 12:00.
+  ///
+  /// Health Connect (especially Pixel Watch) writes sleep as multiple records
+  /// per night — one per stage or one per awakening gap. Summing gives the true
+  /// sleep total; taking the longest single record under-counts badly.
+  int? lastNightSleepMinutes(DateTime today, List<SleepPeriod> periods) {
     final day = DateTime(today.year, today.month, today.day);
     final windowStart = day.subtract(const Duration(hours: 6)); // 18:00 prev day
     final windowEnd = day.add(const Duration(hours: 12));
 
-    SleepPeriod? longest;
+    var totalMinutes = 0;
     for (final p in periods) {
       if (!p.end.isAfter(windowStart) || !p.start.isBefore(windowEnd)) continue;
-      if (longest == null || p.minutes > longest.minutes) longest = p;
+      totalMinutes += p.minutes;
     }
-    return longest;
+    return totalMinutes > 0 ? totalMinutes : null;
+  }
+
+  // Keep backward-compatible name used in tests; delegates to the new method.
+  SleepPeriod? lastNightSleep(DateTime today, List<SleepPeriod> periods) {
+    final minutes = lastNightSleepMinutes(today, periods);
+    if (minutes == null) return null;
+    // Return a synthetic period whose .minutes equals the summed total.
+    final now = DateTime(today.year, today.month, today.day);
+    return SleepPeriod(start: now, end: now.add(Duration(minutes: minutes)));
   }
 
   ReadinessSnapshot compute({

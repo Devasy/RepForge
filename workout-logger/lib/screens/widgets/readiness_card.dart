@@ -25,15 +25,27 @@ class ReadinessCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final manager = context.watch<ReadinessManager>();
     final snapshot = manager.snapshot;
-    if (manager.status != ReadinessStatus.ready ||
-        snapshot == null ||
-        snapshot.score == null ||
-        snapshot.band == null) {
+    debugPrint('[ReadinessCard] build: status=${manager.status} score=${snapshot?.score} band=${snapshot?.band}');
+
+    final bool hasScore = manager.status == ReadinessStatus.ready &&
+        snapshot != null &&
+        snapshot.score != null &&
+        snapshot.band != null;
+
+    if (!hasScore) {
       return const SizedBox.shrink();
     }
 
     final color = _bandColor(snapshot.band!);
 
+    return _buildMainCard(context, snapshot, color);
+  }
+
+  Widget _buildMainCard(
+    BuildContext context,
+    ReadinessSnapshot snapshot,
+    Color color,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: GlassCard(
@@ -252,6 +264,7 @@ class _ReadinessDetailsSheet extends StatelessWidget {
     );
   }
 }
+
 
 class _ComponentRow extends StatelessWidget {
   const _ComponentRow({

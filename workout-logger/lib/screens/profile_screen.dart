@@ -138,10 +138,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _requestReadinessPermission() async {
+    debugPrint('[Readiness] toggle tapped — starting permission flow');
     setState(() => _isRequestingReadinessPermission = true);
     try {
       final hc = context.read<IHealthConnectService>();
       final available = await hc.isAvailable();
+      debugPrint('[Readiness] isAvailable = $available');
       if (!available) {
         if (mounted) {
           _showSnack(
@@ -155,17 +157,21 @@ class _ProfileScreenState extends State<ProfileScreen>
       // Any single granted read type is enough — readiness components
       // degrade independently when data is missing.
       var granted = await hc.grantedReadTypes();
+      debugPrint('[Readiness] granted before request = $granted');
       if (granted.isEmpty) {
+        debugPrint('[Readiness] requesting read permissions…');
         try {
           await hc.requestReadPermissions();
-        } catch (_) {
-          // Fall through to re-check below.
+        } catch (e) {
+          debugPrint('[Readiness] requestReadPermissions threw: $e');
         }
         granted = await hc.grantedReadTypes();
+        debugPrint('[Readiness] granted after request = $granted');
       }
 
       if (!mounted) return;
       if (granted.isNotEmpty) {
+        debugPrint('[Readiness] permissions granted — enabling readiness');
         final settings = context.read<SettingsProvider>();
         await settings.setReadinessEnabled(true);
         if (!mounted) return;
@@ -173,12 +179,14 @@ class _ProfileScreenState extends State<ProfileScreen>
         unawaited(context.read<ReadinessManager>().refresh(force: true));
         _showSnack('Readiness insights enabled!', AppColors.success);
       } else {
+        debugPrint('[Readiness] still no granted types — showing manual instructions');
         _showSnack(
           'Open Health Connect → App permissions → RepForge and allow Sleep and Heart rate.',
           AppColors.warning,
         );
       }
     } catch (e) {
+      debugPrint('[Readiness] unexpected error: $e');
       if (mounted) {
         _showSnack('Could not connect to Health Connect.', AppColors.error);
       }

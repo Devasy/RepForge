@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'services/debug_log_buffer.dart';
 import 'services/storage_service.dart';
 import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
@@ -29,6 +30,7 @@ import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 
 void main() async {
+  DebugLogBuffer.attach();
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set preferred orientations

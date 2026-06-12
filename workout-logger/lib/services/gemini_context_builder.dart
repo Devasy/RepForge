@@ -38,6 +38,14 @@ class GeminiContextBuilder {
         'numbers. Pass ISO dates (YYYY-MM-DD) or a day count to the tools.',
       )
       ..writeln(
+        'You can also MODIFY the user\'s data with tools: create or update '
+        'routines, and add a new custom exercise when one does not already '
+        'exist. You do not need to ask permission before calling a write tool '
+        'the user clearly requested, but confirm what you did in your reply. '
+        'If a routine needs an exercise that is not in the catalogue, create it '
+        'with add_custom_exercise first, then reference it by name.',
+      )
+      ..writeln(
         'Weights are in $unitLabel. Format replies with Markdown (lists, bold, '
         'tables) where it aids clarity.',
       );
@@ -69,28 +77,37 @@ class GeminiContextBuilder {
       ..writeln()
       ..writeln('STRICT WORKFLOW — execute in this order every time:')
       ..writeln(
-        '1. QUESTIONS FIRST: Call ask_user_questions immediately. '
-        'Ask about (a) primary goal [Strength/Hypertrophy/Fat loss/Endurance], '
-        '(b) sessions per week for this routine, and optionally (c) any exercises '
-        'they want to keep no matter what. Do NOT skip this step.',
+        '1. FETCH DATA FIRST: Before saying anything or asking anything, '
+        'call get_routine_performance for the routine, then call '
+        'get_exercise_performance for EVERY exercise in that routine (use '
+        'the exercise list from the routine response), and call '
+        'get_muscle_recovery. Never skip this step and never invent numbers.',
       )
       ..writeln(
-        '2. FETCH DATA: After answers arrive, call get_routine_performance '
-        'for the routine and get_exercise_performance for each exercise that '
-        'has data. Never invent numbers.',
+        '2. ANALYSE SILENTLY: Identify issues — stalling or declining '
+        'exercises (negative slope or r²<0.5), missing muscle groups, '
+        'recovery conflicts, poor ordering. Do not output this analysis.',
       )
       ..writeln(
-        '3. PROPOSE CHANGES: List proposed changes as short bullets: '
-        'reorder (give full new order), replace (which exercise → which '
-        'alternative and why), add (specific exercise to fill a gap). '
-        'Keep your analysis under 150 words.',
+        '3. ASK ONLY IF AMBIGUOUS: Call ask_user_questions only if '
+        'the data alone cannot determine the best changes — e.g. the user '
+        'goal (strength vs hypertrophy) would flip which exercise to suggest, '
+        'or you need to know which exercises they want to keep. '
+        'Skip this step entirely if the data makes the answer obvious. '
+        'Never ask questions whose answers would not change your recommendations.',
       )
       ..writeln(
-        '4. CONFIRM: Call ask_user_questions with multiSelect:true listing '
-        'your proposed changes as chips so the user can pick which to apply.',
+        '4. PROPOSE CHANGES: List proposed changes as short bullets with '
+        'specific numbers from the data (e.g. "Overhead Press slope −0.3 kg/session"): '
+        'reorder (give full new order), replace (which → which and why), '
+        'add (specific exercise to fill a muscle gap). Under 150 words.',
       )
       ..writeln(
-        '5. APPLY: Call update_routine exactly once with only the confirmed '
+        '5. CONFIRM: Call ask_user_questions with multiSelect:true listing '
+        'each proposed change as a chip. The user picks which to apply.',
+      )
+      ..writeln(
+        '6. APPLY: Call update_routine exactly once with only the confirmed '
         'changes. Then confirm in one sentence what was changed.',
       )
       ..writeln()

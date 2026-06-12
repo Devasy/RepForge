@@ -20,6 +20,7 @@ import 'profile_screen.dart';
 import 'widgets/workout_conflict_dialog.dart';
 import 'ai_coach_screen.dart';
 import 'widgets/readiness_card.dart';
+import 'widgets/sleep_hr_card.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/sparkline_painter.dart';
 import 'widgets/activity_heatmap.dart';
@@ -207,6 +208,7 @@ class _DashboardTab extends StatelessWidget {
                               _buildStreakHero(context: context, provider: provider, homeState: homeState),
                               const SizedBox(height: 16),
                               const ReadinessCard(),
+                              const SleepHrCard(),
                               _buildStatsGrid(context, provider),
                               const SizedBox(height: 16),
                               _buildHeatmapCard(context, provider),
