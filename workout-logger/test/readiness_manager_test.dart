@@ -247,7 +247,10 @@ void main() {
 
       expect(manager.snapshot!.restingHr, 60.5);
       expect(manager.snapshot!.rhrScore, 50);
-      expect(hc.hrReadCount, 0);
+      // The one HR-sample read is the all-day Heart-rate-card snapshot; the
+      // scoring path still uses the RHR record and skips its minute-level
+      // fallback (verified by restingHr above coming from the RHR record).
+      expect(hc.hrReadCount, 1);
     });
 
     test('falls back to minimum morning heart rate when no RHR record today',
@@ -271,7 +274,9 @@ void main() {
 
       await manager.refresh();
 
-      expect(hc.hrReadCount, 1);
+      // Two HR-sample reads now: the all-day HR snapshot (for the Heart-rate
+      // card) plus the morning-RHR fallback used for scoring.
+      expect(hc.hrReadCount, 2);
       expect(manager.snapshot?.restingHr, 55);
     });
 

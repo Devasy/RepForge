@@ -12,16 +12,9 @@ import 'package:provider/provider.dart';
 import '../../models/sleep_hr_models.dart';
 import '../../services/managers/readiness_manager.dart';
 import '../../theme/app_theme.dart';
+import '../sleep_detail_screen.dart';
 import 'rf_widgets.dart';
-import 'sleep_hr_sheet.dart';
-
-// Stage colour map — shared with SleepHrSheet.
-const Map<String, Color> kSleepStageColors = {
-  'deep':  Color(0xFF4C8EFF),
-  'rem':   Color(0xFFA78BFA),
-  'light': Color(0xFF34D399),
-  'awake': Color(0xFFF59E0B),
-};
+import 'sleep_hr_charts.dart' show kSleepStageColors;
 
 class SleepHrCard extends StatelessWidget {
   const SleepHrCard({super.key});
@@ -127,11 +120,10 @@ class SleepHrCard extends StatelessWidget {
   }
 
   void _openSheet(BuildContext context, SleepHrSnapshot snap) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => SleepHrSheet(snapshot: snap),
+    // Land on the night this snapshot represents (handles the watch-not-synced
+    // fallback where it's the night before last).
+    Navigator.of(context).push(
+      slideRoute(SleepDetailScreen(initialDate: snap.sleepEnd)),
     );
   }
 

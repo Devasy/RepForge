@@ -1,11 +1,9 @@
-// SleepHrSheet — full overnight-HR detail shown in a bottom sheet.
+// sleep_hr_charts.dart — reusable overnight-HR chart widgets.
 //
-// Sections (top → bottom):
-//   1. Handle + title + subtitle (times in IST)
-//   2. Key stat chips (P5 / P95 / Deep avg / REM avg)
-//   3. Interactive 10-minute bar chart — tap/drag to see segment tooltip
-//   4. Stage timeline strip + legend
-//   5. "HR range by stage" horizontal distribution chart
+// Extracted from the old SleepHrSheet so the Day tab of SleepDetailScreen and
+// the dashboard card can share the same painters. `SleepHrDayView` composes the
+// full day breakdown (stat pills + interactive bar chart + stage timeline +
+// legend + HR-range-by-stage distribution).
 
 import 'dart:math' show min, max;
 
@@ -14,144 +12,90 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/sleep_hr_models.dart';
 import '../../theme/app_theme.dart';
-import 'sleep_hr_card.dart' show kSleepStageColors;
 
-class SleepHrSheet extends StatelessWidget {
-  const SleepHrSheet({super.key, required this.snapshot});
+/// Stage colour map — shared across the sleep widgets.
+const Map<String, Color> kSleepStageColors = {
+  'deep': Color(0xFF4C8EFF),
+  'rem': Color(0xFFA78BFA),
+  'light': Color(0xFF34D399),
+  'awake': Color(0xFFF59E0B),
+};
+
+const _stageOrder = ['awake', 'rem', 'light', 'deep'];
+const _stageLabels = {
+  'awake': 'Awake',
+  'rem': 'REM',
+  'light': 'Light',
+  'deep': 'Deep',
+};
+
+DateTime _toIst(DateTime dt) => dt.toUtc().add(const Duration(hours: 5, minutes: 30));
+
+/// Full Day-view breakdown for one overnight HR snapshot.
+class SleepHrDayView extends StatelessWidget {
+  const SleepHrDayView({super.key, required this.snapshot});
 
   final SleepHrSnapshot snapshot;
 
-  static const _stageOrder = ['awake', 'rem', 'light', 'deep'];
-  static const _stageLabels = {
-    'awake': 'Awake',
-    'rem': 'REM',
-    'light': 'Light',
-    'deep': 'Deep',
-  };
-
-  static DateTime _toIst(DateTime dt) =>
-      dt.toUtc().add(const Duration(hours: 5, minutes: 30));
-
-  static String _fmtTime(DateTime dt) {
-    final h = dt.hour == 0 ? 12 : dt.hour > 12 ? dt.hour - 12 : dt.hour;
-    final m = dt.minute.toString().padLeft(2, '0');
-    final period = dt.hour < 12 ? 'AM' : 'PM';
-    return '$h:$m $period';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final remAvg  = snapshot.statsFor('rem')?.avgBpm;
+    final remAvg = snapshot.statsFor('rem')?.avgBpm;
     final deepAvg = snapshot.statsFor('deep')?.avgBpm;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.88,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-        ),
-        child: Column(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Stat pills row
+        Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 4),
-              child: Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.glassBorderStrong,
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                ),
+            _StatPill(label: 'P5', value: '${snapshot.p5Bpm} bpm', color: AppColors.success),
+            const SizedBox(width: 6),
+            _StatPill(label: 'P95', value: '${snapshot.p95Bpm} bpm', color: AppColors.primary),
+            if (deepAvg != null) ...[
+              const SizedBox(width: 6),
+              _StatPill(
+                label: 'Deep avg',
+                value: '${deepAvg.round()} bpm',
+                color: kSleepStageColors['deep']!,
               ),
-            ),
-            Expanded(
-              child: ListView(
-                controller: controller,
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-                children: [
-                  // Title
-                  Text(
-                    'Sleep heart rate',
-                    style: GoogleFonts.geist(
-                      color: AppColors.textPrimary,
-                      fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Last night · ${_fmtTime(_toIst(snapshot.sleepStart))} – '
-                    '${_fmtTime(_toIst(snapshot.sleepEnd))} IST',
-                    style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 12),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Stat pills row
-                  Row(
-                    children: [
-                      _StatPill(label: 'P5',  value: '${snapshot.p5Bpm} bpm',  color: AppColors.success),
-                      const SizedBox(width: 6),
-                      _StatPill(label: 'P95', value: '${snapshot.p95Bpm} bpm', color: AppColors.primary),
-                      if (deepAvg != null) ...[
-                        const SizedBox(width: 6),
-                        _StatPill(
-                          label: 'Deep avg',
-                          value: '${deepAvg.round()} bpm',
-                          color: kSleepStageColors['deep']!,
-                        ),
-                      ],
-                      if (remAvg != null) ...[
-                        const SizedBox(width: 6),
-                        _StatPill(
-                          label: 'REM avg',
-                          value: '${remAvg.round()} bpm',
-                          color: kSleepStageColors['rem']!,
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Interactive bar chart
-                  Text(
-                    'Heart rate during sleep · 10-min bars',
-                    style: GoogleFonts.geist(
-                      color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _InteractiveBarChart(segments: snapshot.segments),
-                  const SizedBox(height: 6),
-
-                  // Stage timeline strip
-                  _StageTimelineStrip(segments: snapshot.segments),
-                  const SizedBox(height: 8),
-
-                  // Legend
-                  _Legend(),
-                  const SizedBox(height: 24),
-
-                  // HR range by stage
-                  Text(
-                    'HR range by stage',
-                    style: GoogleFonts.geist(
-                      color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _StageDistributionChart(
-                    stats: snapshot.stageStats,
-                    stageOrder: _stageOrder,
-                    stageLabels: _stageLabels,
-                  ),
-                  const SizedBox(height: 10),
-                  _DistLegend(),
-                ],
+            ],
+            if (remAvg != null) ...[
+              const SizedBox(width: 6),
+              _StatPill(
+                label: 'REM avg',
+                value: '${remAvg.round()} bpm',
+                color: kSleepStageColors['rem']!,
               ),
-            ),
+            ],
           ],
         ),
-      ),
+        const SizedBox(height: 20),
+
+        Text(
+          'Heart rate during sleep · 10-min bars',
+          style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
+        ),
+        const SizedBox(height: 8),
+        _InteractiveBarChart(segments: snapshot.segments),
+        const SizedBox(height: 6),
+        _StageTimelineStrip(segments: snapshot.segments),
+        const SizedBox(height: 8),
+        _Legend(),
+        const SizedBox(height: 24),
+
+        Text(
+          'HR range by stage',
+          style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
+        ),
+        const SizedBox(height: 10),
+        _StageDistributionChart(
+          stats: snapshot.stageStats,
+          stageOrder: _stageOrder,
+          stageLabels: _stageLabels,
+        ),
+        const SizedBox(height: 10),
+        _DistLegend(),
+      ],
     );
   }
 }
@@ -226,13 +170,9 @@ class _InteractiveBarChartState extends State<_InteractiveBarChart> {
         builder: (_, constraints) {
           final width = constraints.maxWidth;
           return GestureDetector(
-            onTapDown: (d) => setState(
-              () => _hoveredIndex = _indexAt(d.localPosition, width),
-            ),
+            onTapDown: (d) => setState(() => _hoveredIndex = _indexAt(d.localPosition, width)),
             onTapUp: (_) => setState(() => _hoveredIndex = null),
-            onPanUpdate: (d) => setState(
-              () => _hoveredIndex = _indexAt(d.localPosition, width),
-            ),
+            onPanUpdate: (d) => setState(() => _hoveredIndex = _indexAt(d.localPosition, width)),
             onPanEnd: (_) => setState(() => _hoveredIndex = null),
             onPanCancel: () => setState(() => _hoveredIndex = null),
             child: CustomPaint(
@@ -249,41 +189,37 @@ class _InteractiveBarChartState extends State<_InteractiveBarChart> {
   }
 }
 
-// ── Bar chart CustomPainter ───────────────────────────────────────────────────
-
 class _BarChartPainter extends CustomPainter {
   const _BarChartPainter({required this.segments, this.hoveredIndex});
 
   final List<SleepHrSegment> segments;
   final int? hoveredIndex;
 
-  static const _padLeft   = 28.0;
-  static const _padTop    = 6.0;
+  static const _padLeft = 28.0;
+  static const _padTop = 6.0;
   static const _padBottom = 22.0;
-
-  static DateTime _toIst(DateTime dt) =>
-      dt.toUtc().add(const Duration(hours: 5, minutes: 30));
 
   @override
   void paint(Canvas canvas, Size size) {
     if (segments.isEmpty) return;
 
     final allBpms = segments.expand((s) => [s.minBpm, s.maxBpm]);
-    final rawMin  = allBpms.reduce(min).toDouble();
-    final rawMax  = segments.map((s) => s.maxBpm).reduce((a, b) => a > b ? a : b).toDouble();
-    final bpmMin  = (rawMin / 10).floor() * 10.0 - 5;
-    final bpmMax  = (rawMax / 10).ceil()  * 10.0 + 5;
+    final rawMin = allBpms.reduce(min).toDouble();
+    final rawMax = segments.map((s) => s.maxBpm).reduce((a, b) => a > b ? a : b).toDouble();
+    final bpmMin = (rawMin / 10).floor() * 10.0 - 5;
+    final bpmMax = (rawMax / 10).ceil() * 10.0 + 5;
 
     final chartW = size.width - _padLeft - 4;
     final chartH = size.height - _padTop - _padBottom;
-    final n      = segments.length;
-    final barW   = chartW / n;
+    final n = segments.length;
+    final barW = chartW / n;
 
     double yFor(double bpm) =>
         _padTop + chartH - ((bpm - bpmMin) / (bpmMax - bpmMin)) * chartH;
 
-    // Grid lines + Y labels
-    final gridPaint = Paint()..color = AppColors.glassBorder..strokeWidth = 0.5;
+    final gridPaint = Paint()
+      ..color = AppColors.glassBorder
+      ..strokeWidth = 0.5;
     final yLabelStyle = GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8);
 
     final gridBpms = <int>[];
@@ -300,13 +236,14 @@ class _BarChartPainter extends CustomPainter {
       tp.paint(canvas, Offset(_padLeft - tp.width - 3, y - tp.height / 2));
     }
 
-    // Bars
     for (var i = 0; i < n; i++) {
-      final seg   = segments[i];
+      final seg = segments[i];
       final color = kSleepStageColors[seg.stage] ?? AppColors.primary;
       final alpha = (hoveredIndex == null || hoveredIndex == i) ? 0.78 : 0.28;
-      final paint = Paint()..color = color.withValues(alpha: alpha)..style = PaintingStyle.fill;
-      final x    = _padLeft + i * barW;
+      final paint = Paint()
+        ..color = color.withValues(alpha: alpha)
+        ..style = PaintingStyle.fill;
+      final x = _padLeft + i * barW;
       final yTop = yFor(seg.maxBpm.toDouble());
       final yBot = yFor(seg.minBpm.toDouble());
       canvas.drawRRect(
@@ -318,7 +255,6 @@ class _BarChartPainter extends CustomPainter {
       );
     }
 
-    // Moving-average trend line
     final avgPaint = Paint()
       ..color = AppColors.secondary.withValues(alpha: 0.9)
       ..strokeWidth = 1.5
@@ -329,19 +265,18 @@ class _BarChartPainter extends CustomPainter {
     for (var i = 0; i < n; i++) {
       final sl = segments.sublist(max(0, i - 4), i + 1);
       final ma = sl.map((s) => s.avgBpm).reduce((a, b) => a + b) / sl.length;
-      final x  = _padLeft + i * barW + barW / 2;
-      final y  = yFor(ma);
+      final x = _padLeft + i * barW + barW / 2;
+      final y = yFor(ma);
       i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
     }
     canvas.drawPath(path, avgPaint);
 
-    // X-axis time labels every ~6 bars
     final xLabelStyle = GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8);
     for (var i = 0; i < n; i += 6) {
-      final t   = _toIst(segments[i].windowStart);
-      final h   = t.hour == 0 ? 12 : t.hour > 12 ? t.hour - 12 : t.hour;
-      final m   = t.minute.toString().padLeft(2, '0');
-      final tp  = TextPainter(
+      final t = _toIst(segments[i].windowStart);
+      final h = t.hour == 0 ? 12 : t.hour > 12 ? t.hour - 12 : t.hour;
+      final m = t.minute.toString().padLeft(2, '0');
+      final tp = TextPainter(
         text: TextSpan(text: '$h:$m', style: xLabelStyle),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -351,72 +286,76 @@ class _BarChartPainter extends CustomPainter {
       );
     }
 
-    // Tooltip for hovered bar
     if (hoveredIndex != null) {
       final idx = hoveredIndex!;
       final seg = segments[idx];
       final color = kSleepStageColors[seg.stage] ?? AppColors.primary;
-      final barX  = _padLeft + idx * barW;
-      final yTop  = yFor(seg.maxBpm.toDouble());
-      final yBot  = yFor(seg.minBpm.toDouble());
+      final barX = _padLeft + idx * barW;
+      final yTop = yFor(seg.maxBpm.toDouble());
+      final yBot = yFor(seg.minBpm.toDouble());
 
-      // Highlight stroke on selected bar
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH(barX + 0.5, yTop, barW - 1, max(yBot - yTop, 2)),
           const Radius.circular(1.5),
         ),
-        Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 1.5,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
       );
 
-      // Tooltip box
-      final t     = _toIst(seg.windowStart);
-      final tEnd  = _toIst(seg.windowStart.add(const Duration(minutes: 10)));
-      final th    = t.hour == 0 ? 12 : t.hour > 12 ? t.hour - 12 : t.hour;
-      final tm    = t.minute.toString().padLeft(2, '0');
-      final eh    = tEnd.hour == 0 ? 12 : tEnd.hour > 12 ? tEnd.hour - 12 : tEnd.hour;
-      final em    = tEnd.minute.toString().padLeft(2, '0');
+      final t = _toIst(seg.windowStart);
+      final tEnd = _toIst(seg.windowStart.add(const Duration(minutes: 10)));
+      final th = t.hour == 0 ? 12 : t.hour > 12 ? t.hour - 12 : t.hour;
+      final tm = t.minute.toString().padLeft(2, '0');
+      final eh = tEnd.hour == 0 ? 12 : tEnd.hour > 12 ? tEnd.hour - 12 : tEnd.hour;
+      final em = tEnd.minute.toString().padLeft(2, '0');
       final stageName = const {
-        'deep': 'Deep', 'rem': 'REM', 'light': 'Light', 'awake': 'Awake',
+        'deep': 'Deep',
+        'rem': 'REM',
+        'light': 'Light',
+        'awake': 'Awake',
       }[seg.stage] ?? seg.stage;
 
       final lines = ['$th:$tm–$eh:$em IST', '${seg.minBpm}–${seg.maxBpm} bpm', stageName];
       final lineStyle = GoogleFonts.geistMono(color: Colors.white, fontSize: 9.5);
-      final painters = lines.map((l) => TextPainter(
-        text: TextSpan(text: l, style: lineStyle),
-        textDirection: TextDirection.ltr,
-      )..layout()).toList();
+      final painters = lines
+          .map((l) => TextPainter(
+                text: TextSpan(text: l, style: lineStyle),
+                textDirection: TextDirection.ltr,
+              )..layout())
+          .toList();
 
       const ttPadH = 8.0, ttPadV = 6.0, ttLineH = 14.0;
       final ttW = painters.map((p) => p.width).reduce(max) + ttPadH * 2;
       final ttH = painters.length * ttLineH + ttPadV * 2;
 
-      // Position: above bar, clamped to chart bounds
       var ttX = barX + barW / 2 - ttW / 2;
       ttX = ttX.clamp(_padLeft, size.width - 4 - ttW);
       var ttY = yTop - ttH - 6;
       if (ttY < _padTop) ttY = yBot + 6;
 
-      // Shadow
       canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
-        Paint()..color = Colors.black.withValues(alpha: 0.4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.4)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
       );
-      // Background
       canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
         Paint()..color = const Color(0xFF1E1E2E),
       );
-      // Border
       canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
-        Paint()..color = color.withValues(alpha: 0.7)..style = PaintingStyle.stroke..strokeWidth = 1,
+        Paint()
+          ..color = color.withValues(alpha: 0.7)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
       );
 
-      // Text lines
       for (var i = 0; i < painters.length; i++) {
         final p = painters[i];
-        // stage line gets stage colour
         if (i == 2) {
           final stagePainter = TextPainter(
             text: TextSpan(
@@ -473,8 +412,8 @@ class _Legend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      ('Deep',  kSleepStageColors['deep']!),
-      ('REM',   kSleepStageColors['rem']!),
+      ('Deep', kSleepStageColors['deep']!),
+      ('REM', kSleepStageColors['rem']!),
       ('Light', kSleepStageColors['light']!),
       ('Awake', kSleepStageColors['awake']!),
     ];
@@ -486,7 +425,8 @@ class _Legend extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 8, height: 8,
+                  width: 8,
+                  height: 8,
                   decoration: BoxDecoration(color: e.$2, borderRadius: BorderRadius.circular(2)),
                 ),
                 const SizedBox(width: 4),
@@ -496,10 +436,7 @@ class _Legend extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 14, height: 10,
-              child: CustomPaint(painter: _DashLinePainter()),
-            ),
+            SizedBox(width: 14, height: 10, child: CustomPaint(painter: _DashLinePainter())),
             const SizedBox(width: 4),
             Text('Avg trend', style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
           ],
@@ -615,7 +552,8 @@ class _DistRow extends StatelessWidget {
                     Positioned(
                       left: pct(stats.minBpm.toDouble()) * w,
                       width: (pct(stats.maxBpm.toDouble()) - pct(stats.minBpm.toDouble())) * w,
-                      top: 7, height: 14,
+                      top: 7,
+                      height: 14,
                       child: Container(
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: 0.22),
@@ -626,7 +564,8 @@ class _DistRow extends StatelessWidget {
                     Positioned(
                       left: pct(stats.p25Bpm.toDouble()) * w,
                       width: (pct(stats.p75Bpm.toDouble()) - pct(stats.p25Bpm.toDouble())) * w,
-                      top: 7, height: 14,
+                      top: 7,
+                      height: 14,
                       child: Container(
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: 0.72),
@@ -638,7 +577,8 @@ class _DistRow extends StatelessWidget {
                       left: pct(stats.avgBpm) * w - 4,
                       top: 10,
                       child: Container(
-                        width: 8, height: 8,
+                        width: 8,
+                        height: 8,
                         decoration: BoxDecoration(
                           color: color,
                           shape: BoxShape.circle,
@@ -652,7 +592,9 @@ class _DistRow extends StatelessWidget {
                       child: Text(
                         '${stats.avgBpm.round()} bpm',
                         style: GoogleFonts.geistMono(
-                          color: color, fontSize: 8, fontWeight: FontWeight.w700,
+                          color: color,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -688,13 +630,15 @@ class _DistAxis extends StatelessWidget {
           return SizedBox(
             height: 16,
             child: Stack(
-              children: ticks.map((t) => Positioned(
-                    left: (pct(t.toDouble()) * w - 10).clamp(0, w - 20),
-                    child: Text(
-                      '$t',
-                      style: GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8),
-                    ),
-                  )).toList(),
+              children: ticks
+                  .map((t) => Positioned(
+                        left: (pct(t.toDouble()) * w - 10).clamp(0, w - 20),
+                        child: Text(
+                          '$t',
+                          style: GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8),
+                        ),
+                      ))
+                  .toList(),
             ),
           );
         },
@@ -702,8 +646,6 @@ class _DistAxis extends StatelessWidget {
     );
   }
 }
-
-// ── Distribution legend ───────────────────────────────────────────────────────
 
 class _DistLegend extends StatelessWidget {
   @override
@@ -714,7 +656,8 @@ class _DistLegend extends StatelessWidget {
       children: [
         _DistLi(
           swatch: Container(
-            width: 16, height: 8,
+            width: 16,
+            height: 8,
             decoration: BoxDecoration(
               color: AppColors.textMuted.withValues(alpha: 0.22),
               borderRadius: BorderRadius.circular(4),
@@ -724,7 +667,8 @@ class _DistLegend extends StatelessWidget {
         ),
         _DistLi(
           swatch: Container(
-            width: 16, height: 8,
+            width: 16,
+            height: 8,
             decoration: BoxDecoration(
               color: AppColors.textMuted.withValues(alpha: 0.72),
               borderRadius: BorderRadius.circular(4),
@@ -734,7 +678,8 @@ class _DistLegend extends StatelessWidget {
         ),
         _DistLi(
           swatch: Container(
-            width: 8, height: 8,
+            width: 8,
+            height: 8,
             decoration: const BoxDecoration(color: AppColors.textSoft, shape: BoxShape.circle),
           ),
           label: 'Avg',

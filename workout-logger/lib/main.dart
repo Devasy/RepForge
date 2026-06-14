@@ -24,6 +24,7 @@ import 'services/managers/history_manager.dart';
 import 'services/managers/health_sync_manager.dart';
 import 'services/managers/pr_manager.dart';
 import 'services/managers/readiness_manager.dart';
+import 'services/managers/health_history_manager.dart';
 import 'services/managers/conversation_manager.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
@@ -71,6 +72,9 @@ class WorkoutLoggerApp extends StatelessWidget {
   // readiness setting so refresh() is a no-op until the user opts in.
   static final ReadinessManager _readinessManager =
       ReadinessManager(_healthConnectService, _storageService, _settingsProvider);
+  // Serves arbitrary-range sleep/HR data to the detail screens.
+  static final HealthHistoryManager _healthHistoryManager =
+      HealthHistoryManager(_healthConnectService, _storageService);
   static final GeminiAiService _geminiService =
       GeminiAiService(storage: _storageService);
   static final ConversationManager _conversationManager =
@@ -102,6 +106,7 @@ class WorkoutLoggerApp extends StatelessWidget {
         ChangeNotifierProvider<HistoryManager>.value(value: _historyManager),
         ChangeNotifierProvider<PRManager>.value(value: _prManager),
         ChangeNotifierProvider<ReadinessManager>.value(value: _readinessManager),
+        Provider<HealthHistoryManager>.value(value: _healthHistoryManager),
         // GeminiAiService is the single AI backend instance. It's a ChangeNotifier
         // (settings UI watches isConfigured/model), so it's provided as such.
         // Consumers that should depend on the abstraction (the coach ViewModel,

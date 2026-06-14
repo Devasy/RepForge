@@ -21,6 +21,7 @@ import 'widgets/workout_conflict_dialog.dart';
 import 'ai_coach_screen.dart';
 import 'widgets/readiness_card.dart';
 import 'widgets/sleep_hr_card.dart';
+import 'widgets/heart_rate_card.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/sparkline_painter.dart';
 import 'widgets/activity_heatmap.dart';
@@ -209,6 +210,7 @@ class _DashboardTab extends StatelessWidget {
                               const SizedBox(height: 16),
                               const ReadinessCard(),
                               const SleepHrCard(),
+                              const HeartRateCard(),
                               _buildStatsGrid(context, provider),
                               const SizedBox(height: 16),
                               _buildHeatmapCard(context, provider),
@@ -1184,19 +1186,8 @@ class _RoutineSelectorSheet extends StatelessWidget {
 
 // ── Route helper ──────────────────────────────────────────────────────────────
 
-PageRouteBuilder<T> _slide<T>(Widget page) {
-  return PageRouteBuilder<T>(
-    pageBuilder: (_, __, ___) => page,
-    transitionsBuilder: (_, anim, __, child) => SlideTransition(
-      position: Tween(
-        begin: const Offset(1, 0),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
-      child: child,
-    ),
-    transitionDuration: const Duration(milliseconds: 300),
-  );
-}
+// Thin alias to the shared slideRoute helper in rf_widgets.dart.
+PageRouteBuilder<T> _slide<T>(Widget page) => slideRoute<T>(page);
 
 // ── Weekly Insights Card ──────────────────────────────────────────────────────
 
