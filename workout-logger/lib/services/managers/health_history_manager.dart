@@ -13,9 +13,11 @@ import 'dart:convert';
 
 import '../../models/models.dart';
 import '../../models/sleep_hr_models.dart';
+import '../../models/workout_hr_models.dart';
 import '../interfaces/health_connect_service_interface.dart';
 import '../interfaces/storage_service_interface.dart';
 import '../utils/sleep_hr_builder.dart';
+import '../utils/workout_hr_builder.dart';
 
 class HealthHistoryManager {
   final IHealthConnectService _hc;
@@ -70,6 +72,13 @@ class HealthHistoryManager {
   }
 
   Future<Set<HealthReadType>> _granted() => _hc.grantedReadTypes();
+
+  /// HR breakdown for one recorded workout: curve, peak/avg/min, exercise
+  /// sections, and per-rest HR recovery. Null when no HR data covers the window.
+  Future<WorkoutHrAnalysis?> workoutHr(WorkoutSession session) async {
+    final granted = await _granted();
+    return buildWorkoutHrAnalysis(_hc, session, granted);
+  }
 
   // ── Day detail ──────────────────────────────────────────────────────────────
 
