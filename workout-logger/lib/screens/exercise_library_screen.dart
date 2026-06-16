@@ -1,4 +1,4 @@
-// Exercise Library Screen - Browse and search exercises
+// exercise_library_screen.dart — Browse and search the exercise library
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +8,9 @@ import '../services/workout_provider.dart';
 import '../theme/app_theme.dart';
 import '../data/exercise_database.dart';
 import 'add_custom_exercise_screen.dart';
+import 'widgets/rf_widgets.dart';
+import 'widgets/rf_cards.dart';
+import 'widgets/exercise_details_sheet.dart';
 
 class ExerciseLibraryScreen extends StatefulWidget {
   const ExerciseLibraryScreen({super.key});
@@ -17,729 +20,457 @@ class ExerciseLibraryScreen extends StatefulWidget {
 }
 
 class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
-  String _searchQuery = '';
-  String? _selectedMuscleGroup;
+  String _query = '';
+  String? _muscleFilter;
 
   @override
   Widget build(BuildContext context) {
-    // Use Provider's exercise list (includes custom exercises)
-    final allExercises = context.watch<WorkoutProvider>().allExercises;
+    final provider = context.watch<WorkoutProvider>();
+    final all = provider.allExercises;
+    final customCount = all.where((e) => e.isCustom).length;
 
-    // Filter exercises
-    var filteredExercises = allExercises.where((e) {
-      final matchesSearch =
-          _searchQuery.isEmpty ||
-          e.name.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesMuscle =
-          _selectedMuscleGroup == null ||
-          e.muscleActivations.any(
-            (m) => m.muscleGroupId == _selectedMuscleGroup,
-          );
-      return matchesSearch && matchesMuscle;
-    }).toList();
+    final filtered = all.where((e) {
+      final matchQ = _query.isEmpty ||
+          e.name.toLowerCase().contains(_query.toLowerCase());
+      final matchM = _muscleFilter == null ||
+          e.muscleActivations.any((m) => m.muscleGroupId == _muscleFilter);
+      return matchQ && matchM;
+    }).toList()
+      ..sort((a, b) {
+        if (a.isCustom && !b.isCustom) return -1;
+        if (!a.isCustom && b.isCustom) return 1;
+        return a.name.compareTo(b.name);
+      });
 
-    // Sort: custom exercises first within each group for visibility
-    filteredExercises.sort((a, b) {
-      // First by custom status (custom first)
-      if (a.isCustom && !b.isCustom) return -1;
-      if (!a.isCustom && b.isCustom) return 1;
-      // Then alphabetically
-      return a.name.compareTo(b.name);
-    });
-
-    // Group by primary muscle
     final grouped = <String, List<Exercise>>{};
-    for (var exercise in filteredExercises) {
-      final primary = exercise.primaryMuscle;
-      grouped.putIfAbsent(primary, () => []).add(exercise);
+    for (final ex in filtered) {
+      grouped.putIfAbsent(ex.primaryMuscle, () => []).add(ex);
     }
 
-    // Count custom exercises for display
-    final customCount = allExercises.where((e) => e.isCustom).length;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Exercise Library'),
-        actions: [
-          if (customCount > 0)
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.md),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '$customCount custom',
-                    style: const TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _Header(customCount: customCount),
+            _SearchBar(
+              query: _query,
+              onChanged: (v) => setState(() => _query = v),
             ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.of(context).push<bool>(
-            MaterialPageRoute(
-              builder: (context) => const AddCustomExerciseScreen(),
+            _MuscleFilterChips(
+              selected: _muscleFilter,
+              onSelected: (id) => setState(() => _muscleFilter = id),
             ),
-          );
-          // No need to manually refresh - Provider will notify listeners
-          if (result == true && mounted) {
-            // Optional: Show a subtle confirmation
-          }
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Add Exercise'),
-      ),
-      body: Column(
-        children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search exercises...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () => setState(() => _searchQuery = ''),
-                      )
-                    : null,
-              ),
-              onChanged: (val) => setState(() => _searchQuery = val),
-            ),
-          ),
-
-          // Muscle group filter chips
-          SizedBox(
-            height: 48,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              children: [
-                FilterChip(
-                  label: const Text('All'),
-                  selected: _selectedMuscleGroup == null,
-                  onSelected: (_) =>
-                      setState(() => _selectedMuscleGroup = null),
-                ),
-                const SizedBox(width: 8),
-                ...MuscleGroups.names.entries.map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(entry.value),
-                      selected: _selectedMuscleGroup == entry.key,
-                      selectedColor: AppTheme.getMuscleColor(
-                        entry.key,
-                      ).withOpacity(0.3),
-                      onSelected: (selected) => setState(() {
-                        _selectedMuscleGroup = selected ? entry.key : null;
-                      }),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.sm),
-
-          // Exercise list
-          Expanded(
-            child: grouped.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.only(
-                      left: AppSpacing.md,
-                      right: AppSpacing.md,
-                      top: AppSpacing.md,
-                      bottom: 80, // Space for FAB
-                    ),
-                    itemCount: grouped.length,
-                    itemBuilder: (context, index) {
-                      final muscleId = grouped.keys.elementAt(index);
-                      final exercises = grouped[muscleId]!;
-                      final muscleName =
-                          MuscleGroups.names[muscleId] ?? muscleId;
-                      final muscleColor = AppTheme.getMuscleColor(muscleId);
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppSpacing.sm,
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 4,
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    color: muscleColor,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  muscleName,
-                                  style: TextStyle(
-                                    color: muscleColor,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '(${exercises.length})',
-                                  style: TextStyle(
-                                    color: AppTheme.textMuted,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          ...exercises.map(
-                            (exercise) => _ExerciseCard(exercise: exercise),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                        ],
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.search_off, size: 64, color: AppTheme.textMuted),
-          const SizedBox(height: 16),
-          const Text(
-            'No exercises found',
-            style: TextStyle(color: AppTheme.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ExerciseCard extends StatelessWidget {
-  final Exercise exercise;
-
-  const _ExerciseCard({required this.exercise});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: InkWell(
-        onTap: () => _showExerciseDetails(context),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            children: [
-              // Icon with custom badge
-              Stack(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: exercise.isCustom
-                          ? AppTheme.warning.withOpacity(0.2)
-                          : AppTheme.primaryColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      exercise.category == 'compound'
-                          ? Icons.fitness_center
-                          : Icons.accessibility_new,
-                      color: exercise.isCustom
-                          ? AppTheme.warning
-                          : AppTheme.primaryColor,
-                    ),
-                  ),
-                  if (exercise.isCustom)
-                    Positioned(
-                      right: -2,
-                      top: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.warning,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Icon(
-                          Icons.star,
-                          size: 10,
-                          color: Colors.black,
-                        ),
+            Expanded(
+              child: grouped.isEmpty
+                  ? RFEmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: 'No exercises found',
+                      subtitle: 'Try a different search or filter',
+                    )
+                  : ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.md,
+                        AppSpacing.sm,
+                        AppSpacing.md,
+                        100,
                       ),
+                      itemCount: grouped.length,
+                      itemBuilder: (_, i) {
+                        final muscleId = grouped.keys.elementAt(i);
+                        final exercises = grouped[muscleId]!;
+                        return _MuscleGroup(
+                          muscleId: muscleId,
+                          exercises: exercises,
+                          onTap: (ex) => _openDetails(context, ex, provider),
+                        );
+                      },
                     ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            exercise.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: exercise.category == 'compound'
-                                ? AppTheme.primaryColor.withOpacity(0.2)
-                                : AppTheme.secondaryColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            exercise.category.toUpperCase(),
-                            style: TextStyle(
-                              color: exercise.category == 'compound'
-                                  ? AppTheme.primaryColor
-                                  : AppTheme.secondaryColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        if (exercise.isCustom) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.warning.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'CUSTOM',
-                              style: TextStyle(
-                                color: AppTheme.warning,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(width: 8),
-                        Text(
-                          '${exercise.muscleActivations.length} muscle${exercise.muscleActivations.length != 1 ? 's' : ''}',
-                          style: TextStyle(
-                            color: AppTheme.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: AppTheme.textMuted),
-            ],
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: AppBreakpoints.navBarClearance),
+        child: FloatingActionButton(
+          onPressed: () => Navigator.of(context).push<bool>(
+            MaterialPageRoute(builder: (_) => const AddCustomExerciseScreen()),
           ),
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          child: const Icon(Icons.add_rounded, color: Colors.white),
         ),
       ),
     );
   }
 
-  void _showExerciseDetails(BuildContext context) {
-    showModalBottomSheet(
+  void _openDetails(
+    BuildContext context,
+    Exercise exercise,
+    WorkoutProvider provider,
+  ) {
+    showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppTheme.cardColor,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
-      builder: (context) => _ExerciseDetailsSheet(exercise: exercise),
+      builder: (_) => ExerciseDetailsSheet(
+        exercise: exercise,
+        provider: provider,
+      ),
     );
   }
 }
 
-class _ExerciseDetailsSheet extends StatelessWidget {
-  final Exercise exercise;
-
-  const _ExerciseDetailsSheet({required this.exercise});
+// ── Header ─────────────────────────────────────────────────────────────────────
+class _Header extends StatelessWidget {
+  const _Header({required this.customCount});
+  final int customCount;
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.read<WorkoutProvider>();
-    final lastSession = provider.getLastSessionForExercise(exercise.id);
-    final growthModel = provider.getGrowthModel(exercise.id);
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
+      child: Row(
         children: [
-          // Handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppTheme.textMuted,
-                borderRadius: BorderRadius.circular(2),
-              ),
+          const Text(
+            'Exercises',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-
-          // Header
-          Row(
-            children: [
-              Stack(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: exercise.isCustom
-                          ? AppTheme.warning.withOpacity(0.2)
-                          : AppTheme.primaryColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      exercise.category == 'compound'
-                          ? Icons.fitness_center
-                          : Icons.accessibility_new,
-                      color: exercise.isCustom
-                          ? AppTheme.warning
-                          : AppTheme.primaryColor,
-                    ),
-                  ),
-                  if (exercise.isCustom)
-                    Positioned(
-                      right: -2,
-                      top: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: AppTheme.warning,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.star,
-                          size: 10,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exercise.name,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          exercise.category == 'compound'
-                              ? 'Compound Exercise'
-                              : 'Isolation Exercise',
-                          style: const TextStyle(color: AppTheme.textSecondary),
-                        ),
-                        if (exercise.isCustom) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.warning.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'CUSTOM',
-                              style: TextStyle(
-                                color: AppTheme.warning,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
+          const Spacer(),
+          if (customCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.3),
                 ),
               ),
-              // Delete button for custom exercises
-              if (exercise.isCustom)
-                IconButton(
-                  onPressed: () => _confirmDelete(context, provider),
-                  icon: const Icon(Icons.delete_outline),
-                  color: AppTheme.error,
-                  tooltip: 'Delete custom exercise',
+              child: Text(
+                '$customCount custom',
+                style: const TextStyle(
+                  color: AppColors.warning,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
-            ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Search bar ─────────────────────────────────────────────────────────────────
+class _SearchBar extends StatelessWidget {
+  const _SearchBar({required this.query, required this.onChanged});
+  final String query;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: Border.all(color: AppColors.glassBorder),
+        ),
+        child: TextField(
+          onChanged: onChanged,
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: 'Search exercises…',
+            hintStyle:
+                const TextStyle(color: AppColors.textMuted, fontSize: 14),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: AppColors.textMuted,
+              size: 18,
+            ),
+            suffixIcon: query.isNotEmpty
+                ? GestureDetector(
+                    onTap: () => onChanged(''),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.textMuted,
+                      size: 16,
+                    ),
+                  )
+                : null,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(vertical: 12),
           ),
+        ),
+      ),
+    );
+  }
+}
 
-          const SizedBox(height: AppSpacing.lg),
+// ── Muscle filter chips ────────────────────────────────────────────────────────
+class _MuscleFilterChips extends StatelessWidget {
+  const _MuscleFilterChips({required this.selected, required this.onSelected});
+  final String? selected;
+  final ValueChanged<String?> onSelected;
 
-          // Muscle activations
-          Text(
-            'Muscle Activation',
-            style: Theme.of(context).textTheme.titleMedium,
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        children: [
+          _Chip(
+            label: 'All',
+            isSelected: selected == null,
+            color: AppColors.primary,
+            onTap: () => onSelected(null),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          ...exercise.muscleActivations.map((activation) {
-            final muscleName =
-                MuscleGroups.names[activation.muscleGroupId] ??
-                activation.muscleGroupId;
-            final color = AppTheme.getMuscleColor(activation.muscleGroupId);
-
+          const SizedBox(width: 6),
+          ...MuscleGroups.names.entries.map((e) {
+            final color = AppColors.muscle(e.key);
             return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Row(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(muscleName)),
-                  Text(
-                    '${activation.activationPercentage}%',
-                    style: TextStyle(color: color, fontWeight: FontWeight.bold),
-                  ),
-                ],
+              padding: const EdgeInsets.only(right: 6),
+              child: _Chip(
+                label: e.value,
+                isSelected: selected == e.key,
+                color: color,
+                onTap: () => onSelected(selected == e.key ? null : e.key),
               ),
             );
           }),
-
-          if (lastSession != null) ...[
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              'Last Session',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: lastSession.sets.asMap().entries.map((entry) {
-                final set = entry.value;
-                return Chip(
-                  label: Text('${set.weight}kg × ${set.reps}'),
-                  backgroundColor: AppTheme.surfaceColor,
-                );
-              }).toList(),
-            ),
-          ],
-
-          if (growthModel != null && growthModel.r2 > 0.2) ...[
-            const SizedBox(height: AppSpacing.md),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppTheme.success.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.trending_up, color: AppTheme.success),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Growing at +${growthModel.slope.toStringAsFixed(1)} kg volume/session',
-                      style: const TextStyle(color: AppTheme.success),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: AppSpacing.lg),
         ],
       ),
     );
-  }
-
-  Future<void> _confirmDelete(
-    BuildContext context,
-    WorkoutProvider provider,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.cardColor,
-        title: const Text('Delete Custom Exercise?'),
-        content: Text(
-          'Are you sure you want to delete "${exercise.name}"? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && context.mounted) {
-      final success = await provider.deleteCustomExercise(exercise.id);
-      if (success && context.mounted) {
-        // Capture messenger before pop to avoid deactivated context
-        final messenger = ScaffoldMessenger.of(context);
-        Navigator.of(context).pop(); // Close the bottom sheet
-        messenger.showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: AppTheme.success),
-                const SizedBox(width: 8),
-                Text('"${exercise.name}" deleted'),
-              ],
-            ),
-            backgroundColor: AppTheme.cardColor,
-          ),
-        );
-      }
-    }
   }
 }
 
-// ==================== Exercise Selector Screen ====================
+class _Chip extends StatelessWidget {
+  const _Chip({
+    required this.label,
+    required this.isSelected,
+    required this.color,
+    required this.onTap,
+  });
+  final String label;
+  final bool isSelected;
+  final Color color;
+  final VoidCallback onTap;
 
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.15) : AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: Border.all(
+            color: isSelected
+                ? color.withValues(alpha: 0.5)
+                : AppColors.glassBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? color : AppColors.textMuted,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Muscle group section ───────────────────────────────────────────────────────
+class _MuscleGroup extends StatelessWidget {
+  const _MuscleGroup({
+    required this.muscleId,
+    required this.exercises,
+    required this.onTap,
+  });
+  final String muscleId;
+  final List<Exercise> exercises;
+  final ValueChanged<Exercise> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppColors.muscle(muscleId);
+    final name = MuscleGroups.names[muscleId] ?? muscleId;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          child: Row(
+            children: [
+              Container(
+                width: 3,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                name,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${exercises.length}',
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...exercises.map(
+          (ex) => ExerciseCard(
+            exercise: ex,
+            onTap: () => onTap(ex),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+      ],
+    );
+  }
+}
+
+// ── Exercise Selector Screen (used by workout flow for quick start) ────────────
 class ExerciseSelectorScreen extends StatefulWidget {
-  final bool selectionMode;
-  final Function(List<String>)? onExercisesSelected;
-
   const ExerciseSelectorScreen({
     super.key,
     this.selectionMode = false,
     this.onExercisesSelected,
   });
 
+  final bool selectionMode;
+  final void Function(List<String>)? onExercisesSelected;
+
   @override
-  State<ExerciseSelectorScreen> createState() => _ExerciseSelectorScreenState();
+  State<ExerciseSelectorScreen> createState() =>
+      _ExerciseSelectorScreenState();
 }
 
 class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
   final Set<String> _selectedIds = {};
-  String _searchQuery = '';
+  String _query = '';
 
   @override
   Widget build(BuildContext context) {
-    // Use Provider's exercise list (includes custom exercises)
-    final allExercises = context.watch<WorkoutProvider>().allExercises;
+    final all = context.watch<WorkoutProvider>().allExercises;
+    final filtered = all
+        .where(
+          (e) => _query.isEmpty ||
+              e.name.toLowerCase().contains(_query.toLowerCase()),
+        )
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
 
-    var filteredExercises = allExercises.where((e) {
-      return _searchQuery.isEmpty ||
-          e.name.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
-
-    // Sort alphabetically within groups
-    filteredExercises.sort((a, b) => a.name.compareTo(b.name));
-
-    // Group by primary muscle
     final grouped = <String, List<Exercise>>{};
-    for (var exercise in filteredExercises) {
-      final primary = exercise.primaryMuscle;
-      grouped.putIfAbsent(primary, () => []).add(exercise);
+    for (final ex in filtered) {
+      grouped.putIfAbsent(ex.primaryMuscle, () => []).add(ex);
     }
 
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
-          child: TextField(
-            decoration: const InputDecoration(
-              hintText: 'Search exercises...',
-              prefixIcon: Icon(Icons.search),
+          child: Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(AppRadius.full),
+              border: Border.all(color: AppColors.glassBorder),
             ),
-            onChanged: (val) => setState(() => _searchQuery = val),
+            child: TextField(
+              onChanged: (v) => setState(() => _query = v),
+              style:
+                  const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              decoration: const InputDecoration(
+                hintText: 'Search exercises…',
+                hintStyle:
+                    TextStyle(color: AppColors.textMuted, fontSize: 14),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.textMuted,
+                  size: 18,
+                ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
           ),
         ),
-
         if (widget.selectionMode && _selectedIds.isNotEmpty)
-          Container(
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Row(
               children: [
                 Text(
                   '${_selectedIds.length} selected',
                   style: const TextStyle(
-                    color: AppTheme.primaryColor,
+                    color: AppColors.primary,
                     fontWeight: FontWeight.w600,
+                    fontSize: 13,
                   ),
                 ),
                 const Spacer(),
-                TextButton(
-                  onPressed: () => setState(() => _selectedIds.clear()),
-                  child: const Text('Clear'),
+                GestureDetector(
+                  onTap: () => setState(() => _selectedIds.clear()),
+                  child: const Text(
+                    'Clear',
+                    style: TextStyle(color: AppColors.error, fontSize: 12),
+                  ),
                 ),
               ],
             ),
           ),
-
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             itemCount: grouped.length,
-            itemBuilder: (context, index) {
-              final muscleId = grouped.keys.elementAt(index);
+            itemBuilder: (_, i) {
+              final muscleId = grouped.keys.elementAt(i);
               final exercises = grouped[muscleId]!;
-              final muscleName = MuscleGroups.names[muscleId] ?? muscleId;
-
+              final name = MuscleGroups.names[muscleId] ?? muscleId;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -747,53 +478,20 @@ class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
                     padding: const EdgeInsets.symmetric(
                       vertical: AppSpacing.sm,
                     ),
-                    child: Text(
-                      muscleName,
-                      style: TextStyle(
-                        color: AppTheme.getMuscleColor(muscleId),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: RFSectionHeader(name),
                   ),
-                  ...exercises.map((exercise) {
-                    final isSelected = _selectedIds.contains(exercise.id);
-                    return ListTile(
-                      leading: widget.selectionMode
-                          ? Checkbox(
-                              value: isSelected,
-                              onChanged: (val) {
-                                setState(() {
-                                  if (val == true) {
-                                    _selectedIds.add(exercise.id);
-                                  } else {
-                                    _selectedIds.remove(exercise.id);
-                                  }
-                                });
-                              },
-                            )
-                          : null,
-                      title: Text(exercise.name),
-                      subtitle: Text(exercise.category),
-                      trailing: widget.selectionMode && isSelected
-                          ? Text(
-                              '${_selectedIds.toList().indexOf(exercise.id) + 1}',
-                              style: const TextStyle(
-                                color: AppTheme.primaryColor,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          : null,
-                      onTap: widget.selectionMode
-                          ? () {
-                              setState(() {
-                                if (isSelected) {
-                                  _selectedIds.remove(exercise.id);
-                                } else {
-                                  _selectedIds.add(exercise.id);
-                                }
-                              });
-                            }
-                          : null,
+                  ...exercises.map((ex) {
+                    final sel = _selectedIds.contains(ex.id);
+                    return ExerciseCard(
+                      exercise: ex,
+                      selected: sel,
+                      onTap: () => setState(() {
+                        if (sel) {
+                          _selectedIds.remove(ex.id);
+                        } else {
+                          _selectedIds.add(ex.id);
+                        }
+                      }),
                     );
                   }),
                 ],
@@ -801,20 +499,17 @@ class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
             },
           ),
         ),
-
         if (widget.selectionMode)
-          Container(
+          Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _selectedIds.isEmpty
-                    ? null
-                    : () {
-                        widget.onExercisesSelected?.call(_selectedIds.toList());
-                      },
-                child: Text('Start with ${_selectedIds.length} exercises'),
-              ),
+            child: GlowButton(
+              label: 'Start with ${_selectedIds.length} exercises',
+              icon: Icons.play_arrow_rounded,
+              onPressed: _selectedIds.isEmpty
+                  ? null
+                  : () =>
+                      widget.onExercisesSelected?.call(_selectedIds.toList()),
+              fullWidth: true,
             ),
           ),
       ],

@@ -1,7 +1,13 @@
 // Data Models for Workout Logger App
 
+import 'dart:math' show log, max;
+
+import 'package:uuid/uuid.dart';
+
 // Sentinel value for copyWith methods to distinguish "not provided" from "null"
 const Object _sentinel = Object();
+
+const _uuid = Uuid();
 
 // ==================== Muscle Groups ====================
 
@@ -167,14 +173,17 @@ class WorkoutSet {
 }
 
 class DropsetEntry {
+  final String id;
   final double weight;
   final int reps;
 
-  DropsetEntry({required this.weight, required this.reps});
+  DropsetEntry({String? id, required this.weight, required this.reps})
+      : id = id ?? _uuid.v4();
 
-  Map<String, dynamic> toJson() => {'weight': weight, 'reps': reps};
+  Map<String, dynamic> toJson() => {'id': id, 'weight': weight, 'reps': reps};
 
   factory DropsetEntry.fromJson(Map<String, dynamic> json) => DropsetEntry(
+    id: json['id'] as String?,
     weight: (json['weight'] as num).toDouble(),
     reps: json['reps'],
   );
@@ -316,6 +325,13 @@ class Routine {
     exerciseIds: List<String>.from(json['exerciseIds']),
     createdAt: DateTime.parse(json['createdAt']),
   );
+
+  Routine copyWith({String? name, List<String>? exerciseIds}) => Routine(
+    id: id,
+    name: name ?? this.name,
+    exerciseIds: exerciseIds ?? this.exerciseIds,
+    createdAt: createdAt,
+  );
 }
 
 // ==================== Target ====================
@@ -387,22 +403,109 @@ class SetRecommendation {
 
 // ==================== Growth Model ====================
 
+/// Functional form of a fitted growth curve.
+///
+/// - [linear]: steady volume gains (typical for newer lifters / new exercises)
+/// - [logarithmic]: diminishing returns, y = a + b·ln(1+x) — typical as an
+///   exercise matures and progress saturates
+enum GrowthCurve { linear, logarithmic }
+
 class GrowthModel {
-  final double slope; // Growth rate per session
-  final double intercept; // Starting baseline
+  /// Instantaneous growth rate (volume per day) at the most recent data point.
+  /// For linear fits this equals the curve coefficient; for logarithmic fits
+  /// it is the tangent slope b/(1+lastX), which decays as training history grows.
+  final double slope;
+  final double intercept; // Curve intercept a
   final double r2; // Model fit quality (0-1)
   final DateTime lastTrained;
+  final GrowthCurve curve;
+
+  /// Curve coefficient b. Equals [slope] for linear fits.
+  final double coefficient;
+
+  /// x (days since first session) of the newest point used in training.
+  final double lastX;
+
+  /// Weighted residual standard error in volume units (0 = unknown/perfect).
+  final double stdError;
 
   GrowthModel({
     required this.slope,
     required this.intercept,
     required this.r2,
     required this.lastTrained,
+    this.curve = GrowthCurve.linear,
+    double? coefficient,
+    this.lastX = 0,
+    this.stdError = 0,
+  }) : coefficient = coefficient ?? slope;
+
+  double predict(num x) {
+    switch (curve) {
+      case GrowthCurve.linear:
+        return intercept + coefficient * x;
+      case GrowthCurve.logarithmic:
+        return intercept + coefficient * log(1 + max(0, x.toDouble()));
+    }
+  }
+
+  /// Model's volume estimate at the newest training point ("today's level").
+  double get currentEstimate => predict(lastX);
+
+  /// Expected volume growth over the next 7 days as a percentage of the
+  /// current level. The plateau/decline signal used by recommendations.
+  double get weeklyGrowthPercent {
+    final current = currentEstimate;
+    if (current <= 0) return 0;
+    return slope * 7 / current * 100;
+  }
+}
+
+// ==================== Personal Record ====================
+
+class PersonalRecord {
+  final String exerciseId;
+  final double bestWeight; // heaviest weight in any single set
+  final int bestReps;      // most reps in any single set
+  final double bestVolume; // highest single-set volume (weight × reps)
+  final DateTime achievedAt;
+
+  PersonalRecord({
+    required this.exerciseId,
+    required this.bestWeight,
+    required this.bestReps,
+    required this.bestVolume,
+    required this.achievedAt,
   });
 
-  double predict(int sessionNumber) {
-    return slope * sessionNumber + intercept;
-  }
+  Map<String, dynamic> toJson() => {
+    'exerciseId': exerciseId,
+    'bestWeight': bestWeight,
+    'bestReps': bestReps,
+    'bestVolume': bestVolume,
+    'achievedAt': achievedAt.toIso8601String(),
+  };
+
+  factory PersonalRecord.fromJson(Map<String, dynamic> json) => PersonalRecord(
+    exerciseId: json['exerciseId'] as String,
+    bestWeight: (json['bestWeight'] as num).toDouble(),
+    bestReps: json['bestReps'] as int,
+    bestVolume: (json['bestVolume'] as num).toDouble(),
+    achievedAt: DateTime.parse(json['achievedAt'] as String),
+  );
+
+  PersonalRecord copyWith({
+    double? bestWeight,
+    int? bestReps,
+    double? bestVolume,
+    DateTime? achievedAt,
+  }) => PersonalRecord(
+    exerciseId: exerciseId,
+    bestWeight: bestWeight ?? this.bestWeight,
+    bestReps: bestReps ?? this.bestReps,
+    bestVolume: bestVolume ?? this.bestVolume,
+    achievedAt: achievedAt ?? this.achievedAt,
+  );
 }
 
 // ==================== Training Program ====================
@@ -757,4 +860,355 @@ class TrainingProgram {
     createdAt:
         createdAt == _sentinel ? this.createdAt : createdAt as DateTime,
   );
+}
+
+// ==================== AI Coach Chat ====================
+
+/// A single message in an AI coach conversation.
+class ChatMessage {
+  final String id;
+  final String role; // 'user' | 'model'
+  final String text;
+  final DateTime timestamp;
+
+  ChatMessage({
+    String? id,
+    required this.role,
+    required this.text,
+    DateTime? timestamp,
+  })  : id = id ?? _uuid.v4(),
+        timestamp = timestamp ?? DateTime.now();
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'role': role,
+    'text': text,
+    'timestamp': timestamp.toIso8601String(),
+  };
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
+    id: json['id'] as String?,
+    role: json['role'] as String,
+    text: json['text'] as String,
+    timestamp: DateTime.parse(json['timestamp'] as String),
+  );
+
+  ChatMessage copyWith({
+    Object? role = _sentinel,
+    Object? text = _sentinel,
+    Object? timestamp = _sentinel,
+  }) => ChatMessage(
+    id: id,
+    role: role == _sentinel ? this.role : role as String,
+    text: text == _sentinel ? this.text : text as String,
+    timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime,
+  );
+}
+
+/// A persisted AI coach conversation: an ordered list of [ChatMessage]s.
+class Conversation {
+  final String id;
+  final String title;
+  final String kind; // 'coach' | 'optimizer'
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final List<ChatMessage> messages;
+
+  Conversation({
+    String? id,
+    required this.title,
+    this.kind = 'coach',
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    List<ChatMessage>? messages,
+  })  : id = id ?? _uuid.v4(),
+        createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? createdAt ?? DateTime.now(),
+        messages = messages ?? const [];
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'kind': kind,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+    'messages': messages.map((m) => m.toJson()).toList(),
+  };
+
+  factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
+    id: json['id'] as String?,
+    title: json['title'] as String,
+    kind: json['kind'] as String? ?? 'coach',
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    updatedAt: json['updatedAt'] != null
+        ? DateTime.parse(json['updatedAt'] as String)
+        : DateTime.parse(json['createdAt'] as String),
+    messages: (json['messages'] as List)
+        .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
+        .toList(),
+  );
+
+  Conversation copyWith({
+    Object? title = _sentinel,
+    Object? kind = _sentinel,
+    Object? createdAt = _sentinel,
+    Object? updatedAt = _sentinel,
+    Object? messages = _sentinel,
+  }) => Conversation(
+    id: id,
+    title: title == _sentinel ? this.title : title as String,
+    kind: kind == _sentinel ? this.kind : kind as String,
+    createdAt: createdAt == _sentinel ? this.createdAt : createdAt as DateTime,
+    updatedAt: updatedAt == _sentinel ? this.updatedAt : updatedAt as DateTime,
+    messages: messages == _sentinel
+        ? this.messages
+        : messages as List<ChatMessage>,
+  );
+}
+
+// ==================== AI Question Models ====================
+
+/// One question the AI asks the user, with predefined options.
+class QuestionSpec {
+  final String question;
+  final List<String> options;
+  final bool multiSelect;
+  final bool allowCustom;
+
+  const QuestionSpec({
+    required this.question,
+    required this.options,
+    this.multiSelect = false,
+    this.allowCustom = true,
+  });
+
+  factory QuestionSpec.fromJson(Map<String, dynamic> j) => QuestionSpec(
+    question: j['question'] as String,
+    options: (j['options'] as List).cast<String>(),
+    multiSelect: j['multiSelect'] as bool? ?? false,
+    allowCustom: j['allowCustom'] as bool? ?? true,
+  );
+}
+
+/// The user's answer to one [QuestionSpec].
+class AnswerSpec {
+  final String question;
+  final List<String> selected;
+  final String? custom;
+
+  const AnswerSpec({
+    required this.question,
+    required this.selected,
+    this.custom,
+  });
+
+  Map<String, Object?> toJson() => {
+    'question': question,
+    'selected': selected,
+    if (custom != null && custom!.isNotEmpty) 'custom': custom,
+  };
+}
+
+/// The structured payload from an `ask_user_questions` tool call.
+class PendingQuestions {
+  final String? preamble;
+  final List<QuestionSpec> questions;
+
+  const PendingQuestions({this.preamble, required this.questions});
+
+  factory PendingQuestions.fromJson(Map<String, dynamic> j) => PendingQuestions(
+    preamble: j['preamble'] as String?,
+    questions: (j['questions'] as List)
+        .map((q) => QuestionSpec.fromJson(q as Map<String, dynamic>))
+        .toList(),
+  );
+}
+
+// ==================== Readiness ====================
+
+/// Coarse training-readiness classification derived from [ReadinessSnapshot].
+enum ReadinessBand { high, moderate, low }
+
+/// A single point-in-time health measurement read from Health Connect.
+class HealthSample {
+  final DateTime time;
+  final double value;
+
+  const HealthSample({required this.time, required this.value});
+}
+
+/// One continuous sleep-stage segment within a `SleepPeriod`.
+///
+/// Stage is one of: `'deep'`, `'rem'`, `'light'`, `'awake'`.
+class SleepStageInterval {
+  final DateTime start;
+  final DateTime end;
+  final String stage;
+
+  const SleepStageInterval({
+    required this.start,
+    required this.end,
+    required this.stage,
+  });
+}
+
+/// A sleep session interval read from Health Connect.
+///
+/// When stage data is available (from `SleepSessionRecord.samples`),
+/// `lightMinutes`, `deepMinutes`, `remMinutes`, and `awakeMinutes` are
+/// populated and `minutes` returns actual sleep time (light + deep + rem),
+/// excluding awake/out-of-bed spans. Without stage data `minutes` falls back
+/// to the raw session duration.
+///
+/// `stageTimeline` carries the ordered list of stage segments when available,
+/// used by the Sleep HR chart to colour-code each 10-minute bar.
+class SleepPeriod {
+  final DateTime start;
+  final DateTime end;
+
+  /// Minutes in light (or unspecified) sleep. Null when no stage data.
+  final int? lightMinutes;
+  final int? deepMinutes;
+  final int? remMinutes;
+
+  /// Awake/out-of-bed minutes within the session window.
+  final int? awakeMinutes;
+
+  /// Ordered stage segments, populated from `SleepSessionRecord.samples`.
+  /// Empty when the session record carries no stage breakdown.
+  final List<SleepStageInterval> stageTimeline;
+
+  const SleepPeriod({
+    required this.start,
+    required this.end,
+    this.lightMinutes,
+    this.deepMinutes,
+    this.remMinutes,
+    this.awakeMinutes,
+    this.stageTimeline = const [],
+  });
+
+  bool get hasStages =>
+      lightMinutes != null || deepMinutes != null || remMinutes != null;
+
+  /// Actual sleep minutes: light + deep + rem when stage data exists,
+  /// otherwise the raw session span (start → end).
+  int get minutes => hasStages
+      ? (lightMinutes ?? 0) + (deepMinutes ?? 0) + (remMinutes ?? 0)
+      : end.difference(start).inMinutes;
+}
+
+/// Rolling per-component averages used as the personal reference point
+/// when scoring today's readiness. Recomputed at most once per day.
+class ReadinessBaseline {
+  final String dateKey; // yyyy-MM-dd the baseline was computed for
+  final double? avgSleepMinutes;
+  final int sleepNights;
+  final double? avgRestingHr;
+  final int rhrDays;
+  final double? avgHrvMs;
+  final int hrvDays;
+
+  const ReadinessBaseline({
+    required this.dateKey,
+    this.avgSleepMinutes,
+    this.sleepNights = 0,
+    this.avgRestingHr,
+    this.rhrDays = 0,
+    this.avgHrvMs,
+    this.hrvDays = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'dateKey': dateKey,
+    'avgSleepMinutes': avgSleepMinutes,
+    'sleepNights': sleepNights,
+    'avgRestingHr': avgRestingHr,
+    'rhrDays': rhrDays,
+    'avgHrvMs': avgHrvMs,
+    'hrvDays': hrvDays,
+  };
+
+  factory ReadinessBaseline.fromJson(Map<String, dynamic> json) =>
+      ReadinessBaseline(
+        dateKey: json['dateKey'] as String,
+        avgSleepMinutes: (json['avgSleepMinutes'] as num?)?.toDouble(),
+        sleepNights: json['sleepNights'] as int? ?? 0,
+        avgRestingHr: (json['avgRestingHr'] as num?)?.toDouble(),
+        rhrDays: json['rhrDays'] as int? ?? 0,
+        avgHrvMs: (json['avgHrvMs'] as num?)?.toDouble(),
+        hrvDays: json['hrvDays'] as int? ?? 0,
+      );
+}
+
+/// One day's computed readiness with the per-component evidence behind it.
+///
+/// Any component (sleep / resting HR / HRV) may be null when the data or a
+/// reliable baseline is unavailable; [score] is null when no component could
+/// be scored at all, in which case the UI hides readiness entirely.
+class ReadinessSnapshot {
+  final String dateKey; // yyyy-MM-dd this snapshot describes
+  final int? score; // 0–100 overall, null = nothing scorable
+  final ReadinessBand? band;
+  final int? sleepMinutes;
+  final double? sleepBaselineMinutes;
+  final int? sleepScore;
+  final double? restingHr;
+  final double? rhrBaseline;
+  final int? rhrScore;
+  final double? hrvMs;
+  final double? hrvBaseline;
+  final int? hrvScore;
+  final DateTime computedAt;
+
+  ReadinessSnapshot({
+    required this.dateKey,
+    this.score,
+    this.band,
+    this.sleepMinutes,
+    this.sleepBaselineMinutes,
+    this.sleepScore,
+    this.restingHr,
+    this.rhrBaseline,
+    this.rhrScore,
+    this.hrvMs,
+    this.hrvBaseline,
+    this.hrvScore,
+    DateTime? computedAt,
+  }) : computedAt = computedAt ?? DateTime.now();
+
+  Map<String, dynamic> toJson() => {
+    'dateKey': dateKey,
+    'score': score,
+    'band': band?.name,
+    'sleepMinutes': sleepMinutes,
+    'sleepBaselineMinutes': sleepBaselineMinutes,
+    'sleepScore': sleepScore,
+    'restingHr': restingHr,
+    'rhrBaseline': rhrBaseline,
+    'rhrScore': rhrScore,
+    'hrvMs': hrvMs,
+    'hrvBaseline': hrvBaseline,
+    'hrvScore': hrvScore,
+    'computedAt': computedAt.toIso8601String(),
+  };
+
+  factory ReadinessSnapshot.fromJson(Map<String, dynamic> json) =>
+      ReadinessSnapshot(
+        dateKey: json['dateKey'] as String,
+        score: json['score'] as int?,
+        band: json['band'] != null
+            ? ReadinessBand.values.byName(json['band'] as String)
+            : null,
+        sleepMinutes: json['sleepMinutes'] as int?,
+        sleepBaselineMinutes: (json['sleepBaselineMinutes'] as num?)?.toDouble(),
+        sleepScore: json['sleepScore'] as int?,
+        restingHr: (json['restingHr'] as num?)?.toDouble(),
+        rhrBaseline: (json['rhrBaseline'] as num?)?.toDouble(),
+        rhrScore: json['rhrScore'] as int?,
+        hrvMs: (json['hrvMs'] as num?)?.toDouble(),
+        hrvBaseline: (json['hrvBaseline'] as num?)?.toDouble(),
+        hrvScore: json['hrvScore'] as int?,
+        computedAt: DateTime.parse(json['computedAt'] as String),
+      );
 }

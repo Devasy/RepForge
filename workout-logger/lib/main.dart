@@ -7,8 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'services/debug_log_buffer.dart';
 import 'services/storage_service.dart';
 import 'services/ml_service.dart';
+import 'services/ai/gemini_ai_service.dart';
+import 'services/ai/coach_tool_service.dart';
 import 'services/health_connect_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
@@ -19,10 +22,16 @@ import 'services/api_service.dart';
 import 'services/managers/program_manager.dart';
 import 'services/managers/history_manager.dart';
 import 'services/managers/health_sync_manager.dart';
+import 'services/managers/pr_manager.dart';
+import 'services/managers/readiness_manager.dart';
+import 'services/managers/health_history_manager.dart';
+import 'services/managers/conversation_manager.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/onboarding_screen.dart';
 
 void main() async {
+  DebugLogBuffer.attach();
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set preferred orientations
@@ -58,6 +67,18 @@ class WorkoutLoggerApp extends StatelessWidget {
   // HistoryManager is the single owner of session history + HC sync trigger.
   static final HistoryManager _historyManager =
       HistoryManager(_storageService, healthSyncManager: _healthSyncManager);
+  static final PRManager _prManager = PRManager(_storageService);
+  // ReadinessManager reads HC sleep/heart data; gated by the in-memory
+  // readiness setting so refresh() is a no-op until the user opts in.
+  static final ReadinessManager _readinessManager =
+      ReadinessManager(_healthConnectService, _storageService, _settingsProvider);
+  // Serves arbitrary-range sleep/HR data to the detail screens.
+  static final HealthHistoryManager _healthHistoryManager =
+      HealthHistoryManager(_healthConnectService, _storageService);
+  static final GeminiAiService _geminiService =
+      GeminiAiService(storage: _storageService);
+  static final ConversationManager _conversationManager =
+      ConversationManager(_storageService);
 
   const WorkoutLoggerApp({super.key});
 
@@ -83,6 +104,18 @@ class WorkoutLoggerApp extends StatelessWidget {
         // HistoryManager is the single source of truth for session history.
         // Provided as ChangeNotifier so HistoryScreen rebuilds on sync badge changes.
         ChangeNotifierProvider<HistoryManager>.value(value: _historyManager),
+        ChangeNotifierProvider<PRManager>.value(value: _prManager),
+        ChangeNotifierProvider<ReadinessManager>.value(value: _readinessManager),
+        Provider<HealthHistoryManager>.value(value: _healthHistoryManager),
+        // GeminiAiService is the single AI backend instance. It's a ChangeNotifier
+        // (settings UI watches isConfigured/model), so it's provided as such.
+        // Consumers that should depend on the abstraction (the coach ViewModel,
+        // program generator) receive it typed as IAiService at construction —
+        // the future firebase_ai swap point — without a separate provider.
+        ChangeNotifierProvider<GeminiAiService>.value(value: _geminiService),
+        ChangeNotifierProvider<ConversationManager>.value(
+          value: _conversationManager,
+        ),
         // WorkoutProvider receives dependencies via constructor injection
         ChangeNotifierProvider(
           create: (_) => WorkoutProvider(
@@ -90,6 +123,13 @@ class WorkoutLoggerApp extends StatelessWidget {
             mlService: _mlService,
             historyManager: _historyManager,
             programManager: _programManager,
+          ),
+        ),
+        // CoachToolService backs AI tool calls; reads from WorkoutProvider + PRManager.
+        Provider<CoachToolService>(
+          create: (ctx) => CoachToolService(
+            ctx.read<WorkoutProvider>(),
+            ctx.read<PRManager>(),
           ),
         ),
       ],
@@ -112,6 +152,7 @@ class AppInitializer extends StatefulWidget {
 
 class _AppInitializerState extends State<AppInitializer> {
   bool _initialized = false;
+  bool _needsNamePrompt = false;
   String? _error;
 
   @override
@@ -121,32 +162,60 @@ class _AppInitializerState extends State<AppInitializer> {
   }
 
   Future<void> _initializeApp() async {
+    // Capture all providers synchronously before any awaits.
+    final provider = context.read<WorkoutProvider>();
+    final settings = context.read<SettingsProvider>();
+    final historyManager = context.read<HistoryManager>();
+    final prManager = context.read<PRManager>();
+    final api = context.read<ApiService>();
+    final gemini = context.read<GeminiAiService>();
+    final readiness = context.read<ReadinessManager>();
+
     try {
-      final provider = context.read<WorkoutProvider>();
       await provider.init();
-
-      final settings = context.read<SettingsProvider>();
       await settings.init();
-
-      // Load HistoryManager session list (independent of WorkoutProvider).
-      final historyManager = context.read<HistoryManager>();
+      gemini.init(settings.geminiApiKey, model: settings.geminiModel);
+      try {
+        await gemini.loadUsage();
+      } catch (e, st) {
+        debugPrint('gemini.loadUsage failed: $e\n$st');
+      }
       await historyManager.loadSessions();
+      await prManager.load();
+      await prManager.backfillFromSessions(historyManager.sessions);
 
-      // Fire-and-forget analytics in background
-      final api = context.read<ApiService>();
+      final version = await settings.getCurrentVersion();
+      final needsName = settings.userName == null || settings.userName!.isEmpty;
+      final versionChanged = !needsName &&
+          settings.lastSeenVersion != null &&
+          settings.lastSeenVersion != version;
+
+      // Fire-and-forget readiness refresh — must run after settings.init()
+      // so the opt-in flag is loaded; never blocks or fails app init.
+      readiness.refresh();
+
+      // Fire-and-forget analytics in background.
       api.sendHeartbeat();
       api.trackEvent('app_open');
-      provider
-          .getQuickStats()
-          .then((stats) {
-            api.reportUsage(stats);
-          })
-          .catchError((e) {
-            debugPrint('Failed to report usage: $e');
-          });
+      provider.getQuickStats().then((stats) => api.reportUsage(stats)).catchError(
+        (Object e) => debugPrint('Failed to report usage: $e'),
+      );
 
-      setState(() => _initialized = true);
+      if (!mounted) return;
+      setState(() {
+        _initialized = true;
+        _needsNamePrompt = needsName;
+      });
+
+      if (!needsName && versionChanged) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          await showVersionUpdateSheet(context, version);
+          if (mounted) await settings.markVersionSeen(version);
+        });
+      }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = e.toString());
     }
   }
@@ -212,6 +281,12 @@ class _AppInitializerState extends State<AppInitializer> {
             ],
           ),
         ),
+      );
+    }
+
+    if (_needsNamePrompt) {
+      return WelcomePage(
+        onComplete: () => setState(() => _needsNamePrompt = false),
       );
     }
 

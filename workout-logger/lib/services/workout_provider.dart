@@ -748,7 +748,7 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== ROUTINES ====================
 
-  Future<void> createRoutine(String name, List<String> exerciseIds) async {
+  Future<Routine> createRoutine(String name, List<String> exerciseIds) async {
     final routine = Routine(
       id: _uuid.v4(),
       name: name,
@@ -757,6 +757,7 @@ class WorkoutProvider extends ChangeNotifier {
     await _storage.saveRoutine(routine);
     _routines.add(routine);
     notifyListeners();
+    return routine;
   }
 
   Future<void> updateRoutine(Routine routine) async {
@@ -962,6 +963,29 @@ class WorkoutProvider extends ChangeNotifier {
     return volumeByMuscle;
   }
 
+  /// Per-muscle recovery scores using exponential decay (recovery = 1 − e^(−t/τ)).
+  Map<String, MuscleRecoveryStatus> getMuscleRecoveryScores() {
+    final exerciseMap = {for (final e in _allExercises) e.id: e};
+    return _mlService.computeMuscleRecoveryScores(_sessions, exerciseMap);
+  }
+
+  /// Per-muscle growth models trained on aggregate weighted volume.
+  Map<String, GrowthModel> getMuscleGrowthModels() {
+    final exerciseMap = {for (final e in _allExercises) e.id: e};
+    final muscleIds = <String>{
+      for (final e in _allExercises)
+        for (final a in e.muscleActivations) a.muscleGroupId,
+    };
+    final result = <String, GrowthModel>{};
+    for (final id in muscleIds) {
+      final points = _mlService.extractMuscleDataPoints(id, _sessions, exerciseMap);
+      if (points.length >= 2) {
+        result[id] = _mlService.trainGrowthModel(points);
+      }
+    }
+    return result;
+  }
+
   /// Get growth model for an exercise
   GrowthModel? getGrowthModel(String exerciseId) => _growthModels[exerciseId];
 
@@ -986,6 +1010,139 @@ class WorkoutProvider extends ChangeNotifier {
       }
     }
     return best;
+  }
+
+  /// Per-exercise contribution to a muscle group's volume within a time window.
+  ///
+  /// [start]/[end] default to the last 7 days. Results are sorted by contributed
+  /// volume (desc). This is a pure, parameterized query intended to double as the
+  /// implementation surface for a future Coach agent tool.
+  List<({String exerciseId, String name, double volume, GrowthModel? growth})>
+      getMuscleExerciseBreakdown(
+    String muscleId, {
+    DateTime? start,
+    DateTime? end,
+  }) {
+    final now = DateTime.now();
+    final from = start ?? now.subtract(const Duration(days: 7));
+    final to = end ?? now;
+    final exerciseMap = <String, Exercise>{
+      for (final e in _allExercises) e.id: e,
+    };
+
+    final byExercise = <String, double>{};
+    for (final session in _sessions) {
+      if (session.date.isBefore(from) || session.date.isAfter(to)) continue;
+      for (final log in session.exercises) {
+        final exercise = exerciseMap[log.exerciseId];
+        if (exercise == null) continue;
+        for (final activation in exercise.muscleActivations) {
+          if (activation.muscleGroupId != muscleId) continue;
+          byExercise[log.exerciseId] = (byExercise[log.exerciseId] ?? 0) +
+              log.totalVolume * (activation.activationPercentage / 100);
+        }
+      }
+    }
+
+    final result = byExercise.entries
+        .map((e) => (
+              exerciseId: e.key,
+              name: getExerciseName(e.key),
+              volume: e.value,
+              growth: _growthModels[e.key],
+            ))
+        .toList()
+      ..sort((a, b) => b.volume.compareTo(a.volume));
+    return result;
+  }
+
+  /// Per-session set-by-set progression for an exercise (oldest-first).
+  ///
+  /// Optionally bounded by [start]/[end]. Each entry holds the working sets
+  /// logged for the exercise in that session, so callers can chart weight/reps
+  /// per set. Pure & parameterized — also the surface for a future agent tool.
+  List<({DateTime date, List<WorkoutSet> sets})> getSetProgression(
+    String exerciseId, {
+    DateTime? start,
+    DateTime? end,
+  }) {
+    final result = <({DateTime date, List<WorkoutSet> sets})>[];
+    // _sessions is maintained newest-first; reverse for oldest-first output.
+    for (final session in _sessions.reversed) {
+      if (start != null && session.date.isBefore(start)) continue;
+      if (end != null && session.date.isAfter(end)) continue;
+      for (final log in session.exercises) {
+        if (log.exerciseId == exerciseId && log.sets.isNotEmpty) {
+          result.add((date: session.date, sets: log.sets));
+          break;
+        }
+      }
+    }
+    return result;
+  }
+
+  /// Last [limit] sessions where [muscleId] was trained (newest-first).
+  List<({DateTime date, List<String> exerciseNames, double volume})>
+      getRecentMuscleSessionSummaries(String muscleId, {int limit = 6}) {
+    final exerciseMap = <String, Exercise>{
+      for (final e in _allExercises) e.id: e,
+    };
+    final result = <({DateTime date, List<String> exerciseNames, double volume})>[];
+    for (final session in _sessions) {
+      if (result.length >= limit) break;
+      final names = <String>[];
+      double vol = 0;
+      for (final log in session.exercises) {
+        final exercise = exerciseMap[log.exerciseId];
+        if (exercise == null) continue;
+        final activation = exercise.muscleActivations
+            .where((a) => a.muscleGroupId == muscleId)
+            .firstOrNull;
+        if (activation == null) continue;
+        names.add(exercise.name);
+        vol += log.totalVolume * (activation.activationPercentage / 100);
+      }
+      if (names.isNotEmpty) {
+        result.add((date: session.date, exerciseNames: names, volume: vol));
+      }
+    }
+    return result;
+  }
+
+  /// Weekly volume for [muscleId] over the last [weeks] weeks, oldest-first.
+  List<({DateTime weekStart, double volume})> getMuscleWeeklyVolumeSeries(
+    String muscleId, {
+    int weeks = 8,
+  }) {
+    final now = DateTime.now();
+    final exerciseMap = <String, Exercise>{
+      for (final e in _allExercises) e.id: e,
+    };
+    final buckets = <int, double>{};
+    final cutoff = now.subtract(Duration(days: weeks * 7));
+
+    for (final session in _sessions) {
+      if (session.date.isBefore(cutoff)) continue;
+      final weekIndex = now.difference(session.date).inDays ~/ 7;
+      if (weekIndex >= weeks) continue;
+      for (final log in session.exercises) {
+        final exercise = exerciseMap[log.exerciseId];
+        if (exercise == null) continue;
+        for (final activation in exercise.muscleActivations) {
+          if (activation.muscleGroupId != muscleId) continue;
+          buckets[weekIndex] = (buckets[weekIndex] ?? 0) +
+              log.totalVolume * (activation.activationPercentage / 100);
+        }
+      }
+    }
+
+    // weekIndex 0 = this week, weeks-1 = oldest; return oldest-first
+    return List.generate(weeks, (i) => weeks - 1 - i)
+        .map((wi) => (
+              weekStart: now.subtract(Duration(days: (wi + 1) * 7)),
+              volume: buckets[wi] ?? 0,
+            ))
+        .toList();
   }
 
   // ==================== QUICK STATS ====================

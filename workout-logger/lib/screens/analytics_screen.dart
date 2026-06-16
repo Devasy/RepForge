@@ -1,16 +1,18 @@
-// Analytics Screen - Visualize progress with charts
+// analytics_screen.dart — Analytics: Overview / Exercises / Targets / Records
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
+import '../services/managers/pr_manager.dart';
 import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
-import '../data/exercise_database.dart';
+import 'widgets/rf_widgets.dart';
+import 'widgets/analytics_overview.dart';
+import 'widgets/exercise_progress_view.dart';
+import 'widgets/targets_tab.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -19,188 +21,60 @@ class AnalyticsScreen extends StatefulWidget {
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
 
-class _AnalyticsScreenState extends State<AnalyticsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  int _tab = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  static const _tabs = ['Overview', 'Exercises', 'Targets', 'Records'];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Analytics'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Overview'),
-            Tab(text: 'Exercises'),
-            Tab(text: 'Targets'),
-          ],
+    return Stack(
+      children: [
+        const AmbientGlow(),
+        SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _buildHeader(),
+              _buildPillTabBar(),
+              Expanded(child: _buildTabView()),
+            ],
+          ),
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          _OverviewTab(),
-          _ExercisesTab(),
-          _TargetsTab(),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================== Overview Tab ====================
-
-class _OverviewTab extends StatelessWidget {
-  const _OverviewTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<WorkoutProvider>();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildVolumeChart(context, provider),
-          const SizedBox(height: AppSpacing.lg),
-          _buildMuscleVolumeChart(context, provider),
-          const SizedBox(height: AppSpacing.lg),
-          _buildWorkoutFrequency(context, provider),
-        ],
-      ),
+      ],
     );
   }
 
-  Widget _buildVolumeChart(BuildContext context, WorkoutProvider provider) {
-    final sessions = provider.sessions.take(14).toList().reversed.toList();
-    
-    if (sessions.isEmpty) {
-      return _buildEmptyChart(context, 'Volume Progression');
-    }
-
-    final spots = sessions.asMap().entries.map((entry) {
-      return FlSpot(entry.key.toDouble(), entry.value.totalVolume / 1000);
-    }).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(
-            'Volume Progression (kg)',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          Text(
-            'Last ${sessions.length} workouts',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            height: 200,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: 1,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: AppTheme.surfaceColor,
-                    strokeWidth: 1,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'INSIGHTS',
+                  style: TextStyle(fontFamily: 'Geist', 
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textFaint,
+                    letterSpacing: 1.2,
                   ),
                 ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      interval: 1,
-                      getTitlesWidget: (value, meta) {
-                        final index = value.toInt();
-                        if (index >= 0 && index < sessions.length) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              DateFormat('d/M').format(sessions[index].date),
-                              style: const TextStyle(
-                                color: AppTheme.textMuted,
-                                fontSize: 10,
-                              ),
-                            ),
-                          );
-                        }
-                        return const Text('');
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 40,
-                      getTitlesWidget: (value, meta) => Text(
-                        '${value.toStringAsFixed(0)}k',
-                        style: const TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
+                const SizedBox(height: 2),
+                Text(
+                  'Analytics',
+                  style: TextStyle(fontFamily: 'Geist', 
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.6,
                   ),
                 ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    curveSmoothness: 0.3,
-                    color: AppTheme.primaryColor,
-                    barWidth: 3,
-                    isStrokeCapRound: true,
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, percent, barData, index) =>
-                          FlDotCirclePainter(
-                        radius: 4,
-                        color: AppTheme.primaryColor,
-                        strokeWidth: 2,
-                        strokeColor: AppTheme.cardColor,
-                      ),
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primaryColor.withOpacity(0.3),
-                          AppTheme.primaryColor.withOpacity(0.0),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
         ],
@@ -208,264 +82,327 @@ class _OverviewTab extends StatelessWidget {
     );
   }
 
-  Widget _buildMuscleVolumeChart(BuildContext context, WorkoutProvider provider) {
-    final volumeByMuscle = provider.getWeeklyVolumeByMuscle();
-    
-    if (volumeByMuscle.isEmpty) {
-      return _buildEmptyChart(context, 'Weekly Muscle Volume');
-    }
-
-    // Sort by volume and take top 8
-    final sorted = volumeByMuscle.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final top = sorted.take(8).toList();
-    final maxVolume = top.first.value;
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Weekly Muscle Volume',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          ...top.map((entry) {
-            final muscleName = MuscleGroups.names[entry.key] ?? entry.key;
-            final color = AppTheme.getMuscleColor(entry.key);
-            final percentage = entry.value / maxVolume;
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        muscleName,
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 13,
-                        ),
-                      ),
-                      Text(
-                        '${(entry.value / 1000).toStringAsFixed(1)}k kg',
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+  Widget _buildPillTabBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.glass2,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.glassBorder),
+        ),
+        child: Row(
+          children: List.generate(_tabs.length, (i) {
+            final active = i == _tab;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _tab = i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(11),
+                    boxShadow: active
+                        ? [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.35),
+                              blurRadius: 12,
+                            ),
+                          ]
+                        : null,
                   ),
-                  const SizedBox(height: 4),
-                  LinearProgressIndicator(
-                    value: percentage,
-                    backgroundColor: AppTheme.surfaceColor,
-                    valueColor: AlwaysStoppedAnimation(color),
-                    borderRadius: BorderRadius.circular(4),
-                    minHeight: 8,
+                  child: Text(
+                    _tabs[i],
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontFamily: 'Geist', 
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: active ? Colors.white : AppColors.textMuted,
+                    ),
                   ),
-                ],
+                ),
               ),
             );
           }),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildWorkoutFrequency(BuildContext context, WorkoutProvider provider) {
-    // Calculate workouts per week for last 4 weeks
-    final now = DateTime.now();
-    final weeks = <int, int>{};
-    
-    for (int i = 0; i < 4; i++) {
-      weeks[i] = 0;
+  Widget _buildTabView() {
+    switch (_tab) {
+      case 0:
+        return const AnalyticsOverviewTab();
+      case 1:
+        return const ExerciseProgressView();
+      case 2:
+        return const TargetsTab();
+      case 3:
+        return const _RecordsTab();
+      default:
+        return const SizedBox.shrink();
     }
-
-    for (var session in provider.sessions) {
-      final weeksAgo = now.difference(session.date).inDays ~/ 7;
-      if (weeksAgo < 4) {
-        weeks[weeksAgo] = (weeks[weeksAgo] ?? 0) + 1;
-      }
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Workout Frequency',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: weeks.entries.map((entry) {
-              final label = entry.key == 0 
-                  ? 'This Week' 
-                  : '${entry.key} week${entry.key > 1 ? 's' : ''} ago';
-              return Column(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(
-                        entry.value > 0 ? 0.2 + (entry.value * 0.15) : 0.1
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${entry.value}',
-                        style: TextStyle(
-                          color: entry.value > 0 
-                              ? AppTheme.primaryColor 
-                              : AppTheme.textMuted,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    entry.key == 0 ? 'This' : '-${entry.key}w',
-                    style: const TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyChart(BuildContext context, String title) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Icon(
-            Icons.show_chart,
-            size: 48,
-            color: AppTheme.textMuted,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const Text(
-            'No data yet',
-            style: TextStyle(color: AppTheme.textSecondary),
-          ),
-          const Text(
-            'Complete workouts to see your progress',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-          ),
-        ],
-      ),
-    );
   }
 }
 
-// ==================== Exercises Tab ====================
+// ── Records Tab ────────────────────────────────────────────────────────────────
 
-class _ExercisesTab extends StatefulWidget {
-  const _ExercisesTab();
+enum _RecordsFilter { all, thisMonth, byExercise }
+enum _RecordsSort { recent, heaviest }
+
+class _RecordsTab extends StatefulWidget {
+  const _RecordsTab();
 
   @override
-  State<_ExercisesTab> createState() => _ExercisesTabState();
+  State<_RecordsTab> createState() => _RecordsTabState();
 }
 
-class _ExercisesTabState extends State<_ExercisesTab> {
-  String? _selectedExerciseId;
+class _RecordsTabState extends State<_RecordsTab> {
+  _RecordsFilter _filter = _RecordsFilter.all;
+  _RecordsSort _sort = _RecordsSort.recent;
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<WorkoutProvider>();
-    
-    // Get exercises that have been performed
-    final performedExercises = <String>{};
-    for (var session in provider.sessions) {
-      for (var log in session.exercises) {
-        performedExercises.add(log.exerciseId);
-      }
-    }
+    final prManager = context.watch<PRManager>();
+    final provider = context.read<WorkoutProvider>();
+    final allRecords = prManager.allRecords;
 
-    if (performedExercises.isEmpty) {
+    if (allRecords.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.fitness_center,
-              size: 64,
-              color: AppTheme.textMuted,
-            ),
-            const SizedBox(height: 16),
+            const Icon(Icons.emoji_events_rounded,
+                size: 48, color: AppColors.textFaint),
+            const SizedBox(height: 12),
             Text(
-              'No Exercise Data',
-              style: Theme.of(context).textTheme.titleLarge,
+              'No records yet',
+              style: TextStyle(fontFamily: 'Geist', 
+                color: AppColors.textMuted,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Complete workouts to track exercises',
-              style: TextStyle(color: AppTheme.textSecondary),
+            const SizedBox(height: 4),
+            Text(
+              'Finish a workout to set your first PRs',
+              style: TextStyle(fontFamily: 'Geist', 
+                  color: AppColors.textFaint, fontSize: 12),
             ),
           ],
         ),
       );
     }
 
-    return Column(
-      children: [
-        // Exercise selector
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: DropdownButtonFormField<String>(
-            initialValue: _selectedExerciseId,
-            decoration: const InputDecoration(
-              labelText: 'Select Exercise',
-              prefixIcon: Icon(Icons.fitness_center),
+    // Filter
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    List<PersonalRecord> filtered = switch (_filter) {
+      _RecordsFilter.all => [...allRecords],
+      _RecordsFilter.thisMonth => allRecords
+          .where((r) => !r.achievedAt.isBefore(startOfMonth))
+          .toList(),
+      _RecordsFilter.byExercise => [...allRecords],
+    };
+
+    // Sort
+    switch (_sort) {
+      case _RecordsSort.recent:
+        filtered.sort((a, b) => b.achievedAt.compareTo(a.achievedAt));
+      case _RecordsSort.heaviest:
+        filtered.sort((a, b) => b.bestWeight.compareTo(a.bestWeight));
+    }
+
+    // Stats for summary
+    final thisMonthCount = allRecords
+        .where((r) => !r.achievedAt.isBefore(startOfMonth))
+        .length;
+    final newest = allRecords.isEmpty
+        ? null
+        : ([...allRecords]
+              ..sort((a, b) => b.achievedAt.compareTo(a.achievedAt)))
+            .first;
+
+    // Group by exercise if needed
+    Map<String, List<PersonalRecord>>? grouped;
+    if (_filter == _RecordsFilter.byExercise) {
+      grouped = {};
+      for (final r in filtered) {
+        grouped.putIfAbsent(r.exerciseId, () => []).add(r);
+      }
+    }
+
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Summary header
+                Row(
+                  children: [
+                    Text(
+                      '${allRecords.length} PRs',
+                      style: TextStyle(fontFamily: 'Geist', 
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (thisMonthCount > 0) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.15),
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.full),
+                          border: Border.all(
+                              color:
+                                  AppColors.warning.withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          '$thisMonthCount this month',
+                          style: TextStyle(fontFamily: 'GeistMono', 
+                            color: AppColors.warning,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                // Newest PR hero
+                if (newest != null) ...[
+                  const SizedBox(height: 12),
+                  _NewestPRHero(
+                    record: newest,
+                    exerciseName:
+                        provider.getExerciseName(newest.exerciseId),
+                  ),
+                ],
+
+                // Filter + sort bar
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _FilterChip(
+                              label: 'All',
+                              selected:
+                                  _filter == _RecordsFilter.all,
+                              onTap: () => setState(
+                                  () => _filter = _RecordsFilter.all),
+                            ),
+                            const SizedBox(width: 6),
+                            _FilterChip(
+                              label: 'This month',
+                              selected: _filter ==
+                                  _RecordsFilter.thisMonth,
+                              onTap: () => setState(() =>
+                                  _filter = _RecordsFilter.thisMonth),
+                            ),
+                            const SizedBox(width: 6),
+                            _FilterChip(
+                              label: 'By exercise',
+                              selected: _filter ==
+                                  _RecordsFilter.byExercise,
+                              onTap: () => setState(() =>
+                                  _filter = _RecordsFilter.byExercise),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => setState(() => _sort = _sort ==
+                              _RecordsSort.recent
+                          ? _RecordsSort.heaviest
+                          : _RecordsSort.recent),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.glass2,
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.sm),
+                          border:
+                              Border.all(color: AppColors.glassBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _sort == _RecordsSort.recent
+                                  ? Icons.access_time_rounded
+                                  : Icons.fitness_center_rounded,
+                              size: 13,
+                              color: AppColors.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _sort == _RecordsSort.recent
+                                  ? 'Recent'
+                                  : 'Heaviest',
+                              style: TextStyle(fontFamily: 'GeistMono', 
+                                color: AppColors.textMuted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
             ),
-            items: performedExercises.map((id) {
-              final name = provider.getExerciseName(id);
-              return DropdownMenuItem(value: id, child: Text(name));
-            }).toList(),
-            onChanged: (value) => setState(() => _selectedExerciseId = value),
           ),
         ),
-        
-        // Exercise stats
-        if (_selectedExerciseId != null)
-          Expanded(
-            child: _ExerciseProgressView(
-              exerciseId: _selectedExerciseId!,
-              provider: provider,
+
+        if (grouped != null)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) {
+                  final entry = grouped!.entries.elementAt(i);
+                  return _ExercisePRGroup(
+                    exerciseName: provider.getExerciseName(entry.key),
+                    records: entry.value,
+                  );
+                },
+                childCount: grouped.length,
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) => _PRCard(
+                  record: filtered[i],
+                  exerciseName:
+                      provider.getExerciseName(filtered[i].exerciseId),
+                ),
+                childCount: filtered.length,
+              ),
             ),
           ),
       ],
@@ -473,175 +410,63 @@ class _ExercisesTabState extends State<_ExercisesTab> {
   }
 }
 
-class _ExerciseProgressView extends StatelessWidget {
-  final String exerciseId;
-  final WorkoutProvider provider;
-
-  const _ExerciseProgressView({
-    required this.exerciseId,
-    required this.provider,
-  });
+class _NewestPRHero extends StatelessWidget {
+  const _NewestPRHero({required this.record, required this.exerciseName});
+  final PersonalRecord record;
+  final String exerciseName;
 
   @override
   Widget build(BuildContext context) {
-    final progression = provider.getVolumeProgression(exerciseId);
-    final growthModel = provider.getGrowthModel(exerciseId);
-    final exercise = provider.getExercise(exerciseId);
-
     final settings = context.watch<SettingsProvider>();
-    final bestOneRM = provider.getBestOneRM(exerciseId);
+    final dateStr = DateFormat('MMM d, yyyy').format(record.achievedAt);
+    final w = settings.toDisplay(record.bestWeight);
 
-    return SingleChildScrollView(
+    return GlassCard(
+      glowColor: AppColors.warning,
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1RM card
-          if (bestOneRM != null)
-            _buildOneRMCard(context, bestOneRM, settings),
-
-          if (bestOneRM != null) const SizedBox(height: AppSpacing.md),
-
-          // Growth rate card
-          if (growthModel != null)
-            _buildGrowthCard(context, growthModel),
-
-          const SizedBox(height: AppSpacing.md),
-          
-          // Volume chart
-          _buildVolumeChart(context, progression),
-          
-          const SizedBox(height: AppSpacing.md),
-          
-          // Session history
-          _buildSessionHistory(context, progression),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOneRMCard(
-    BuildContext context,
-    double bestOneRMkg,
-    SettingsProvider settings,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryColor.withOpacity(0.2),
-            AppTheme.primaryColor.withOpacity(0.1),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: const Icon(
-              Icons.emoji_events_rounded,
-              color: AppTheme.primaryColor,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Estimated 1RM',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                Text(
-                  settings.formatWeight(bestOneRMkg),
-                  style: const TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'Epley formula',
-                style: TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 10,
-                ),
+              gradient: const LinearGradient(
+                colors: [AppColors.warning, Color(0xFFFF9500)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              Text(
-                'Best across all sets',
-                style: TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 10,
-                ),
-              ),
-            ],
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: const Icon(Icons.emoji_events_rounded,
+                color: Colors.white, size: 22),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGrowthCard(BuildContext context, GrowthModel model) {
-    final isGrowing = model.slope > 0;
-    final slopeFormatted = model.slope.abs().toStringAsFixed(1);
-    
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isGrowing
-              ? [AppTheme.success.withOpacity(0.2), AppTheme.success.withOpacity(0.1)]
-              : [AppTheme.warning.withOpacity(0.2), AppTheme.warning.withOpacity(0.1)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isGrowing ? Icons.trending_up : Icons.trending_down,
-            color: isGrowing ? AppTheme.success : AppTheme.warning,
-            size: 40,
-          ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isGrowing ? 'Growing!' : 'Plateau',
-                  style: TextStyle(
-                    color: isGrowing ? AppTheme.success : AppTheme.warning,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                  'Latest PR',
+                  style: TextStyle(fontFamily: 'Geist', 
+                    color: AppColors.warning,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
                   ),
                 ),
                 Text(
-                  isGrowing
-                      ? '+$slopeFormatted kg volume per session'
-                      : 'Volume trend is flat or declining',
-                  style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
+                  exerciseName,
+                  style: TextStyle(fontFamily: 'Geist', 
+                    color: AppColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  dateStr,
+                  style: TextStyle(fontFamily: 'Geist', 
+                    color: AppColors.textFaint,
+                    fontSize: 11,
                   ),
                 ),
               ],
@@ -651,17 +476,19 @@ class _ExerciseProgressView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                'R² = ${(model.r2 * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 12,
+                '${w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1)} ${settings.unitLabel}',
+                style: TextStyle(fontFamily: 'GeistMono', 
+                  color: AppColors.warning,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               Text(
-                'Model Fit',
-                style: TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 10,
+                '${record.bestReps} reps',
+                style: TextStyle(fontFamily: 'GeistMono', 
+                  color: AppColors.textMuted,
+                  fontSize: 11,
                 ),
               ),
             ],
@@ -670,443 +497,203 @@ class _ExerciseProgressView extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildVolumeChart(
-    BuildContext context,
-    List<({DateTime date, double volume})> data,
-  ) {
-    if (data.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: AppTheme.cardColor,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        child: const Center(
-          child: Text('No data', style: TextStyle(color: AppTheme.textMuted)),
-        ),
-      );
-    }
-
-    final spots = data.asMap().entries.map((entry) {
-      return FlSpot(entry.key.toDouble(), entry.value.volume / 100);
-    }).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Volume Progression',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            height: 180,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: AppTheme.surfaceColor,
-                    strokeWidth: 1,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 40,
-                      getTitlesWidget: (value, meta) => Text(
-                        (value * 100).toStringAsFixed(0),
-                        style: const TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    curveSmoothness: 0.3,
-                    color: AppTheme.secondaryColor,
-                    barWidth: 3,
-                    dotData: const FlDotData(show: true),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.secondaryColor.withOpacity(0.3),
-                          AppTheme.secondaryColor.withOpacity(0.0),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSessionHistory(
-    BuildContext context,
-    List<({DateTime date, double volume})> data,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Session History',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Builder(
-            builder: (context) {
-              final settings = context.watch<SettingsProvider>();
-              return Column(
-                children: data.take(10).map((entry) {
-                  final displayVolume = settings.toDisplay(entry.volume);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          DateFormat('MMM d, yyyy').format(entry.date),
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        Text(
-                          '${displayVolume.toStringAsFixed(0)} ${settings.unitLabel}',
-                          style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-// ==================== Targets Tab ====================
-
-class _TargetsTab extends StatelessWidget {
-  const _TargetsTab();
+class _ExercisePRGroup extends StatelessWidget {
+  const _ExercisePRGroup(
+      {required this.exerciseName, required this.records});
+  final String exerciseName;
+  final List<PersonalRecord> records;
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<WorkoutProvider>();
-    final targets = provider.targets;
-    final activeTargets = targets.where((t) => !t.isCompleted).toList();
-    final completedTargets = targets.where((t) => t.isCompleted).toList();
-
-    return Scaffold(
-      body: targets.isEmpty
-          ? _buildEmptyState(context)
-          : ListView(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              children: [
-                if (activeTargets.isNotEmpty) ...[
-                  Text(
-                    'Active Targets',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  ...activeTargets.map((t) => _TargetCard(target: t, provider: provider)),
-                ],
-                if (completedTargets.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    'Completed',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  ...completedTargets.map((t) => _TargetCard(target: t, provider: provider)),
-                ],
-              ],
+    final best = records.reduce(
+        (a, b) => a.bestWeight >= b.bestWeight ? a : b);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6, top: 4),
+          child: Text(
+            exerciseName,
+            style: TextStyle(fontFamily: 'Geist', 
+              color: AppColors.textSoft,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateTargetDialog(context),
-        icon: const Icon(Icons.add),
-        label: const Text('New Target'),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.flag,
-            size: 64,
-            color: AppTheme.textMuted,
           ),
-          const SizedBox(height: 16),
-          Text(
-            'No Targets Set',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Set a target to track your progress',
-            style: TextStyle(color: AppTheme.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showCreateTargetDialog(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.cardColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => const _CreateTargetSheet(),
+        ),
+        _PRCard(record: best, exerciseName: exerciseName),
+        const SizedBox(height: 4),
+      ],
     );
   }
 }
 
-class _TargetCard extends StatelessWidget {
-  final Target target;
-  final WorkoutProvider provider;
-
-  const _TargetCard({
-    required this.target,
-    required this.provider,
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
   });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final exerciseName = provider.getExerciseName(target.exerciseId);
-    final progress = target.progressPercentage;
-    final isCompleted = target.isCompleted;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.18)
+              : AppColors.glass2,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.5)
+                : AppColors.glassBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(fontFamily: 'GeistMono', 
+            color: selected ? AppColors.primary : AppColors.textMuted,
+            fontSize: 11,
+            fontWeight:
+                selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+class _PRCard extends StatelessWidget {
+  const _PRCard({required this.record, required this.exerciseName});
+
+  final PersonalRecord record;
+  final String exerciseName;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    final dateStr = DateFormat('MMM d, yyyy').format(record.achievedAt);
+    final displayWeight = settings.toDisplay(record.bestWeight);
+    final displayVol = settings.toDisplay(record.bestVolume);
+    final unit = settings.unitLabel;
+
+    return GlassCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.emoji_events_rounded,
+                    color: AppColors.warning, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exerciseName,
+                      style: TextStyle(fontFamily: 'Geist', 
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      dateStr,
+                      style: TextStyle(fontFamily: 'Geist', 
+                          color: AppColors.textFaint, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              _PRStat(
+                label: 'Best Weight',
+                value:
+                    '${displayWeight.toStringAsFixed(displayWeight % 1 == 0 ? 0 : 1)} $unit',
+                color: AppColors.warning,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _PRStat(
+                label: 'Best Reps',
+                value: '${record.bestReps}',
+                color: AppColors.secondary,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _PRStat(
+                label: 'Best Vol.',
+                value: '${displayVol.toStringAsFixed(0)} $unit',
+                color: AppColors.success,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PRStat extends StatelessWidget {
+  const _PRStat(
+      {required this.label,
+      required this.value,
+      required this.color});
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  isCompleted ? Icons.check_circle : Icons.flag,
-                  color: isCompleted ? AppTheme.success : AppTheme.warning,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    exerciseName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () => provider.deleteTarget(target.id),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              '${target.targetType}: ${target.currentValue.toStringAsFixed(0)} / ${target.targetValue.toStringAsFixed(0)}',
-              style: const TextStyle(color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            LinearProgressIndicator(
-              value: progress / 100,
-              backgroundColor: AppTheme.surfaceColor,
-              valueColor: AlwaysStoppedAnimation(
-                isCompleted ? AppTheme.success : AppTheme.primaryColor,
-              ),
-              borderRadius: BorderRadius.circular(4),
-              minHeight: 8,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${progress.toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    color: isCompleted ? AppTheme.success : AppTheme.primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (target.estimatedCompletionDate != null && !isCompleted)
-                  Text(
-                    'Est: ${DateFormat('MMM d').format(target.estimatedCompletionDate!)}',
-                    style: const TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-              ],
-            ),
+            Text(label,
+                style: TextStyle(fontFamily: 'Geist', 
+                    color: AppColors.textFaint, fontSize: 10)),
+            const SizedBox(height: 2),
+            Text(value,
+                style: TextStyle(fontFamily: 'GeistMono', 
+                    color: color,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700)),
           ],
         ),
       ),
     );
-  }
-}
-
-class _CreateTargetSheet extends StatefulWidget {
-  const _CreateTargetSheet();
-
-  @override
-  State<_CreateTargetSheet> createState() => _CreateTargetSheetState();
-}
-
-class _CreateTargetSheetState extends State<_CreateTargetSheet> {
-  String? _selectedExerciseId;
-  String _targetType = 'reps';
-  final _valueController = TextEditingController();
-
-  @override
-  void dispose() {
-    _valueController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final exercises = ExerciseDatabase.getAll();
-
-    return Padding(
-      padding: EdgeInsets.only(
-        left: AppSpacing.lg,
-        right: AppSpacing.lg,
-        top: AppSpacing.lg,
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Create Target',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          
-          DropdownButtonFormField<String>(
-            initialValue: _selectedExerciseId,
-            decoration: const InputDecoration(
-              labelText: 'Exercise',
-            ),
-            items: exercises.map((e) => DropdownMenuItem(
-              value: e.id,
-              child: Text(e.name),
-            )).toList(),
-            onChanged: (val) => setState(() => _selectedExerciseId = val),
-          ),
-          
-          const SizedBox(height: AppSpacing.md),
-          
-          DropdownButtonFormField<String>(
-            initialValue: _targetType,
-            decoration: const InputDecoration(
-              labelText: 'Target Type',
-            ),
-            items: const [
-              DropdownMenuItem(value: 'reps', child: Text('Max Reps')),
-              DropdownMenuItem(value: 'weight', child: Text('Max Weight (kg)')),
-              DropdownMenuItem(value: 'volume', child: Text('Total Volume (kg)')),
-            ],
-            onChanged: (val) => setState(() => _targetType = val!),
-          ),
-          
-          const SizedBox(height: AppSpacing.md),
-          
-          TextField(
-            controller: _valueController,
-            decoration: const InputDecoration(
-              labelText: 'Target Value',
-            ),
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-            ],
-          ),
-          
-          const SizedBox(height: AppSpacing.lg),
-          
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _createTarget,
-              child: const Text('Create Target'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _createTarget() async {
-    if (_selectedExerciseId == null || _valueController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
-      return;
-    }
-
-    final value = double.tryParse(_valueController.text);
-    if (value == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid target value')),
-      );
-      return;
-    }
-
-    await context.read<WorkoutProvider>().createTarget(
-      exerciseId: _selectedExerciseId!,
-      type: _targetType,
-      targetValue: value,
-    );
-
-    if (mounted) Navigator.pop(context);
   }
 }

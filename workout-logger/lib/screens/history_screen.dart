@@ -1,4 +1,4 @@
-// History Screen - View past workout sessions
+// history_screen.dart — Workout history with calendar + session list
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,236 +10,278 @@ import '../services/managers/history_manager.dart';
 import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import 'edit_workout_session_screen.dart';
+import 'widgets/rf_widgets.dart';
+import 'widgets/session_details_sheet.dart';
+import 'widgets/calendar_grid.dart';
 
-// Teal color shared by the HC badge and sync status indicators.
-const Color _hcColor = Color(0xFF00BFA5);
+const Color _hcColor = Color(0xFF4ECDC4);
 
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Watch HistoryManager so the list rebuilds when hcSyncedAt changes.
-    final historyManager = context.watch<HistoryManager>();
-    final provider = context.read<WorkoutProvider>();
-    final settings = context.watch<SettingsProvider>();
-    final sessions = historyManager.sessions;
-
-    final hasUnsynced = settings.healthConnectEnabled &&
-        sessions.any((s) => s.hcSyncedAt == null);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Workout History'),
-        actions: [
-          if (hasUnsynced)
-            IconButton(
-              icon: const Icon(Icons.monitor_heart_outlined, color: _hcColor),
-              tooltip: 'Sync all to Health Connect',
-              onPressed: () {
-                historyManager.syncAllUnsynced();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Syncing all unsynced workouts…'),
-                    backgroundColor: AppTheme.cardColor,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-      body: sessions.isEmpty
-          ? _buildEmptyState(context)
-          : _buildSessionList(context, sessions, provider, historyManager),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.history, size: 64, color: AppTheme.textMuted),
-          const SizedBox(height: 16),
-          Text(
-            'No Workout History',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Complete a workout to see it here',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSessionList(
-    BuildContext context,
-    List<WorkoutSession> sessions,
-    WorkoutProvider provider,
-    HistoryManager historyManager,
-  ) {
-    // Group sessions by month
-    final groupedSessions = <String, List<WorkoutSession>>{};
-    for (var session in sessions) {
-      final monthKey = DateFormat('MMMM yyyy').format(session.date);
-      groupedSessions.putIfAbsent(monthKey, () => []).add(session);
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      itemCount: groupedSessions.length,
-      itemBuilder: (context, index) {
-        final month = groupedSessions.keys.elementAt(index);
-        final monthSessions = groupedSessions[month]!;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-              child: Text(
-                month,
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            ...monthSessions.map(
-              (session) => _SessionCard(
-                session: session,
-                provider: provider,
-                historyManager: historyManager,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _SessionCard extends StatelessWidget {
-  final WorkoutSession session;
-  final WorkoutProvider provider;
-  final HistoryManager historyManager;
+class _HistoryScreenState extends State<HistoryScreen> {
+  final _searchController = TextEditingController();
+  String _query = '';
+  bool _showSearch = false;
 
-  const _SessionCard({
-    required this.session,
-    required this.provider,
-    required this.historyManager,
-  });
+  // Calendar state
+  DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  int? _selectedDay;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<WorkoutSession> _filtered(List<WorkoutSession> sessions, WorkoutProvider provider) {
+    if (_query.isEmpty) return sessions;
+    final q = _query.toLowerCase();
+    return sessions.where((s) {
+      final dateStr = DateFormat('EEEE MMM d yyyy').format(s.date).toLowerCase();
+      if (dateStr.contains(q)) return true;
+      return s.exercises.any((e) {
+        final name = provider.getExerciseName(e.exerciseId).toLowerCase();
+        return name.contains(q);
+      });
+    }).toList();
+  }
+
+  Map<String, List<WorkoutSession>> _group(List<WorkoutSession> sessions) {
+    final map = <String, List<WorkoutSession>>{};
+    for (final s in sessions) {
+      final key = DateFormat('MMMM yyyy').format(s.date);
+      map.putIfAbsent(key, () => []).add(s);
+    }
+    return map;
+  }
+
+  Map<int, CalendarDayData> _buildCalendarData(List<WorkoutSession> sessions) {
+    final map = <int, CalendarDayData>{};
+    final monthSessions = sessions.where((s) =>
+        s.date.year == _calendarMonth.year && s.date.month == _calendarMonth.month);
+    final dayVolumes = <int, double>{};
+    for (final s in monthSessions) {
+      dayVolumes[s.date.day] = (dayVolumes[s.date.day] ?? 0) + s.totalVolume;
+    }
+    for (final entry in dayVolumes.entries) {
+      final vol = entry.value;
+      final intensity = vol > 15000 ? 3 : vol > 5000 ? 2 : 1;
+      map[entry.key] = CalendarDayData(intensity: intensity);
+    }
+    return map;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('EEEE, MMM d');
-    final timeFormat = DateFormat('h:mm a');
+    final historyManager = context.watch<HistoryManager>();
+    final provider = context.read<WorkoutProvider>();
     final settings = context.watch<SettingsProvider>();
-    final isSynced = session.hcSyncedAt != null;
-    final showSyncOption = !isSynced && settings.healthConnectEnabled;
+    final all = historyManager.sessions;
+    final filtered = _filtered(all, provider);
+    final grouped = _group(filtered);
+    final months = grouped.keys.toList();
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: InkWell(
-        onTap: () => _showSessionDetails(context),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header row ────────────────────────────────────────
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      dateFormat.format(session.date),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
+    final totalVolume = all.fold<double>(0, (s, e) => s + e.totalVolume);
+    final hasUnsynced = settings.healthConnectEnabled && all.any((s) => s.hcSyncedAt == null);
+
+    return Stack(
+      children: [
+        const AmbientGlow(),
+        SafeArea(
+            bottom: false,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // Header
+                SliverToBoxAdapter(
+                  child: _buildHeader(context, hasUnsynced: hasUnsynced, historyManager: historyManager),
+                ),
+
+                // Search bar (animated)
+                if (_showSearch)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: _SearchBar(
+                        controller: _searchController,
+                        onChanged: (v) => setState(() => _query = v),
                       ),
                     ),
                   ),
-                  // HC synced badge
-                  if (isSynced)
-                    Tooltip(
-                      message: 'Synced to Health Connect',
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: Icon(
-                          Icons.monitor_heart,
-                          color: _hcColor,
-                          size: 16,
-                        ),
+
+                // Lifetime summary
+                SliverToBoxAdapter(
+                  child: _buildSummaryCard(all: all, totalVolume: totalVolume, settings: settings),
+                ),
+
+                // Calendar card
+                if (_query.isEmpty)
+                  SliverToBoxAdapter(
+                    child: _buildCalendarCard(all),
+                  ),
+
+                // Session list
+                if (filtered.isEmpty)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.history_rounded, size: 48, color: AppColors.textFaint),
+                          const SizedBox(height: 12),
+                          Text(
+                            _query.isNotEmpty ? 'No results' : 'No Workout History',
+                            style: TextStyle(fontFamily: 'Geist', fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _query.isNotEmpty ? 'Try a different search term' : 'Complete a workout to see it here',
+                            style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.textFaint),
+                          ),
+                        ],
                       ),
                     ),
-                  Text(
-                    timeFormat.format(session.date),
-                    style: const TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 12,
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) {
+                          final month = months[i];
+                          final sessions = grouped[month]!;
+                          return _MonthGroup(
+                            month: month,
+                            sessions: sessions,
+                            provider: provider,
+                            historyManager: historyManager,
+                            settings: settings,
+                          );
+                        },
+                        childCount: months.length,
+                      ),
                     ),
                   ),
-                  // ⋮ popup menu
-                  _SessionMenu(
-                    session: session,
-                    provider: provider,
-                    historyManager: historyManager,
-                    showSyncOption: showSyncOption,
-                    onDetailRequested: () => _showSessionDetails(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                children: [
-                  _buildStat(
-                    Icons.fitness_center,
-                    '${session.exercises.length} exercises',
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  _buildStat(Icons.timer_outlined, '${session.duration} min'),
-                  const SizedBox(width: AppSpacing.md),
-                  _buildStat(
-                    Icons.trending_up,
-                    '${(session.totalVolume / 1000).toStringAsFixed(1)}k kg',
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              const Divider(),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: session.exercises.take(4).map((log) {
-                  final exerciseName = provider.getExerciseName(log.exerciseId);
-                  return Chip(
-                    label: Text(
-                      exerciseName,
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  );
-                }).toList(),
-              ),
-              if (session.exercises.length > 4)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '+${session.exercises.length - 4} more',
-                    style: const TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 12,
-                    ),
+              ],
+            ),
+          ),
+        ],
+      );
+  }
+
+  Widget _buildHeader(BuildContext context, {required bool hasUnsynced, required HistoryManager historyManager}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'LOG',
+                  style: TextStyle(fontFamily: 'Geist', 
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textFaint,
+                    letterSpacing: 1.2,
                   ),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  'History',
+                  style: TextStyle(fontFamily: 'Geist', 
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasUnsynced)
+            GestureDetector(
+              onTap: () {
+                historyManager.syncAllUnsynced();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  _snackBar('Syncing all unsynced workouts…'),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: _hcColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                  border: Border.all(color: _hcColor.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.favorite_rounded, size: 13, color: _hcColor),
+                    SizedBox(width: 5),
+                    Text('Sync', style: TextStyle(color: _hcColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          GestureDetector(
+            onTap: () => setState(() {
+              _showSearch = !_showSearch;
+              if (!_showSearch) {
+                _query = '';
+                _searchController.clear();
+              }
+            }),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: _showSearch ? AppColors.primary.withValues(alpha: 0.15) : AppColors.glass2,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _showSearch ? AppColors.primary.withValues(alpha: 0.4) : AppColors.glassBorder,
+                ),
+              ),
+              child: Icon(
+                _showSearch ? Icons.close_rounded : Icons.search_rounded,
+                size: 16,
+                color: _showSearch ? AppColors.primary : AppColors.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard({required List<WorkoutSession> all, required double totalVolume, required SettingsProvider settings}) {
+    final displayVol = settings.toDisplay(totalVolume);
+    final volStr = displayVol >= 1000000
+        ? '${(displayVol / 1000000).toStringAsFixed(1)}M'
+        : displayVol >= 1000
+            ? '${(displayVol / 1000).toStringAsFixed(0)}k'
+            : displayVol.toStringAsFixed(0);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              _SummaryCell(label: 'WORKOUTS', value: '${all.length}', unit: 'total'),
+              const _VertDivider(),
+              _SummaryCell(label: 'VOLUME', value: volStr, unit: settings.unitLabel),
+              const _VertDivider(),
+              _SummaryCell(label: 'THIS MONTH', value: '${all.where((s) => s.date.month == DateTime.now().month && s.date.year == DateTime.now().year).length}', unit: 'sessions'),
             ],
           ),
         ),
@@ -247,444 +289,122 @@ class _SessionCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStat(IconData icon, String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: AppTheme.textSecondary),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-        ),
-      ],
-    );
-  }
+  Widget _buildCalendarCard(List<WorkoutSession> sessions) {
+    final monthLabel = DateFormat('MMMM yyyy').format(_calendarMonth);
+    final monthSessions = sessions.where((s) =>
+        s.date.year == _calendarMonth.year && s.date.month == _calendarMonth.month).length;
+    final calData = _buildCalendarData(sessions);
 
-  void _showSessionDetails(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.cardColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => _SessionDetailsSheet(
-          session: session,
-          provider: provider,
-          historyManager: historyManager,
-          scrollController: scrollController,
-        ),
-      ),
-    );
-  }
-}
-
-// ── 3-button popup menu ────────────────────────────────────────────────────────
-
-enum _SessionMenuAction { edit, syncHc, delete }
-
-class _SessionMenu extends StatelessWidget {
-  final WorkoutSession session;
-  final WorkoutProvider provider;
-  final HistoryManager historyManager;
-  final bool showSyncOption;
-  final VoidCallback onDetailRequested;
-
-  const _SessionMenu({
-    required this.session,
-    required this.provider,
-    required this.historyManager,
-    required this.showSyncOption,
-    required this.onDetailRequested,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<_SessionMenuAction>(
-      icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary, size: 20),
-      color: AppTheme.cardColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: (action) => _handleAction(context, action),
-      itemBuilder: (_) => [
-        const PopupMenuItem(
-          value: _SessionMenuAction.edit,
-          child: ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.edit_outlined, color: AppTheme.primaryColor),
-            title: Text('Edit', style: TextStyle(color: AppTheme.textPrimary)),
-          ),
-        ),
-        if (showSyncOption)
-          const PopupMenuItem(
-            value: _SessionMenuAction.syncHc,
-            child: ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.monitor_heart_outlined, color: _hcColor),
-              title: Text(
-                'Sync to Health Connect',
-                style: TextStyle(color: AppTheme.textPrimary),
-              ),
-            ),
-          ),
-        const PopupMenuItem(
-          value: _SessionMenuAction.delete,
-          child: ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.delete_outline, color: AppTheme.error),
-            title: Text(
-              'Delete',
-              style: TextStyle(color: AppTheme.error),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _handleAction(BuildContext context, _SessionMenuAction action) {
-    switch (action) {
-      case _SessionMenuAction.edit:
-        Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (_) => EditWorkoutSessionScreen(session: session),
-          ),
-        );
-      case _SessionMenuAction.syncHc:
-        historyManager.syncSession(session);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: GlassCard(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
               children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
+                GestureDetector(
+                  onTap: () => setState(() {
+                    _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month - 1);
+                    _selectedDay = null;
+                  }),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.glass2,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.chevron_left_rounded, size: 18, color: AppColors.textMuted),
                   ),
                 ),
-                SizedBox(width: 12),
-                Text('Syncing to Health Connect…'),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        monthLabel,
+                        style: TextStyle(fontFamily: 'Geist', 
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      Text(
+                        '$monthSessions session${monthSessions == 1 ? '' : 's'}',
+                        style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.textMuted),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() {
+                    final next = DateTime(_calendarMonth.year, _calendarMonth.month + 1);
+                    if (next.isBefore(DateTime.now()) || next.month == DateTime.now().month) {
+                      _calendarMonth = next;
+                      _selectedDay = null;
+                    }
+                  }),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.glass2,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+                  ),
+                ),
               ],
             ),
-            backgroundColor: AppTheme.cardColor,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      case _SessionMenuAction.delete:
-        _confirmDelete(context);
-    }
-  }
-
-  Future<void> _confirmDelete(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.cardColor,
-        title: const Text('Delete Workout?'),
-        content: Text(
-          'Are you sure you want to delete this workout from '
-          '${DateFormat('MMMM d, yyyy').format(session.date)}? '
-          'This action cannot be undone.',
+            const SizedBox(height: 16),
+            CalendarMonthGrid(
+              year: _calendarMonth.year,
+              month: _calendarMonth.month,
+              workoutDays: calData,
+              selectedDay: _selectedDay,
+              onDayTap: (day) => setState(() => _selectedDay = _selectedDay == day ? null : day),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
-            child: const Text('Delete'),
-          ),
-        ],
       ),
     );
-
-    if (confirmed == true && context.mounted) {
-      final messenger = ScaffoldMessenger.of(context);
-      try {
-        await provider.deleteWorkoutSession(session.id);
-        if (context.mounted) {
-          messenger.showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: AppTheme.success),
-                  SizedBox(width: 8),
-                  Text('Workout deleted'),
-                ],
-              ),
-              backgroundColor: AppTheme.cardColor,
-            ),
-          );
-        }
-      } catch (e) {
-        debugPrint('Failed to delete workout session: $e');
-        if (context.mounted) {
-          messenger.showSnackBar(
-            const SnackBar(
-              content: Text('Failed to delete workout. Please try again.'),
-              backgroundColor: AppTheme.error,
-            ),
-          );
-        }
-      }
-    }
   }
 }
 
-// ── Detail bottom sheet ────────────────────────────────────────────────────────
+// ── Summary cell ───────────────────────────────────────────────────────────────
 
-class _SessionDetailsSheet extends StatelessWidget {
-  final WorkoutSession session;
-  final WorkoutProvider provider;
-  final HistoryManager historyManager;
-  final ScrollController scrollController;
-
-  const _SessionDetailsSheet({
-    required this.session,
-    required this.provider,
-    required this.historyManager,
-    required this.scrollController,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final dateFormat = DateFormat('EEEE, MMMM d, yyyy');
-    final timeFormat = DateFormat('h:mm a');
-
-    return ListView(
-      controller: scrollController,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      children: [
-        // Handle
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppTheme.textMuted,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-
-        // Action Buttons Row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // Edit Button
-            TextButton.icon(
-              onPressed: () => _editSession(context),
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('Edit'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppTheme.primaryColor,
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Delete Button
-            TextButton.icon(
-              onPressed: () => _confirmDelete(context),
-              icon: const Icon(Icons.delete_outline, size: 18),
-              label: const Text('Delete'),
-              style: TextButton.styleFrom(foregroundColor: AppTheme.error),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: AppSpacing.sm),
-
-        // Header
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    dateFormat.format(session.date),
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  Text(
-                    '${timeFormat.format(session.date)} • ${session.duration} minutes',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
-            if (session.hcSyncedAt != null)
-              Tooltip(
-                message:
-                    'Synced to Health Connect\n${DateFormat('MMM d, h:mm a').format(session.hcSyncedAt!)}',
-                child: const Icon(Icons.monitor_heart, color: _hcColor, size: 20),
-              ),
-          ],
-        ),
-
-        const SizedBox(height: AppSpacing.lg),
-
-        // Stats row
-        Row(
-          children: [
-            Expanded(
-              child: _StatBox(
-                value: '${session.exercises.length}',
-                label: 'Exercises',
-                color: AppTheme.primaryColor,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: _StatBox(
-                value:
-                    '${session.exercises.fold<int>(0, (sum, e) => sum + e.sets.length)}',
-                label: 'Total Sets',
-                color: AppTheme.secondaryColor,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: _StatBox(
-                value: '${(session.totalVolume / 1000).toStringAsFixed(1)}k',
-                label: 'Volume (kg)',
-                color: AppTheme.success,
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: AppSpacing.lg),
-        const Divider(),
-        const SizedBox(height: AppSpacing.md),
-
-        // Exercises
-        ...session.exercises.map(
-          (log) => _ExerciseDetailCard(log: log, provider: provider),
-        ),
-
-        if (session.notes != null && session.notes!.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.lg),
-          Text('Notes', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: AppSpacing.sm),
-          Text(session.notes!, style: Theme.of(context).textTheme.bodyMedium),
-        ],
-      ],
-    );
-  }
-
-  void _editSession(BuildContext context) {
-    final navigator = Navigator.of(context);
-    navigator.pop();
-    navigator.push<bool>(
-      MaterialPageRoute(
-        builder: (context) => EditWorkoutSessionScreen(session: session),
-      ),
-    );
-  }
-
-  Future<void> _confirmDelete(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.cardColor,
-        title: const Text('Delete Workout?'),
-        content: Text(
-          'Are you sure you want to delete this workout from ${DateFormat('MMMM d, yyyy').format(session.date)}? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && context.mounted) {
-      final navigator = Navigator.of(context);
-      final messenger = ScaffoldMessenger.of(context);
-      try {
-        await provider.deleteWorkoutSession(session.id);
-        if (context.mounted) {
-          navigator.pop();
-          messenger.showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: AppTheme.success),
-                  SizedBox(width: 8),
-                  Text('Workout deleted'),
-                ],
-              ),
-              backgroundColor: AppTheme.cardColor,
-            ),
-          );
-        }
-      } catch (e) {
-        debugPrint('Failed to delete workout session: $e');
-        if (context.mounted) {
-          messenger.showSnackBar(
-            const SnackBar(
-              content: Text('Failed to delete workout. Please try again.'),
-              backgroundColor: AppTheme.error,
-            ),
-          );
-        }
-      }
-    }
-  }
-}
-
-class _StatBox extends StatelessWidget {
-  final String value;
+class _SummaryCell extends StatelessWidget {
+  const _SummaryCell({required this.label, required this.value, required this.unit});
   final String label;
-  final Color color;
-
-  const _StatBox({
-    required this.value,
-    required this.label,
-    required this.color,
-  });
+  final String value;
+  final String unit;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
+    return Expanded(
       child: Column(
         children: [
           Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
+            label,
+            style: TextStyle(fontFamily: 'Geist', 
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textFaint,
+              letterSpacing: 0.8,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+            value,
+            style: TextStyle(fontFamily: 'GeistMono', 
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          Text(
+            unit,
+            style: TextStyle(fontFamily: 'Geist', fontSize: 10, color: AppColors.textMuted),
           ),
         ],
       ),
@@ -692,124 +412,336 @@ class _StatBox extends StatelessWidget {
   }
 }
 
-class _ExerciseDetailCard extends StatelessWidget {
-  final ExerciseLog log;
-  final WorkoutProvider provider;
-
-  const _ExerciseDetailCard({required this.log, required this.provider});
+class _VertDivider extends StatelessWidget {
+  const _VertDivider();
 
   @override
   Widget build(BuildContext context) {
-    final exercise = provider.getExercise(log.exerciseId);
+    return Container(width: 1, color: AppColors.glassBorder);
+  }
+}
 
+// ── Search bar ─────────────────────────────────────────────────────────────────
+
+class _SearchBar extends StatelessWidget {
+  const _SearchBar({required this.controller, required this.onChanged});
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      padding: const EdgeInsets.all(AppSpacing.md),
+      height: 44,
       decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        color: AppColors.glass2,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.glassBorder),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        autofocus: true,
+        style: TextStyle(fontFamily: 'Geist', color: AppColors.textPrimary, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: 'Search by date or exercise…',
+          hintStyle: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 14),
+          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 18),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Month group ────────────────────────────────────────────────────────────────
+
+class _MonthGroup extends StatelessWidget {
+  const _MonthGroup({
+    required this.month,
+    required this.sessions,
+    required this.provider,
+    required this.historyManager,
+    required this.settings,
+  });
+  final String month;
+  final List<WorkoutSession> sessions;
+  final WorkoutProvider provider;
+  final HistoryManager historyManager;
+  final SettingsProvider settings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 20, bottom: 10),
+          child: Row(
             children: [
               Text(
-                exercise?.name ?? 'Unknown Exercise',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimary,
+                month,
+                style: TextStyle(fontFamily: 'Geist', 
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSoft,
                 ),
               ),
+              const SizedBox(width: 10),
+              Expanded(child: Container(height: 1, color: AppColors.glassBorder)),
+              const SizedBox(width: 10),
               Text(
-                '${log.sets.length} sets',
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 12,
-                ),
+                '${sessions.length}',
+                style: TextStyle(fontFamily: 'GeistMono', fontSize: 11, color: AppColors.textMuted),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          ...log.sets.asMap().entries.map((entry) {
-            final index = entry.key;
-            final set = entry.value;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${index + 1}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryColor,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${set.weight} kg × ${set.reps} reps',
-                    style: const TextStyle(color: AppTheme.textPrimary),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${set.volume.toStringAsFixed(0)} kg',
-                    style: const TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                  if (set.isDropset) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.warning.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'DROP',
-                        style: TextStyle(
-                          color: AppTheme.warning,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+        ),
+        ...sessions.map(
+          (s) => _HistoryCard(
+            session: s,
+            provider: provider,
+            historyManager: historyManager,
+            showSync: settings.healthConnectEnabled && s.hcSyncedAt == null,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Per-session card ────────────────────────────────────────────────────────────
+
+class _HistoryCard extends StatelessWidget {
+  const _HistoryCard({
+    required this.session,
+    required this.provider,
+    required this.historyManager,
+    required this.showSync,
+  });
+
+  final WorkoutSession session;
+  final WorkoutProvider provider;
+  final HistoryManager historyManager;
+  final bool showSync;
+
+  void _openDetails(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (ctx, sc) => SessionDetailsSheet(
+          session: session,
+          provider: provider,
+          scrollController: sc,
+          onEdit: () {
+            Navigator.of(ctx).pop();
+            Navigator.of(context).push<bool>(
+              MaterialPageRoute(builder: (_) => EditWorkoutSessionScreen(session: session)),
             );
-          }),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(
-                'Total: ${log.totalVolume.toStringAsFixed(0)} kg',
-                style: const TextStyle(
-                  color: AppTheme.success,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          },
+          onDelete: () async {
+            final confirmed = await _confirmDelete(context);
+            if (confirmed && ctx.mounted) Navigator.of(ctx).pop();
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardHigh,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+        title: const Text('Delete Workout?', style: TextStyle(color: AppColors.textPrimary)),
+        content: Text(
+          'Delete workout from ${DateFormat('MMMM d, yyyy').format(session.date)}? This cannot be undone.',
+          style: const TextStyle(color: AppColors.textSoft),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSoft)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
+
+    if (confirmed == true && context.mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      try {
+        await provider.deleteWorkoutSession(session.id);
+        if (context.mounted) {
+          messenger.showSnackBar(_snackBar('Workout deleted'));
+        }
+        return true;
+      } catch (e) {
+        if (context.mounted) {
+          messenger.showSnackBar(_snackBar('Failed to delete workout', isError: true));
+        }
+      }
+    }
+    return false;
   }
+
+  void _handleMenu(BuildContext context, String value) {
+    if (value == 'edit') {
+      Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => EditWorkoutSessionScreen(session: session)),
+      );
+    } else if (value == 'sync') {
+      historyManager.syncSession(session);
+      ScaffoldMessenger.of(context).showSnackBar(_snackBar('Syncing to Health Connect…'));
+    } else if (value == 'delete') {
+      _confirmDelete(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dayAbbr = DateFormat('EEE').format(session.date);
+    final dayNum = session.date.day;
+    final exCount = session.exercises.length;
+    final setCount = session.exercises.fold(0, (s, e) => s + e.sets.length);
+    final settings = context.read<SettingsProvider>();
+    final vol = settings.toDisplay(session.totalVolume);
+    final volStr = vol >= 1000 ? '${(vol / 1000).toStringAsFixed(1)}k' : vol.toStringAsFixed(0);
+    final duration = session.duration;
+    final routineName = session.routineId != null
+        ? provider.routines.cast<Routine?>().firstWhere(
+            (r) => r?.id == session.routineId, orElse: () => null)?.name ?? 'Workout'
+        : 'Quick Workout';
+
+    return GestureDetector(
+      onTap: () => _openDetails(context),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: GlassCard(
+          padding: EdgeInsets.zero,
+          child: Row(
+            children: [
+              // Date column
+              Container(
+                width: 56,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.glass2,
+                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(18)),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      dayAbbr.toUpperCase(),
+                      style: TextStyle(fontFamily: 'Geist', fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.6),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$dayNum',
+                      style: TextStyle(fontFamily: 'GeistMono', fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
+              // Vertical divider
+              Container(width: 1, height: 56, color: AppColors.glassBorder),
+              const SizedBox(width: 12),
+              // Content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        routineName,
+                        style: TextStyle(fontFamily: 'Geist', fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '$exCount exercises · $setCount sets${duration > 0 ? ' · ${duration}m' : ''}',
+                        style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Volume
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      volStr,
+                      style: TextStyle(fontFamily: 'GeistMono', 
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    Text(settings.unitLabel, style: TextStyle(fontFamily: 'Geist', fontSize: 10, color: AppColors.textMuted)),
+                  ],
+                ),
+              ),
+              // Menu
+              PopupMenuButton<String>(
+                color: AppColors.cardHigh,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                icon: const Icon(Icons.more_vert_rounded, color: AppColors.textMuted, size: 18),
+                onSelected: (v) => _handleMenu(context, v),
+                itemBuilder: (_) => [
+                  _menuItem(value: 'edit', icon: Icons.edit_outlined, label: 'Edit', color: AppColors.primary),
+                  if (showSync)
+                    _menuItem(value: 'sync', icon: Icons.favorite_outlined, label: 'Sync to Health Connect', color: _hcColor),
+                  _menuItem(value: 'delete', icon: Icons.delete_outline, label: 'Delete', color: AppColors.error),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _menuItem({required String value, required IconData icon, required String label, required Color color}) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 10),
+          Text(label, style: TextStyle(color: color, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+SnackBar _snackBar(String msg, {bool isError = false}) {
+  return SnackBar(
+    content: Text(msg, style: const TextStyle(color: AppColors.textPrimary)),
+    backgroundColor: isError ? AppColors.error : AppColors.cardHigh,
+    behavior: SnackBarBehavior.floating,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+    duration: const Duration(seconds: 2),
+  );
 }

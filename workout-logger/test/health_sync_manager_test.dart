@@ -29,6 +29,28 @@ class _MockHcService implements IHealthConnectService {
   Future<bool> hasPermissions() async => true;
 
   @override
+  Future<bool> requestReadPermissions() async => false;
+
+  @override
+  Future<Set<HealthReadType>> grantedReadTypes() async => const {};
+
+  @override
+  Future<List<SleepPeriod>> readSleepSessions(DateTime start, DateTime end) async =>
+      const [];
+
+  @override
+  Future<List<HealthSample>> readRestingHeartRate(DateTime start, DateTime end) async =>
+      const [];
+
+  @override
+  Future<List<HealthSample>> readHrvRmssd(DateTime start, DateTime end) async =>
+      const [];
+
+  @override
+  Future<List<HealthSample>> readHeartRateSamples(DateTime start, DateTime end) async =>
+      const [];
+
+  @override
   Future<bool> syncWorkoutSession(
     WorkoutSession session, {
     String? title,

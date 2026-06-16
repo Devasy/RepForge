@@ -186,7 +186,7 @@ void main() {
 
       // Assert - Description should change
       expect(
-        find.text('Targets a single muscle group (e.g., bicep curls)'),
+        find.text('Single muscle group'),
         findsOneWidget,
       );
     });

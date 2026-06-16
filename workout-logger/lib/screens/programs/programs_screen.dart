@@ -1,9 +1,4 @@
-// Programs Screen
-//
-// Shows the list of training programs and provides entry points for:
-//   - Viewing program details
-//   - Creating a new program
-//   - Importing a program from JSON (full-screen ImportProgramScreen)
+// programs_screen.dart — Training programs list
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -11,9 +6,11 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../services/workout_provider.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/rf_widgets.dart';
 import 'program_detail_screen.dart';
 import 'program_designer_screen.dart';
 import 'import_program_screen.dart';
+import '../ai_program_generator_screen.dart';
 
 class ProgramsScreen extends StatelessWidget {
   const ProgramsScreen({super.key});
@@ -27,70 +24,86 @@ class ProgramsScreen extends StatelessWidget {
             context.read<WorkoutProvider>().programManager.programs;
 
         return Scaffold(
-          backgroundColor: AppTheme.backgroundColor,
-          body: programs.isEmpty
-              ? _buildEmptyState(context)
-              : _buildList(context, programs),
-          floatingActionButton: Column(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            bottom: false,
+            child: programs.isEmpty
+                ? _buildEmptyState(context)
+                : _buildList(context, programs),
+          ),
+          floatingActionButton: Padding(
+            padding: const EdgeInsets.only(bottom: AppBreakpoints.navBarClearance),
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               FloatingActionButton.small(
                 heroTag: 'import_json',
                 onPressed: () => _openImport(context),
-                backgroundColor: AppTheme.surfaceColor,
-                child: const Icon(Icons.download, color: AppTheme.secondaryColor),
+                backgroundColor: AppColors.card,
+                elevation: 0,
+                child: const Icon(
+                  Icons.download_rounded,
+                  color: AppColors.secondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              FloatingActionButton.small(
+                heroTag: 'ai_generate',
+                onPressed: () => _openAiGenerator(context),
+                backgroundColor: AppColors.card,
+                elevation: 0,
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppColors.primary,
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               FloatingActionButton.extended(
                 heroTag: 'new_program',
                 onPressed: () => _openDesigner(context, null),
-                icon: const Icon(Icons.add),
-                label: const Text('New Program'),
+                backgroundColor: AppColors.primary,
+                elevation: 0,
+                icon: const Icon(Icons.add_rounded, color: Colors.white),
+                label: const Text(
+                  'New Program',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
+            ),
           ),
         );
       },
     );
   }
 
-  // ── Empty State ──────────────────────────────────────────────────────
-
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.calendar_month, size: 64, color: AppTheme.textMuted),
-          const SizedBox(height: 16),
-          Text(
-            'No Training Programs',
-            style: Theme.of(context).textTheme.titleLarge,
+          const RFEmptyState(
+            icon: Icons.calendar_month_rounded,
+            title: 'No Training Programs',
+            subtitle: 'Create a structured multi-week program\nor import one from JSON',
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Create a structured multi-week program\nor import one from JSON',
-            textAlign: TextAlign.center,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.lg),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ElevatedButton.icon(
+              GlowButton(
+                label: 'Create',
+                icon: Icons.add_rounded,
+                fullWidth: false,
                 onPressed: () => _openDesigner(context, null),
-                icon: const Icon(Icons.add),
-                label: const Text('Create'),
               ),
               const SizedBox(width: AppSpacing.md),
-              OutlinedButton.icon(
+              OutlineGlowButton(
+                label: 'Import JSON',
+                icon: Icons.download_rounded,
                 onPressed: () => _openImport(context),
-                icon: const Icon(Icons.download),
-                label: const Text('Import JSON'),
               ),
             ],
           ),
@@ -99,23 +112,19 @@ class ProgramsScreen extends StatelessWidget {
     );
   }
 
-  // ── Program List ─────────────────────────────────────────────────────
-
   Widget _buildList(BuildContext context, List<TrainingProgram> programs) {
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.md,
         AppSpacing.md,
-        100, // FAB clearance
+        MediaQuery.of(context).padding.bottom + 100,
       ),
       itemCount: programs.length,
-      itemBuilder: (context, index) =>
-          _ProgramCard(program: programs[index]),
+      itemBuilder: (context, index) => _ProgramCard(program: programs[index]),
     );
   }
-
-  // ── Actions ──────────────────────────────────────────────────────────
 
   void _openDesigner(BuildContext context, TrainingProgram? existing) {
     Navigator.push(
@@ -126,6 +135,28 @@ class ProgramsScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _openAiGenerator(BuildContext context) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const AiProgramGeneratorScreen()),
+    );
+    if (result == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'AI program added!',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          backgroundColor: AppColors.cardHigh,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _openImport(BuildContext context) async {
     final result = await Navigator.push<bool>(
       context,
@@ -133,140 +164,137 @@ class ProgramsScreen extends StatelessWidget {
     );
     if (result == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Program imported successfully!')),
+        SnackBar(
+          content: const Text(
+            'Program imported successfully!',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          backgroundColor: AppColors.cardHigh,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+        ),
       );
     }
   }
 }
 
-// ── Program Card ──────────────────────────────────────────────────────────
-
+// ── Program Card ──────────────────────────────────────────────────────────────
 class _ProgramCard extends StatelessWidget {
+  const _ProgramCard({required this.program});
   final TrainingProgram program;
 
-  const _ProgramCard({required this.program});
+  static const _phaseColors = [
+    AppColors.primary,
+    AppColors.secondary,
+    Colors.orange,
+    Colors.pink,
+    Colors.green,
+  ];
 
   @override
   Widget build(BuildContext context) {
     final deloadCount = program.weeks.where((w) => w.isDeload).length;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProgramDetailScreen(program: program),
-          ),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProgramDetailScreen(program: program),
         ),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: const Icon(
-                      Icons.calendar_month,
-                      color: AppTheme.primaryColor,
-                      size: 20,
-                    ),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.glassBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          program.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        if (program.author != null)
-                          Text(
-                            program.author!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textMuted,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (program.isImported)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 4),
-                      child: Icon(
-                        Icons.download_done,
-                        size: 16,
-                        color: AppTheme.textMuted,
-                      ),
-                    ),
-                  const Icon(
-                    Icons.chevron_right,
-                    color: AppTheme.textMuted,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              if (program.description != null) ...[
-                Text(
-                  program.description!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
+                  child: const Icon(
+                    Icons.calendar_month_rounded,
+                    color: AppColors.primary,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        program.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (program.author != null)
+                        Text(
+                          program.author!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (program.isImported)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 4),
+                    child: Icon(
+                      Icons.download_done_rounded,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
               ],
-              // Stats row
-              Row(
-                children: [
-                  _badge(
-                    '${program.totalWeeks}w',
-                    AppTheme.primaryColor,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  _badge(
-                    '${program.phases.length} phases',
-                    AppTheme.secondaryColor,
-                  ),
-                  if (deloadCount > 0) ...[
-                    const SizedBox(width: AppSpacing.xs),
-                    _badge('$deloadCount deload', Colors.amber),
-                  ],
-                ],
+            ),
+            if (program.description != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                program.description!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: AppColors.textSoft),
               ),
-              if (program.phases.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                _buildMiniTimeline(),
-              ],
             ],
-          ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                _badge('${program.totalWeeks}w', AppColors.primary),
+                const SizedBox(width: AppSpacing.xs),
+                _badge('${program.phases.length} phases', AppColors.secondary),
+                if (deloadCount > 0) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  _badge('$deloadCount deload', Colors.amber),
+                ],
+              ],
+            ),
+            if (program.phases.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              _buildMiniTimeline(),
+            ],
+          ],
         ),
       ),
     );
   }
-
-  static const _phaseColors = [
-    AppTheme.primaryColor,
-    AppTheme.secondaryColor,
-    Colors.orange,
-    Colors.pink,
-    Colors.green,
-  ];
 
   Widget _buildMiniTimeline() {
     return SizedBox(
@@ -275,8 +303,9 @@ class _ProgramCard extends StatelessWidget {
         children: program.phases.asMap().entries.map((entry) {
           final phase = entry.value;
           final color = _phaseColors[entry.key % _phaseColors.length];
+          final safeDenominator = program.totalWeeks <= 0 ? 1 : program.totalWeeks;
           final fraction =
-              (phase.endWeek - phase.startWeek + 1) / program.totalWeeks;
+              (phase.endWeek - phase.startWeek + 1) / safeDenominator;
           return Expanded(
             flex: ((fraction * 100).round()).clamp(1, 100),
             child: Container(
@@ -296,7 +325,7 @@ class _ProgramCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(

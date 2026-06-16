@@ -392,4 +392,36 @@ void main() {
       expect(stats['totalWorkouts'], 1);
     });
   });
+
+  group('AnalyticsManager - updateGrowthModelsForExercises', () {
+    test('trains model only for the specified exercise subset', () async {
+      final sessions = [
+        _session(id: 's1', exerciseId: 'ex1', weight: 100, date: DateTime(2024, 1, 1)),
+        _session(id: 's2', exerciseId: 'ex1', weight: 110, date: DateTime(2024, 1, 8)),
+        _session(id: 's3', exerciseId: 'ex2', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's4', exerciseId: 'ex2', weight: 90, date: DateTime(2024, 1, 8)),
+      ];
+
+      // Only request model update for ex1
+      await manager.updateGrowthModelsForExercises({'ex1'}, sessions);
+
+      expect(manager.growthModels.containsKey('ex1'), isTrue);
+      expect(manager.growthModels.containsKey('ex2'), isFalse);
+    });
+
+    test('evicts stale model when data drops below two points', () async {
+      final twoSessions = [
+        _session(id: 's1', exerciseId: 'ex1', weight: 100, date: DateTime(2024, 1, 1)),
+        _session(id: 's2', exerciseId: 'ex1', weight: 110, date: DateTime(2024, 1, 8)),
+      ];
+      // First: train model with two sessions
+      await manager.updateGrowthModelsForExercises({'ex1'}, twoSessions);
+      expect(manager.growthModels.containsKey('ex1'), isTrue);
+
+      // Then: drop to one session — model must be removed
+      final oneSession = [twoSessions.first];
+      await manager.updateGrowthModelsForExercises({'ex1'}, oneSession);
+      expect(manager.growthModels.containsKey('ex1'), isFalse);
+    });
+  });
 }

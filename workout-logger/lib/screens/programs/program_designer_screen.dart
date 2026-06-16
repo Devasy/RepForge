@@ -657,9 +657,13 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
                     onChanged: (v) => setDlg(() => exerciseSearch = v),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  SizedBox(
-                    height: 140,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: 80,
+                      maxHeight: 160,
+                    ),
                     child: ListView.builder(
+                      shrinkWrap: true,
                       itemCount: filtered.length,
                       itemBuilder: (_, i) => ListTile(
                         dense: true,
