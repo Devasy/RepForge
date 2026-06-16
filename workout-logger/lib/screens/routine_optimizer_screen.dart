@@ -7,7 +7,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../models/models.dart';
@@ -180,7 +179,7 @@ class _OptimizerViewState extends State<_OptimizerView> {
               children: [
                 Text(
                   'Optimize Routine',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -191,7 +190,7 @@ class _OptimizerViewState extends State<_OptimizerView> {
                   widget.routine.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
@@ -292,7 +291,7 @@ class _OptimizerViewState extends State<_OptimizerView> {
             const SizedBox(height: AppSpacing.lg),
             Text(
               'Analyzing your routine…',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -303,7 +302,7 @@ class _OptimizerViewState extends State<_OptimizerView> {
             Text(
               'Reviewing your history and building a personalized plan.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textMuted,
                 fontSize: 14,
                 height: 1.5,
@@ -395,7 +394,7 @@ class _MessageBubble extends StatelessWidget {
               child: isUser
                   ? Text(
                       message.text,
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         height: 1.55,
@@ -461,7 +460,7 @@ class _OptimizerMarkdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return GptMarkdown(
       text,
-      style: GoogleFonts.geist(
+      style: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textPrimary,
         fontSize: 14,
         height: 1.55,
@@ -517,7 +516,7 @@ class _ConversationsSheet extends StatelessWidget {
               children: [
                 Text(
                   'Optimization History',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -529,7 +528,7 @@ class _ConversationsSheet extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
                     child: Text(
                       'No saved optimization sessions yet.',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 13,
                       ),
@@ -617,7 +616,7 @@ class _ConversationTile extends StatelessWidget {
                         : conversation.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -625,7 +624,7 @@ class _ConversationTile extends StatelessWidget {
                   ),
                   Text(
                     '${conversation.messages.length} messages',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textFaint,
                       fontSize: 11,
                     ),

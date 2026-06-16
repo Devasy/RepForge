@@ -5,7 +5,6 @@
 // 8h goal line and workout-day highlights.
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -140,7 +139,7 @@ class _DayBody extends StatelessWidget {
         children: [
           Text(
             'Asleep · ${_fmt(_ist(snapshot.sleepStart))} – ${_fmt(_ist(snapshot.sleepEnd))} IST',
-            style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 12),
+            style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 16),
           SleepHrDayView(snapshot: snapshot),
@@ -180,11 +179,11 @@ class _AggBody extends StatelessWidget {
             children: [
               Text(
                 'Sleep duration · $unit',
-                style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
+                style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
               ),
               Text(
                 withData.isEmpty ? '—' : 'avg $avgLabel',
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                   color: AppColors.textPrimary,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -220,7 +219,7 @@ class _AggBody extends StatelessWidget {
             decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2)),
           ),
           const SizedBox(width: 4),
-          Text(label, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+          Text(label, style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 10)),
         ],
       );
 
@@ -229,7 +228,7 @@ class _AggBody extends StatelessWidget {
         children: [
           Container(width: 14, height: 2, color: c),
           const SizedBox(width: 4),
-          Text(label, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+          Text(label, style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 10)),
         ],
       );
 }
@@ -252,7 +251,7 @@ class _Empty extends StatelessWidget {
         child: Center(
           child: Text(
             message,
-            style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 13),
+            style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 13),
           ),
         ),
       );

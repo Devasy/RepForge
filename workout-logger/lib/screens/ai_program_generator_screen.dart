@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../models/models.dart';
 import '../services/ai/gemini_ai_service.dart';
@@ -196,7 +195,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
               children: [
                 Text(
                   'AI Program Generator',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -205,7 +204,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                 ),
                 Text(
                   'Powered by Gemini',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
@@ -233,7 +232,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
               const SizedBox(width: 8),
               Text(
                 'Describe your program',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -250,7 +249,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
             ),
             child: TextField(
               controller: _promptCtrl,
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textPrimary,
                 fontSize: 14,
                 height: 1.5,
@@ -261,7 +260,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
               decoration: InputDecoration(
                 hintText:
                     'e.g. "12-week hypertrophy program, 4 days/week, push-pull split, intermediate level"',
-                hintStyle: GoogleFonts.geist(
+                hintStyle: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textFaint,
                   fontSize: 13,
                   height: 1.5,
@@ -274,7 +273,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
           const SizedBox(height: AppSpacing.md),
           Text(
             'QUICK PROMPTS',
-            style: GoogleFonts.geistMono(
+            style: TextStyle(fontFamily: 'GeistMono', 
               color: AppColors.textFaint,
               fontSize: 9,
               fontWeight: FontWeight.w600,
@@ -300,7 +299,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                   ),
                   child: Text(
                     s,
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textSoft,
                       fontSize: 11,
                     ),
@@ -337,7 +336,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
           const SizedBox(height: AppSpacing.md),
           Text(
             _statusText,
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textPrimary,
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -346,7 +345,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
           const SizedBox(height: AppSpacing.xs),
           Text(
             'Gemini is designing your training block…',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textMuted,
               fontSize: 12,
             ),
@@ -367,7 +366,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
           Expanded(
             child: Text(
               _error!,
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.error,
                 fontSize: 13,
               ),
@@ -415,7 +414,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                       children: [
                         Text(
                           p.name,
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             color: AppColors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -425,7 +424,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                         if (p.description != null)
                           Text(
                             p.description!,
-                            style: GoogleFonts.geist(
+                            style: TextStyle(fontFamily: 'Geist', 
                               color: AppColors.textMuted,
                               fontSize: 12,
                             ),
@@ -456,7 +455,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   'PHASES',
-                  style: GoogleFonts.geistMono(
+                  style: TextStyle(fontFamily: 'GeistMono', 
                     color: AppColors.textFaint,
                     fontSize: 9,
                     fontWeight: FontWeight.w600,
@@ -480,7 +479,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                         const SizedBox(width: 10),
                         Text(
                           phase.name,
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             color: AppColors.textPrimary,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -489,7 +488,7 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                         const Spacer(),
                         Text(
                           'Wk ${phase.startWeek}–${phase.endWeek}',
-                          style: GoogleFonts.geistMono(
+                          style: TextStyle(fontFamily: 'GeistMono', 
                             color: AppColors.textMuted,
                             fontSize: 11,
                           ),

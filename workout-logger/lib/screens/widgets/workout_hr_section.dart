@@ -8,7 +8,6 @@
 import 'dart:math' show max, min;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
@@ -83,9 +82,9 @@ class _WorkoutHrSectionState extends State<WorkoutHrSection> {
                     children: [
                       Text(
                         'HR across the session · ⚑ = exercise',
-                        style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11),
+                        style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 11),
                       ),
-                      Text('bpm', style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11)),
+                      Text('bpm', style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 11)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -113,7 +112,7 @@ class _WorkoutHrSectionState extends State<WorkoutHrSection> {
                         alignment: Alignment.center,
                         child: Text(
                           _expanded ? 'Hide per-rest breakdown ▴' : 'Show per-rest breakdown ▾',
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             color: AppColors.textMuted,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -130,7 +129,7 @@ class _WorkoutHrSectionState extends State<WorkoutHrSection> {
                     Text(
                       'Per-rest recovery needs per-set timing, which this workout '
                       'didn\'t record.',
-                      style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11, height: 1.4),
+                      style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 11, height: 1.4),
                     ),
                   ],
                 ],
@@ -177,7 +176,7 @@ class _RecoverySummary extends StatelessWidget {
         children: [
           Text(
             '${analysis.restsRecovered}/${analysis.restCount}',
-            style: GoogleFonts.geistMono(
+            style: TextStyle(fontFamily: 'GeistMono', 
               color: AppColors.success,
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -187,7 +186,7 @@ class _RecoverySummary extends StatelessWidget {
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 11, height: 1.4),
+                style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 11, height: 1.4),
                 children: [
                   const TextSpan(
                     text: 'rests brought your HR down\n',
@@ -238,7 +237,7 @@ class _RestRow extends StatelessWidget {
               children: [
                 Text(
                   'After set ${rest.afterSet} · rest ${rest.durationSec}s',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textSoft,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -247,14 +246,14 @@ class _RestRow extends StatelessWidget {
                 const SizedBox(height: 1),
                 Text(
                   'peak ${rest.peakBpm} → low ${rest.troughBpm} bpm${ok ? '' : ' · too short'}',
-                  style: GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 10),
+                  style: TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 10),
                 ),
               ],
             ),
           ),
           Text(
             '−${rest.recoveryBpm} bpm',
-            style: GoogleFonts.geistMono(color: color, fontSize: 14, fontWeight: FontWeight.w700),
+            style: TextStyle(fontFamily: 'GeistMono', color: color, fontSize: 14, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -285,16 +284,16 @@ class _Pill extends StatelessWidget {
           children: [
             Text(
               label.toUpperCase(),
-              style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 9, letterSpacing: 0.5),
+              style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 9, letterSpacing: 0.5),
             ),
             const SizedBox(height: 2),
             RichText(
               text: TextSpan(children: [
                 TextSpan(
                   text: value,
-                  style: GoogleFonts.geistMono(color: color, fontSize: 16, fontWeight: FontWeight.w700),
+                  style: TextStyle(fontFamily: 'GeistMono', color: color, fontSize: 16, fontWeight: FontWeight.w700),
                 ),
-                TextSpan(text: ' bpm', style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 9)),
+                TextSpan(text: ' bpm', style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 9)),
               ]),
             ),
           ],
@@ -337,7 +336,7 @@ class _CurvePainter extends CustomPainter {
     final grid = Paint()
       ..color = AppColors.glassBorder
       ..strokeWidth = 0.5;
-    final yStyle = GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8);
+    final yStyle = TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 8);
     for (var v = (vmin / 20).ceil() * 20; v <= vmax; v += 20) {
       final yy = y(v.toDouble());
       canvas.drawLine(Offset(_padLeft, yy), Offset(size.width - 4, yy), grid);
@@ -402,7 +401,7 @@ class _CurvePainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: s.label,
-          style: GoogleFonts.geist(color: AppColors.textSoft, fontSize: 8, fontWeight: FontWeight.w600),
+          style: TextStyle(fontFamily: 'Geist', color: AppColors.textSoft, fontSize: 8, fontWeight: FontWeight.w600),
         ),
         textDirection: TextDirection.ltr,
         maxLines: 1,
@@ -418,7 +417,7 @@ class _CurvePainter extends CustomPainter {
     }
 
     // X labels (minutes).
-    final xStyle = GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8);
+    final xStyle = TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 8);
     final totalMin = (spanMs / 60000).round();
     final stepMin = totalMin <= 0 ? 1 : (totalMin / 4).ceil();
     for (var m = 0; m <= totalMin; m += stepMin) {

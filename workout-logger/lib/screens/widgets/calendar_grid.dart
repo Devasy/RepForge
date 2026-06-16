@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 
 class CalendarDayData {
@@ -43,7 +42,7 @@ class CalendarMonthGrid extends StatelessWidget {
                     child: Center(
                       child: Text(
                         d,
-                        style: GoogleFonts.geist(
+                        style: TextStyle(fontFamily: 'Geist', 
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textFaint,
@@ -206,7 +205,7 @@ class _DayCell extends StatelessWidget {
             Center(
               child: Text(
                 '$day',
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                   fontSize: 12,
                   fontWeight:
                       intensity > 0 ? FontWeight.w600 : FontWeight.w400,

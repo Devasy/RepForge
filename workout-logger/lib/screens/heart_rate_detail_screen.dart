@@ -4,7 +4,6 @@
 // Week / Month / Year : daily/monthly min–max range bars with resting markers.
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -144,9 +143,9 @@ class _DayBody extends StatelessWidget {
                 children: [
                   Text(
                     'All-day heart rate · 30-min bars',
-                    style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
+                    style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
                   ),
-                  Text('bpm', style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11)),
+                  Text('bpm', style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 11)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -171,7 +170,7 @@ class _DayBody extends StatelessWidget {
         children: [
           Container(width: 8, height: 8, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2))),
           const SizedBox(width: 4),
-          Text(label, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+          Text(label, style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 10)),
         ],
       );
 
@@ -180,7 +179,7 @@ class _DayBody extends StatelessWidget {
         children: [
           Container(width: 14, height: 2, color: c),
           const SizedBox(width: 4),
-          Text(label, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+          Text(label, style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 10)),
         ],
       );
 }
@@ -221,7 +220,7 @@ class _AggBody extends StatelessWidget {
             children: [
               Text(
                 '$unit range · resting ●',
-                style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
+                style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
               ),
               const SizedBox(height: 12),
               HrRangeChart(bars: bars, workoutDays: workoutDays),
@@ -246,7 +245,7 @@ class _AggBody extends StatelessWidget {
         children: [
           Container(width: 8, height: 8, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2))),
           const SizedBox(width: 4),
-          Text(label, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+          Text(label, style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 10)),
         ],
       );
 }
@@ -272,12 +271,12 @@ class _Pill extends StatelessWidget {
           children: [
             Text(
               label.toUpperCase(),
-              style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 9, letterSpacing: 0.5),
+              style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 9, letterSpacing: 0.5),
             ),
             const SizedBox(height: 2),
             Text(
               value,
-              style: GoogleFonts.geistMono(color: color, fontSize: 16, fontWeight: FontWeight.w700),
+              style: TextStyle(fontFamily: 'GeistMono', color: color, fontSize: 16, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -293,7 +292,7 @@ class _Empty extends StatelessWidget {
   Widget build(BuildContext context) => GlassCard(
         padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 16),
         child: Center(
-          child: Text(message, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 13)),
+          child: Text(message, style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 13)),
         ),
       );
 }

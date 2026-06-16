@@ -6,7 +6,6 @@
 import 'dart:math' show max, min;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/sleep_hr_models.dart';
@@ -47,7 +46,7 @@ class HeartRateCard extends StatelessWidget {
                         const SizedBox(width: 5),
                         Text(
                           'Heart rate',
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             color: AppColors.textPrimary,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -59,7 +58,7 @@ class HeartRateCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Today · all-day',
-                      style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11),
+                      style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 11),
                     ),
                   ],
                 ),
@@ -92,7 +91,7 @@ class HeartRateCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: ['12a', '6a', '12p', '6p', 'now']
-                  .map((l) => Text(l, style: GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8)))
+                  .map((l) => Text(l, style: TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 8)))
                   .toList(),
             ),
           ],
@@ -116,14 +115,14 @@ class _MiniStat extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+          Text(label, style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 10)),
           const SizedBox(height: 1),
           RichText(
             text: TextSpan(
               children: [
                 TextSpan(
                   text: value,
-                  style: GoogleFonts.geistMono(
+                  style: TextStyle(fontFamily: 'GeistMono', 
                     color: color,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -132,7 +131,7 @@ class _MiniStat extends StatelessWidget {
                 ),
                 TextSpan(
                   text: ' $unit',
-                  style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10),
+                  style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 10),
                 ),
               ],
             ),

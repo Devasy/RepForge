@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
@@ -137,12 +136,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           const SizedBox(height: 12),
                           Text(
                             _query.isNotEmpty ? 'No results' : 'No Workout History',
-                            style: GoogleFonts.geist(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+                            style: TextStyle(fontFamily: 'Geist', fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textMuted),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _query.isNotEmpty ? 'Try a different search term' : 'Complete a workout to see it here',
-                            style: GoogleFonts.geist(fontSize: 13, color: AppColors.textFaint),
+                            style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.textFaint),
                           ),
                         ],
                       ),
@@ -187,7 +186,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               children: [
                 Text(
                   'LOG',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textFaint,
@@ -197,7 +196,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 const SizedBox(height: 2),
                 Text(
                   'History',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -323,7 +322,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     children: [
                       Text(
                         monthLabel,
-                        style: GoogleFonts.geist(
+                        style: TextStyle(fontFamily: 'Geist', 
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
@@ -332,7 +331,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                       Text(
                         '$monthSessions session${monthSessions == 1 ? '' : 's'}',
-                        style: GoogleFonts.geist(fontSize: 11, color: AppColors.textMuted),
+                        style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.textMuted),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -387,7 +386,7 @@ class _SummaryCell extends StatelessWidget {
         children: [
           Text(
             label,
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               fontSize: 9,
               fontWeight: FontWeight.w600,
               color: AppColors.textFaint,
@@ -397,7 +396,7 @@ class _SummaryCell extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            style: GoogleFonts.geistMono(
+            style: TextStyle(fontFamily: 'GeistMono', 
               fontSize: 22,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
@@ -405,7 +404,7 @@ class _SummaryCell extends StatelessWidget {
           ),
           Text(
             unit,
-            style: GoogleFonts.geist(fontSize: 10, color: AppColors.textMuted),
+            style: TextStyle(fontFamily: 'Geist', fontSize: 10, color: AppColors.textMuted),
           ),
         ],
       ),
@@ -442,10 +441,10 @@ class _SearchBar extends StatelessWidget {
         controller: controller,
         onChanged: onChanged,
         autofocus: true,
-        style: GoogleFonts.geist(color: AppColors.textPrimary, fontSize: 14),
+        style: TextStyle(fontFamily: 'Geist', color: AppColors.textPrimary, fontSize: 14),
         decoration: InputDecoration(
           hintText: 'Search by date or exercise…',
-          hintStyle: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 14),
+          hintStyle: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 14),
           prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 18),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -482,7 +481,7 @@ class _MonthGroup extends StatelessWidget {
             children: [
               Text(
                 month,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textSoft,
@@ -493,7 +492,7 @@ class _MonthGroup extends StatelessWidget {
               const SizedBox(width: 10),
               Text(
                 '${sessions.length}',
-                style: GoogleFonts.geistMono(fontSize: 11, color: AppColors.textMuted),
+                style: TextStyle(fontFamily: 'GeistMono', fontSize: 11, color: AppColors.textMuted),
               ),
             ],
           ),
@@ -648,12 +647,12 @@ class _HistoryCard extends StatelessWidget {
                   children: [
                     Text(
                       dayAbbr.toUpperCase(),
-                      style: GoogleFonts.geist(fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.6),
+                      style: TextStyle(fontFamily: 'Geist', fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.6),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '$dayNum',
-                      style: GoogleFonts.geistMono(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      style: TextStyle(fontFamily: 'GeistMono', fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                     ),
                   ],
                 ),
@@ -670,14 +669,14 @@ class _HistoryCard extends StatelessWidget {
                     children: [
                       Text(
                         routineName,
-                        style: GoogleFonts.geist(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        style: TextStyle(fontFamily: 'Geist', fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 3),
                       Text(
                         '$exCount exercises · $setCount sets${duration > 0 ? ' · ${duration}m' : ''}',
-                        style: GoogleFonts.geist(fontSize: 11, color: AppColors.textMuted),
+                        style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.textMuted),
                       ),
                     ],
                   ),
@@ -691,13 +690,13 @@ class _HistoryCard extends StatelessWidget {
                   children: [
                     Text(
                       volStr,
-                      style: GoogleFonts.geistMono(
+                      style: TextStyle(fontFamily: 'GeistMono', 
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: AppColors.secondary,
                       ),
                     ),
-                    Text(settings.unitLabel, style: GoogleFonts.geist(fontSize: 10, color: AppColors.textMuted)),
+                    Text(settings.unitLabel, style: TextStyle(fontFamily: 'Geist', fontSize: 10, color: AppColors.textMuted)),
                   ],
                 ),
               ),

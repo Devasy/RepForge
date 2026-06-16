@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
@@ -58,7 +57,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               children: [
                 Text(
                   'INSIGHTS',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textFaint,
@@ -68,7 +67,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 const SizedBox(height: 2),
                 Text(
                   'Analytics',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -118,7 +117,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   child: Text(
                     _tabs[i],
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: active ? Colors.white : AppColors.textMuted,
@@ -181,7 +180,7 @@ class _RecordsTabState extends State<_RecordsTab> {
             const SizedBox(height: 12),
             Text(
               'No records yet',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textMuted,
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -190,7 +189,7 @@ class _RecordsTabState extends State<_RecordsTab> {
             const SizedBox(height: 4),
             Text(
               'Finish a workout to set your first PRs',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textFaint, fontSize: 12),
             ),
           ],
@@ -250,7 +249,7 @@ class _RecordsTabState extends State<_RecordsTab> {
                   children: [
                     Text(
                       '${allRecords.length} PRs',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -271,7 +270,7 @@ class _RecordsTabState extends State<_RecordsTab> {
                         ),
                         child: Text(
                           '$thisMonthCount this month',
-                          style: GoogleFonts.geistMono(
+                          style: TextStyle(fontFamily: 'GeistMono', 
                             color: AppColors.warning,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -358,7 +357,7 @@ class _RecordsTabState extends State<_RecordsTab> {
                               _sort == _RecordsSort.recent
                                   ? 'Recent'
                                   : 'Heaviest',
-                              style: GoogleFonts.geistMono(
+                              style: TextStyle(fontFamily: 'GeistMono', 
                                 color: AppColors.textMuted,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -448,7 +447,7 @@ class _NewestPRHero extends StatelessWidget {
               children: [
                 Text(
                   'Latest PR',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.warning,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -457,7 +456,7 @@ class _NewestPRHero extends StatelessWidget {
                 ),
                 Text(
                   exerciseName,
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -465,7 +464,7 @@ class _NewestPRHero extends StatelessWidget {
                 ),
                 Text(
                   dateStr,
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textFaint,
                     fontSize: 11,
                   ),
@@ -478,7 +477,7 @@ class _NewestPRHero extends StatelessWidget {
             children: [
               Text(
                 '${w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1)} ${settings.unitLabel}',
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                   color: AppColors.warning,
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -487,7 +486,7 @@ class _NewestPRHero extends StatelessWidget {
               ),
               Text(
                 '${record.bestReps} reps',
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                   color: AppColors.textMuted,
                   fontSize: 11,
                 ),
@@ -517,7 +516,7 @@ class _ExercisePRGroup extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 6, top: 4),
           child: Text(
             exerciseName,
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textSoft,
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -563,7 +562,7 @@ class _FilterChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: GoogleFonts.geistMono(
+          style: TextStyle(fontFamily: 'GeistMono', 
             color: selected ? AppColors.primary : AppColors.textMuted,
             fontSize: 11,
             fontWeight:
@@ -614,7 +613,7 @@ class _PRCard extends StatelessWidget {
                   children: [
                     Text(
                       exerciseName,
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -622,7 +621,7 @@ class _PRCard extends StatelessWidget {
                     ),
                     Text(
                       dateStr,
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                           color: AppColors.textFaint, fontSize: 11),
                     ),
                   ],
@@ -684,11 +683,11 @@ class _PRStat extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textFaint, fontSize: 10)),
             const SizedBox(height: 2),
             Text(value,
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                     color: color,
                     fontSize: 13,
                     fontWeight: FontWeight.w700)),

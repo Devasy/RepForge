@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 
 class VolumeChart extends StatelessWidget {
@@ -35,7 +34,7 @@ class VolumeChart extends StatelessWidget {
             children: labels
                 .map((l) => Text(
                       l,
-                      style: GoogleFonts.geistMono(
+                      style: TextStyle(fontFamily: 'GeistMono', 
                         fontSize: 9,
                         color: AppColors.textFaint,
                       ),

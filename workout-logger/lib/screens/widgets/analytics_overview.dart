@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/models.dart';
 import '../../services/workout_provider.dart';
@@ -159,7 +158,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                   children: [
                     Text(
                       'Volume Trend',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -168,7 +167,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                     const SizedBox(height: 2),
                     Text(
                       '${settings.unitLabel} · per week',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 11,
                       ),
@@ -196,7 +195,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                 const SizedBox(width: 2),
                 Text(
                   '${deltaPct.abs().toStringAsFixed(0)}% vs prev ${weeks}w',
-                  style: GoogleFonts.geistMono(
+                  style: TextStyle(fontFamily: 'GeistMono', 
                     color: deltaPct >= 0 ? AppColors.success : AppColors.error,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -232,7 +231,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                           final ws = weekStartFor(i);
                           return LineTooltipItem(
                             '$volStr ${settings.unitLabel}',
-                            GoogleFonts.geistMono(
+                            TextStyle(fontFamily: 'GeistMono', 
                               color: AppColors.primary,
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -241,7 +240,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                               TextSpan(
                                 text:
                                     '\nwk of ${DateFormat('MMM d').format(ws)}',
-                                style: GoogleFonts.geist(
+                                style: TextStyle(fontFamily: 'Geist', 
                                   color: AppColors.textMuted,
                                   fontSize: 10,
                                   fontWeight: FontWeight.normal,
@@ -269,7 +268,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                               padding: const EdgeInsets.only(top: 6),
                               child: Text(
                                 DateFormat('d/M').format(weekStartFor(i)),
-                                style: GoogleFonts.geistMono(
+                                style: TextStyle(fontFamily: 'GeistMono', 
                                   color: AppColors.textMuted,
                                   fontSize: 9,
                                 ),
@@ -284,7 +283,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                           reservedSize: 40,
                           getTitlesWidget: (v, _) => Text(
                             _fmtK(v),
-                            style: GoogleFonts.geistMono(
+                            style: TextStyle(fontFamily: 'GeistMono', 
                               color: AppColors.textMuted,
                               fontSize: 9,
                             ),
@@ -306,7 +305,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                               direction: LabelDirection.horizontal,
                               alignment: Alignment.topRight,
                               padding: const EdgeInsets.only(right: 6, bottom: 2),
-                              style: GoogleFonts.geistMono(
+                              style: TextStyle(fontFamily: 'GeistMono', 
                                 color: AppColors.warning,
                                 fontSize: 9,
                                 fontWeight: FontWeight.w600,
@@ -388,7 +387,7 @@ class _RangeToggle extends StatelessWidget {
               ),
               child: Text(
                 r.label,
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: active ? Colors.white : AppColors.textMuted,
@@ -557,7 +556,7 @@ class _MuscleFocusRow extends StatelessWidget {
                 Expanded(
                   child: Text(
                     name,
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textSoft,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -566,7 +565,7 @@ class _MuscleFocusRow extends StatelessWidget {
                 ),
                 Text(
                   '${_fmtK(displayVol)} ${settings.unitLabel}',
-                  style: GoogleFonts.geistMono(
+                  style: TextStyle(fontFamily: 'GeistMono', 
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
@@ -591,7 +590,7 @@ class _MuscleFocusRow extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     '${recovery!.recoveryPercent}%',
-                    style: GoogleFonts.geistMono(
+                    style: TextStyle(fontFamily: 'GeistMono', 
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: _recoveryColor,
@@ -663,7 +662,7 @@ class _FrequencyGrid extends StatelessWidget {
                     child: Center(
                       child: Text(
                         '$count',
-                        style: GoogleFonts.geistMono(
+                        style: TextStyle(fontFamily: 'GeistMono', 
                           color: active ? AppColors.primary : AppColors.textMuted,
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
@@ -674,7 +673,7 @@ class _FrequencyGrid extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     label,
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textMuted,
                       fontSize: 10,
                     ),
@@ -713,7 +712,7 @@ class _ChartCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -723,7 +722,7 @@ class _ChartCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               subtitle!,
-              style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 11),
+              style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 11),
             ),
           ],
           if (isEmpty) ...[
@@ -750,9 +749,9 @@ class _EmptyChart extends StatelessWidget {
           const Icon(Icons.show_chart_rounded, size: 32, color: AppColors.textFaint),
           const SizedBox(height: 8),
           Text('No data yet',
-              style: GoogleFonts.geist(fontSize: 13, color: AppColors.textMuted)),
+              style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.textMuted)),
           Text('Complete workouts to see progress',
-              style: GoogleFonts.geist(fontSize: 11, color: AppColors.textFaint)),
+              style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.textFaint)),
         ],
       ),
     );

@@ -7,7 +7,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../models/models.dart';
@@ -190,7 +189,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
               children: [
                 Text(
                   'AI Coach',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -199,7 +198,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
                 ),
                 Text(
                   'Powered by Gemini',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
@@ -297,7 +296,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
             const SizedBox(height: AppSpacing.lg),
             Text(
               name != null && name.isNotEmpty ? 'Hey $name 👋' : 'Your AI Coach',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textPrimary,
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
@@ -308,7 +307,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
             Text(
               'Ask me anything — what to train today, how to break a plateau, reading your progress, anything.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textMuted,
                 fontSize: 14,
                 height: 1.5,
@@ -393,7 +392,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
               ),
               child: TextField(
                 controller: _controller,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textPrimary,
                   fontSize: 14,
                 ),
@@ -402,7 +401,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
                   hintText: 'Ask your coach...',
-                  hintStyle: GoogleFonts.geist(
+                  hintStyle: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textFaint,
                     fontSize: 14,
                   ),
@@ -515,7 +514,7 @@ class _ConversationsSheet extends StatelessWidget {
                   children: [
                     Text(
                       'Conversations',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -534,7 +533,7 @@ class _ConversationsSheet extends StatelessWidget {
                           const SizedBox(width: 4),
                           Text(
                             'New chat',
-                            style: GoogleFonts.geist(
+                            style: TextStyle(fontFamily: 'Geist', 
                               color: AppColors.primary,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -551,7 +550,7 @@ class _ConversationsSheet extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
                     child: Text(
                       'No saved conversations yet.',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 13,
                       ),
@@ -630,7 +629,7 @@ class _ConversationTile extends StatelessWidget {
                 conversation.title.isEmpty ? 'New chat' : conversation.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textPrimary,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -672,7 +671,7 @@ class _SuggestionChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: GoogleFonts.geist(
+          style: TextStyle(fontFamily: 'Geist', 
             color: AppColors.primary,
             fontSize: 13,
             fontWeight: FontWeight.w500,
@@ -740,7 +739,7 @@ class _MessageBubble extends StatelessWidget {
               child: isUser
                   ? Text(
                       message.text,
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         height: 1.55,
@@ -804,7 +803,7 @@ class _CoachMarkdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return GptMarkdown(
       text,
-      style: GoogleFonts.geist(
+      style: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textPrimary,
         fontSize: 14,
         height: 1.55,

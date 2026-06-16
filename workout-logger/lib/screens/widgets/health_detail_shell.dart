@@ -3,7 +3,6 @@
 // Day/Week/Month/Year granularity toggle. The body is supplied by each screen.
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/sleep_hr_models.dart';
 import '../../theme/app_theme.dart';
@@ -95,7 +94,7 @@ class HealthDetailShell extends StatelessWidget {
                         const SizedBox(width: 5),
                         Text(
                           title,
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             color: AppColors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -107,7 +106,7 @@ class HealthDetailShell extends StatelessWidget {
                     const SizedBox(height: 1),
                     Text(
                       dateLabel,
-                      style: GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 11),
+                      style: TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 11),
                     ),
                   ],
                 ),
@@ -189,7 +188,7 @@ class _GranularityToggle extends StatelessWidget {
                 alignment: Alignment.center,
                 child: Text(
                   g.label,
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: active ? AppColors.textPrimary : AppColors.textMuted,

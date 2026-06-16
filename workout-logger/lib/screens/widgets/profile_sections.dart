@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/debug_log_buffer.dart';
@@ -59,7 +58,7 @@ class _ProfileSection extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -68,7 +67,7 @@ class _ProfileSection extends StatelessWidget {
                     ),
                     Text(
                       subtitle,
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
@@ -174,7 +173,7 @@ class PreferencesSection extends StatelessWidget {
                   ),
                   child: Text(
                     label,
-                    style: GoogleFonts.geistMono(
+                    style: TextStyle(fontFamily: 'GeistMono', 
                       color: selected ? AppColors.primary : AppColors.textSoft,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
                       fontSize: 12,
@@ -197,7 +196,7 @@ class PreferencesSection extends StatelessWidget {
                   children: [
                     Text(
                       'Show estimated 1RM',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -206,7 +205,7 @@ class PreferencesSection extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Display 1-rep max badge on completed sets',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 12,
                       ),
@@ -268,7 +267,7 @@ class HealthConnectSection extends StatelessWidget {
                   children: [
                     Text(
                       'Sync workouts after finishing',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -277,7 +276,7 @@ class HealthConnectSection extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Writes session + per-set reps to Health Connect',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 12,
                       ),
@@ -303,7 +302,7 @@ class HealthConnectSection extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   'Connected — syncing after each workout',
-                  style: GoogleFonts.geist(color: _hcColor, fontSize: 12),
+                  style: TextStyle(fontFamily: 'Geist', color: _hcColor, fontSize: 12),
                 ),
               ],
             ),
@@ -319,7 +318,7 @@ class HealthConnectSection extends StatelessWidget {
                   children: [
                     Text(
                       'Readiness insights',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -328,7 +327,7 @@ class HealthConnectSection extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Reads sleep & heart data to score daily recovery',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 12,
                       ),
@@ -436,13 +435,13 @@ class CloudSyncSection extends StatelessWidget {
             ),
             child: TextField(
               enabled: false,
-              style: GoogleFonts.geistMono(
+              style: TextStyle(fontFamily: 'GeistMono', 
                 color: AppColors.textFaint,
                 fontSize: 12,
               ),
               decoration: InputDecoration(
                 hintText: 'mongodb+srv://user:pass@cluster.mongodb.net/db',
-                hintStyle: GoogleFonts.geistMono(
+                hintStyle: TextStyle(fontFamily: 'GeistMono', 
                   color: AppColors.textFaint,
                   fontSize: 12,
                 ),
@@ -462,7 +461,7 @@ class CloudSyncSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Cloud sync with custom MongoDB will be available in a future update.',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textFaint,
               fontSize: 11,
               fontStyle: FontStyle.italic,
@@ -557,7 +556,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: GoogleFonts.geistMono(
+      style: TextStyle(fontFamily: 'GeistMono', 
         color: AppColors.textFaint,
         fontSize: 9,
         fontWeight: FontWeight.w600,
@@ -609,7 +608,7 @@ class _UnitToggleButton extends StatelessWidget {
         child: Center(
           child: Text(
             label,
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: selected ? AppColors.primary : AppColors.textSoft,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               fontSize: 14,
@@ -668,7 +667,7 @@ class _ActionTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -676,7 +675,7 @@ class _ActionTile extends StatelessWidget {
                   ),
                   Text(
                     subtitle,
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textMuted,
                       fontSize: 12,
                     ),
@@ -727,7 +726,7 @@ class _InfoTile extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             label,
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textMuted,
               fontSize: 13,
             ),
@@ -735,7 +734,7 @@ class _InfoTile extends StatelessWidget {
           const Spacer(),
           Text(
             value,
-            style: GoogleFonts.geistMono(
+            style: TextStyle(fontFamily: 'GeistMono', 
               color: AppColors.textSoft,
               fontSize: 12,
               fontWeight: FontWeight.w500,
@@ -826,7 +825,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
               ),
               child: Text(
                 'Active',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.success,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
@@ -854,13 +853,13 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                     enableSuggestions: false,
                     autocorrect: false,
                     keyboardType: TextInputType.visiblePassword,
-                    style: GoogleFonts.geistMono(
+                    style: TextStyle(fontFamily: 'GeistMono', 
                       color: AppColors.textPrimary,
                       fontSize: 12,
                     ),
                     decoration: InputDecoration(
                       hintText: 'AIza…',
-                      hintStyle: GoogleFonts.geistMono(
+                      hintStyle: TextStyle(fontFamily: 'GeistMono', 
                         color: AppColors.textFaint,
                         fontSize: 12,
                       ),
@@ -889,7 +888,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Get a free key at aistudio.google.com. Stored locally on-device.',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textFaint,
               fontSize: 11,
               fontStyle: FontStyle.italic,
@@ -923,7 +922,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                   ),
                   child: Text(
                     label,
-                    style: GoogleFonts.geistMono(
+                    style: TextStyle(fontFamily: 'GeistMono', 
                       color: selected ? AppColors.primary : AppColors.textSoft,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
                       fontSize: 11,
@@ -962,7 +961,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                       )
                     : Text(
                         'Save API Key',
-                        style: GoogleFonts.geist(
+                        style: TextStyle(fontFamily: 'Geist', 
                           color: AppColors.primary,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -981,7 +980,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                   onTap: () => context.read<GeminiAiService>().resetUsage(),
                   child: Text(
                     'Reset',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.accent,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -1013,7 +1012,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Cumulative billable tokens across coach, program builder & insights.',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textFaint,
               fontSize: 11,
               fontStyle: FontStyle.italic,
@@ -1038,11 +1037,11 @@ class _UsageRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 12),
+          style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 12),
         ),
         Text(
           value,
-          style: GoogleFonts.geistMono(
+          style: TextStyle(fontFamily: 'GeistMono', 
             color: AppColors.textPrimary,
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -1084,7 +1083,7 @@ class _DebugLogSheet extends StatelessWidget {
                 children: [
                   Text(
                     'Debug Logs',
-                    style: GoogleFonts.geistMono(
+                    style: TextStyle(fontFamily: 'GeistMono', 
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
@@ -1095,7 +1094,7 @@ class _DebugLogSheet extends StatelessWidget {
                     onPressed: () => DebugLogBuffer.instance.clear(),
                     child: Text(
                       'Clear',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.accent,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -1119,7 +1118,7 @@ class _DebugLogSheet extends StatelessWidget {
                     return Center(
                       child: Text(
                         'No logs yet',
-                        style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 13),
+                        style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 13),
                       ),
                     );
                   }
@@ -1141,7 +1140,7 @@ class _DebugLogSheet extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 1),
                         child: Text(
                           line,
-                          style: GoogleFonts.geistMono(fontSize: 10, color: color),
+                          style: TextStyle(fontFamily: 'GeistMono', fontSize: 10, color: color),
                         ),
                       );
                     },
@@ -1170,7 +1169,7 @@ class _ComingSoonBadge extends StatelessWidget {
       ),
       child: Text(
         'Soon',
-        style: GoogleFonts.geist(
+        style: TextStyle(fontFamily: 'Geist', 
           color: AppColors.warning,
           fontSize: 10,
           fontWeight: FontWeight.w600,
