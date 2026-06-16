@@ -514,13 +514,16 @@ class _MuscleFocusRow extends StatelessWidget {
     if (model == null) {
       return (color: AppColors.textFaint, icon: Icons.remove_rounded);
     }
-    if (model.slope > 2) {
+    // Relative weekly growth so small muscles (low effective volume) use the
+    // same bar as large ones — +2 %/week is strong progress on any muscle.
+    final weekly = model.weeklyGrowthPercent;
+    if (weekly > 2) {
       return (color: AppColors.success, icon: Icons.trending_up_rounded);
     }
-    if (model.slope > 0) {
+    if (weekly > 0.5) {
       return (color: AppColors.secondary, icon: Icons.trending_up_rounded);
     }
-    if (model.slope < -2) {
+    if (weekly < -2) {
       return (color: AppColors.error, icon: Icons.trending_down_rounded);
     }
     return (color: AppColors.warning, icon: Icons.trending_flat_rounded);

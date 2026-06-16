@@ -1,5 +1,7 @@
 // Data Models for Workout Logger App
 
+import 'dart:math' show log, max;
+
 import 'package:uuid/uuid.dart';
 
 // Sentinel value for copyWith methods to distinguish "not provided" from "null"
@@ -401,21 +403,61 @@ class SetRecommendation {
 
 // ==================== Growth Model ====================
 
+/// Functional form of a fitted growth curve.
+///
+/// - [linear]: steady volume gains (typical for newer lifters / new exercises)
+/// - [logarithmic]: diminishing returns, y = a + b·ln(1+x) — typical as an
+///   exercise matures and progress saturates
+enum GrowthCurve { linear, logarithmic }
+
 class GrowthModel {
-  final double slope; // Growth rate per session
-  final double intercept; // Starting baseline
+  /// Instantaneous growth rate (volume per day) at the most recent data point.
+  /// For linear fits this equals the curve coefficient; for logarithmic fits
+  /// it is the tangent slope b/(1+lastX), which decays as training history grows.
+  final double slope;
+  final double intercept; // Curve intercept a
   final double r2; // Model fit quality (0-1)
   final DateTime lastTrained;
+  final GrowthCurve curve;
+
+  /// Curve coefficient b. Equals [slope] for linear fits.
+  final double coefficient;
+
+  /// x (days since first session) of the newest point used in training.
+  final double lastX;
+
+  /// Weighted residual standard error in volume units (0 = unknown/perfect).
+  final double stdError;
 
   GrowthModel({
     required this.slope,
     required this.intercept,
     required this.r2,
     required this.lastTrained,
-  });
+    this.curve = GrowthCurve.linear,
+    double? coefficient,
+    this.lastX = 0,
+    this.stdError = 0,
+  }) : coefficient = coefficient ?? slope;
 
-  double predict(int sessionNumber) {
-    return slope * sessionNumber + intercept;
+  double predict(num x) {
+    switch (curve) {
+      case GrowthCurve.linear:
+        return intercept + coefficient * x;
+      case GrowthCurve.logarithmic:
+        return intercept + coefficient * log(1 + max(0, x.toDouble()));
+    }
+  }
+
+  /// Model's volume estimate at the newest training point ("today's level").
+  double get currentEstimate => predict(lastX);
+
+  /// Expected volume growth over the next 7 days as a percentage of the
+  /// current level. The plateau/decline signal used by recommendations.
+  double get weeklyGrowthPercent {
+    final current = currentEstimate;
+    if (current <= 0) return 0;
+    return slope * 7 / current * 100;
   }
 }
 
@@ -980,4 +1022,193 @@ class PendingQuestions {
         .map((q) => QuestionSpec.fromJson(q as Map<String, dynamic>))
         .toList(),
   );
+}
+
+// ==================== Readiness ====================
+
+/// Coarse training-readiness classification derived from [ReadinessSnapshot].
+enum ReadinessBand { high, moderate, low }
+
+/// A single point-in-time health measurement read from Health Connect.
+class HealthSample {
+  final DateTime time;
+  final double value;
+
+  const HealthSample({required this.time, required this.value});
+}
+
+/// One continuous sleep-stage segment within a `SleepPeriod`.
+///
+/// Stage is one of: `'deep'`, `'rem'`, `'light'`, `'awake'`.
+class SleepStageInterval {
+  final DateTime start;
+  final DateTime end;
+  final String stage;
+
+  const SleepStageInterval({
+    required this.start,
+    required this.end,
+    required this.stage,
+  });
+}
+
+/// A sleep session interval read from Health Connect.
+///
+/// When stage data is available (from `SleepSessionRecord.samples`),
+/// `lightMinutes`, `deepMinutes`, `remMinutes`, and `awakeMinutes` are
+/// populated and `minutes` returns actual sleep time (light + deep + rem),
+/// excluding awake/out-of-bed spans. Without stage data `minutes` falls back
+/// to the raw session duration.
+///
+/// `stageTimeline` carries the ordered list of stage segments when available,
+/// used by the Sleep HR chart to colour-code each 10-minute bar.
+class SleepPeriod {
+  final DateTime start;
+  final DateTime end;
+
+  /// Minutes in light (or unspecified) sleep. Null when no stage data.
+  final int? lightMinutes;
+  final int? deepMinutes;
+  final int? remMinutes;
+
+  /// Awake/out-of-bed minutes within the session window.
+  final int? awakeMinutes;
+
+  /// Ordered stage segments, populated from `SleepSessionRecord.samples`.
+  /// Empty when the session record carries no stage breakdown.
+  final List<SleepStageInterval> stageTimeline;
+
+  const SleepPeriod({
+    required this.start,
+    required this.end,
+    this.lightMinutes,
+    this.deepMinutes,
+    this.remMinutes,
+    this.awakeMinutes,
+    this.stageTimeline = const [],
+  });
+
+  bool get hasStages =>
+      lightMinutes != null || deepMinutes != null || remMinutes != null;
+
+  /// Actual sleep minutes: light + deep + rem when stage data exists,
+  /// otherwise the raw session span (start → end).
+  int get minutes => hasStages
+      ? (lightMinutes ?? 0) + (deepMinutes ?? 0) + (remMinutes ?? 0)
+      : end.difference(start).inMinutes;
+}
+
+/// Rolling per-component averages used as the personal reference point
+/// when scoring today's readiness. Recomputed at most once per day.
+class ReadinessBaseline {
+  final String dateKey; // yyyy-MM-dd the baseline was computed for
+  final double? avgSleepMinutes;
+  final int sleepNights;
+  final double? avgRestingHr;
+  final int rhrDays;
+  final double? avgHrvMs;
+  final int hrvDays;
+
+  const ReadinessBaseline({
+    required this.dateKey,
+    this.avgSleepMinutes,
+    this.sleepNights = 0,
+    this.avgRestingHr,
+    this.rhrDays = 0,
+    this.avgHrvMs,
+    this.hrvDays = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'dateKey': dateKey,
+    'avgSleepMinutes': avgSleepMinutes,
+    'sleepNights': sleepNights,
+    'avgRestingHr': avgRestingHr,
+    'rhrDays': rhrDays,
+    'avgHrvMs': avgHrvMs,
+    'hrvDays': hrvDays,
+  };
+
+  factory ReadinessBaseline.fromJson(Map<String, dynamic> json) =>
+      ReadinessBaseline(
+        dateKey: json['dateKey'] as String,
+        avgSleepMinutes: (json['avgSleepMinutes'] as num?)?.toDouble(),
+        sleepNights: json['sleepNights'] as int? ?? 0,
+        avgRestingHr: (json['avgRestingHr'] as num?)?.toDouble(),
+        rhrDays: json['rhrDays'] as int? ?? 0,
+        avgHrvMs: (json['avgHrvMs'] as num?)?.toDouble(),
+        hrvDays: json['hrvDays'] as int? ?? 0,
+      );
+}
+
+/// One day's computed readiness with the per-component evidence behind it.
+///
+/// Any component (sleep / resting HR / HRV) may be null when the data or a
+/// reliable baseline is unavailable; [score] is null when no component could
+/// be scored at all, in which case the UI hides readiness entirely.
+class ReadinessSnapshot {
+  final String dateKey; // yyyy-MM-dd this snapshot describes
+  final int? score; // 0–100 overall, null = nothing scorable
+  final ReadinessBand? band;
+  final int? sleepMinutes;
+  final double? sleepBaselineMinutes;
+  final int? sleepScore;
+  final double? restingHr;
+  final double? rhrBaseline;
+  final int? rhrScore;
+  final double? hrvMs;
+  final double? hrvBaseline;
+  final int? hrvScore;
+  final DateTime computedAt;
+
+  ReadinessSnapshot({
+    required this.dateKey,
+    this.score,
+    this.band,
+    this.sleepMinutes,
+    this.sleepBaselineMinutes,
+    this.sleepScore,
+    this.restingHr,
+    this.rhrBaseline,
+    this.rhrScore,
+    this.hrvMs,
+    this.hrvBaseline,
+    this.hrvScore,
+    DateTime? computedAt,
+  }) : computedAt = computedAt ?? DateTime.now();
+
+  Map<String, dynamic> toJson() => {
+    'dateKey': dateKey,
+    'score': score,
+    'band': band?.name,
+    'sleepMinutes': sleepMinutes,
+    'sleepBaselineMinutes': sleepBaselineMinutes,
+    'sleepScore': sleepScore,
+    'restingHr': restingHr,
+    'rhrBaseline': rhrBaseline,
+    'rhrScore': rhrScore,
+    'hrvMs': hrvMs,
+    'hrvBaseline': hrvBaseline,
+    'hrvScore': hrvScore,
+    'computedAt': computedAt.toIso8601String(),
+  };
+
+  factory ReadinessSnapshot.fromJson(Map<String, dynamic> json) =>
+      ReadinessSnapshot(
+        dateKey: json['dateKey'] as String,
+        score: json['score'] as int?,
+        band: json['band'] != null
+            ? ReadinessBand.values.byName(json['band'] as String)
+            : null,
+        sleepMinutes: json['sleepMinutes'] as int?,
+        sleepBaselineMinutes: (json['sleepBaselineMinutes'] as num?)?.toDouble(),
+        sleepScore: json['sleepScore'] as int?,
+        restingHr: (json['restingHr'] as num?)?.toDouble(),
+        rhrBaseline: (json['rhrBaseline'] as num?)?.toDouble(),
+        rhrScore: json['rhrScore'] as int?,
+        hrvMs: (json['hrvMs'] as num?)?.toDouble(),
+        hrvBaseline: (json['hrvBaseline'] as num?)?.toDouble(),
+        hrvScore: json['hrvScore'] as int?,
+        computedAt: DateTime.parse(json['computedAt'] as String),
+      );
 }

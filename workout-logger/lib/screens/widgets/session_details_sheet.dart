@@ -9,6 +9,7 @@ import '../../services/workout_provider.dart';
 import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
+import 'workout_hr_section.dart';
 
 const Color _hcColor = Color(0xFF4ECDC4);
 
@@ -162,6 +163,9 @@ class SessionDetailsSheet extends StatelessWidget {
         ...session.exercises.map(
           (log) => _ExerciseDetailCard(log: log, provider: provider),
         ),
+
+        // HR + rest-recovery breakdown (self-hides when no HR data).
+        WorkoutHrSection(session: session, provider: provider),
 
         if (session.notes != null && session.notes!.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),

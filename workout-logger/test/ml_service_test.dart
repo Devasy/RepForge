@@ -1,3 +1,5 @@
+import 'dart:math' show log;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/ml_service.dart';
@@ -91,6 +93,97 @@ void main() {
       final expected = model.slope * 3 + model.intercept;
       expect(model.predict(3), closeTo(expected, 0.001));
     });
+
+    test('linear data over a long span still selects the linear curve', () {
+      // 10 sessions spread over 63 days — log candidate is eligible but
+      // must not beat a genuinely linear trend.
+      final points = List.generate(10, (i) => dp(i * 7.0, 100 + 8.0 * i));
+      final model = ml.trainGrowthModel(points);
+      expect(model.curve, GrowthCurve.linear);
+      expect(model.r2, closeTo(1.0, 0.01));
+    });
+
+    test('saturating data selects the logarithmic curve', () {
+      // y = 100 + 80·ln(1+x): fast early gains, then diminishing returns.
+      final points = List.generate(12, (i) {
+        final x = i * 5.0;
+        return dp(x, 100 + 80 * log(1 + x));
+      });
+      final model = ml.trainGrowthModel(points);
+      expect(model.curve, GrowthCurve.logarithmic);
+      expect(model.r2, greaterThan(0.95));
+      // predict() reproduces the generating curve.
+      expect(model.predict(30), closeTo(100 + 80 * log(31), 5.0));
+      // Instantaneous slope at the newest point is the tangent, far below
+      // the early-history rate a linear fit would average in.
+      expect(model.slope, closeTo(80 / (1 + 55), 0.5));
+    });
+
+    test('log curve is not considered for short histories', () {
+      // Strongly saturating but only 5 points over 8 days.
+      final points = List.generate(5, (i) {
+        final x = i * 2.0;
+        return dp(x, 100 + 80 * log(1 + x));
+      });
+      final model = ml.trainGrowthModel(points);
+      expect(model.curve, GrowthCurve.linear);
+    });
+
+    test('a single deload outlier does not tilt the trend (robust pass)', () {
+      // Clean linear trend with one cut-short session at 40% volume.
+      final clean = List.generate(10, (i) => dp(i * 7.0, 200 + 5.0 * i * 7));
+      final withOutlier = List.of(clean)..[5] = dp(35, (200 + 5.0 * 35) * 0.4);
+
+      final robust = ml.trainGrowthModel(withOutlier);
+      final reference = ml.trainGrowthModel(clean);
+      // Slope recovered to within 10% of the outlier-free fit.
+      expect(
+        robust.slope,
+        closeTo(reference.slope, reference.slope.abs() * 0.10),
+      );
+    });
+
+    test('model exposes lastX and a positive stdError on noisy data', () {
+      final points = [
+        dp(0, 100),
+        dp(7, 130),
+        dp(14, 118),
+        dp(21, 150),
+        dp(28, 141),
+        dp(35, 168),
+      ];
+      final model = ml.trainGrowthModel(points);
+      expect(model.lastX, 35);
+      expect(model.stdError, greaterThan(0));
+    });
+  });
+
+  group('GrowthModel - derived metrics', () {
+    test('weeklyGrowthPercent is growth relative to current level', () {
+      final model = GrowthModel(
+        slope: 2.0, // +2 volume/day
+        intercept: 600.0,
+        r2: 0.9,
+        lastTrained: DateTime.now(),
+        lastX: 50,
+      );
+      // current = 600 + 2·50 = 700; weekly = 14/700 = 2%
+      expect(model.currentEstimate, closeTo(700, 0.001));
+      expect(model.weeklyGrowthPercent, closeTo(2.0, 0.001));
+    });
+
+    test('legacy four-field constructor stays linear and backward compatible',
+        () {
+      final model = GrowthModel(
+        slope: 5.0,
+        intercept: 100.0,
+        r2: 0.9,
+        lastTrained: DateTime.now(),
+      );
+      expect(model.curve, GrowthCurve.linear);
+      expect(model.coefficient, 5.0);
+      expect(model.predict(3), closeTo(115.0, 0.001));
+    });
   });
 
   group('MLService - recommendSets', () {
@@ -137,6 +230,43 @@ void main() {
       expect(recs.first.weight, closeTo(60.0, 0.001));
       expect(recs.first.reps, 10);
       expect(recs.first.confidence, 'medium');
+    });
+
+    test('declining trend → ~10% deload rounded to 2.5 kg', () {
+      final set = wset(weight: 100.0, reps: 8);
+      final decliningModel = GrowthModel(
+        slope: -3.0, // −21/week on ~600 volume ≈ −3.5%/week
+        intercept: 600.0,
+        r2: 0.8,
+        lastTrained: DateTime.now(),
+      );
+      final recs = ml.recommendSets(
+        lastSession: [set],
+        growthModel: decliningModel,
+        maxReps: 12,
+      );
+      expect(recs.first.weight, closeTo(90.0, 0.001));
+      expect(recs.first.reps, 8);
+      expect(recs.first.confidence, 'medium');
+      expect(recs.first.reasoning, contains('deload'));
+    });
+
+    test('untrustworthy fit (low r2) never triggers plateau or deload', () {
+      final set = wset(weight: 60.0, reps: 10);
+      final noisyModel = GrowthModel(
+        slope: -5.0,
+        intercept: 600.0,
+        r2: 0.1, // below the trust threshold
+        lastTrained: DateTime.now(),
+      );
+      final recs = ml.recommendSets(
+        lastSession: [set],
+        growthModel: noisyModel,
+        maxReps: 12,
+      );
+      // Falls through to normal double progression.
+      expect(recs.first.reps, 11);
+      expect(recs.first.weight, closeTo(60.0, 0.001));
     });
 
     test('under-recovered muscle → maintenance recommendation (low confidence)',
@@ -239,6 +369,66 @@ void main() {
         growthModel: model,
       );
       expect(result, isNotNull);
+    });
+
+    test('logarithmic curve pushes the date out vs naive linear extrapolation',
+        () {
+      // Curve y = 100 + 80·ln(1+x), currently at x=55 (y ≈ 422).
+      final model = GrowthModel(
+        slope: 80 / 56, // tangent at x=55
+        intercept: 100.0,
+        r2: 0.95,
+        lastTrained: DateTime.now(),
+        curve: GrowthCurve.logarithmic,
+        coefficient: 80.0,
+        lastX: 55,
+      );
+      final current = model.currentEstimate;
+      final target = current + 50;
+
+      final curveAware = ml.predictTargetCompletion(
+        currentValue: current,
+        targetValue: target,
+        growthModel: model,
+      )!;
+      // Exact inversion: Δx = (1+x)·(e^(50/80) − 1) ≈ 48.5 days, while the
+      // tangent rate promises 50/(80/56) = 35 days.
+      final days = curveAware.difference(DateTime.now()).inDays;
+      expect(days, greaterThan(40));
+      expect(days, lessThan(55));
+    });
+
+    test('returns null when the curve cannot reach the target within 2 years',
+        () {
+      final model = GrowthModel(
+        slope: 0.01,
+        intercept: 100.0,
+        r2: 0.9,
+        lastTrained: DateTime.now(),
+      );
+      final result = ml.predictTargetCompletion(
+        currentValue: 100.0,
+        targetValue: 500.0, // 40,000 days away at 0.01/day
+        growthModel: model,
+      );
+      expect(result, isNull);
+    });
+
+    test('confidence interval uses stdError when available', () {
+      final model = GrowthModel(
+        slope: 5.0,
+        intercept: 100.0,
+        r2: 0.9,
+        lastTrained: DateTime.now(),
+        stdError: 25.0, // → ±5 days at 5 volume/day
+      );
+      final result = MLService.predictTargetWithConfidence(
+        currentValue: 100.0,
+        targetValue: 200.0,
+        growthModel: model,
+      )!;
+      expect(result.expected.difference(result.optimistic).inDays, 5);
+      expect(result.pessimistic.difference(result.expected).inDays, 5);
     });
   });
 

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'services/debug_log_buffer.dart';
 import 'services/storage_service.dart';
 import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
@@ -22,12 +23,15 @@ import 'services/managers/program_manager.dart';
 import 'services/managers/history_manager.dart';
 import 'services/managers/health_sync_manager.dart';
 import 'services/managers/pr_manager.dart';
+import 'services/managers/readiness_manager.dart';
+import 'services/managers/health_history_manager.dart';
 import 'services/managers/conversation_manager.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 
 void main() async {
+  DebugLogBuffer.attach();
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set preferred orientations
@@ -64,6 +68,13 @@ class WorkoutLoggerApp extends StatelessWidget {
   static final HistoryManager _historyManager =
       HistoryManager(_storageService, healthSyncManager: _healthSyncManager);
   static final PRManager _prManager = PRManager(_storageService);
+  // ReadinessManager reads HC sleep/heart data; gated by the in-memory
+  // readiness setting so refresh() is a no-op until the user opts in.
+  static final ReadinessManager _readinessManager =
+      ReadinessManager(_healthConnectService, _storageService, _settingsProvider);
+  // Serves arbitrary-range sleep/HR data to the detail screens.
+  static final HealthHistoryManager _healthHistoryManager =
+      HealthHistoryManager(_healthConnectService, _storageService);
   static final GeminiAiService _geminiService =
       GeminiAiService(storage: _storageService);
   static final ConversationManager _conversationManager =
@@ -94,6 +105,8 @@ class WorkoutLoggerApp extends StatelessWidget {
         // Provided as ChangeNotifier so HistoryScreen rebuilds on sync badge changes.
         ChangeNotifierProvider<HistoryManager>.value(value: _historyManager),
         ChangeNotifierProvider<PRManager>.value(value: _prManager),
+        ChangeNotifierProvider<ReadinessManager>.value(value: _readinessManager),
+        Provider<HealthHistoryManager>.value(value: _healthHistoryManager),
         // GeminiAiService is the single AI backend instance. It's a ChangeNotifier
         // (settings UI watches isConfigured/model), so it's provided as such.
         // Consumers that should depend on the abstraction (the coach ViewModel,
@@ -156,6 +169,7 @@ class _AppInitializerState extends State<AppInitializer> {
     final prManager = context.read<PRManager>();
     final api = context.read<ApiService>();
     final gemini = context.read<GeminiAiService>();
+    final readiness = context.read<ReadinessManager>();
 
     try {
       await provider.init();
@@ -175,6 +189,10 @@ class _AppInitializerState extends State<AppInitializer> {
       final versionChanged = !needsName &&
           settings.lastSeenVersion != null &&
           settings.lastSeenVersion != version;
+
+      // Fire-and-forget readiness refresh — must run after settings.init()
+      // so the opt-in flag is loaded; never blocks or fails app init.
+      readiness.refresh();
 
       // Fire-and-forget analytics in background.
       api.sendHeartbeat();

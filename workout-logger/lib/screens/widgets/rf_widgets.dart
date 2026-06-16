@@ -8,6 +8,22 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 
+// ── Route helper ──────────────────────────────────────────────────────────────
+// Right-to-left slide push, shared by the home screen and detail entry points.
+PageRouteBuilder<T> slideRoute<T>(Widget page) {
+  return PageRouteBuilder<T>(
+    pageBuilder: (_, __, ___) => page,
+    transitionsBuilder: (_, anim, __, child) => SlideTransition(
+      position: Tween(
+        begin: const Offset(1, 0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+      child: child,
+    ),
+    transitionDuration: const Duration(milliseconds: 300),
+  );
+}
+
 // ── GlassCard ───────────────────────────────────────────────────────────────
 // Soft-futurist glass card — gradient top-to-bottom + subtle inner highlight.
 class GlassCard extends StatelessWidget {

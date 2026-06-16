@@ -12,6 +12,7 @@ class SettingsProvider extends ChangeNotifier {
   WeightUnit _weightUnit = WeightUnit.kg;
   double _weightIncrement = 2.5;
   bool _healthConnectEnabled = false;
+  bool _readinessEnabled = false;
   String? _userName;
   String? _lastSeenVersion;
   String _geminiApiKey = '';
@@ -24,6 +25,7 @@ class SettingsProvider extends ChangeNotifier {
   double get weightIncrement => _weightIncrement;
   String get unitLabel => _weightUnit == WeightUnit.kg ? 'kg' : 'lbs';
   bool get healthConnectEnabled => _healthConnectEnabled;
+  bool get readinessEnabled => _readinessEnabled;
   String? get userName => _userName;
   String? get lastSeenVersion => _lastSeenVersion;
   String get geminiApiKey => _geminiApiKey;
@@ -45,6 +47,9 @@ class SettingsProvider extends ChangeNotifier {
 
     final hcEnabled = await _storage.getSetting('healthConnectEnabled');
     _healthConnectEnabled = hcEnabled == 'true';
+
+    final readiness = await _storage.getSetting('readinessEnabled');
+    _readinessEnabled = readiness == 'true';
 
     _userName = await _storage.getSetting('userName');
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
@@ -98,6 +103,12 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setHealthConnectEnabled(bool enabled) async {
     _healthConnectEnabled = enabled;
     await _storage.saveSetting('healthConnectEnabled', enabled.toString());
+    notifyListeners();
+  }
+
+  Future<void> setReadinessEnabled(bool enabled) async {
+    _readinessEnabled = enabled;
+    await _storage.saveSetting('readinessEnabled', enabled.toString());
     notifyListeners();
   }
 

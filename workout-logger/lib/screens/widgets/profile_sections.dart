@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import '../../services/debug_log_buffer.dart';
 import '../../services/settings_provider.dart';
 import '../../services/ai/gemini_ai_service.dart';
 import '../../theme/app_theme.dart';
@@ -237,11 +238,15 @@ class HealthConnectSection extends StatelessWidget {
     required this.settings,
     required this.isLoading,
     required this.onToggle,
+    required this.isReadinessLoading,
+    required this.onReadinessToggle,
   });
 
   final SettingsProvider settings;
   final bool isLoading;
   final Future<void> Function(bool) onToggle;
+  final bool isReadinessLoading;
+  final Future<void> Function(bool) onReadinessToggle;
 
   static const _hcColor = Color(0xFF00BFA5);
 
@@ -303,6 +308,43 @@ class HealthConnectSection extends StatelessWidget {
               ],
             ),
           ],
+          const SizedBox(height: AppSpacing.sm),
+          const Divider(color: AppColors.glassBorder, height: 1),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Readiness insights',
+                      style: GoogleFonts.geist(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Reads sleep & heart data to score daily recovery',
+                      style: GoogleFonts.geist(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: settings.readinessEnabled,
+                onChanged:
+                    isReadinessLoading ? null : (v) => onReadinessToggle(v),
+                activeThumbColor: _hcColor,
+                activeTrackColor: _hcColor.withValues(alpha: 0.35),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -433,9 +475,36 @@ class CloudSyncSection extends StatelessWidget {
 }
 
 // ── About section ─────────────────────────────────────────────────────────────
-class AboutSection extends StatelessWidget {
+class AboutSection extends StatefulWidget {
   const AboutSection({super.key, required this.appVersion});
   final String appVersion;
+
+  @override
+  State<AboutSection> createState() => _AboutSectionState();
+}
+
+class _AboutSectionState extends State<AboutSection> {
+  int _versionTaps = 0;
+
+  void _onVersionTap() {
+    _versionTaps++;
+    if (_versionTaps >= 5) {
+      _versionTaps = 0;
+      _showDebugLogs(context);
+    }
+  }
+
+  void _showDebugLogs(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (_) => const _DebugLogSheet(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -446,10 +515,13 @@ class AboutSection extends StatelessWidget {
       subtitle: 'RepForge Workout Logger',
       child: Column(
         children: [
-          _InfoTile(
-            label: 'Version',
-            value: appVersion,
-            icon: Icons.tag_rounded,
+          GestureDetector(
+            onTap: _onVersionTap,
+            child: _InfoTile(
+              label: 'Version',
+              value: widget.appVersion,
+              icon: Icons.tag_rounded,
+            ),
           ),
           const _SectionDivider(),
           _InfoTile(
@@ -990,6 +1062,98 @@ String _formatInt(int n) {
     buf.write(s[i]);
   }
   return buf.toString();
+}
+
+// ── Debug log viewer (tap version 5× to open) ────────────────────────────────
+class _DebugLogSheet extends StatelessWidget {
+  const _DebugLogSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) {
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.sm, 0),
+              child: Row(
+                children: [
+                  Text(
+                    'Debug Logs',
+                    style: GoogleFonts.geistMono(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => DebugLogBuffer.instance.clear(),
+                    child: Text(
+                      'Clear',
+                      style: GoogleFonts.geist(
+                        color: AppColors.accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.textMuted, size: 18),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: AppColors.glassBorder, height: 1),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: DebugLogBuffer.instance,
+                builder: (context, _) {
+                  final lines = DebugLogBuffer.instance.lines;
+                  if (lines.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No logs yet',
+                        style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 13),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    controller: scrollController,
+                    reverse: true,
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    itemCount: lines.length,
+                    itemBuilder: (context, i) {
+                      final line = lines[lines.length - 1 - i];
+                      final isHc = line.contains('[HC]');
+                      final isReadiness = line.contains('[Readiness]');
+                      final color = isHc
+                          ? AppColors.secondary
+                          : isReadiness
+                              ? AppColors.primary
+                              : AppColors.textSoft;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 1),
+                        child: Text(
+                          line,
+                          style: GoogleFonts.geistMono(fontSize: 10, color: color),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _ComingSoonBadge extends StatelessWidget {

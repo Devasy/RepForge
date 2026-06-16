@@ -73,9 +73,11 @@ class CoachToolService {
           FunctionDeclaration(
             'get_exercise_performance',
             'Get how a specific exercise has progressed: per-session volume '
-                'trend, growth slope, best estimated 1RM, last logged sets, and '
-                'personal record. Use for questions like "how is my bench press '
-                'progressing".',
+                'trend, the full per-session weight×reps set history, growth '
+                'slope, best estimated 1RM, last logged sets, and personal '
+                'record. Use for questions like "how is my bench press '
+                'progressing" or "what weight and reps did I do for squats '
+                'last month".',
             Schema.object(
               properties: {
                 'exercise_name': Schema.string(
@@ -85,6 +87,14 @@ class CoachToolService {
                 'days': Schema.integer(
                   description:
                       'Optional. Only consider sessions from the last N days.',
+                  nullable: true,
+                ),
+                'limit': Schema.integer(
+                  description:
+                      'Optional. Max number of most-recent sessions to return '
+                      'in set_history and volume_trend. Use a small value (e.g. '
+                      '1–5) when you only need recent sessions, to save tokens. '
+                      'Defaults to 20; capped at 40.',
                   nullable: true,
                 ),
               },
@@ -112,6 +122,14 @@ class CoachToolService {
                       'Defaults to 30 if no dates are provided.',
                   nullable: true,
                 ),
+                'limit': Schema.integer(
+                  description:
+                      'Optional. Max number of most-recent sessions to include '
+                      'in the per-session breakdown. The session_count and '
+                      'total_volume totals always cover the full range. Use a '
+                      'small value to save tokens. Defaults to 40; capped at 40.',
+                  nullable: true,
+                ),
               },
             ),
           ),
@@ -128,6 +146,13 @@ class CoachToolService {
                 'days': Schema.integer(
                   description:
                       'Optional. Only consider sessions from the last N days.',
+                  nullable: true,
+                ),
+                'limit': Schema.integer(
+                  description:
+                      'Optional. Max number of most-recent points to include in '
+                      'volume_over_time. session_count and total_volume always '
+                      'cover all matching sessions. Defaults to 40; capped at 40.',
                   nullable: true,
                 ),
               },
@@ -223,6 +248,31 @@ class CoachToolService {
               requiredProperties: ['routine_name'],
             ),
           ),
+          FunctionDeclaration(
+            'add_custom_exercise',
+            'Create a new custom exercise in the catalogue when the one the user '
+                'wants does not already exist. Match the muscle to an existing '
+                'muscle group (call get_muscle_recovery or list routines first '
+                'if unsure of the available muscle names). After creating it you '
+                'can reference it by name in create_routine / update_routine.',
+            Schema.object(
+              properties: {
+                'name': Schema.string(
+                  description: 'Name of the new exercise, e.g. "Cable Crossover".',
+                ),
+                'category': Schema.string(
+                  description:
+                      'Either "compound" (multi-joint) or "isolation" (single-joint).',
+                ),
+                'primary_muscle': Schema.string(
+                  description:
+                      'Primary muscle group this exercise targets, e.g. "Chest" '
+                      'or "Biceps". Must match an existing muscle group.',
+                ),
+              },
+              requiredProperties: ['name', 'category', 'primary_muscle'],
+            ),
+          ),
         ]),
       ];
 
@@ -248,6 +298,8 @@ class CoachToolService {
         return _createRoutine(call.args);
       case 'update_routine':
         return await _updateRoutine(call.args);
+      case 'add_custom_exercise':
+        return await _addCustomExercise(call.args);
       default:
         return {'error': 'Unknown tool: ${call.name}'};
     }
@@ -287,26 +339,37 @@ class CoachToolService {
     final lastLog = _wp.getLastSessionForExercise(exercise.id);
     final pr = _pr.getRecord(exercise.id);
 
+    // Optional model-supplied cap; defaults preserve prior behaviour
+    // (40 trend points, 20 set-history sessions).
+    final hasLimit = args['limit'] != null;
+    final trendCap = hasLimit ? _limitArg(args, 40) : 40;
+    final setCap = hasLimit ? _limitArg(args, 20) : 20;
+
     return {
       'exercise': exercise.name,
       'session_count': progression.length,
       if (days != null) 'window_days': days,
       'volume_trend': [
-        for (final p in progression.length > 40
-            ? progression.sublist(progression.length - 40)
+        for (final p in progression.length > trendCap
+            ? progression.sublist(progression.length - trendCap)
             : progression)
           {'date': _d(p.date), 'volume': _round(p.volume)},
       ],
+      // Per-session weight×reps breakdown (most recent first), so the model can
+      // answer "what weight/reps did I do" rather than only volume totals.
+      'set_history': _setHistory(exercise.id, cutoff, setCap),
       'growth': growth == null
           ? null
           : {
-              'slope_per_session': _round(growth.slope),
+              'slope_per_day': _round(growth.slope),
+              'weekly_growth_percent': _round(growth.weeklyGrowthPercent),
+              'curve': growth.curve.name,
               'r2': _round(growth.r2),
-              'trend': growth.slope > 0
+              'trend': growth.weeklyGrowthPercent > 0.5
                   ? 'improving'
-                  : growth.slope < 0
+                  : growth.weeklyGrowthPercent < -2
                       ? 'declining'
-                      : 'flat',
+                      : 'plateauing',
             },
       'best_estimated_1rm': _roundOrNull(_wp.getBestOneRM(exercise.id)),
       'last_session': lastLog == null
@@ -359,7 +422,7 @@ class CoachToolService {
       'session_count': sessions.length,
       'total_volume': _round(totalVolume),
       'sessions': [
-        for (final s in sessions.take(40))
+        for (final s in sessions.take(_limitArg(args, 40)))
           {
             'date': _d(s.date),
             'duration_min': s.duration,
@@ -412,8 +475,8 @@ class CoachToolService {
       if (days != null) 'window_days': days,
       'total_volume': _round(totalVolume),
       'volume_over_time': [
-        for (final s in sessions.length > 40
-            ? sessions.sublist(sessions.length - 40)
+        for (final s in sessions.length > _limitArg(args, 40)
+            ? sessions.sublist(sessions.length - _limitArg(args, 40))
             : sessions)
           {'date': _d(s.date), 'volume': _round(s.totalVolume)},
       ],
@@ -653,7 +716,99 @@ class CoachToolService {
     };
   }
 
+  Future<Map<String, Object?>> _addCustomExercise(
+      Map<String, Object?> args) async {
+    final name = (args['name'] as String?)?.trim() ?? '';
+    if (name.isEmpty) return {'error': 'Exercise name cannot be empty.'};
+
+    // Reject duplicates so the model reuses the existing exercise instead.
+    final existing = _wp.allExercises.where(
+      (e) => e.name.toLowerCase() == name.toLowerCase(),
+    );
+    if (existing.isNotEmpty) {
+      return {
+        'error': 'An exercise named "${existing.first.name}" already exists. '
+            'Use it by name instead of creating a duplicate.',
+      };
+    }
+
+    final category = (args['category'] as String?)?.trim().toLowerCase() ?? '';
+    if (category != 'compound' && category != 'isolation') {
+      return {
+        'error': 'category must be "compound" or "isolation", got "$category".',
+      };
+    }
+
+    final muscleName = (args['primary_muscle'] as String?)?.trim() ?? '';
+    final MuscleGroup muscle;
+    try {
+      final resolved = _resolveMuscleGroup(muscleName);
+      if (resolved == null) {
+        return {
+          'error': 'No muscle group found matching "$muscleName".',
+          'available_muscles': [for (final m in _wp.muscleGroups) m.name],
+        };
+      }
+      muscle = resolved;
+    } on AmbiguousMatchException catch (e) {
+      return {
+        'error': 'Multiple muscle groups match "$muscleName". Did you mean:',
+        'ambiguous_matches': e.candidates,
+      };
+    }
+
+    try {
+      await _wp.addCustomExercise(
+        name: name,
+        category: category,
+        primaryMuscleGroupId: muscle.id,
+      );
+    } catch (e) {
+      return {'error': 'Could not create exercise: $e'};
+    }
+
+    return {
+      'created': true,
+      'exercise_name': name,
+      'category': category,
+      'primary_muscle': muscle.name,
+    };
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  /// Per-session weight×reps breakdown for [exerciseId], newest first.
+  /// Bounded to the most recent [limit] sessions (after the optional [cutoff])
+  /// to keep the tool payload small.
+  List<Map<String, Object?>> _setHistory(
+      String exerciseId, DateTime? cutoff, int limit) {
+    final sessions = _wp.sessions
+        .where((s) => cutoff == null || !s.date.isBefore(cutoff))
+        .where((s) => s.exercises.any((e) => e.exerciseId == exerciseId))
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    return [
+      for (final s in sessions.take(limit))
+        {
+          'date': _d(s.date),
+          'sets': [
+            for (final log in s.exercises.where((e) => e.exerciseId == exerciseId))
+              for (final set in log.sets)
+                {
+                  'weight': _round(set.weight),
+                  'reps': set.reps,
+                  if (set.isDropset) 'dropset': true,
+                  if (set.isDropset && set.drops != null)
+                    'drops': [
+                      for (final d in set.drops!)
+                        {'weight': _round(d.weight), 'reps': d.reps},
+                    ],
+                },
+          ],
+        },
+    ];
+  }
 
   Exercise? _resolveExercise(String query) {
     final q = query.toLowerCase().trim();
@@ -682,6 +837,20 @@ class CoachToolService {
     throw AmbiguousMatchException([for (final r in partials) r.name]);
   }
 
+  MuscleGroup? _resolveMuscleGroup(String query) {
+    final q = query.toLowerCase().trim();
+    if (q.isEmpty) return null;
+    for (final m in _wp.muscleGroups) {
+      if (m.name.toLowerCase() == q) return m;
+    }
+    final partials = [
+      for (final m in _wp.muscleGroups) if (m.name.toLowerCase().contains(q)) m
+    ];
+    if (partials.isEmpty) return null;
+    if (partials.length == 1) return partials.first;
+    throw AmbiguousMatchException([for (final m in partials) m.name]);
+  }
+
   List<String> _exampleExerciseNames() =>
       _wp.allExercises.take(8).map((e) => e.name).toList();
 
@@ -693,4 +862,11 @@ class CoachToolService {
 
   double _round(double v) => (v * 10).round() / 10;
   double? _roundOrNull(double? v) => v == null ? null : _round(v);
+
+  /// Read an optional `limit` arg, clamped to [1, 40]; [fallback] when absent.
+  int _limitArg(Map<String, Object?> args, int fallback) {
+    final n = (args['limit'] as num?)?.toInt();
+    if (n == null) return fallback;
+    return n.clamp(1, 40);
+  }
 }

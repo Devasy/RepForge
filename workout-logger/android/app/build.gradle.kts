@@ -20,11 +20,23 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("KEYSTORE_PATH")
+            val storePass    = System.getenv("KEY_STORE_PASSWORD")
+            val alias        = System.getenv("KEY_ALIAS")
+            val keyPass      = System.getenv("KEY_PASSWORD")
+            if (keystorePath != null && storePass != null && alias != null && keyPass != null) {
+                storeFile     = file(keystorePath)
+                storePassword = storePass
+                keyAlias      = alias
+                keyPassword   = keyPass
+            }
+        }
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.devasy.repforge"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         // MIGRATION NOTE: minSdk is intentionally set to 26 (Android 8.0 Oreo).
         // Health Connect requires API 26+. Devices running API <26 are no longer
         // supported. If downgrading, remove the health_connector dependency and
@@ -48,9 +60,12 @@ android {
             manifestPlaceholders["appLabel"] = "RepForge (Debug)"
         }
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Uses the production EC P-256 keystore when KEYSTORE_PATH env var is set
+            // (CI injects it via GitHub Secrets). Falls back to debug key for local
+            // flutter run --release without env vars configured.
+            val releaseConfig = signingConfigs.getByName("release")
+            signingConfig = if (releaseConfig.storeFile != null) releaseConfig
+                            else signingConfigs.getByName("debug")
         }
     }
 }
