@@ -2,6 +2,7 @@
 *.class
 *.log
 *.lock
+!workout-logger/pubspec.lock
 *.pyc
 *.swp
 .DS_Store
