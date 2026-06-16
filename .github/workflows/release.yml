@@ -115,14 +115,26 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
+      - name: Decode release keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > /tmp/repforge-release.jks
+
       - name: Build APK
         working-directory: ./workout-logger
-        run: flutter build apk --release
+        env:
+          KEYSTORE_PATH: /tmp/repforge-release.jks
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: flutter build apk --release --split-per-abi
 
-      - name: Rename APK
+      - name: Rename APKs
         run: |
-          mv workout-logger/build/app/outputs/flutter-apk/app-release.apk \
-             workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}.apk
+          V="${{ steps.version.outputs.value }}"
+          DIR="workout-logger/build/app/outputs/flutter-apk"
+          mv "$DIR/app-arm64-v8a-release.apk"   "$DIR/repforge-v${V}-arm64-v8a.apk"   2>/dev/null || true
+          mv "$DIR/app-armeabi-v7a-release.apk" "$DIR/repforge-v${V}-armeabi-v7a.apk" 2>/dev/null || true
+          mv "$DIR/app-x86_64-release.apk"      "$DIR/repforge-v${V}-x86_64.apk"      2>/dev/null || true
 
       - name: Sanitize ref name for artifact
         id: sanitize_ref
@@ -133,7 +145,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: repforge-v${{ steps.version.outputs.value }}-${{ steps.sanitize_ref.outputs.ref_name }}
-          path: workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}.apk
+          path: workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}-*.apk
           retention-days: 7
 
       - name: Create GitHub Release
@@ -156,7 +168,7 @@ jobs:
             - **Build Date**: ${{ github.event.head_commit.timestamp }}
             - **Commit**: ${{ github.sha }}
           files: |
-            workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}.apk
+            workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}-*.apk
           draft: false
           prerelease: false
         env:
