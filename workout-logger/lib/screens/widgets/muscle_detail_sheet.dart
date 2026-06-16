@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../services/workout_provider.dart';
@@ -89,7 +88,7 @@ class MuscleDetailSheet extends StatelessWidget {
               Expanded(
                 child: Text(
                   name,
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
@@ -117,7 +116,7 @@ class MuscleDetailSheet extends StatelessWidget {
                     const SizedBox(width: 5),
                     Text(
                       recoveryLabel,
-                      style: GoogleFonts.geistMono(
+                      style: TextStyle(fontFamily: 'GeistMono', 
                         color: recoveryColor,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -137,7 +136,7 @@ class MuscleDetailSheet extends StatelessWidget {
                   : recovery.isUnderRecovered
                       ? 'Still fatigued — consider rest'
                       : 'Recovering',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textMuted,
                 fontSize: 12,
               ),
@@ -153,7 +152,7 @@ class MuscleDetailSheet extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
               child: Text(
                 'No sessions logged for this muscle in the last 7 days.',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textMuted,
                   fontSize: 13,
                 ),
@@ -200,7 +199,7 @@ class MuscleDetailSheet extends StatelessWidget {
                     Expanded(
                       child: Text(
                         ex.name,
-                        style: GoogleFonts.geist(
+                        style: TextStyle(fontFamily: 'Geist', 
                           color: AppColors.textSoft,
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -209,7 +208,7 @@ class MuscleDetailSheet extends StatelessWidget {
                     ),
                     Text(
                       '$volStr ${settings.unitLabel}',
-                      style: GoogleFonts.geistMono(
+                      style: TextStyle(fontFamily: 'GeistMono', 
                         color: AppColors.textPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -299,7 +298,7 @@ class _VolumeTrendChartView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
             child: Text(
               'Not enough data yet.',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textMuted,
                 fontSize: 13,
               ),
@@ -327,7 +326,7 @@ class _VolumeTrendChartView extends StatelessWidget {
                         if (i != 0 && i != series.length - 1) return const SizedBox.shrink();
                         return Text(
                           DateFormat('MMM d').format(series[i].weekStart),
-                          style: GoogleFonts.geistMono(
+                          style: TextStyle(fontFamily: 'GeistMono', 
                             color: AppColors.textFaint,
                             fontSize: 9,
                           ),
@@ -419,7 +418,7 @@ class _RecentSessionsView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
             child: Text(
               'No sessions recorded for this muscle yet.',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textMuted,
                 fontSize: 13,
               ),
@@ -450,7 +449,7 @@ class _RecentSessionsView extends StatelessWidget {
                       children: [
                         Text(
                           _relativeDate(s.date),
-                          style: GoogleFonts.geistMono(
+                          style: TextStyle(fontFamily: 'GeistMono', 
                             color: AppColors.textMuted,
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
@@ -459,7 +458,7 @@ class _RecentSessionsView extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           s.exerciseNames.join(' · '),
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             color: AppColors.textSoft,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -472,7 +471,7 @@ class _RecentSessionsView extends StatelessWidget {
                   ),
                   Text(
                     '$volStr $unitLabel',
-                    style: GoogleFonts.geistMono(
+                    style: TextStyle(fontFamily: 'GeistMono', 
                       color: AppColors.textPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -684,7 +683,7 @@ class _AiInsightSectionState extends State<_AiInsightSection> {
                     const SizedBox(width: 5),
                     Text(
                       'AI Insight',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.primary,
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -696,7 +695,7 @@ class _AiInsightSectionState extends State<_AiInsightSection> {
                 const SizedBox(height: 6),
                 Text(
                   _insight!,
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textSoft,
                     fontSize: 13,
                     height: 1.5,
@@ -707,7 +706,7 @@ class _AiInsightSectionState extends State<_AiInsightSection> {
                   onTap: () => _openCoach(context),
                   child: Text(
                     'Continue in Coach →',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.secondary,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,

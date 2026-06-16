@@ -6,7 +6,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
@@ -95,7 +94,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   const SizedBox(height: AppSpacing.xl),
                   Text(
                     'Welcome to\nRepForge',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       fontSize: 36,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
@@ -106,7 +105,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   const SizedBox(height: 12),
                   Text(
                     'Track every rep. Beat every record.\nForge your best self.',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       fontSize: 15,
                       color: AppColors.textMuted,
                       height: 1.5,
@@ -115,7 +114,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   const Spacer(flex: 2),
                   Text(
                     'WHAT SHOULD WE CALL YOU?',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textFaint,
@@ -127,14 +126,14 @@ class _WelcomePageState extends State<WelcomePage> {
                     controller: _controller,
                     autofocus: true,
                     textCapitalization: TextCapitalization.words,
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textPrimary,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Your name',
-                      hintStyle: GoogleFonts.geist(color: AppColors.textFaint),
+                      hintStyle: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint),
                       filled: true,
                       fillColor: AppColors.glass2,
                       border: OutlineInputBorder(
@@ -240,7 +239,7 @@ class _VersionUpdateSheet extends StatelessWidget {
                 children: [
                   Text(
                     'Updated to v$version',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textPrimary,
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -248,7 +247,7 @@ class _VersionUpdateSheet extends StatelessWidget {
                   ),
                   Text(
                     'RepForge is better than ever',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textMuted,
                       fontSize: 12,
                     ),
@@ -321,7 +320,7 @@ class _WhatsNewItem extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textPrimary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -330,7 +329,7 @@ class _WhatsNewItem extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 description,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textMuted,
                   fontSize: 12,
                   height: 1.4,

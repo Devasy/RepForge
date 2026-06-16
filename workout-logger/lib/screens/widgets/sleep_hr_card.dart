@@ -6,7 +6,6 @@
 import 'dart:math' show min;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/sleep_hr_models.dart';
@@ -48,7 +47,7 @@ class SleepHrCard extends StatelessWidget {
                   children: [
                     Text(
                       'Sleep heart rate',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -58,7 +57,7 @@ class SleepHrCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Last night · $startFmt – $endFmt',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textFaint,
                         fontSize: 11,
                       ),
@@ -159,7 +158,7 @@ class _MiniStat extends StatelessWidget {
         children: [
           Text(
             label,
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textFaint,
               fontSize: 10,
             ),
@@ -170,7 +169,7 @@ class _MiniStat extends StatelessWidget {
               children: [
                 TextSpan(
                   text: value,
-                  style: GoogleFonts.geistMono(
+                  style: TextStyle(fontFamily: 'GeistMono', 
                     color: color,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -179,7 +178,7 @@ class _MiniStat extends StatelessWidget {
                 ),
                 TextSpan(
                   text: ' $unit',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textFaint,
                     fontSize: 10,
                   ),

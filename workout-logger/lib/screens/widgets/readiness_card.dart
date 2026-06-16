@@ -5,7 +5,6 @@
 // (or with the feature disabled) never see an empty state.
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
@@ -62,7 +61,7 @@ class ReadinessCard extends StatelessWidget {
                 children: [
                   Text(
                     _headline(snapshot.band!),
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -72,7 +71,7 @@ class ReadinessCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     _subtitle(snapshot),
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textMuted,
                       fontSize: 12,
                     ),
@@ -173,7 +172,7 @@ class _ScoreRing extends StatelessWidget {
           ),
           Text(
             '$score',
-            style: GoogleFonts.geistMono(
+            style: TextStyle(fontFamily: 'GeistMono', 
               color: AppColors.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -213,7 +212,7 @@ class _ReadinessDetailsSheet extends StatelessWidget {
             const SizedBox(height: 18),
             Text(
               'Readiness · ${snapshot.score}',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -223,7 +222,7 @@ class _ReadinessDetailsSheet extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'As of $time, from your watch via Health Connect',
-              style: GoogleFonts.geist(color: AppColors.textMuted, fontSize: 12),
+              style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 12),
             ),
             const SizedBox(height: 18),
             if (snapshot.sleepScore != null)
@@ -252,7 +251,7 @@ class _ReadinessDetailsSheet extends StatelessWidget {
               'Each factor compares last night and this morning to your own '
               '14-day average — only dips below your normal lower the score. '
               'Accuracy improves after about 5 nights of watch data.',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textFaint,
                 fontSize: 11,
                 height: 1.5,
@@ -294,7 +293,7 @@ class _ComponentRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textSoft,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -302,7 +301,7 @@ class _ComponentRow extends StatelessWidget {
               ),
               Text(
                 value,
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                   color: AppColors.textMuted,
                   fontSize: 12,
                 ),

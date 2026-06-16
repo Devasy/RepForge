@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
@@ -81,7 +80,7 @@ class TargetsTab extends StatelessWidget {
           icon: const Icon(Icons.add_rounded, color: Colors.white),
           label: Text(
             'New Target',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: Colors.white,
               fontWeight: FontWeight.w700,
             ),
@@ -171,7 +170,7 @@ class _SummaryChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: GoogleFonts.geistMono(
+        style: TextStyle(fontFamily: 'GeistMono', 
           color: color,
           fontSize: 11,
           fontWeight: FontWeight.w600,
@@ -280,7 +279,7 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
               Expanded(
                 child: Text(
                   widget.exerciseName,
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -303,7 +302,7 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
                 ),
                 child: Text(
                   _statusWord,
-                  style: GoogleFonts.geistMono(
+                  style: TextStyle(fontFamily: 'GeistMono', 
                     color: _statusColor,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -330,14 +329,14 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
               Text(
                 '${settings.toDisplay(t.currentValue).toStringAsFixed(1)} / '
                 '${settings.toDisplay(t.targetValue).toStringAsFixed(1)} ${settings.unitLabel}',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textSoft,
                   fontSize: 12,
                 ),
               ),
               Text(
                 '${pct.toStringAsFixed(0)}%',
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                   color: AppColors.primary,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -356,7 +355,7 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
                 const SizedBox(width: 4),
                 Text(
                   'Est. $etaStr',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
@@ -412,7 +411,7 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
                         const SizedBox(width: 4),
                         Text(
                           'AI Tip',
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             color: AppColors.warning,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -423,7 +422,7 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
                     const SizedBox(height: 4),
                     Text(
                       _nudge!,
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textSoft,
                         fontSize: 12,
                         height: 1.5,
@@ -434,7 +433,7 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
                       onTap: _openCoach,
                       child: Text(
                         'Continue in Coach →',
-                        style: GoogleFonts.geist(
+                        style: TextStyle(fontFamily: 'Geist', 
                           color: AppColors.secondary,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -546,7 +545,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
           ),
           Text(
             'New Target',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textPrimary,
               fontSize: 20,
               fontWeight: FontWeight.w800,
@@ -556,7 +555,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
 
           Text(
             'EXERCISE',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textMuted,
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -578,12 +577,12 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
                 dropdownColor: AppColors.cardHigh,
                 hint: Text(
                   'Select exercise…',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textMuted,
                     fontSize: 14,
                   ),
                 ),
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textPrimary,
                   fontSize: 14,
                 ),
@@ -606,7 +605,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
           const SizedBox(height: AppSpacing.md),
           Text(
             'TARGET TYPE',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textMuted,
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -641,7 +640,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
                     child: Text(
                       t.$2,
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: selected
                             ? AppColors.primary
                             : AppColors.textMuted,
@@ -660,7 +659,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
           const SizedBox(height: AppSpacing.md),
           Text(
             'TARGET VALUE',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textMuted,
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -681,14 +680,14 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
                 FilteringTextInputFormatter.allow(
                     RegExp(r'^\d*\.?\d*$')),
               ],
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textPrimary,
                 fontSize: 16,
               ),
               decoration: InputDecoration(
                 hintText: 'e.g. 100',
                 hintStyle:
-                    GoogleFonts.geist(color: AppColors.textMuted),
+                    TextStyle(fontFamily: 'Geist', color: AppColors.textMuted),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
@@ -711,7 +710,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
                     const SizedBox(width: 5),
                     Text(
                       'Suggest a target based on my progress',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.primary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -740,7 +739,7 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
                     Expanded(
                       child: Text(
                         _suggestionText!,
-                        style: GoogleFonts.geist(
+                        style: TextStyle(fontFamily: 'Geist', 
                           color: AppColors.textSoft,
                           fontSize: 12,
                           height: 1.4,

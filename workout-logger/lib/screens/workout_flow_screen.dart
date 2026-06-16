@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import 'package:google_fonts/google_fonts.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
@@ -410,7 +409,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                       const SizedBox(width: 6),
                       Text(
                         'Prev',
-                        style: GoogleFonts.geist(
+                        style: TextStyle(fontFamily: 'Geist', 
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textMuted,
@@ -453,7 +452,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                       child: Text(
                         isLast ? 'Finish' : 'Next exercise',
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.geist(
+                        style: TextStyle(fontFamily: 'Geist', 
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,

@@ -8,7 +8,6 @@
 import 'dart:math' show min, max;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/sleep_hr_models.dart';
 import '../../theme/app_theme.dart';
@@ -73,7 +72,7 @@ class SleepHrDayView extends StatelessWidget {
 
         Text(
           'Heart rate during sleep · 10-min bars',
-          style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
+          style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
         ),
         const SizedBox(height: 8),
         _InteractiveBarChart(segments: snapshot.segments),
@@ -85,7 +84,7 @@ class SleepHrDayView extends StatelessWidget {
 
         Text(
           'HR range by stage',
-          style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
+          style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 11, letterSpacing: 0.3),
         ),
         const SizedBox(height: 10),
         _StageDistributionChart(
@@ -124,12 +123,12 @@ class _StatPill extends StatelessWidget {
           children: [
             Text(
               label.toUpperCase(),
-              style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 9, letterSpacing: 0.5),
+              style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 9, letterSpacing: 0.5),
             ),
             const SizedBox(height: 2),
             Text(
               value,
-              style: GoogleFonts.geistMono(color: color, fontSize: 14, fontWeight: FontWeight.w700),
+              style: TextStyle(fontFamily: 'GeistMono', color: color, fontSize: 14, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -220,7 +219,7 @@ class _BarChartPainter extends CustomPainter {
     final gridPaint = Paint()
       ..color = AppColors.glassBorder
       ..strokeWidth = 0.5;
-    final yLabelStyle = GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8);
+    final yLabelStyle = TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 8);
 
     final gridBpms = <int>[];
     for (var b = (bpmMin ~/ 10) * 10; b <= bpmMax; b += 10) {
@@ -271,7 +270,7 @@ class _BarChartPainter extends CustomPainter {
     }
     canvas.drawPath(path, avgPaint);
 
-    final xLabelStyle = GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8);
+    final xLabelStyle = TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 8);
     for (var i = 0; i < n; i += 6) {
       final t = _toIst(segments[i].windowStart);
       final h = t.hour == 0 ? 12 : t.hour > 12 ? t.hour - 12 : t.hour;
@@ -319,7 +318,7 @@ class _BarChartPainter extends CustomPainter {
       }[seg.stage] ?? seg.stage;
 
       final lines = ['$th:$tm–$eh:$em IST', '${seg.minBpm}–${seg.maxBpm} bpm', stageName];
-      final lineStyle = GoogleFonts.geistMono(color: Colors.white, fontSize: 9.5);
+      final lineStyle = TextStyle(fontFamily: 'GeistMono', color: Colors.white, fontSize: 9.5);
       final painters = lines
           .map((l) => TextPainter(
                 text: TextSpan(text: l, style: lineStyle),
@@ -360,7 +359,7 @@ class _BarChartPainter extends CustomPainter {
           final stagePainter = TextPainter(
             text: TextSpan(
               text: stageName,
-              style: GoogleFonts.geistMono(color: color, fontSize: 9.5, fontWeight: FontWeight.w700),
+              style: TextStyle(fontFamily: 'GeistMono', color: color, fontSize: 9.5, fontWeight: FontWeight.w700),
             ),
             textDirection: TextDirection.ltr,
           )..layout();
@@ -430,7 +429,7 @@ class _Legend extends StatelessWidget {
                   decoration: BoxDecoration(color: e.$2, borderRadius: BorderRadius.circular(2)),
                 ),
                 const SizedBox(width: 4),
-                Text(e.$1, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+                Text(e.$1, style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 10)),
               ],
             )),
         Row(
@@ -438,7 +437,7 @@ class _Legend extends StatelessWidget {
           children: [
             SizedBox(width: 14, height: 10, child: CustomPaint(painter: _DashLinePainter())),
             const SizedBox(width: 4),
-            Text('Avg trend', style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+            Text('Avg trend', style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 10)),
           ],
         ),
       ],
@@ -481,7 +480,7 @@ class _StageDistributionChart extends StatelessWidget {
     if (stats.isEmpty) {
       return Text(
         'No stage HR data available.',
-        style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 12),
+        style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 12),
       );
     }
 
@@ -537,7 +536,7 @@ class _DistRow extends StatelessWidget {
           child: Text(
             label,
             textAlign: TextAlign.right,
-            style: GoogleFonts.geist(color: color, fontSize: 10, fontWeight: FontWeight.w600),
+            style: TextStyle(fontFamily: 'Geist', color: color, fontSize: 10, fontWeight: FontWeight.w600),
           ),
         ),
         const SizedBox(width: 8),
@@ -591,7 +590,7 @@ class _DistRow extends StatelessWidget {
                       top: 0,
                       child: Text(
                         '${stats.avgBpm.round()} bpm',
-                        style: GoogleFonts.geistMono(
+                        style: TextStyle(fontFamily: 'GeistMono', 
                           color: color,
                           fontSize: 8,
                           fontWeight: FontWeight.w700,
@@ -635,7 +634,7 @@ class _DistAxis extends StatelessWidget {
                         left: (pct(t.toDouble()) * w - 10).clamp(0, w - 20),
                         child: Text(
                           '$t',
-                          style: GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8),
+                          style: TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 8),
                         ),
                       ))
                   .toList(),
@@ -701,7 +700,7 @@ class _DistLi extends StatelessWidget {
       children: [
         swatch,
         const SizedBox(width: 4),
-        Text(label, style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 10)),
+        Text(label, style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 10)),
       ],
     );
   }

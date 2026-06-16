@@ -9,7 +9,6 @@
 import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/sleep_hr_models.dart';
 import '../../theme/app_theme.dart';
@@ -251,7 +250,7 @@ class _HrDayPainter extends CustomPainter {
     final gridPaint = Paint()
       ..color = AppColors.glassBorder
       ..strokeWidth = 0.5;
-    final yStyle = GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8);
+    final yStyle = TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 8);
     for (var v = (axisMin / 30).ceil() * 30.0; v <= axisMax; v += 30) {
       final y = yFor(v);
       canvas.drawLine(Offset(_padLeft, y), Offset(size.width - 4, y), gridPaint);
@@ -293,7 +292,7 @@ class _HrDayPainter extends CustomPainter {
     }
 
     // X-axis time labels (12a / 6a / 12p / 6p / 11p).
-    final labelStyle = GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8);
+    final labelStyle = TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 8);
     const marks = ['12a', '6a', '12p', '6p', '11p'];
     for (var i = 0; i < marks.length; i++) {
       final x = _padLeft + (i / (marks.length - 1)) * chartW;
@@ -312,7 +311,7 @@ class _HrDayPainter extends CustomPainter {
       final mm = t.minute.toString().padLeft(2, '0');
       final ap = t.hour < 12 ? 'AM' : 'PM';
       final lines = ['$h12:$mm $ap', '${b.minBpm}–${b.maxBpm} bpm', 'avg ${b.avgBpm.round()}'];
-      final lineStyle = GoogleFonts.geistMono(color: Colors.white, fontSize: 9.5);
+      final lineStyle = TextStyle(fontFamily: 'GeistMono', color: Colors.white, fontSize: 9.5);
       final painters = lines
           .map((l) => TextPainter(text: TextSpan(text: l, style: lineStyle), textDirection: TextDirection.ltr)..layout())
           .toList();
@@ -391,7 +390,7 @@ class _AggBarChartState extends State<_AggBarChart> {
         child: Center(
           child: Text(
             'No data for this range.',
-            style: GoogleFonts.geist(color: AppColors.textFaint, fontSize: 12),
+            style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 12),
           ),
         ),
       );
@@ -468,7 +467,7 @@ class _AggPainter extends CustomPainter {
     final gridPaint = Paint()
       ..color = AppColors.glassBorder
       ..strokeWidth = 0.5;
-    final yStyle = GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8);
+    final yStyle = TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 8);
     for (var v = (axisMin / gridStep).ceil() * gridStep; v <= axisMax; v += gridStep) {
       final y = yFor(v);
       canvas.drawLine(Offset(_padLeft, y), Offset(size.width - 4, y), gridPaint);
@@ -491,7 +490,7 @@ class _AggPainter extends CustomPainter {
     }
 
     final baselineY = yFor(axisMin);
-    final labelStyle = GoogleFonts.geistMono(color: AppColors.textFaint, fontSize: 8);
+    final labelStyle = TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 8);
     final labelEvery = n > 16 ? 5 : (n > 10 ? 2 : 1);
 
     for (var i = 0; i < n; i++) {
@@ -574,7 +573,7 @@ class _AggPainter extends CustomPainter {
 
   void _paintTooltip(Canvas canvas, Size size, int idx, double slotW, double Function(double) yFor) {
     final bar = bars[idx];
-    final lineStyle = GoogleFonts.geistMono(color: Colors.white, fontSize: 9.5);
+    final lineStyle = TextStyle(fontFamily: 'GeistMono', color: Colors.white, fontSize: 9.5);
     final painters = bar.tooltip
         .map((l) => TextPainter(
               text: TextSpan(text: l, style: lineStyle),

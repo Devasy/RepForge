@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 // ── AppColors ──────────────────────────────────────────────────────────────
 // Single source of truth for all colour tokens. Never use hex literals in
@@ -121,7 +120,7 @@ class AppTheme {
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.geist(
+        titleTextStyle: TextStyle(fontFamily: 'Geist', 
           color: AppColors.textPrimary,
           fontSize: 22,
           fontWeight: FontWeight.w700,
@@ -144,7 +143,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: GoogleFonts.geist(
+          textStyle: TextStyle(fontFamily: 'Geist', 
             fontSize: 14,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.2,
@@ -210,64 +209,64 @@ class AppTheme {
 
   static TextTheme _buildTextTheme() {
     return TextTheme(
-      headlineLarge: GoogleFonts.geist(
+      headlineLarge: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textPrimary,
         fontSize: 32,
         fontWeight: FontWeight.w700,
         letterSpacing: -1.28,
       ),
-      headlineMedium: GoogleFonts.geist(
+      headlineMedium: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textPrimary,
         fontSize: 28,
         fontWeight: FontWeight.w600,
         letterSpacing: -1.12,
       ),
-      headlineSmall: GoogleFonts.geist(
+      headlineSmall: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textPrimary,
         fontSize: 22,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.88,
       ),
-      titleLarge: GoogleFonts.geist(
+      titleLarge: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textPrimary,
         fontSize: 17,
         fontWeight: FontWeight.w600,
       ),
-      titleMedium: GoogleFonts.geist(
+      titleMedium: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textPrimary,
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
-      titleSmall: GoogleFonts.geist(
+      titleSmall: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textSoft,
         fontSize: 13,
         fontWeight: FontWeight.w500,
       ),
-      bodyLarge: GoogleFonts.geist(
+      bodyLarge: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textPrimary,
         fontSize: 16,
       ),
-      bodyMedium: GoogleFonts.geist(
+      bodyMedium: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textSoft,
         fontSize: 14,
       ),
-      bodySmall: GoogleFonts.geist(
+      bodySmall: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textMuted,
         fontSize: 12,
       ),
-      labelLarge: GoogleFonts.geist(
+      labelLarge: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textPrimary,
         fontSize: 11,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.4,
       ),
-      labelMedium: GoogleFonts.geist(
+      labelMedium: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textMuted,
         fontSize: 10,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.3,
       ),
-      labelSmall: GoogleFonts.geist(
+      labelSmall: TextStyle(fontFamily: 'Geist', 
         color: AppColors.textFaint,
         fontSize: 9,
         fontWeight: FontWeight.w500,

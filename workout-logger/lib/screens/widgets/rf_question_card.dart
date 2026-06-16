@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/models.dart';
 import '../../theme/app_theme.dart';
@@ -76,7 +75,7 @@ class _RFQuestionCardState extends State<RFQuestionCard> {
               const SizedBox(width: AppSpacing.xs),
               Text(
                 'QUICK QUESTIONS',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.2,
@@ -143,7 +142,7 @@ class _QuestionBlock extends StatelessWidget {
       children: [
         Text(
           spec.question,
-          style: GoogleFonts.geist(
+          style: TextStyle(fontFamily: 'Geist', 
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
@@ -167,13 +166,13 @@ class _QuestionBlock extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: controller,
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               fontSize: 13,
               color: AppColors.textPrimary,
             ),
             decoration: InputDecoration(
               hintText: 'Or type your own answer…',
-              hintStyle: GoogleFonts.geist(
+              hintStyle: TextStyle(fontFamily: 'Geist', 
                 fontSize: 12,
                 color: AppColors.textFaint,
               ),
@@ -243,7 +242,7 @@ class _OptionChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: GoogleFonts.geist(
+          style: TextStyle(fontFamily: 'Geist', 
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             color: selected ? AppColors.secondary : AppColors.textSoft,

@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
@@ -368,7 +367,7 @@ class _NumberInputCardState extends State<_NumberInputCard> {
         children: [
           Text(
             widget.label,
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textMuted,
               fontSize: 11,
               fontWeight: FontWeight.w600,
@@ -389,7 +388,7 @@ class _NumberInputCardState extends State<_NumberInputCard> {
                 child: TextField(
                   controller: _controller,
                   focusNode: _focusNode,
-                  style: GoogleFonts.geistMono(
+                  style: TextStyle(fontFamily: 'GeistMono', 
                     color: AppColors.textPrimary,
                     fontSize: 36,
                     fontWeight: FontWeight.w700,
@@ -687,7 +686,7 @@ class _PreviousSetsSection extends StatelessWidget {
       children: [
         Text(
           'THIS SESSION',
-          style: GoogleFonts.geist(
+          style: TextStyle(fontFamily: 'Geist', 
             color: AppColors.textFaint,
             fontSize: 10,
             fontWeight: FontWeight.w600,
@@ -820,7 +819,7 @@ class _LastSessionSection extends StatelessWidget {
       children: [
         Text(
           'LAST SESSION',
-          style: GoogleFonts.geist(
+          style: TextStyle(fontFamily: 'Geist', 
             color: AppColors.textFaint,
             fontSize: 10,
             fontWeight: FontWeight.w600,

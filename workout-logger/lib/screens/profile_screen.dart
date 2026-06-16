@@ -11,7 +11,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
@@ -231,7 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
         title: Text(
           'Import Backup',
-          style: GoogleFonts.geist(
+          style: TextStyle(fontFamily: 'Geist', 
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w700,
           ),
@@ -239,14 +238,14 @@ class _ProfileScreenState extends State<ProfileScreen>
         content: Text(
           'This will merge the backup with your existing data. '
           'Select a .json RepForge backup file to continue.',
-          style: GoogleFonts.geist(color: AppColors.textSoft),
+          style: TextStyle(fontFamily: 'Geist', color: AppColors.textSoft),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(
               'Cancel',
-              style: GoogleFonts.geist(color: AppColors.textMuted),
+              style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted),
             ),
           ),
           TextButton(
@@ -254,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             child: Text(
               'Choose File',
-              style: GoogleFonts.geist(fontWeight: FontWeight.w600),
+              style: TextStyle(fontFamily: 'Geist', fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -322,7 +321,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       SnackBar(
         content: Text(
           message,
-          style: GoogleFonts.geist(color: AppColors.textPrimary),
+          style: TextStyle(fontFamily: 'Geist', color: AppColors.textPrimary),
         ),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
@@ -484,7 +483,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                           child: Text(
                             'v$_appVersion',
-                            style: GoogleFonts.geistMono(
+                            style: TextStyle(fontFamily: 'GeistMono', 
                               color: AppColors.textMuted,
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
@@ -496,7 +495,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   const SizedBox(height: AppSpacing.md),
                   Text(
                     'RepForge',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textPrimary,
                       fontSize: 30,
                       fontWeight: FontWeight.w800,
@@ -506,7 +505,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   const SizedBox(height: 2),
                   Text(
                     'Settings & preferences',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textMuted,
                       fontSize: 14,
                       fontWeight: FontWeight.w400,

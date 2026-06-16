@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 
 // ── Route helper ──────────────────────────────────────────────────────────────
@@ -286,7 +285,7 @@ class _NavItem extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 item.label,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 10,
                   fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                   color: active ? AppColors.textPrimary : AppColors.textMuted,

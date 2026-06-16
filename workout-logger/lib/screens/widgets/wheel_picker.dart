@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 
 /// Two-column wheel picker for weight + reps input.
@@ -159,7 +158,7 @@ class _SingleWheelState<T> extends State<_SingleWheel<T>> {
             children: [
               Text(
                 widget.label,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textMuted,
@@ -169,7 +168,7 @@ class _SingleWheelState<T> extends State<_SingleWheel<T>> {
               if (widget.unit.isNotEmpty)
                 Text(
                   widget.unit,
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 10,
                     color: AppColors.textFaint,
                   ),
@@ -217,7 +216,7 @@ class _SingleWheelState<T> extends State<_SingleWheel<T>> {
                       return Center(
                         child: Text(
                           widget.formatter(widget.values[i]),
-                          style: GoogleFonts.geistMono(
+                          style: TextStyle(fontFamily: 'GeistMono', 
                             fontSize: isCurrent ? 28 : 16,
                             fontWeight: FontWeight.w600,
                             color: isCurrent

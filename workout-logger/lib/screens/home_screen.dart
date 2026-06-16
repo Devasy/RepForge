@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../models/models.dart';
 import '../services/workout_provider.dart';
@@ -248,7 +247,7 @@ class _DashboardTab extends StatelessWidget {
           children: [
             Text(
               dateStr.toUpperCase(),
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 fontSize: 12,
                 color: AppColors.textMuted,
                 fontWeight: FontWeight.w500,
@@ -258,7 +257,7 @@ class _DashboardTab extends StatelessWidget {
             const SizedBox(height: 4),
             RichText(
               text: TextSpan(
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 28,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -416,7 +415,7 @@ class _DashboardTab extends StatelessWidget {
                             const SizedBox(width: 6),
                             Text(
                               'STREAK',
-                              style: GoogleFonts.geist(
+                              style: TextStyle(fontFamily: 'Geist', 
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.primary,
@@ -432,7 +431,7 @@ class _DashboardTab extends StatelessWidget {
                           children: [
                             Text(
                               '$streak',
-                              style: GoogleFonts.geistMono(
+                              style: TextStyle(fontFamily: 'GeistMono', 
                                 fontSize: 56,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary,
@@ -443,7 +442,7 @@ class _DashboardTab extends StatelessWidget {
                             const SizedBox(width: 6),
                             Text(
                               'days',
-                              style: GoogleFonts.geist(
+                              style: TextStyle(fontFamily: 'Geist', 
                                 fontSize: 16,
                                 color: AppColors.textMuted,
                                 fontWeight: FontWeight.w500,
@@ -456,7 +455,7 @@ class _DashboardTab extends StatelessWidget {
                           streak == 0
                               ? 'Start your streak today'
                               : 'Keep it going — you\'re on a roll',
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             fontSize: 13,
                             color: AppColors.textMuted,
                           ),
@@ -499,7 +498,7 @@ class _DashboardTab extends StatelessWidget {
                           const SizedBox(width: 4),
                           Text(
                             isActive ? 'Resume' : 'Start',
-                            style: GoogleFonts.geist(
+                            style: TextStyle(fontFamily: 'Geist', 
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
@@ -525,7 +524,7 @@ class _DashboardTab extends StatelessWidget {
                         children: [
                           Text(
                             weekDays[i],
-                            style: GoogleFonts.geist(
+                            style: TextStyle(fontFamily: 'Geist', 
                               fontSize: 10,
                               color: AppColors.textFaint,
                               fontWeight: FontWeight.w500,
@@ -689,7 +688,7 @@ class _DashboardTab extends StatelessWidget {
             children: [
               Text(
                 'Activity',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -697,7 +696,7 @@ class _DashboardTab extends StatelessWidget {
               ),
               Text(
                 'Last 14 weeks',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 11,
                   color: AppColors.textMuted,
                 ),
@@ -751,7 +750,7 @@ class _DashboardTab extends StatelessWidget {
             children: [
               Text(
                 'Weekly muscle volume',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -759,7 +758,7 @@ class _DashboardTab extends StatelessWidget {
               ),
               Text(
                 settings.unitLabel,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 11,
                   color: AppColors.textMuted,
                 ),
@@ -779,7 +778,7 @@ class _DashboardTab extends StatelessWidget {
                       ? [
                           Text(
                             'No data yet',
-                            style: GoogleFonts.geist(
+                            style: TextStyle(fontFamily: 'Geist', 
                               fontSize: 12,
                               color: AppColors.textMuted,
                             ),
@@ -801,14 +800,14 @@ class _DashboardTab extends StatelessWidget {
                                   children: [
                                     Text(
                                       _capitalize(e.key.replaceAll('_', ' ')),
-                                      style: GoogleFonts.geist(
+                                      style: TextStyle(fontFamily: 'Geist', 
                                         fontSize: 11,
                                         color: AppColors.textSoft,
                                       ),
                                     ),
                                     Text(
                                       volStr,
-                                      style: GoogleFonts.geistMono(
+                                      style: TextStyle(fontFamily: 'GeistMono', 
                                         fontSize: 11,
                                         color: AppColors.textMuted,
                                       ),
@@ -869,7 +868,7 @@ class _DashboardTab extends StatelessWidget {
             children: [
               Text(
                 'Recent workouts',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -879,7 +878,7 @@ class _DashboardTab extends StatelessWidget {
                 onTap: () => homeState?.switchTab(2),
                 child: Text(
                   'See all',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 12,
                     color: AppColors.primary,
                     fontWeight: FontWeight.w500,
@@ -895,7 +894,7 @@ class _DashboardTab extends StatelessWidget {
             child: Center(
               child: Text(
                 'No workouts yet — start one!',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 13,
                   color: AppColors.textMuted,
                 ),
@@ -940,7 +939,7 @@ class _DashboardTab extends StatelessWidget {
                             s.routineId != null
                                 ? (provider.routines.cast<Routine?>().firstWhere((r) => r?.id == s.routineId, orElse: () => null)?.name ?? 'Workout')
                                 : 'Quick Workout',
-                            style: GoogleFonts.geist(
+                            style: TextStyle(fontFamily: 'Geist', 
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
@@ -949,7 +948,7 @@ class _DashboardTab extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             '$dateStr · $exCount exercises · $setCount sets',
-                            style: GoogleFonts.geist(
+                            style: TextStyle(fontFamily: 'Geist', 
                               fontSize: 11,
                               color: AppColors.textMuted,
                             ),
@@ -962,7 +961,7 @@ class _DashboardTab extends StatelessWidget {
                       children: [
                         Text(
                           volStr,
-                          style: GoogleFonts.geistMono(
+                          style: TextStyle(fontFamily: 'GeistMono', 
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: AppColors.secondary,
@@ -970,7 +969,7 @@ class _DashboardTab extends StatelessWidget {
                         ),
                         Text(
                           '${settings.unitLabel} vol',
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             fontSize: 10,
                             color: AppColors.textFaint,
                           ),
@@ -1034,7 +1033,7 @@ class _StatCard extends StatelessWidget {
             children: [
               Text(
                 item.label,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 11,
                   color: AppColors.textMuted,
                   fontWeight: FontWeight.w500,
@@ -1054,7 +1053,7 @@ class _StatCard extends StatelessWidget {
             children: [
               Text(
                 item.value,
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                   fontSize: 26,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -1063,7 +1062,7 @@ class _StatCard extends StatelessWidget {
               ),
               Text(
                 item.unit,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 11,
                   color: AppColors.textMuted,
                   fontWeight: FontWeight.w400,
@@ -1131,14 +1130,14 @@ class _RoutineSelectorSheet extends StatelessWidget {
                 ),
                 title: Text(
                   'Quick Start',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 subtitle: Text(
                   'Empty workout, no routine',
-                  style: GoogleFonts.geist(color: AppColors.textMuted),
+                  style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted),
                 ),
                 trailing: const Icon(Icons.play_arrow_rounded, color: AppColors.primary),
                 onTap: onQuickStart,
@@ -1161,14 +1160,14 @@ class _RoutineSelectorSheet extends StatelessWidget {
                 ),
                 title: Text(
                   r.name,
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 subtitle: Text(
                   '${r.exerciseIds.length} exercises',
-                  style: GoogleFonts.geist(color: AppColors.textMuted),
+                  style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted),
                 ),
                 trailing: const Icon(
                   Icons.play_arrow_rounded,
@@ -1288,7 +1287,7 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
               Expanded(
                 child: Text(
                   'This Week\'s Insights',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -1319,7 +1318,7 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
                         )
                       : Text(
                           hasInsights ? 'Refresh' : 'Generate',
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             color: AppColors.primary,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -1341,7 +1340,7 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
             else
               Text(
                 insights,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textSoft,
                   fontSize: 13,
                   height: 1.6,
@@ -1351,7 +1350,7 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
               const SizedBox(height: AppSpacing.sm),
               Text(
                 'Updated ${DateFormat('MMM d, h:mm a').format(updatedAt)}',
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                   color: AppColors.textFaint,
                   fontSize: 10,
                 ),
@@ -1361,7 +1360,7 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
             const SizedBox(height: AppSpacing.sm),
             Text(
               'Tap Generate to get a personalised coaching summary for this week.',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textMuted,
                 fontSize: 13,
                 height: 1.5,

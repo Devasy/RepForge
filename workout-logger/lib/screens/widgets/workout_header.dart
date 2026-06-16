@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 
@@ -111,7 +110,7 @@ class _WorkoutHeaderState extends State<WorkoutHeader> {
                       children: [
                         Text(
                           widget.exerciseName,
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             color: AppColors.textPrimary,
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
@@ -127,7 +126,7 @@ class _WorkoutHeaderState extends State<WorkoutHeader> {
                           children: [
                             Text(
                               'Exercise ${widget.currentExerciseIndex + 1} of ${widget.totalExercises} · Set ${widget.setNumber}',
-                              style: GoogleFonts.geist(
+                              style: TextStyle(fontFamily: 'Geist', 
                                 color: AppColors.textMuted,
                                 fontSize: 11,
                               ),
@@ -157,7 +156,7 @@ class _WorkoutHeaderState extends State<WorkoutHeader> {
                             const SizedBox(width: 4),
                             Text(
                               _elapsedLabel,
-                              style: GoogleFonts.geistMono(
+                              style: TextStyle(fontFamily: 'GeistMono', 
                                 color: AppColors.textSoft,
                                 fontSize: 12,
                               ),

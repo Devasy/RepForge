@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
@@ -67,7 +66,7 @@ class RoutinesScreen extends StatelessWidget {
               children: [
                 Text(
                   'PROGRAMS',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textFaint,
@@ -77,7 +76,7 @@ class RoutinesScreen extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   'Routines',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -103,7 +102,7 @@ class RoutinesScreen extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     'New',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppColors.primary,
@@ -160,7 +159,7 @@ class RoutinesScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       'UP NEXT · TODAY',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,
@@ -172,7 +171,7 @@ class RoutinesScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   routine.name,
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -182,7 +181,7 @@ class RoutinesScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '$exCount exercises',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     fontSize: 12,
                     color: AppColors.textMuted,
                   ),
@@ -216,7 +215,7 @@ class RoutinesScreen extends StatelessWidget {
                               const SizedBox(width: 6),
                               Text(
                                 'Start workout',
-                                style: GoogleFonts.geist(
+                                style: TextStyle(fontFamily: 'Geist', 
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
@@ -260,7 +259,7 @@ class RoutinesScreen extends StatelessWidget {
         children: [
           Text(
             'All Routines',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: AppColors.textSoft,
@@ -275,7 +274,7 @@ class RoutinesScreen extends StatelessWidget {
             ),
             child: Text(
               '${routines.length}',
-              style: GoogleFonts.geistMono(
+              style: TextStyle(fontFamily: 'GeistMono', 
                 fontSize: 11,
                 color: AppColors.textMuted,
               ),
@@ -304,7 +303,7 @@ class RoutinesScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'No Routines Yet',
-              style: GoogleFonts.geist(
+              style: TextStyle(fontFamily: 'Geist', 
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -313,7 +312,7 @@ class RoutinesScreen extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               'Create a routine to organize your workouts',
-              style: GoogleFonts.geist(fontSize: 13, color: AppColors.textMuted),
+              style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.textMuted),
               textAlign: TextAlign.center,
             ),
           ],
@@ -332,7 +331,7 @@ class RoutinesScreen extends StatelessWidget {
             children: [
               Text(
                 'Programs',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -368,7 +367,7 @@ class RoutinesScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Browse Programs',
-                          style: GoogleFonts.geist(
+                          style: TextStyle(fontFamily: 'Geist', 
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
@@ -376,7 +375,7 @@ class RoutinesScreen extends StatelessWidget {
                         ),
                         Text(
                           'Structured multi-week training plans',
-                          style: GoogleFonts.geist(fontSize: 12, color: AppColors.textMuted),
+                          style: TextStyle(fontFamily: 'Geist', fontSize: 12, color: AppColors.textMuted),
                         ),
                       ],
                     ),
@@ -412,7 +411,7 @@ class RoutinesScreen extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 'New Routine',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: AppColors.textMuted,
@@ -473,7 +472,7 @@ class _RoutineCard extends StatelessWidget {
                 children: [
                   Text(
                     routine.name,
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
@@ -482,7 +481,7 @@ class _RoutineCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     '$exCount exercise${exCount == 1 ? '' : 's'}',
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       fontSize: 12,
                       color: AppColors.textMuted,
                     ),

@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/models.dart';
 import '../../services/workout_provider.dart';
@@ -71,7 +70,7 @@ class _ExerciseProgressViewState extends State<ExerciseProgressView> {
             child: Center(
               child: Text(
                 'Select an exercise above',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textMuted,
                   fontSize: 14,
                 ),
@@ -173,7 +172,7 @@ class _ExerciseDropdown extends StatelessWidget {
                   hasSelection
                       ? getExerciseName(selected!)
                       : 'Pick an exercise…',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: hasSelection
                         ? AppColors.textPrimary
                         : AppColors.textMuted,
@@ -275,7 +274,7 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
               children: [
                 Text(
                   'Select Exercise',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -284,7 +283,7 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                 const Spacer(),
                 Text(
                   '${widget.ids.length} logged',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textFaint,
                     fontSize: 12,
                   ),
@@ -305,13 +304,13 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
               child: TextField(
                 controller: _search,
                 autofocus: true,
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textPrimary,
                   fontSize: 14,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Search…',
-                  hintStyle: GoogleFonts.geist(
+                  hintStyle: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textFaint,
                     fontSize: 14,
                   ),
@@ -345,7 +344,7 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                 ? Center(
                     child: Text(
                       'No exercises match',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 13,
                       ),
@@ -382,7 +381,7 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                               Expanded(
                                 child: Text(
                                   name,
-                                  style: GoogleFonts.geist(
+                                  style: TextStyle(fontFamily: 'Geist', 
                                     color: isSelected
                                         ? AppColors.primary
                                         : AppColors.textSoft,
@@ -505,14 +504,14 @@ class _OneRMCard extends StatelessWidget {
               children: [
                 Text(
                   'Estimated 1RM',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
                 Text(
                   settings.formatWeight(oneRM),
-                  style: GoogleFonts.geistMono(
+                  style: TextStyle(fontFamily: 'GeistMono', 
                     color: AppColors.primary,
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
@@ -527,14 +526,14 @@ class _OneRMCard extends StatelessWidget {
             children: [
               Text(
                 'Epley formula',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textMuted,
                   fontSize: 10,
                 ),
               ),
               Text(
                 'Best across sets',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textMuted,
                   fontSize: 10,
                 ),
@@ -578,7 +577,7 @@ class _GrowthCard extends StatelessWidget {
               children: [
                 Text(
                   isGrowing ? 'Growing!' : 'Plateau',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: color,
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -588,7 +587,7 @@ class _GrowthCard extends StatelessWidget {
                   isGrowing
                       ? '+${settings.toDisplay(model.slope.abs() * 7).toStringAsFixed(1)} ${settings.unitLabel}/week'
                       : 'Volume trend is flat',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textSoft,
                     fontSize: 12,
                   ),
@@ -601,7 +600,7 @@ class _GrowthCard extends StatelessWidget {
             children: [
               Text(
                 'R² ${(model.r2 * 100).toStringAsFixed(0)}%',
-                style: GoogleFonts.geistMono(
+                style: TextStyle(fontFamily: 'GeistMono', 
                   color: color,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -609,7 +608,7 @@ class _GrowthCard extends StatelessWidget {
               ),
               Text(
                 'model fit',
-                style: GoogleFonts.geist(
+                style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textMuted,
                   fontSize: 10,
                 ),
@@ -655,7 +654,7 @@ class _ChartSection extends StatelessWidget {
                   chartMode == _ChartMode.volume
                       ? 'Volume Progression'
                       : 'Set Progression',
-                  style: GoogleFonts.geist(
+                  style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -708,7 +707,7 @@ class _ChartModeToggle extends StatelessWidget {
                 ),
                 child: Text(
                   mode == _ChartMode.volume ? 'Volume' : 'Sets',
-                  style: GoogleFonts.geistMono(
+                  style: TextStyle(fontFamily: 'GeistMono', 
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: mode == value ? Colors.white : AppColors.textMuted,
@@ -883,7 +882,7 @@ class _VolumeChart extends StatelessWidget {
                     : '';
                 return LineTooltipItem(
                   '$volStr ${settings.unitLabel}',
-                  GoogleFonts.geistMono(
+                  TextStyle(fontFamily: 'GeistMono', 
                     color: AppColors.secondary,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -891,7 +890,7 @@ class _VolumeChart extends StatelessWidget {
                   children: [
                     TextSpan(
                       text: '\n$dateStr',
-                      style: GoogleFonts.geist(
+                      style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 10,
                         fontWeight: FontWeight.normal,
@@ -919,7 +918,7 @@ class _VolumeChart extends StatelessWidget {
                       : v.toStringAsFixed(0);
                   return Text(
                     label,
-                    style: GoogleFonts.geistMono(
+                    style: TextStyle(fontFamily: 'GeistMono', 
                       color: AppColors.textMuted,
                       fontSize: 9,
                     ),
@@ -942,7 +941,7 @@ class _VolumeChart extends StatelessWidget {
                     direction: LabelDirection.horizontal,
                     alignment: Alignment.topRight,
                     padding: const EdgeInsets.only(right: 4, bottom: 2),
-                    style: GoogleFonts.geistMono(
+                    style: TextStyle(fontFamily: 'GeistMono', 
                       color: AppColors.warning,
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
@@ -1130,12 +1129,12 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
           w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1);
       return BarTooltipItem(
         '$setLabel  $wStr ${settings.unitLabel}',
-        GoogleFonts.geistMono(
+        TextStyle(fontFamily: 'GeistMono', 
             color: _wc, fontSize: 12, fontWeight: FontWeight.w700),
         children: [
           TextSpan(
             text: '\n$dateLabel',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textFaint,
                 fontSize: 10,
                 fontWeight: FontWeight.normal),
@@ -1145,12 +1144,12 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
     } else {
       return BarTooltipItem(
         '$setLabel  ${set.reps} reps',
-        GoogleFonts.geistMono(
+        TextStyle(fontFamily: 'GeistMono', 
             color: _rc, fontSize: 12, fontWeight: FontWeight.w700),
         children: [
           TextSpan(
             text: '\n$dateLabel',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
                 color: AppColors.textFaint,
                 fontSize: 10,
                 fontWeight: FontWeight.normal),
@@ -1256,7 +1255,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                   leftTitles: AxisTitles(
                     axisNameWidget: Text(
                       settings.unitLabel,
-                      style: GoogleFonts.geistMono(
+                      style: TextStyle(fontFamily: 'GeistMono', 
                           color: _wc,
                           fontSize: 9,
                           fontWeight: FontWeight.w700),
@@ -1269,7 +1268,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                         v >= 1000
                             ? '${(v / 1000).toStringAsFixed(1)}k'
                             : v.toStringAsFixed(0),
-                        style: GoogleFonts.geistMono(
+                        style: TextStyle(fontFamily: 'GeistMono', 
                             color: _wc.withValues(alpha: 0.7),
                             fontSize: 9),
                       ),
@@ -1278,7 +1277,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                   rightTitles: AxisTitles(
                     axisNameWidget: Text(
                       'reps',
-                      style: GoogleFonts.geistMono(
+                      style: TextStyle(fontFamily: 'GeistMono', 
                           color: _rc,
                           fontSize: 9,
                           fontWeight: FontWeight.w700),
@@ -1291,7 +1290,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                         final r = (v / scale).round();
                         if (r <= 0) return const Text('');
                         return Text('$r',
-                            style: GoogleFonts.geistMono(
+                            style: TextStyle(fontFamily: 'GeistMono', 
                                 color: _rc.withValues(alpha: 0.7),
                                 fontSize: 9));
                       },
@@ -1313,7 +1312,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                         return Padding(
                           padding: const EdgeInsets.only(top: 6),
                           child: Text(label,
-                              style: GoogleFonts.geistMono(
+                              style: TextStyle(fontFamily: 'GeistMono', 
                                   color: AppColors.textMuted,
                                   fontSize: 9)),
                         );
@@ -1368,7 +1367,7 @@ class _ToggleLegend extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               label,
-              style: GoogleFonts.geistMono(
+              style: TextStyle(fontFamily: 'GeistMono', 
                 color: active ? AppColors.textSoft : AppColors.textFaint,
                 fontSize: 11,
               ),
@@ -1411,7 +1410,7 @@ class _SetModeToggle extends StatelessWidget {
                 ),
                 child: Text(
                   mode == _SetViewMode.recent ? 'Recent' : 'Weekly',
-                  style: GoogleFonts.geistMono(
+                  style: TextStyle(fontFamily: 'GeistMono', 
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: mode == value ? Colors.white : AppColors.textMuted,
@@ -1447,7 +1446,7 @@ class _SessionHistory extends StatelessWidget {
         children: [
           Text(
             'Session History',
-            style: GoogleFonts.geist(
+            style: TextStyle(fontFamily: 'Geist', 
               color: AppColors.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -1463,14 +1462,14 @@ class _SessionHistory extends StatelessWidget {
                 children: [
                   Text(
                     DateFormat('MMM d, yyyy').format(entry.date),
-                    style: GoogleFonts.geist(
+                    style: TextStyle(fontFamily: 'Geist', 
                       color: AppColors.textSoft,
                       fontSize: 13,
                     ),
                   ),
                   Text(
                     '${displayVol.toStringAsFixed(0)} ${settings.unitLabel}',
-                    style: GoogleFonts.geistMono(
+                    style: TextStyle(fontFamily: 'GeistMono', 
                       color: AppColors.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
