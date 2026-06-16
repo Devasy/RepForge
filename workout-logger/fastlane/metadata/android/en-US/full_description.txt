@@ -1,0 +1,23 @@
+RepForge is a privacy-first workout logging app that helps you track sets, reps, and weights across customisable routines.
+
+All workout data is stored locally on-device using Hive. No account required. No data is sent to any server unless you explicitly configure the optional AI Coach feature with your own API key.
+
+FEATURES
+
+• Log workout sessions with sets, reps, and weights
+• Visualise progress with charts (volume, strength curves)
+• AI-powered set recommendations using on-device linear regression
+• Customisable exercise library with 50+ built-in exercises
+• Goal tracking with ML-estimated completion dates
+• Reusable workout routines
+• Health Connect integration for sleep and heart-rate readiness scores
+• Optional AI Coach powered by Google Gemini (requires a user-supplied API key)
+• Full data export/import for portability
+
+PRIVACY
+
+RepForge is fully offline by default. The optional AI Coach feature sends data to Google's Gemini API only if you provide your own API key in Settings → AI Settings. The app works completely without it.
+
+LICENSE
+
+Apache-2.0. Source code: https://github.com/Devasy23/Workout-logger
