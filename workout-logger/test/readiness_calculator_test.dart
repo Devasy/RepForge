@@ -185,19 +185,19 @@ void main() {
   });
 
   group('lastNightSleep', () {
-    test('picks the longest period overlapping the night window', () {
+    test('sums all periods in the night window (18:00 prev day → 12:00 today)', () {
       final periods = [
-        // 90-min nap yesterday afternoon — outside window
+        // 90-min nap yesterday afternoon — outside window (ends before 18:00)
         SleepPeriod(
           start: DateTime(2026, 6, 9, 14),
           end: DateTime(2026, 6, 9, 15, 30),
         ),
-        // Main sleep 23:00–06:30
+        // Main sleep 23:00–06:30 = 450 min
         SleepPeriod(
           start: DateTime(2026, 6, 9, 23),
           end: DateTime(2026, 6, 10, 6, 30),
         ),
-        // Short morning doze
+        // Short morning doze 07:00–07:45 = 45 min (inside window)
         SleepPeriod(
           start: DateTime(2026, 6, 10, 7),
           end: DateTime(2026, 6, 10, 7, 45),
@@ -205,7 +205,7 @@ void main() {
       ];
       final picked = calc.lastNightSleep(today, periods);
       expect(picked, isNotNull);
-      expect(picked!.minutes, 450);
+      expect(picked!.minutes, 495); // 450 + 45
     });
 
     test('returns null when nothing overlaps the window', () {
