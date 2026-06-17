@@ -61,11 +61,16 @@ android {
         }
         release {
             // Uses the production EC P-256 keystore when KEYSTORE_PATH env var is set
-            // (CI injects it via GitHub Secrets). Falls back to debug key for local
-            // flutter run --release without env vars configured.
-            val releaseConfig = signingConfigs.getByName("release")
-            signingConfig = if (releaseConfig.storeFile != null) releaseConfig
-                            else signingConfigs.getByName("debug")
+            // (CI injects it via GitHub Secrets). Falls back to the debug key for a
+            // local `flutter run --release` without env vars configured.
+            //
+            // This MUST stay on a single line beginning with `signingConfig` so the
+            // F-Droid build server's signing-key stripper removes the whole statement
+            // (it deletes the `signingConfigs { ... }` block too, after which any
+            // surviving reference like `signingConfigs.getByName("release")` would
+            // fail with "SigningConfig with name 'release' not found"). F-Droid then
+            // signs the APK with its own key.
+            signingConfig = signingConfigs.findByName("release")?.takeIf { it.storeFile != null } ?: signingConfigs.getByName("debug")
         }
     }
 }

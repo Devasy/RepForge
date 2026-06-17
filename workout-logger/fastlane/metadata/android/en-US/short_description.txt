@@ -1,1 +1,1 @@
-Workout logger with AI coaching, progress analytics, and Health Connect integration
+Workout logger with AI coaching, analytics & Health Connect integration
