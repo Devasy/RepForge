@@ -20,6 +20,15 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
+    // Strip AGP's "Dependency metadata" signing block from the APK. It embeds a
+    // Protobuf list of dependencies in an extra APK signing block, which F-Droid's
+    // `scanner` rejects ("Found extra signing block 'Dependency metadata'"). It is
+    // only consumed by Google Play, so disabling it is safe.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     signingConfigs {
         create("release") {
             val keystorePath = System.getenv("KEYSTORE_PATH")
