@@ -532,7 +532,7 @@ class _DashboardTab extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
+                            duration: AppDurations.medium,
                             height: 6,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(3),
@@ -1298,7 +1298,7 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
               GestureDetector(
                 onTap: _loading ? null : _refresh,
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
+                  duration: AppDurations.fast,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.12),

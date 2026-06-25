@@ -208,7 +208,7 @@ class _ProgramWeekEditorStepState extends State<ProgramWeekEditorStep> {
                     style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                   ),
                   value: week.isDeload,
-                  activeColor: Colors.amber,
+                  activeThumbColor: Colors.amber,
                   onChanged: (v) {
                     final updated = List<ProgramWeek>.from(_weeks);
                     updated[idx] = week.copyWith(isDeload: v);

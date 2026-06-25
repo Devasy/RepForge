@@ -299,8 +299,8 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
           height: 32,
           decoration: BoxDecoration(
             color: week.isDeload
-                ? Colors.amber.withOpacity(0.2)
-                : AppTheme.primaryColor.withOpacity(0.2),
+                ? Colors.amber.withValues(alpha: 0.2)
+                : AppTheme.primaryColor.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(6),
           ),
           alignment: Alignment.center,
@@ -875,6 +875,7 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
       );
       if (proceed != true) return;
     }
+    if (!mounted) return;
 
     final provider = context.read<WorkoutProvider>();
     final program = TrainingProgram(

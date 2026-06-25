@@ -348,7 +348,7 @@ class CoachToolService {
     return {
       'exercise': exercise.name,
       'session_count': progression.length,
-      if (days != null) 'window_days': days,
+      'window_days': ?days,
       'volume_trend': [
         for (final p in progression.length > trendCap
             ? progression.sublist(progression.length - trendCap)
@@ -472,7 +472,7 @@ class CoachToolService {
       'routine': routine.name,
       'exercises': [for (final id in routine.exerciseIds) _wp.getExerciseName(id)],
       'session_count': sessions.length,
-      if (days != null) 'window_days': days,
+      'window_days': ?days,
       'total_volume': _round(totalVolume),
       'volume_over_time': [
         for (final s in sessions.length > _limitArg(args, 40)

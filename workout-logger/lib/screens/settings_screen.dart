@@ -55,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final jsonString = await provider.exportAllData();
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
 
+      if (!mounted) return;
       final api = context.read<ApiService>();
       await api.trackEvent('backup_triggered').catchError((_) => null);
       final success = await api.backupData(data);
@@ -89,9 +90,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsString(jsonString);
 
-      final result = await Share.shareXFiles([
-        XFile(file.path),
-      ], subject: 'RepForge Backup');
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          subject: 'RepForge Backup',
+        ),
+      );
 
       if (result.status == ShareResultStatus.success ||
           result.status == ShareResultStatus.dismissed) {
@@ -110,6 +114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ==================== Local Import ====================
 
   Future<void> _importFromFile() async {
+    final provider = context.read<WorkoutProvider>();
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
@@ -154,7 +159,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _isImporting = true);
 
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['json'],
       );
@@ -166,6 +171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       final file = File(result.files.single.path!);
       final jsonString = await file.readAsString();
+      if (!mounted) return;
 
       // Basic validation: ensure it's valid JSON with expected keys
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
@@ -174,8 +180,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return;
       }
 
-      final provider = context.read<WorkoutProvider>();
       await provider.importData(jsonString);
+      if (!mounted) return;
 
       final itemCount = (data['sessions'] as List?)?.length ?? 0;
       final routineCount = (data['routines'] as List?)?.length ?? 0;
@@ -239,7 +245,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -325,7 +331,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 selected: selected,
                 onSelected: (_) => settings.setWeightIncrement(inc),
-                selectedColor: AppTheme.primaryColor.withOpacity(0.3),
+                selectedColor: AppTheme.primaryColor.withValues(alpha: 0.3),
                 backgroundColor: AppTheme.surfaceColor,
                 labelStyle: TextStyle(
                   color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
@@ -369,7 +375,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.secondaryColor.withOpacity(0.1),
+                  color: AppTheme.secondaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -480,7 +486,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -564,7 +570,7 @@ class _UnitButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.primaryColor.withOpacity(0.2)
+              ? AppTheme.primaryColor.withValues(alpha: 0.2)
               : AppTheme.surfaceColor,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(

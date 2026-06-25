@@ -92,7 +92,7 @@ class ApiService {
         'event': event,
         'platform': _platform,
         'timestamp': DateTime.now().toUtc().toIso8601String(),
-        if (metadata != null) 'metadata': metadata,
+        'metadata': ?metadata,
       };
       final res = await _client
           .post(

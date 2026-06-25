@@ -399,7 +399,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     color: AppColors.glass2,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadius.button),
                     border: Border.all(color: AppColors.glassBorderStrong),
                   ),
                   child: Row(
@@ -435,7 +435,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 decoration: BoxDecoration(
                   color: isLast ? AppColors.success : AppColors.primary,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.button),
                   boxShadow: [
                     BoxShadow(
                       color: (isLast ? AppColors.success : AppColors.primary)

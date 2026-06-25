@@ -352,7 +352,7 @@ class RFToggle extends StatelessWidget {
           return GestureDetector(
             onTap: () => onChanged(i),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration: AppDurations.fast,
               curve: Curves.easeInOut,
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               decoration: BoxDecoration(
