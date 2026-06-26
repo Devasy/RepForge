@@ -1,56 +1,88 @@
+AntiFeatures:
+  NonFreeNet:
+    en-US: "The optional AI Coach and Routine Optimizer features send data to Google's
+      Gemini API. These features are fully disabled unless the user provides their
+      own Gemini API key in Settings → AI Settings."
 Categories:
   - Sports & Health
 License: Apache-2.0
 AuthorName: Devasy Patel
-SourceCode: https://github.com/Devasy23/RepForge
-IssueTracker: https://github.com/Devasy23/RepForge/issues
+SourceCode: https://github.com/Devasy/RepForge
+IssueTracker: https://github.com/Devasy/RepForge/issues
 
 AutoName: RepForge
-Summary: Open-source workout logger with AI coaching and progress analytics
-Description: |-
-  RepForge is a privacy-first workout logging app that helps you track sets,
-  reps, and weights across customizable routines.
-
-  Features:
-  * Log workout sessions with sets, reps, and weights
-  * Visualise progress with charts (volume, strength curves)
-  * AI-powered set recommendations using linear regression
-  * Customisable exercise library with 50+ built-in exercises
-  * Goal tracking with ML-estimated completion dates
-  * Reusable workout routines
-  * Health Connect integration for sleep and heart rate readiness scores
-  * Optional AI Coach powered by Google Gemini (requires user-supplied API key)
-  * Full data export/import for portability
-
-  All workout data is stored locally on-device using Hive. No account required.
-  No data is sent to any server unless you enable the optional AI Coach feature.
 
 RepoType: git
-Repo: https://github.com/Devasy23/RepForge
-
-AntiFeatures:
-  NonFreeNet:
-    - description: >
-        The optional AI Coach and Routine Optimizer features send data to
-        Google's Gemini API (a proprietary cloud service). These features are
-        fully disabled unless the user provides their own Gemini API key in
-        Settings → AI Settings. The app is fully functional as an offline
-        workout logger without configuring a key.
+Repo: https://github.com/Devasy/RepForge
 
 Builds:
-  - versionName: 2.0.1
-    versionCode: 21
-    commit: v2.0.1
+  - versionName: 2.0.5
+    versionCode: 251
+    commit: ed8be2420595337f69cf550aeb4d77cb1ae943ef
     subdir: workout-logger
-    gradle:
-      - release
+    output: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+    srclibs:
+      - flutter@stable
     prebuild:
-      - flutter pub get
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - 'export FLUTTER_VERSION=$(sed -n -E "s/^  flutter: (.+)/\1/p" pubspec.yaml)'
+      - '[[ $FLUTTER_VERSION ]]'
+      - git -C $$flutter$$ checkout -f $FLUTTER_VERSION
+      - $$flutter$$/bin/flutter config --no-analytics
+      - $$flutter$$/bin/flutter pub get --enforce-lockfile
+    scandelete:
+      - workout-logger/.pub-cache
     build:
-      - flutter build apk --release --split-per-abi
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform="android-arm"
 
-AutoUpdateMode: Version v%v
-UpdateCheckMode: Tags
-UpdateCheckData: workout-logger/pubspec.yaml|^version:\s+([\d.]+)\+|.|
-CurrentVersion: 2.0.1
-CurrentVersionCode: 21
+  - versionName: 2.0.5
+    versionCode: 252
+    commit: ed8be2420595337f69cf550aeb4d77cb1ae943ef
+    subdir: workout-logger
+    output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+    srclibs:
+      - flutter@stable
+    prebuild:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - 'export FLUTTER_VERSION=$(sed -n -E "s/^  flutter: (.+)/\1/p" pubspec.yaml)'
+      - '[[ $FLUTTER_VERSION ]]'
+      - git -C $$flutter$$ checkout -f $FLUTTER_VERSION
+      - $$flutter$$/bin/flutter config --no-analytics
+      - $$flutter$$/bin/flutter pub get --enforce-lockfile
+    scandelete:
+      - workout-logger/.pub-cache
+    build:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform="android-arm64"
+
+  - versionName: 2.0.5
+    versionCode: 253
+    commit: ed8be2420595337f69cf550aeb4d77cb1ae943ef
+    subdir: workout-logger
+    output: build/app/outputs/flutter-apk/app-x86_64-release.apk
+    srclibs:
+      - flutter@stable
+    prebuild:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - 'export FLUTTER_VERSION=$(sed -n -E "s/^  flutter: (.+)/\1/p" pubspec.yaml)'
+      - '[[ $FLUTTER_VERSION ]]'
+      - git -C $$flutter$$ checkout -f $FLUTTER_VERSION
+      - $$flutter$$/bin/flutter config --no-analytics
+      - $$flutter$$/bin/flutter pub get --enforce-lockfile
+    scandelete:
+      - workout-logger/.pub-cache
+    build:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform="android-x64"
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[\d.]+$
+VercodeOperation:
+  - 10 * %c + 1
+  - 10 * %c + 2
+  - 10 * %c + 3
+UpdateCheckData: 
+  workout-logger/pubspec.yaml|version:\s.*\+(\d+)|workout-logger/pubspec.yaml|version:\s([\d.]+)\+
+CurrentVersion: 2.0.5
+CurrentVersionCode: 253
