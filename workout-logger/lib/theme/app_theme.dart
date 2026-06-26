@@ -141,7 +141,7 @@ class AppTheme {
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.button),
           ),
           textStyle: TextStyle(fontFamily: 'Geist', 
             fontSize: 14,
@@ -156,7 +156,7 @@ class AppTheme {
           side: const BorderSide(color: AppColors.primary),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.button),
           ),
         ),
       ),
@@ -289,12 +289,33 @@ class AppSpacing {
 
 class AppRadius {
   const AppRadius._();
+  static const double xs = 6;     // micro pill, small inner accents
   static const double sm = 8;
   static const double md = 12;
   static const double lg = 16;
-  static const double xl = 18; // glass card radius
-  static const double xxl = 22; // nav pill radius
+  static const double button = 14; // standard button shape radius
+  static const double xl = 18;    // glass card radius
+  static const double xxl = 22;   // nav pill radius
   static const double full = 999;
+}
+
+// ── Animation Durations ──────────────────────────────────────────────────────
+class AppDurations {
+  const AppDurations._();
+  /// 100ms — instant toggles, checkbox presses
+  static const micro  = Duration(milliseconds: 100);
+  /// 150ms — press state feedback, chip selection
+  static const fast   = Duration(milliseconds: 150);
+  /// 200ms — standard UI transitions (tab switches, card expands)
+  static const normal = Duration(milliseconds: 200);
+  /// 250ms — slightly heavier containers
+  static const moderate = Duration(milliseconds: 250);
+  /// 300ms — page & modal slide transitions
+  static const medium = Duration(milliseconds: 300);
+  /// 600ms — progress rings, loading fills
+  static const slow   = Duration(milliseconds: 600);
+  /// 800ms — counter roll-up animations
+  static const xslow  = Duration(milliseconds: 800);
 }
 
 class AppBreakpoints {

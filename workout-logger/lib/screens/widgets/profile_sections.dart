@@ -76,7 +76,7 @@ class _ProfileSection extends StatelessWidget {
                   ],
                 ),
               ),
-              if (trailing != null) trailing!,
+              ?trailing,
             ],
           ),
           const SizedBox(height: AppSpacing.md),
@@ -154,7 +154,7 @@ class PreferencesSection extends StatelessWidget {
                   settings.setWeightIncrement(inc);
                 },
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
+                  duration: AppDurations.fast,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 7,
@@ -582,7 +582,7 @@ class _UnitToggleButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: AppDurations.fast,
         padding: const EdgeInsets.symmetric(vertical: 11),
         decoration: BoxDecoration(
           color: selected
@@ -906,7 +906,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
               return GestureDetector(
                 onTap: () => _selectModel(id),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
+                  duration: AppDurations.fast,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
                     color: selected
@@ -936,7 +936,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
           SizedBox(
             width: double.infinity,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
+              duration: AppDurations.fast,
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadius.sm),

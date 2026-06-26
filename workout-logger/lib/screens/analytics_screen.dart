@@ -89,7 +89,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: AppColors.glass2,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.button),
           border: Border.all(color: AppColors.glassBorder),
         ),
         child: Row(
@@ -99,7 +99,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               child: GestureDetector(
                 onTap: () => setState(() => _tab = i),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: AppDurations.normal,
                   curve: Curves.easeOut,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
@@ -546,7 +546,7 @@ class _FilterChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: AppDurations.fast,
         padding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(

@@ -11,8 +11,8 @@ import '../../theme/app_theme.dart';
 // Right-to-left slide push, shared by the home screen and detail entry points.
 PageRouteBuilder<T> slideRoute<T>(Widget page) {
   return PageRouteBuilder<T>(
-    pageBuilder: (_, __, ___) => page,
-    transitionsBuilder: (_, anim, __, child) => SlideTransition(
+    pageBuilder: (_, _, _) => page,
+    transitionsBuilder: (_, anim, _, child) => SlideTransition(
       position: Tween(
         begin: const Offset(1, 0),
         end: Offset.zero,
@@ -96,11 +96,9 @@ class GlassCard extends StatelessWidget {
 }
 
 // ── AmbientGlow ──────────────────────────────────────────────────────────────
-// Decorative ambient gradient wash — place inside a Stack as first child.
 // Matches the design's rf-ambient pseudo-elements.
 class AmbientGlow extends StatelessWidget {
-  const AmbientGlow({super.key, this.showBottom = true});
-  final bool showBottom;
+  const AmbientGlow({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -130,26 +128,6 @@ class AmbientGlow extends StatelessWidget {
                 ),
               ),
             ),
-            // Bottom cyan wash
-            if (showBottom)
-              Positioned(
-                bottom: -200,
-                right: -100,
-                child: Container(
-                  width: 400,
-                  height: 400,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.secondary.withValues(alpha: 0.20),
-                        Colors.transparent,
-                      ],
-                      stops: const [0, 0.6],
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -260,7 +238,7 @@ class _NavItem extends StatelessWidget {
             children: [
               // Accent indicator above icon
               AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
+                duration: AppDurations.normal,
                 width: active ? 18 : 0,
                 height: 2,
                 margin: const EdgeInsets.only(bottom: 4),
@@ -334,8 +312,8 @@ class _GlowButtonState extends State<GlowButton>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 100),
-      reverseDuration: const Duration(milliseconds: 200),
+      duration: AppDurations.micro,
+      reverseDuration: AppDurations.normal,
       lowerBound: 0.95,
       upperBound: 1.0,
       value: 1.0,
@@ -562,7 +540,7 @@ class RFSectionHeader extends StatelessWidget {
               letterSpacing: 1.2,
             ),
           ),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );
@@ -638,7 +616,7 @@ class AnimatedCounter extends StatelessWidget {
     this.style,
     this.decimals = 0,
     this.suffix = '',
-    this.duration = const Duration(milliseconds: 800),
+    this.duration = AppDurations.xslow,
   });
 
   final double value;
@@ -834,7 +812,7 @@ class _RFLoadingDotsState extends State<RFLoadingDots>
     final c = widget.color ?? AppColors.primary;
     return AnimatedBuilder(
       animation: _ctrl,
-      builder: (_, __) {
+      builder: (_, _) {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(3, (i) {
@@ -889,7 +867,7 @@ class RFProgressBar extends StatelessWidget {
           return Stack(
             children: [
               AnimatedContainer(
-                duration: const Duration(milliseconds: 600),
+                duration: AppDurations.slow,
                 curve: Curves.easeOutCubic,
                 width: constraints.maxWidth * clamped,
                 decoration: BoxDecoration(
@@ -1046,7 +1024,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _ctrl,
-      builder: (_, __) => Container(
+      builder: (_, _) => Container(
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(

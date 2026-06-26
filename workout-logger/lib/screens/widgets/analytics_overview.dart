@@ -325,7 +325,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                         isStrokeCapRound: true,
                         dotData: FlDotData(
                           show: weeks <= 12,
-                          getDotPainter: (_, __, ___, ____) =>
+                          getDotPainter: (_, _, _, _) =>
                               FlDotCirclePainter(
                             radius: 3.5,
                             color: AppColors.primary,
@@ -378,7 +378,7 @@ class _RangeToggle extends StatelessWidget {
           return GestureDetector(
             onTap: () => onChanged(r),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration: AppDurations.fast,
               curve: Curves.easeOut,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
@@ -644,7 +644,7 @@ class _FrequencyGrid extends StatelessWidget {
                       color: active
                           ? AppColors.primary.withValues(alpha: 0.12 + count * 0.06)
                           : AppColors.glass2,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadius.button),
                       border: Border.all(
                         color: active
                             ? AppColors.primary.withValues(alpha: 0.4)

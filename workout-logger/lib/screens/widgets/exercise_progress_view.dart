@@ -699,7 +699,7 @@ class _ChartModeToggle extends StatelessWidget {
             GestureDetector(
               onTap: () => onChanged(mode),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
+                duration: AppDurations.fast,
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: mode == value ? AppColors.primary : Colors.transparent,
@@ -787,7 +787,7 @@ class _VolumeChart extends StatelessWidget {
         barWidth: 2.5,
         dotData: FlDotData(
           show: true,
-          getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+          getDotPainter: (_, _, _, _) => FlDotCirclePainter(
             radius: 3,
             color: AppColors.secondary,
             strokeWidth: 1.5,
@@ -1350,13 +1350,13 @@ class _ToggleLegend extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
+        duration: AppDurations.normal,
         opacity: active ? 1.0 : 0.32,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+              duration: AppDurations.normal,
               width: 10,
               height: 10,
               decoration: BoxDecoration(
@@ -1402,7 +1402,7 @@ class _SetModeToggle extends StatelessWidget {
             GestureDetector(
               onTap: () => onChanged(mode),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
+                duration: AppDurations.fast,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: mode == value ? AppColors.primary : Colors.transparent,
