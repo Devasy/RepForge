@@ -11,6 +11,7 @@ import 'services/debug_log_buffer.dart';
 import 'services/storage_service.dart';
 import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
+import 'services/ai/agent_orchestrator.dart';
 import 'services/ai/coach_tool_service.dart';
 import 'services/health_connect_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
@@ -134,6 +135,11 @@ class WorkoutLoggerApp extends StatelessWidget {
           create: (ctx) => CoachToolService(
             ctx.read<WorkoutProvider>(),
             ctx.read<PRManager>(),
+          ),
+        ),
+        Provider<AgentOrchestrator>(
+          create: (ctx) => AgentOrchestrator(
+            ai: ctx.read<GeminiAiService>(),
           ),
         ),
       ],

@@ -11,7 +11,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../models/models.dart';
 import '../viewmodels/routine_optimizer_view_model.dart';
-import '../services/ai/gemini_ai_service.dart';
+import '../services/ai/agent_orchestrator.dart';
 import '../services/ai/coach_tool_service.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/interfaces/storage_service_interface.dart';
@@ -39,7 +39,7 @@ class RoutineOptimizerScreen extends StatelessWidget {
         final conversations =
             ConversationManager(storage, kind: 'optimizer');
         return RoutineOptimizerViewModel(
-          ai: ctx.read<GeminiAiService>(),
+          orchestrator: ctx.read<AgentOrchestrator>(),
           coachTools: ctx.read<CoachToolService>(),
           conversations: conversations,
           settings: ctx.read<SettingsProvider>(),
@@ -250,7 +250,11 @@ class _OptimizerViewState extends State<_OptimizerView> {
               ),
             );
           }
-          return _StreamingBubble(text: vm.streamingText);
+          return _StreamingBubble(
+            text: vm.streamingText,
+            statusText: vm.statusText,
+            activeTools: vm.activeTools,
+          );
         }
         return _MessageBubble(message: messages[i]);
       },
@@ -412,8 +416,14 @@ class _MessageBubble extends StatelessWidget {
 // ── Streaming bubble ──────────────────────────────────────────────────────────
 
 class _StreamingBubble extends StatelessWidget {
-  const _StreamingBubble({required this.text});
+  const _StreamingBubble({
+    required this.text,
+    required this.statusText,
+    required this.activeTools,
+  });
   final String text;
+  final String statusText;
+  final List<String> activeTools;
 
   @override
   Widget build(BuildContext context) {
@@ -440,9 +450,77 @@ class _StreamingBubble extends StatelessWidget {
                 ),
                 border: Border.all(color: AppColors.glassBorder),
               ),
-              child: text.isEmpty
-                  ? const RFLoadingDots(color: AppColors.secondary)
-                  : _OptimizerMarkdown(text: text),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (text.isEmpty && statusText.isEmpty && activeTools.isEmpty)
+                    const RFLoadingDots(color: AppColors.secondary)
+                  else ...[
+                    if (text.isNotEmpty)
+                      _OptimizerMarkdown(text: text),
+                    if (text.isNotEmpty && (statusText.isNotEmpty || activeTools.isNotEmpty))
+                      const SizedBox(height: 8),
+                    if (statusText.isNotEmpty)
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 10,
+                            height: 10,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.2,
+                              valueColor: AlwaysStoppedAnimation(AppColors.secondary),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              statusText,
+                              style: const TextStyle(
+                                fontFamily: 'Geist',
+                                color: AppColors.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (activeTools.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: activeTools.map((tool) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.handyman_rounded, size: 10, color: AppColors.secondary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  tool,
+                                  style: const TextStyle(
+                                    fontFamily: 'Geist',
+                                    color: AppColors.secondary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
             ),
           ),
         ],

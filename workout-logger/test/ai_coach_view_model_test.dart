@@ -6,6 +6,7 @@ import 'package:google_generative_ai/google_generative_ai.dart'
     show Content, Tool, FunctionCall;
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/interfaces/ai_service_interface.dart';
+import 'package:repforge/services/ai/agent_orchestrator.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'package:repforge/services/managers/conversation_manager.dart';
 import 'package:repforge/services/managers/program_manager.dart';
@@ -79,7 +80,7 @@ void main() {
       settings = SettingsProvider(storage);
       conversations = ConversationManager(storage);
       return AiCoachViewModel(
-        ai: ai,
+        orchestrator: AgentOrchestrator(ai: ai),
         coachTools: CoachToolService(provider, pr),
         conversations: conversations,
         settings: settings,
@@ -93,11 +94,11 @@ void main() {
     test('sendMessage appends user + model messages and persists', () async {
       final vm = await buildVm(_FakeAiService());
 
-      await vm.sendMessage('How am I doing?');
+      await vm.sendMessage('Hello coach');
 
       expect(vm.messages, hasLength(2));
       expect(vm.messages[0].role, 'user');
-      expect(vm.messages[0].text, 'How am I doing?');
+      expect(vm.messages[0].text, 'Hello coach');
       expect(vm.messages[1].role, 'model');
       expect(vm.messages[1].text, 'Hello world');
       expect(vm.isLoading, isFalse);

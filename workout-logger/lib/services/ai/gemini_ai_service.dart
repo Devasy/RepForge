@@ -20,11 +20,13 @@ import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
 import '../interfaces/ai_service_interface.dart';
 import '../interfaces/storage_service_interface.dart';
+import 'retry_policy.dart';
 
 // Ordered list of available Gemini models shown in the picker.
 const kGeminiModels = [
   ('gemini-2.5-flash',      'Gemini 2.5 Flash'),
   ('gemini-2.5-flash-lite', 'Gemini 2.5 Flash Lite'),
+  ('gemini-3.0-flash',      'Gemini 3.0 Flash'),
   ('gemini-3.1-flash-lite', 'Gemini 3.1 Flash Lite'),
   ('gemini-3.5-flash',      'Gemini 3.5 Flash'),
 ];
@@ -35,40 +37,26 @@ const kDefaultGeminiModel = 'gemini-3.5-flash';
 // Upper bound on tool-resolution rounds per user turn, to bound runaway loops.
 const int _kMaxToolRounds = 5;
 
-// Retry policy for transient (5xx / 429) errors. Total attempts = 1 + retries.
-const int _kMaxRetries = 2;
-
 const String _apiBase =
     'https://generativelanguage.googleapis.com/v1beta/models';
-
-// 429 (rate limit) and 5xx (server/overload, e.g. 503 "high demand") are
-// transient and worth retrying; 4xx (bad key, bad request) are not.
-bool _isRetryableStatus(int code) => code == 429 || (code >= 500 && code < 600);
-
-// Exponential backoff: 500ms, 1s, 2s …
-Duration _retryBackoff(int attempt) =>
-    Duration(milliseconds: 500 * (1 << attempt));
-
-// Gemini error bodies look like {"error":{"code":503,"message":"…","status":"…"}}.
-// Surface just the human-readable message rather than the whole JSON blob.
-String _errorMessage(int code, String body) {
-  try {
-    final decoded = jsonDecode(body);
-    if (decoded is Map && decoded['error'] is Map) {
-      final msg = (decoded['error'] as Map)['message'];
-      if (msg is String && msg.isNotEmpty) return msg;
-    }
-  } catch (_) {
-    // Body wasn't JSON — fall through to a generic message.
-  }
-  return 'request failed (HTTP $code).';
-}
 
 class GeminiAiService extends ChangeNotifier implements IAiService {
   // Optional storage so cumulative token usage survives restarts.
   final IStorageService? _storage;
 
-  GeminiAiService({IStorageService? storage}) : _storage = storage;
+  /// Retry policy for transient HTTP errors (429 / 5xx). Configurable so
+  /// free-tier users get more patient retries with Retry-After parsing.
+  final RetryPolicy retryPolicy;
+
+  /// Optional callback fired on each retry status event so the orchestrator
+  /// (or ViewModel) can update the UI with countdown / attempt info.
+  void Function(RetryStatus status)? onRetryStatus;
+
+  GeminiAiService({
+    IStorageService? storage,
+    RetryPolicy? retryPolicy,
+  })  : _storage = storage,
+        retryPolicy = retryPolicy ?? const RetryPolicy();
 
   static const String _usageKey = 'aiTokenUsage';
 
@@ -185,6 +173,13 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     String? system,
     List<Tool>? tools,
     bool jsonMode = false,
+    // Gemini 3.5: use thinking_level instead of deprecated thinkingBudget.
+    // 'medium' (default) — best quality for most tasks, recommended for
+    //   complex code and agentic use cases.
+    // 'low' — faster, cheaper; good for quick insights and simple queries.
+    // 'high' — maximizes reasoning depth for hard problems.
+    // 'minimal' — optimized for speed; chat-like use cases.
+    String thinkingLevel = 'medium',
   }) =>
       {
         'contents': contents,
@@ -196,9 +191,10 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
           },
         if (tools != null) 'tools': tools.map((t) => t.toJson()).toList(),
         'generationConfig': {
-          // Disable thinking tokens so SDK-incompatible thoughtSignature parts
-          // are never returned by Gemini 3.x models.
-          'thinkingConfig': {'thinkingBudget': 0},
+          // Gemini 3.x: use thinking_level (string enum) instead of the
+          // deprecated numeric thinkingBudget. Do NOT set temperature,
+          // top_p, or top_k — the model is optimized for its defaults.
+          'thinkingConfig': {'thinkingLevel': thinkingLevel},
           if (jsonMode) 'responseMimeType': 'application/json',
         },
       };
@@ -218,35 +214,25 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   }
 
   // Streams parsed SSE chunks from the streamGenerateContent endpoint.
+  // Uses RetryPolicy for connection-level retries (safe before any bytes are
+  // yielded). Mid-stream failures are NOT retried (would duplicate output).
   Stream<Map<String, dynamic>> _streamSse(Map<String, dynamic> body) async* {
     final uri = Uri.parse(
       '$_apiBase/$_model:streamGenerateContent?alt=sse&key=$_apiKey',
     );
+    final encodedBody = jsonEncode(body);
 
-    // Establish the connection with retries. Retrying is only safe here —
-    // before any bytes are yielded — so a transient 503 never reaches the user,
-    // but a mid-stream failure is not retried (it would duplicate output).
-    http.Client client = http.Client();
-    http.StreamedResponse streamed;
-    for (var attempt = 0;; attempt++) {
-      final request = http.Request('POST', uri)
-        ..headers['Content-Type'] = 'application/json'
-        ..body = jsonEncode(body);
-      final resp = await client.send(request);
-      if (resp.statusCode == 200) {
-        streamed = resp;
-        break;
-      }
-      final err = await resp.stream.bytesToString();
-      if (_isRetryableStatus(resp.statusCode) && attempt < _kMaxRetries) {
-        client.close();
-        await Future.delayed(_retryBackoff(attempt));
-        client = http.Client();
-        continue;
-      }
-      client.close();
-      throw Exception(_errorMessage(resp.statusCode, err));
-    }
+    // Use RetryPolicy to establish the initial connection.
+    final streamed = await retryPolicy.execute(
+      makeRequest: () {
+        final client = http.Client();
+        final request = http.Request('POST', uri)
+          ..headers['Content-Type'] = 'application/json'
+          ..body = encodedBody;
+        return client.send(request);
+      },
+      onStatus: onRetryStatus,
+    );
 
     try {
       final lineBuf = StringBuffer();
@@ -273,30 +259,37 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
           yield jsonDecode(payload) as Map<String, dynamic>;
         }
       }
-    } finally {
-      client.close();
+    } catch (_) {
+      rethrow;
     }
   }
 
-  // Single-shot (non-streaming) generateContent call, with retry on 5xx/429.
+  // Single-shot (non-streaming) generateContent call. Uses RetryPolicy for
+  // transient error handling with Retry-After parsing and patient retries.
   Future<Map<String, dynamic>> _generate(Map<String, dynamic> body) async {
     final uri = Uri.parse('$_apiBase/$_model:generateContent?key=$_apiKey');
     final payload = jsonEncode(body);
-    for (var attempt = 0;; attempt++) {
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: payload,
-      );
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-      if (_isRetryableStatus(response.statusCode) && attempt < _kMaxRetries) {
-        await Future.delayed(_retryBackoff(attempt));
-        continue;
-      }
-      throw Exception(_errorMessage(response.statusCode, response.body));
-    }
+
+    final streamed = await retryPolicy.execute(
+      makeRequest: () async {
+        final response = await http.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: payload,
+        );
+        // Wrap the regular Response in a StreamedResponse for the policy.
+        return http.StreamedResponse(
+          Stream.value(response.bodyBytes),
+          response.statusCode,
+          headers: response.headers,
+          reasonPhrase: response.reasonPhrase,
+        );
+      },
+      onStatus: onRetryStatus,
+    );
+
+    final responseBody = await streamed.stream.bytesToString();
+    return jsonDecode(responseBody) as Map<String, dynamic>;
   }
 
   String _textFromResponse(Map<String, dynamic> data) {

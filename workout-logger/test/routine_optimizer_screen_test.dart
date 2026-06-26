@@ -15,6 +15,7 @@ import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/routine_optimizer_screen.dart';
 import 'package:repforge/screens/widgets/rf_question_card.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
+import 'package:repforge/services/ai/agent_orchestrator.dart';
 import 'package:repforge/services/interfaces/ai_service_interface.dart';
 import 'package:repforge/services/managers/conversation_manager.dart';
 import 'package:repforge/services/managers/program_manager.dart';
@@ -152,7 +153,7 @@ RoutineOptimizerViewModel _buildVm(IAiService ai) {
   final settings = SettingsProvider(storage);
   final coachTools = CoachToolService(wp, pr);
   return RoutineOptimizerViewModel(
-    ai: ai,
+    orchestrator: AgentOrchestrator(ai: ai),
     coachTools: coachTools,
     conversations: conversations,
     settings: settings,

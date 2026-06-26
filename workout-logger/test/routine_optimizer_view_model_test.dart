@@ -7,6 +7,7 @@ import 'package:google_generative_ai/google_generative_ai.dart'
     show Content, Tool, FunctionCall;
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/interfaces/ai_service_interface.dart';
+import 'package:repforge/services/ai/agent_orchestrator.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'package:repforge/services/managers/conversation_manager.dart';
 import 'package:repforge/services/managers/program_manager.dart';
@@ -107,7 +108,7 @@ RoutineOptimizerViewModel _buildVm({
   final settings = SettingsProvider(storage);
   final coachTools = CoachToolService(wp, pr);
   return RoutineOptimizerViewModel(
-    ai: ai,
+    orchestrator: AgentOrchestrator(ai: ai),
     coachTools: coachTools,
     conversations: conversations,
     settings: settings,
@@ -124,7 +125,9 @@ void main() {
 
   group('RoutineOptimizerViewModel', () {
     test('startForRoutine auto-sends seed message', () async {
-      final ai = _SimpleAi();
+      final ai = _SimpleAi(
+        toolCall: FunctionCall('get_routine_performance', {'routine_name': 'Push Day'}),
+      );
       final vm = _buildVm(storage: storage, ai: ai);
       await vm.startForRoutine(_routine);
       expect(ai.calls, 1);
@@ -134,7 +137,10 @@ void main() {
     });
 
     test('isLoading is true during streaming and false after', () async {
-      final ai = _SimpleAi(chunks: ['chunk']);
+      final ai = _SimpleAi(
+        chunks: ['chunk'],
+        toolCall: FunctionCall('get_routine_performance', {'routine_name': 'Push Day'}),
+      );
       final vm = _buildVm(storage: storage, ai: ai);
       bool wasLoading = false;
       vm.addListener(() {

@@ -10,14 +10,15 @@ import 'package:google_generative_ai/google_generative_ai.dart'
     show Content, TextPart, FunctionCall, Tool;
 
 import '../models/models.dart';
-import '../services/interfaces/ai_service_interface.dart';
+import '../services/ai/agent_event.dart';
+import '../services/ai/agent_orchestrator.dart';
 import '../services/ai/coach_tool_service.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
 import '../services/gemini_context_builder.dart';
 
 class RoutineOptimizerViewModel extends ChangeNotifier {
-  final IAiService _ai;
+  final AgentOrchestrator _orchestrator;
   final CoachToolService _coachTools;
   final ConversationManager _conversations;
   final SettingsProvider _settings;
@@ -25,15 +26,17 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
   bool _loading = false;
   bool _disposed = false;
   String _streamingText = '';
+  String _statusText = '';
+  final List<String> _activeTools = [];
   PendingQuestions? _pendingQuestions;
   Completer<Map<String, Object?>>? _pendingCompleter;
 
   RoutineOptimizerViewModel({
-    required IAiService ai,
+    required AgentOrchestrator orchestrator,
     required CoachToolService coachTools,
     required ConversationManager conversations,
     required SettingsProvider settings,
-  })  : _ai = ai,
+  })  : _orchestrator = orchestrator,
         _coachTools = coachTools,
         _conversations = conversations,
         _settings = settings {
@@ -56,9 +59,11 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
 
   // ── State ──────────────────────────────────────────────────────────────────
 
-  bool get isConfigured => _ai.isConfigured;
+  bool get isConfigured => _orchestrator.isConfigured;
   bool get isLoading => _loading;
   String get streamingText => _streamingText;
+  String get statusText => _statusText;
+  List<String> get activeTools => List.unmodifiable(_activeTools);
   PendingQuestions? get pendingQuestions => _pendingQuestions;
   List<ChatMessage> get messages => _conversations.activeMessages;
   List<Conversation> get conversations => _conversations.conversations;
@@ -113,6 +118,8 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
 
     _loading = true;
     _streamingText = '';
+    _statusText = '';
+    _activeTools.clear();
     _notify();
 
     await _conversations.appendMessage(ChatMessage(role: 'user', text: trimmed));
@@ -129,16 +136,44 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
 
     final buffer = StringBuffer();
     try {
-      await for (final chunk in _ai.streamCoachReply(
+      await for (final event in _orchestrator.orchestrate(
         userMessage: trimmed,
         systemPrompt: systemPrompt,
         history: history,
         tools: tools,
         onToolCall: _routeToolCall,
       )) {
-        buffer.write(chunk);
-        _streamingText = buffer.toString();
-        _notify();
+        switch (event) {
+          case AgentTextChunk(:final text):
+            buffer.write(text);
+            _streamingText = buffer.toString();
+            _statusText = '';
+            _notify();
+
+          case AgentStatusUpdate(:final status):
+            _statusText = status;
+            _notify();
+
+          case AgentToolActivity(:final toolName, :final isStart, :final label):
+            if (isStart) {
+              _activeTools.add(label ?? toolName);
+            } else {
+              _activeTools.remove(label ?? toolName);
+            }
+            _notify();
+
+          case AgentRetryWait(:final remaining, :final reason):
+            _statusText = '$reason — retrying in ${remaining.inSeconds}s…';
+            _notify();
+
+          case AgentError(:final message):
+            buffer.write('\n\n_Error: ${message}_');
+            _notify();
+
+          case AgentChartData():
+            // Future: route to chart rendering
+            break;
+        }
       }
       final reply = buffer.toString().trim();
       if (reply.isNotEmpty) {
@@ -155,6 +190,8 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
       }
     } finally {
       _streamingText = '';
+      _statusText = '';
+      _activeTools.clear();
       _loading = false;
       _pendingQuestions = null;
       _notify();
