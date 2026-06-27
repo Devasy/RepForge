@@ -100,48 +100,88 @@ def patch_so_data(built_so_data, ref_so_data):
         print(f"[-] Patched SO still differs from reference at {len(diffs)} positions.")
         return None
 
+import zlib
+
+def find_cd_header_offset(data, filename):
+    fname_bytes = filename.encode('utf-8')
+    idx = 0
+    while True:
+        idx = data.find(b"\x50\x4b\x01\x02", idx)
+        if idx == -1:
+            break
+        fn_len = int.from_bytes(data[idx+28:idx+30], 'little')
+        if fn_len == len(fname_bytes):
+            if data[idx+46 : idx+46+fn_len] == fname_bytes:
+                return idx
+        idx += 4
+    return -1
+
 def patch_apk(built_apk, ref_apk, output_apk):
-    temp_dir = tempfile.mkdtemp()
     try:
         if os.path.abspath(built_apk) != os.path.abspath(output_apk):
             shutil.copy2(built_apk, output_apk)
         
-        # Open both to extract and patch SO files
+        with open(output_apk, "rb") as f:
+            apk_data = bytearray(f.read())
+            
         with zipfile.ZipFile(ref_apk, 'r') as z_ref:
             ref_so_entries = {name: z_ref.read(name) for name in z_ref.namelist() if name.endswith(".so")}
             
-        with zipfile.ZipFile(built_apk, 'r') as z_built:
-            built_so_entries = {name: z_built.read(name) for name in z_built.namelist() if name.endswith(".so")}
-            
-        patched_entries = {}
+        with zipfile.ZipFile(output_apk, 'r') as z_built:
+            built_so_entries = {}
+            built_so_info = {}
+            for info in z_built.infolist():
+                if info.filename.endswith(".so"):
+                    built_so_entries[info.filename] = z_built.read(info)
+                    built_so_info[info.filename] = info
+                    
+        patched_count = 0
         for name, built_data in built_so_entries.items():
             if name in ref_so_entries:
                 print(f"[+] Found shared library in both: {name}")
                 ref_data = ref_so_entries[name]
-                patched_data = patch_so_data(built_data, ref_data)
-                if patched_data:
-                    patched_entries[name] = patched_data
+                patched_so = patch_so_data(built_data, ref_data)
+                if patched_so:
+                    info = built_so_info[name]
+                    if info.compress_type != 0:
+                        print(f"[-] Shared library {name} is compressed. In-place patching is not supported.")
+                        return False
+                        
+                    new_crc = zlib.crc32(patched_so) & 0xffffffff
+                    local_header_offset = info.header_offset
+                    local_extra_len = int.from_bytes(apk_data[local_header_offset+28 : local_header_offset+30], 'little')
+                    filename_len = len(name.encode('utf-8'))
                     
-        if not patched_entries:
+                    data_offset = local_header_offset + 30 + filename_len + local_extra_len
+                    print(f"[+] Writing patched SO to APK data offset: {hex(data_offset)}")
+                    apk_data[data_offset : data_offset + len(patched_so)] = patched_so
+                    
+                    print(f"[+] Updating Local Header CRC-32 to: {hex(new_crc)}")
+                    apk_data[local_header_offset+14 : local_header_offset+18] = new_crc.to_bytes(4, 'little')
+                    
+                    cd_offset = find_cd_header_offset(apk_data, name)
+                    if cd_offset == -1:
+                        print(f"[-] Could not find Central Directory Header for {name}")
+                        return False
+                        
+                    print(f"[+] Updating Central Directory CRC-32 to: {hex(new_crc)}")
+                    apk_data[cd_offset+16 : cd_offset+20] = new_crc.to_bytes(4, 'little')
+                    patched_count += 1
+                    
+        if patched_count == 0:
             print("[-] No patchable SO files found or patching failed.")
             return False
             
-        # Recreate the APK with patched entries
-        tmp_apk_path = os.path.join(temp_dir, "patched.apk")
-        with zipfile.ZipFile(built_apk, 'r') as zin:
-            with zipfile.ZipFile(tmp_apk_path, 'w', zipfile.ZIP_DEFLATED) as zout:
-                for item in zin.infolist():
-                    if item.filename in patched_entries:
-                        print(f"[+] Writing patched entry: {item.filename}")
-                        zout.writestr(item, patched_entries[item.filename])
-                    else:
-                        zout.writestr(item, zin.read(item.filename))
-                        
-        shutil.copy2(tmp_apk_path, output_apk)
-        print(f"[+] Successfully generated patched APK: {output_apk}")
+        with open(output_apk, "wb") as f:
+            f.write(apk_data)
+            
+        print(f"[+] Successfully patched APK in-place: {output_apk}")
         return True
-    finally:
-        shutil.rmtree(temp_dir)
+    except Exception as e:
+        print(f"[-] Exception occurred during patching: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
