@@ -16,9 +16,9 @@ RepoType: git
 Repo: https://github.com/Devasy/RepForge
 
 Builds:
-  - versionName: 2.0.5
-    versionCode: 251
-    commit: ed8be2420595337f69cf550aeb4d77cb1ae943ef
+  - versionName: 2.0.6
+    versionCode: 271
+    commit: b5738b601283846ca77df3ede377f85502415850
     subdir: workout-logger
     output: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
     srclibs:
@@ -36,9 +36,9 @@ Builds:
       - export PUB_CACHE=$(pwd)/.pub-cache
       - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform="android-arm"
 
-  - versionName: 2.0.5
-    versionCode: 252
-    commit: ed8be2420595337f69cf550aeb4d77cb1ae943ef
+  - versionName: 2.0.6
+    versionCode: 272
+    commit: b5738b601283846ca77df3ede377f85502415850
     subdir: workout-logger
     output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
     srclibs:
@@ -56,9 +56,9 @@ Builds:
       - export PUB_CACHE=$(pwd)/.pub-cache
       - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform="android-arm64"
 
-  - versionName: 2.0.5
-    versionCode: 253
-    commit: ed8be2420595337f69cf550aeb4d77cb1ae943ef
+  - versionName: 2.0.6
+    versionCode: 273
+    commit: b5738b601283846ca77df3ede377f85502415850
     subdir: workout-logger
     output: build/app/outputs/flutter-apk/app-x86_64-release.apk
     srclibs:
@@ -84,5 +84,5 @@ VercodeOperation:
   - 10 * %c + 3
 UpdateCheckData: 
   workout-logger/pubspec.yaml|version:\s.*\+(\d+)|workout-logger/pubspec.yaml|version:\s([\d.]+)\+
-CurrentVersion: 2.0.5
-CurrentVersionCode: 253
+CurrentVersion: 2.0.6
+CurrentVersionCode: 273
