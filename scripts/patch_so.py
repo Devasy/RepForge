@@ -103,7 +103,8 @@ def patch_so_data(built_so_data, ref_so_data):
 def patch_apk(built_apk, ref_apk, output_apk):
     temp_dir = tempfile.mkdtemp()
     try:
-        shutil.copy2(built_apk, output_apk)
+        if os.path.abspath(built_apk) != os.path.abspath(output_apk):
+            shutil.copy2(built_apk, output_apk)
         
         # Open both to extract and patch SO files
         with zipfile.ZipFile(ref_apk, 'r') as z_ref:
