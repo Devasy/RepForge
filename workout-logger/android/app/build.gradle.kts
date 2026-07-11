@@ -2,8 +2,8 @@ import com.android.build.gradle.internal.api.ApkVariantOutputImpl
 
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // kotlin-android is injected automatically by Flutter's built-in Kotlin support.
+    // (android.builtInKotlin=true in gradle.properties)
     id("dev.flutter.flutter-gradle-plugin")
 }
 
