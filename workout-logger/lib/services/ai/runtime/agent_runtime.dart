@@ -15,7 +15,6 @@ import '../provider/model_runtime.dart';
 import '../tools/tool_registry.dart';
 import 'agent_context.dart';
 import 'agent_graph.dart';
-import 'agent_interrupt.dart';
 import 'agent_node.dart';
 import 'agent_policies.dart';
 import 'agent_run_state.dart';

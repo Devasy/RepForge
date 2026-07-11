@@ -393,12 +393,12 @@ class _AiCoachViewState extends State<_AiCoachView> {
         ),
         padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
-          color: AppColors.surface.withOpacity(0.85),
+          color: AppColors.surface.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppColors.glassBorder),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -413,7 +413,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
                   borderRadius: BorderRadius.circular(AppRadius.xl),
                   border: Border.all(
                     color: _isFocused
-                        ? AppColors.primary.withOpacity(0.6)
+                        ? AppColors.primary.withValues(alpha: 0.6)
                         : AppColors.glassBorderStrong,
                     width: 1.5,
                   ),
@@ -709,9 +709,9 @@ class _SuggestionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.08),
+          color: AppColors.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(AppRadius.full),
-          border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

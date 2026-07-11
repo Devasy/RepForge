@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'package:repforge/services/ai/tools/agent_tool.dart';
 import 'package:repforge/services/ai/tools/builtins/routine_tools.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
 
 class FakeCoachToolService implements CoachToolService {
   @override

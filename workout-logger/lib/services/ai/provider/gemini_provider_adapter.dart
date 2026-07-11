@@ -252,7 +252,7 @@ class GeminiProviderAdapter implements ModelRuntime {
               {'text': system}
             ]
           },
-        if (tools != null) 'tools': tools,
+        'tools': ?tools,
         'generationConfig': {
           'thinkingConfig': {'thinkingLevel': thinkingLevel},
           if (jsonMode) 'responseMimeType': 'application/json',

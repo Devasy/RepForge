@@ -1,7 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repforge/services/ai/agent_event.dart';
 import 'package:repforge/services/ai/provider/model_message.dart';
-import 'package:repforge/services/ai/provider/model_step.dart';
 import 'package:repforge/services/ai/runtime/agent_context.dart';
 import 'package:repforge/services/ai/runtime/agent_node.dart';
 import 'package:repforge/services/ai/runtime/agent_run_state.dart';

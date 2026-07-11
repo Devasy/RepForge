@@ -2,8 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/services/ai/tools/agent_tool.dart';
 import 'package:repforge/services/ai/tools/builtins/ask_user_questions_tool.dart';
 import 'package:repforge/services/ai/tools/builtins/show_graph_tool.dart';
-import 'package:repforge/services/ai/tools/tool_result.dart';
-import 'package:repforge/services/ai/agent_event.dart';
 import 'package:repforge/services/ai/runtime/agent_artifact.dart';
 
 void main() {
