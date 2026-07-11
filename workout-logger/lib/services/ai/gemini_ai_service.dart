@@ -20,6 +20,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
 import '../interfaces/ai_service_interface.dart';
 import '../interfaces/storage_service_interface.dart';
+import 'provider/gemini_provider_adapter.dart';
 import 'retry_policy.dart';
 
 // Ordered list of available Gemini models shown in the picker.
@@ -90,6 +91,21 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   void init(String apiKey, {String model = kDefaultGeminiModel}) {
     _apiKey = apiKey.trim();
     _model = model;
+  }
+
+  /// Lazy-initialized provider adapter for the new agent runtime.
+  /// Shares API key, model, retry policy, and token tracking with this service.
+  GeminiProviderAdapter? _providerAdapter;
+  GeminiProviderAdapter get providerAdapter {
+    return _providerAdapter ??= GeminiProviderAdapter(
+      apiKeyGetter: () => _apiKey,
+      modelGetter: () => _model,
+      retryPolicy: retryPolicy,
+      onRetryStatus: onRetryStatus,
+      onUsage: ({required int prompt, required int response, required int total}) {
+        recordUsage(prompt: prompt, response: response, total: total);
+      },
+    );
   }
 
   /// Load persisted cumulative token usage (call once at startup).

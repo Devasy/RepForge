@@ -12,8 +12,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../models/models.dart';
 import '../viewmodels/ai_coach_view_model.dart';
-import '../services/ai/agent_orchestrator.dart';
-import '../services/ai/coach_tool_service.dart';
+import '../services/ai/runtime/agent_runtime.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
@@ -31,8 +30,7 @@ class AiCoachScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<AiCoachViewModel>(
       create: (ctx) => AiCoachViewModel(
-        orchestrator: ctx.read<AgentOrchestrator>(),
-        coachTools: ctx.read<CoachToolService>(),
+        runtime: ctx.read<DefaultAgentRuntime>(),
         conversations: ctx.read<ConversationManager>(),
         settings: ctx.read<SettingsProvider>(),
       )..loadConversations(),

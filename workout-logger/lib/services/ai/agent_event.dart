@@ -1,12 +1,24 @@
-// agent_event.dart — Typed event stream for the agent orchestration layer.
+// agent_event.dart — Typed event stream for the agent runtime layer.
 //
-// The AgentOrchestrator yields these events so consumers (ViewModels, UI) can
+// The AgentRuntime yields these events so consumers (ViewModels, UI) can
 // react to each phase: streamed text, status updates, tool activity, retry
-// waits, errors, and (future) chart data for visualization tools.
+// waits, errors, chart data, artifacts, interrupts, and trace events.
 
-/// Sealed base for all events the agent orchestrator emits.
+import 'runtime/agent_artifact.dart';
+import 'runtime/agent_interrupt.dart';
+
+/// Sealed base for all events the agent runtime emits.
 sealed class AgentEvent {
   const AgentEvent();
+}
+
+/// Emitted when a new agent run starts. The [runId] is needed for resume().
+class AgentRunStarted extends AgentEvent {
+  final String runId;
+  const AgentRunStarted(this.runId);
+
+  @override
+  String toString() => 'AgentRunStarted($runId)';
 }
 
 /// A chunk of streamed text from the model's reply.
@@ -60,7 +72,7 @@ class AgentRetryWait extends AgentEvent {
       'AgentRetryWait(${remaining.inSeconds}s, "$reason")';
 }
 
-/// An error the orchestrator could not recover from.
+/// An error the runtime could not recover from.
 class AgentError extends AgentEvent {
   final String message;
   final bool isRetryable;
@@ -70,7 +82,7 @@ class AgentError extends AgentEvent {
   String toString() => 'AgentError("$message", retryable=$isRetryable)';
 }
 
-/// Future: a tool returns structured chart/graph data for inline visualization.
+/// A tool returns structured chart/graph data for inline visualization.
 /// The spec follows a simple {type, title, labels, series} shape so a future
 /// ChartRenderer widget can consume it without knowing which tool produced it.
 class AgentChartData extends AgentEvent {
@@ -79,4 +91,34 @@ class AgentChartData extends AgentEvent {
 
   @override
   String toString() => 'AgentChartData(${chartSpec.keys})';
+}
+
+// ── New event types for the graph runtime ─────────────────────────────────
+
+/// A typed artifact is ready for display (chart, table, question form, etc.).
+class AgentArtifactReady extends AgentEvent {
+  final AgentArtifact artifact;
+  const AgentArtifactReady(this.artifact);
+
+  @override
+  String toString() => 'AgentArtifactReady($artifact)';
+}
+
+/// The runtime has been interrupted and is waiting for human input.
+class AgentInterrupted extends AgentEvent {
+  final AgentInterrupt interrupt;
+  const AgentInterrupted(this.interrupt);
+
+  @override
+  String toString() => 'AgentInterrupted($interrupt)';
+}
+
+/// A trace/debug event from the graph execution (node transitions, etc.).
+class AgentTraceEvent extends AgentEvent {
+  final String nodeId;
+  final String message;
+  const AgentTraceEvent(this.nodeId, this.message);
+
+  @override
+  String toString() => 'AgentTraceEvent($nodeId, "$message")';
 }

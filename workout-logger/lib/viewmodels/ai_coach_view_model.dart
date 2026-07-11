@@ -1,24 +1,22 @@
 // ai_coach_view_model.dart — orchestration for the AI coach screen.
 //
-// Owns all coach logic so the View stays dumb: builds the system prompt,
-// drives the streaming tool-call loop via AgentOrchestrator + CoachToolService,
-// and persists each turn through ConversationManager. Exposes immutable state
-// including agent status text and active tool tracking.
+// Owns all coach logic so the View stays dumb: builds the coach graph,
+// drives the streaming agent runtime, and persists each turn through
+// ConversationManager. Exposes immutable state including agent status text
+// and active tool tracking.
 
 import 'package:flutter/foundation.dart';
-import 'package:google_generative_ai/google_generative_ai.dart' show Content, TextPart;
 
 import '../models/models.dart';
 import '../services/ai/agent_event.dart';
-import '../services/ai/agent_orchestrator.dart';
-import '../services/ai/coach_tool_service.dart';
+import '../services/ai/graphs/coach_graph.dart';
+import '../services/ai/runtime/agent_artifact.dart';
+import '../services/ai/runtime/agent_runtime.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
-import '../services/gemini_context_builder.dart';
 
 class AiCoachViewModel extends ChangeNotifier {
-  final AgentOrchestrator _orchestrator;
-  final CoachToolService _coachTools;
+  final DefaultAgentRuntime _runtime;
   final ConversationManager _conversations;
   final SettingsProvider _settings;
 
@@ -33,12 +31,10 @@ class AiCoachViewModel extends ChangeNotifier {
   final List<String> _activeTools = [];
 
   AiCoachViewModel({
-    required AgentOrchestrator orchestrator,
-    required CoachToolService coachTools,
+    required DefaultAgentRuntime runtime,
     required ConversationManager conversations,
     required SettingsProvider settings,
-  })  : _orchestrator = orchestrator,
-        _coachTools = coachTools,
+  })  : _runtime = runtime,
         _conversations = conversations,
         _settings = settings {
     // Forward conversation-store changes so the View only watches the VM.
@@ -53,7 +49,7 @@ class AiCoachViewModel extends ChangeNotifier {
 
   // ── Exposed state (immutable snapshots) ────────────────────────────────────
 
-  bool get isConfigured => _orchestrator.isConfigured;
+  bool get isConfigured => _runtime.isConfigured;
   bool get isLoading => _loading;
   String get streamingText => _streamingText;
   String get statusText => _statusText;
@@ -84,8 +80,9 @@ class AiCoachViewModel extends ChangeNotifier {
       _conversations.deleteConversation(id);
 
   /// Send a user message and stream the coach's reply through the agent
-  /// orchestrator. Both the user message and the final reply are persisted.
-  /// The orchestrator handles tool calls, retries, and status updates.
+  /// runtime. Both the user message and the final reply are persisted.
+  /// The runtime handles tool calls, retries, and status updates via the
+  /// coach graph.
   Future<void> sendMessage(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _loading) return;
@@ -96,24 +93,27 @@ class AiCoachViewModel extends ChangeNotifier {
     _activeTools.clear();
     notifyListeners();
 
-    // Persist the user message first; history is derived from the store.
+    // Persist the user message first.
     await _conversations.appendMessage(
       ChatMessage(role: 'user', text: trimmed),
     );
 
-    final systemPrompt = _buildSystemPrompt();
-    final history = _buildHistory();
+    final graph = buildCoachGraph(
+      userName: _settings.userName,
+      unitLabel: _settings.unitLabel,
+    );
 
     final buffer = StringBuffer();
     try {
-      await for (final event in _orchestrator.orchestrate(
-        userMessage: trimmed,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: _coachTools.buildTools(),
-        onToolCall: _coachTools.handleCall,
+      await for (final event in _runtime.run(
+        graph: graph,
+        input: AgentRunInput(userMessage: trimmed),
       )) {
         switch (event) {
+          case AgentRunStarted():
+            // Coach graph doesn't use interrupts, run ID not needed.
+            break;
+
           case AgentTextChunk(:final text):
             buffer.write(text);
             _streamingText = buffer.toString();
@@ -141,7 +141,22 @@ class AiCoachViewModel extends ChangeNotifier {
             notifyListeners();
 
           case AgentChartData():
-            // Future: route to chart rendering
+            // Legacy: route to chart rendering (backward compat).
+            break;
+
+          case AgentArtifactReady(:final artifact):
+            // Future: render typed artifacts (charts, tables, etc.)
+            if (artifact is ChartArtifact) {
+              // Could render inline chart here.
+            }
+            break;
+
+          case AgentInterrupted():
+            // Coach graph doesn't use interrupts, but handle gracefully.
+            break;
+
+          case AgentTraceEvent():
+            // Debug/trace events — ignore in production UI.
             break;
         }
       }
@@ -167,22 +182,5 @@ class AiCoachViewModel extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
-  }
-
-  // ── Internals ──────────────────────────────────────────────────────────────
-
-  // Static prompt — live data is fetched by the model via the coach tools,
-  // keeping the prefix stable for implicit prompt caching.
-  String _buildSystemPrompt() => GeminiContextBuilder.buildCoachSystemPrompt(
-        userName: _settings.userName,
-        unitLabel: _settings.unitLabel,
-      );
-
-  /// Prior turns (everything before the user message just appended).
-  List<Content> _buildHistory() {
-    final msgs = _conversations.activeMessages;
-    final prior =
-        msgs.length > 1 ? msgs.sublist(0, msgs.length - 1) : <ChatMessage>[];
-    return prior.map((m) => Content(m.role, [TextPart(m.text)])).toList();
   }
 }

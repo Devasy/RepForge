@@ -78,7 +78,8 @@ class ReadinessManager extends ChangeNotifier implements IReadinessManager {
       debugPrint('[Readiness] refresh: granted=$granted');
       if (granted.isEmpty) {
         debugPrint('[Readiness] refresh: no permissions → noData');
-        _debugTrace = 'NO PERMISSIONS granted\n'
+        _debugTrace =
+            'NO PERMISSIONS granted\n'
             'Open Health Connect → App permissions → RepForge\n'
             'and allow Sleep and Heart rate.';
         _setNoData();
@@ -91,9 +92,12 @@ class ReadinessManager extends ChangeNotifier implements IReadinessManager {
         _snapshot = cached;
         _status = ReadinessStatus.ready;
         notifyListeners();
-        debugPrint('[Readiness] refresh: serving cached snapshot score=${cached.score}');
+        debugPrint(
+          '[Readiness] refresh: serving cached snapshot score=${cached.score}',
+        );
         if (!force && now.difference(cached.computedAt) < _snapshotTtl) {
-          _debugTrace = 'Serving cached snapshot (within ${_snapshotTtl.inMinutes}min TTL)\n'
+          _debugTrace =
+              'Serving cached snapshot (within ${_snapshotTtl.inMinutes}min TTL)\n'
               'score=${cached.score} band=${cached.band}\n'
               'computedAt=${cached.computedAt.toLocal()}';
           // Still build the HR snapshots if we don't have them yet.
@@ -123,13 +127,17 @@ class ReadinessManager extends ChangeNotifier implements IReadinessManager {
         debugPrint('[Readiness] _buildHrDaySnapshot failed (non-fatal): $e');
         _hrDaySnapshot = null;
       }
-      debugPrint('[Readiness] refresh: today → sleepMinutes=$sleepMinutes restingHr=$restingHr hrv=$hrv');
+      debugPrint(
+        '[Readiness] refresh: today → sleepMinutes=$sleepMinutes restingHr=$restingHr hrv=$hrv',
+      );
 
       final baseline = await _baselineFor(todayKey, now, granted);
-      debugPrint('[Readiness] refresh: baseline → '
-          'avgSleep=${baseline.avgSleepMinutes?.toStringAsFixed(0)} (${baseline.sleepNights} nights) '
-          'avgRhr=${baseline.avgRestingHr?.toStringAsFixed(1)} (${baseline.rhrDays} days) '
-          'avgHrv=${baseline.avgHrvMs?.toStringAsFixed(1)} (${baseline.hrvDays} days)');
+      debugPrint(
+        '[Readiness] refresh: baseline → '
+        'avgSleep=${baseline.avgSleepMinutes?.toStringAsFixed(0)} (${baseline.sleepNights} nights) '
+        'avgRhr=${baseline.avgRestingHr?.toStringAsFixed(1)} (${baseline.rhrDays} days) '
+        'avgHrv=${baseline.avgHrvMs?.toStringAsFixed(1)} (${baseline.hrvDays} days)',
+      );
 
       final snapshot = _calculator.compute(
         today: now,
@@ -138,8 +146,10 @@ class ReadinessManager extends ChangeNotifier implements IReadinessManager {
         todayRestingHr: restingHr,
         todayHrvMs: hrv,
       );
-      debugPrint('[Readiness] refresh: snapshot score=${snapshot.score} band=${snapshot.band} '
-          'sleepScore=${snapshot.sleepScore} rhrScore=${snapshot.rhrScore} hrvScore=${snapshot.hrvScore}');
+      debugPrint(
+        '[Readiness] refresh: snapshot score=${snapshot.score} band=${snapshot.band} '
+        'sleepScore=${snapshot.sleepScore} rhrScore=${snapshot.rhrScore} hrvScore=${snapshot.hrvScore}',
+      );
 
       // Build human-readable trace for the in-app debug panel.
       final need = ReadinessCalculator.minBaselineSamples;
@@ -147,36 +157,54 @@ class ReadinessManager extends ChangeNotifier implements IReadinessManager {
       buf.writeln('Granted: ${granted.map((e) => e.name).join(', ')}');
       buf.writeln('');
       buf.writeln('TODAY:');
-      buf.writeln('  sleep  : ${sleepMinutes != null ? "${sleepMinutes}min" : "—  (no data)"}'
-          '${!granted.contains(HealthReadType.sleep) ? " [no perm]" : ""}');
-      buf.writeln('  RHR    : ${restingHr != null ? "${restingHr.toStringAsFixed(1)} bpm" : "—  (no data)"}'
-          '${!granted.contains(HealthReadType.restingHeartRate) ? " [no perm]" : ""}');
-      buf.writeln('  HRV    : ${hrv != null ? "${hrv.toStringAsFixed(1)} ms" : "—  (no data)"}'
-          '${!granted.contains(HealthReadType.hrv) ? " [no perm]" : ""}');
+      buf.writeln(
+        '  sleep  : ${sleepMinutes != null ? "${sleepMinutes}min" : "—  (no data)"}'
+        '${!granted.contains(HealthReadType.sleep) ? " [no perm]" : ""}',
+      );
+      buf.writeln(
+        '  RHR    : ${restingHr != null ? "${restingHr.toStringAsFixed(1)} bpm" : "—  (no data)"}'
+        '${!granted.contains(HealthReadType.restingHeartRate) ? " [no perm]" : ""}',
+      );
+      buf.writeln(
+        '  HRV    : ${hrv != null ? "${hrv.toStringAsFixed(1)} ms" : "—  (no data)"}'
+        '${!granted.contains(HealthReadType.hrv) ? " [no perm]" : ""}',
+      );
       buf.writeln('');
       buf.writeln('BASELINE (14d, need ≥$need samples):');
-      buf.writeln('  sleep  : ${baseline.avgSleepMinutes?.toStringAsFixed(0) ?? "—"}min'
-          ' · ${baseline.sleepNights} nights'
-          ' ${baseline.sleepNights >= need ? "✓" : "⚠ need $need"}');
-      buf.writeln('  RHR    : ${baseline.avgRestingHr?.toStringAsFixed(1) ?? "—"} bpm'
-          ' · ${baseline.rhrDays} days'
-          ' ${baseline.rhrDays >= need ? "✓" : "⚠ need $need"}');
-      buf.writeln('  HRV    : ${baseline.avgHrvMs?.toStringAsFixed(1) ?? "—"} ms'
-          ' · ${baseline.hrvDays} days'
-          ' ${baseline.hrvDays >= need ? "✓" : "⚠ need $need"}');
+      buf.writeln(
+        '  sleep  : ${baseline.avgSleepMinutes?.toStringAsFixed(0) ?? "—"}min'
+        ' · ${baseline.sleepNights} nights'
+        ' ${baseline.sleepNights >= need ? "✓" : "⚠ need $need"}',
+      );
+      buf.writeln(
+        '  RHR    : ${baseline.avgRestingHr?.toStringAsFixed(1) ?? "—"} bpm'
+        ' · ${baseline.rhrDays} days'
+        ' ${baseline.rhrDays >= need ? "✓" : "⚠ need $need"}',
+      );
+      buf.writeln(
+        '  HRV    : ${baseline.avgHrvMs?.toStringAsFixed(1) ?? "—"} ms'
+        ' · ${baseline.hrvDays} days'
+        ' ${baseline.hrvDays >= need ? "✓" : "⚠ need $need"}',
+      );
       buf.writeln('');
       buf.writeln('SLEEP HR:');
       if (_sleepHrSnapshot != null) {
         final sh = _sleepHrSnapshot!;
-        buf.writeln('  segments=${sh.segments.length}  p95=${sh.p95Bpm}bpm'
-            '  stages=${sh.stageStats.map((s) => s.stage).join(",")}');
+        buf.writeln(
+          '  segments=${sh.segments.length}  p95=${sh.p95Bpm}bpm'
+          '  stages=${sh.stageStats.map((s) => s.stage).join(",")}',
+        );
       } else {
         buf.writeln('  — no snapshot (need heartRate perm + sleep data)');
       }
       buf.writeln('');
       buf.writeln('SCORES:');
-      buf.writeln('  sleep=${snapshot.sleepScore ?? "—"}  rhr=${snapshot.rhrScore ?? "—"}  hrv=${snapshot.hrvScore ?? "—"}');
-      buf.writeln('  overall=${snapshot.score ?? "null"}  band=${snapshot.band?.name ?? "—"}');
+      buf.writeln(
+        '  sleep=${snapshot.sleepScore ?? "—"}  rhr=${snapshot.rhrScore ?? "—"}  hrv=${snapshot.hrvScore ?? "—"}',
+      );
+      buf.writeln(
+        '  overall=${snapshot.score ?? "null"}  band=${snapshot.band?.name ?? "—"}',
+      );
       if (snapshot.score == null) {
         buf.writeln('');
         buf.writeln('⚠ Score null: a component needs both today\'s data');
@@ -185,9 +213,11 @@ class ReadinessManager extends ChangeNotifier implements IReadinessManager {
       _debugTrace = buf.toString().trimRight();
 
       if (snapshot.score == null) {
-        debugPrint('[Readiness] refresh: score null → noData '
-            '(need ${ReadinessCalculator.minBaselineSamples}+ baseline days; '
-            'have sleep=${baseline.sleepNights} rhr=${baseline.rhrDays} hrv=${baseline.hrvDays})');
+        debugPrint(
+          '[Readiness] refresh: score null → noData '
+          '(need ${ReadinessCalculator.minBaselineSamples}+ baseline days; '
+          'have sleep=${baseline.sleepNights} rhr=${baseline.rhrDays} hrv=${baseline.hrvDays})',
+        );
         _setNoData();
         return;
       }
@@ -208,15 +238,13 @@ class ReadinessManager extends ChangeNotifier implements IReadinessManager {
   Future<SleepHrSnapshot?> _buildSleepHrSnapshot(
     DateTime now,
     Set<HealthReadType> granted,
-  ) =>
-      buildSleepHrSnapshot(_hc, now, granted, fallbackToPriorNight: true);
+  ) => buildSleepHrSnapshot(_hc, now, granted, fallbackToPriorNight: true);
 
   /// Builds today's all-day HR snapshot for the Heart-rate card.
   Future<HrDaySnapshot?> _buildHrDaySnapshot(
     DateTime now,
     Set<HealthReadType> granted,
-  ) =>
-      buildHrDaySnapshot(_hc, now, granted);
+  ) => buildHrDaySnapshot(_hc, now, granted);
 
   void _setNoData() {
     _snapshot = null;
@@ -247,8 +275,9 @@ class ReadinessManager extends ChangeNotifier implements IReadinessManager {
     try {
       final raw = await _storage.getSetting(_baselineKey);
       if (raw != null) {
-        final cached =
-            ReadinessBaseline.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        final cached = ReadinessBaseline.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>,
+        );
         if (cached.dateKey == todayKey) return cached;
       }
     } catch (_) {
@@ -344,9 +373,11 @@ class ReadinessManager extends ChangeNotifier implements IReadinessManager {
       final stageInfo = p.hasStages
           ? 'L=${p.lightMinutes} D=${p.deepMinutes} R=${p.remMinutes} A=${p.awakeMinutes}'
           : 'no stages';
-      debugPrint('[Readiness]   period ${p.start.toLocal().hour}:${p.start.toLocal().minute.toString().padLeft(2, '0')}'
-          '→${p.end.toLocal().hour}:${p.end.toLocal().minute.toString().padLeft(2, '0')}'
-          ' actual=${p.minutes}min ($stageInfo)');
+      debugPrint(
+        '[Readiness]   period ${p.start.toLocal().hour}:${p.start.toLocal().minute.toString().padLeft(2, '0')}'
+        '→${p.end.toLocal().hour}:${p.end.toLocal().minute.toString().padLeft(2, '0')}'
+        ' actual=${p.minutes}min ($stageInfo)',
+      );
     }
     return _calculator.lastNightSleepMinutes(now, periods);
   }

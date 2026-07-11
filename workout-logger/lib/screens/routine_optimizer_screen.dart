@@ -12,8 +12,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../models/models.dart';
 import '../viewmodels/routine_optimizer_view_model.dart';
-import '../services/ai/agent_orchestrator.dart';
-import '../services/ai/coach_tool_service.dart';
+import '../services/ai/runtime/agent_runtime.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/interfaces/storage_service_interface.dart';
 import '../services/settings_provider.dart';
@@ -40,8 +39,7 @@ class RoutineOptimizerScreen extends StatelessWidget {
         final conversations =
             ConversationManager(storage, kind: 'optimizer');
         return RoutineOptimizerViewModel(
-          orchestrator: ctx.read<AgentOrchestrator>(),
-          coachTools: ctx.read<CoachToolService>(),
+          runtime: ctx.read<DefaultAgentRuntime>(),
           conversations: conversations,
           settings: ctx.read<SettingsProvider>(),
         )
