@@ -150,20 +150,22 @@ class RFNavBar extends StatelessWidget {
   final ValueChanged<int> onTap;
   final List<RFNavItem> items;
 
-  // Each icon cell is 52px wide; pill itself is 44px wide and 44px tall.
+  // Each icon cell is 52px wide; pill is 44×44px; outer pad 6px each side.
+  // navW = items.length * _cellW + _hPad * 2  →  4×52 + 12 = 220px
+  // Outer container effective corner radius ≈ 56/2 = 28px.
+  // Pill left for cell n = _hPad + n*_cellW + (_cellW-_pillW)/2
+  //                      = 6    + n*52     + 4            = 10 + n*52
+  // → n=0→10, n=1→62, n=2→114, n=3→166; right edge n=3→210  (10px margin both sides)
+  // Both inner and outer radii are AppRadius.full so they are always concentric.
   static const double _cellW = 52;
   static const double _pillW = 44;
   static const double _pillH = 44;
   static const double _hPad  = 6;
+  static const double _navH  = 56;
 
-  /// Maps [currentIndex] → Alignment.x in range [-1, 1] across the pill row.
-  Alignment _pillAlignment(int n) {
-    if (n <= 0) return const Alignment(-1, 0);
-    if (n >= items.length - 1) return const Alignment(1, 0);
-    // Linear interpolation between -1 and 1 across (items.length - 1) steps.
-    final t = n / (items.length - 1);
-    return Alignment(t * 2 - 1, 0);
-  }
+  /// Pixel offset of the pill's left edge for tab [n], relative to container left.
+  static double _pillLeft(int n) =>
+      _hPad + n * _cellW + (_cellW - _pillW) / 2;
 
   @override
   Widget build(BuildContext context) {
@@ -209,16 +211,19 @@ class RFNavBar extends StatelessWidget {
                   ),
                 ),
                 child: Stack(
-                  alignment: Alignment.center,
+                  clipBehavior: Clip.hardEdge,
                   children: [
                     // ── Sliding pill highlight ────────────────────────────
-                    AnimatedAlign(
+                    // AnimatedPositioned guarantees exact pixel alignment so
+                    // the pill is always concentric with the outer container.
+                    AnimatedPositioned(
                       duration: AppDurations.moderate,
                       curve: Curves.easeInOutCubic,
-                      alignment: _pillAlignment(currentIndex),
+                      left: _pillLeft(currentIndex),
+                      top: (_navH - _pillH) / 2,
+                      width: _pillW,
+                      height: _pillH,
                       child: Container(
-                        width: _pillW,
-                        height: _pillH,
                         decoration: BoxDecoration(
                           color: AppColors.glass3,
                           borderRadius: BorderRadius.circular(AppRadius.full),
