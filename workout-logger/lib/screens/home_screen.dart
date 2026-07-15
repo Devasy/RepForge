@@ -37,6 +37,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  bool _navVisible = true;
 
   static const _navItems = [
     RFNavItem(icon: Icons.home_rounded, label: 'Home'),
@@ -45,26 +46,61 @@ class _HomeScreenState extends State<HomeScreen> {
     RFNavItem(icon: Icons.bar_chart_rounded, label: 'Stats'),
   ];
 
-  void switchTab(int index) => setState(() => _currentIndex = index);
+  void switchTab(int index) => setState(() {
+        _currentIndex = index;
+        _navVisible = true; // always show nav on tab change
+      });
+
+  bool _onScrollNotification(ScrollNotification n) {
+    if (n is ScrollUpdateNotification) {
+      final delta = n.scrollDelta ?? 0;
+      if (delta > 2 && _navVisible) {
+        setState(() => _navVisible = false);
+      } else if (delta < -2 && !_navVisible) {
+        setState(() => _navVisible = true);
+      }
+    }
+    // Always show nav when at the very top of any scroll view.
+    if (n is ScrollUpdateNotification && n.metrics.pixels <= 0 && !_navVisible) {
+      setState(() => _navVisible = true);
+    }
+    return false; // let the notification keep bubbling
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
       backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: const [
-          _DashboardTab(),
-          RoutinesScreen(),
-          HistoryScreen(),
-          AnalyticsScreen(),
+      body: Stack(
+        children: [
+          NotificationListener<ScrollNotification>(
+            onNotification: _onScrollNotification,
+            child: IndexedStack(
+              index: _currentIndex,
+              children: const [
+                _DashboardTab(),
+                RoutinesScreen(),
+                HistoryScreen(),
+                AnalyticsScreen(),
+              ],
+            ),
+          ),
+          AnimatedSlide(
+            offset: _navVisible ? Offset.zero : const Offset(0, 1.5),
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeInOutCubic,
+            child: AnimatedOpacity(
+              opacity: _navVisible ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOutCubic,
+              child: RFNavBar(
+                currentIndex: _currentIndex,
+                onTap: switchTab,
+                items: _navItems,
+              ),
+            ),
+          ),
         ],
-      ),
-      bottomNavigationBar: RFNavBar(
-        currentIndex: _currentIndex,
-        onTap: switchTab,
-        items: _navItems,
       ),
     );
   }

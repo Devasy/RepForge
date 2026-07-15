@@ -136,8 +136,8 @@ class AmbientGlow extends StatelessWidget {
 }
 
 // ── RFNavBar ─────────────────────────────────────────────────────────────────
-// Premium floating glassmorphic bottom navigation bar with perfect rounded blur,
-// deep drop shadow, and clean transparent padding so it sits elegantly above the content.
+// Compact floating glassmorphic pill — auto-sized to fit icons only.
+// Active state: butter-smooth AnimatedAlign sliding highlight pill behind icon.
 class RFNavBar extends StatelessWidget {
   const RFNavBar({
     super.key,
@@ -150,53 +150,109 @@ class RFNavBar extends StatelessWidget {
   final ValueChanged<int> onTap;
   final List<RFNavItem> items;
 
+  // Each icon cell is 52px wide; pill itself is 44px wide and 44px tall.
+  static const double _cellW = 52;
+  static const double _pillW = 44;
+  static const double _pillH = 44;
+  static const double _hPad  = 6;
+
+  /// Maps [currentIndex] → Alignment.x in range [-1, 1] across the pill row.
+  Alignment _pillAlignment(int n) {
+    if (n <= 0) return const Alignment(-1, 0);
+    if (n >= items.length - 1) return const Alignment(1, 0);
+    // Linear interpolation between -1 and 1 across (items.length - 1) steps.
+    final t = n / (items.length - 1);
+    return Alignment(t * 2 - 1, 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return Container(
-      color: Colors.transparent, // Completely transparent outer container
-      padding: EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        bottomPadding > 0 ? bottomPadding + 8 : 16,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
-              blurRadius: 28,
-              spreadRadius: -4,
-              offset: const Offset(0, 10),
-            ),
-          ],
+    final double navW = items.length * _cellW + _hPad * 2;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: bottomPadding > 0 ? bottomPadding : 16,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.8), // Sleek transparent surface
-                borderRadius: BorderRadius.circular(AppRadius.xxl),
-                border: Border.all(
-                  color: AppColors.glassBorderStrong,
-                  width: 1.5,
-                ),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.45),
+                blurRadius: 28,
+                spreadRadius: -4,
+                offset: const Offset(0, 10),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(items.length, (i) {
-                  final active = i == currentIndex;
-                  return _NavItem(
-                    item: items[i],
-                    active: active,
-                    onTap: () => onTap(i),
-                  );
-                }),
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                blurRadius: 32,
+                spreadRadius: 0,
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: Container(
+                width: navW,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.surface.withValues(alpha: 0.82),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                  border: Border.all(
+                    color: AppColors.glassBorderStrong,
+                    width: 1.2,
+                  ),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // ── Sliding pill highlight ────────────────────────────
+                    AnimatedAlign(
+                      duration: AppDurations.moderate,
+                      curve: Curves.easeInOutCubic,
+                      alignment: _pillAlignment(currentIndex),
+                      child: Container(
+                        width: _pillW,
+                        height: _pillH,
+                        decoration: BoxDecoration(
+                          color: AppColors.glass3,
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.25),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.15),
+                              blurRadius: 12,
+                              spreadRadius: -2,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // ── Icon row ────────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: _hPad),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(items.length, (i) {
+                          final active = i == currentIndex;
+                          return _NavCell(
+                            item: items[i],
+                            active: active,
+                            onTap: () => onTap(i),
+                          );
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -209,11 +265,11 @@ class RFNavBar extends StatelessWidget {
 class RFNavItem {
   const RFNavItem({required this.icon, required this.label});
   final IconData icon;
-  final String label;
+  final String label; // kept for semantics / accessibility
 }
 
-class _NavItem extends StatelessWidget {
-  const _NavItem({
+class _NavCell extends StatelessWidget {
+  const _NavCell({
     required this.item,
     required this.active,
     required this.onTap,
@@ -228,49 +284,26 @@ class _NavItem extends StatelessWidget {
     return Semantics(
       button: true,
       label: item.label,
+      selected: active,
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
-          width: 60,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Accent indicator above icon
-              AnimatedContainer(
-                duration: AppDurations.normal,
-                width: active ? 18 : 0,
-                height: 2,
-                margin: const EdgeInsets.only(bottom: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(2),
-                  color: AppColors.primary,
-                  boxShadow: active
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.6),
-                            blurRadius: 6,
-                          ),
-                        ]
-                      : null,
-                ),
-              ),
-              Icon(
+          width: RFNavBar._cellW,
+          height: 56,
+          child: Center(
+            child: AnimatedScale(
+              scale: active ? 1.12 : 1.0,
+              duration: AppDurations.moderate,
+              curve: Curves.easeInOutCubic,
+              child: Icon(
                 item.icon,
-                size: 19,
-                color: active ? AppColors.textPrimary : AppColors.textMuted,
+                size: 22,
+                color: active
+                    ? AppColors.textPrimary
+                    : AppColors.textMuted,
               ),
-              const SizedBox(height: 4),
-              Text(
-                item.label,
-                style: TextStyle(fontFamily: 'Geist', 
-                  fontSize: 10,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                  color: active ? AppColors.textPrimary : AppColors.textMuted,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
