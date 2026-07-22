@@ -22,6 +22,7 @@ import 'widgets/readiness_card.dart';
 import 'widgets/sleep_hr_card.dart';
 import 'widgets/heart_rate_card.dart';
 import 'widgets/rf_widgets.dart';
+import 'widgets/floating_nav_bar.dart';
 import 'widgets/sparkline_painter.dart';
 import 'widgets/activity_heatmap.dart';
 import 'widgets/body_heatmap.dart';
@@ -37,69 +38,43 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
-  bool _navVisible = true;
 
   static const _navItems = [
-    RFNavItem(icon: Icons.home_rounded, label: 'Home'),
-    RFNavItem(icon: Icons.layers_rounded, label: 'Routines'),
-    RFNavItem(icon: Icons.history_rounded, label: 'History'),
-    RFNavItem(icon: Icons.bar_chart_rounded, label: 'Stats'),
+    FloatingNavItem(icon: Icons.home_rounded,      label: 'Home'),
+    FloatingNavItem(icon: Icons.layers_rounded,    label: 'Routines'),
+    FloatingNavItem(icon: Icons.history_rounded,   label: 'History'),
+    FloatingNavItem(icon: Icons.bar_chart_rounded, label: 'Stats'),
   ];
 
-  void switchTab(int index) => setState(() {
-        _currentIndex = index;
-        _navVisible = true; // always show nav on tab change
-      });
-
-  bool _onScrollNotification(ScrollNotification n) {
-    if (n is ScrollUpdateNotification) {
-      final delta = n.scrollDelta ?? 0;
-      if (delta > 2 && _navVisible) {
-        setState(() => _navVisible = false);
-      } else if (delta < -2 && !_navVisible) {
-        setState(() => _navVisible = true);
-      }
-    }
-    // Always show nav when at the very top of any scroll view.
-    if (n is ScrollUpdateNotification && n.metrics.pixels <= 0 && !_navVisible) {
-      setState(() => _navVisible = true);
-    }
-    return false; // let the notification keep bubbling
-  }
+  void switchTab(int index) => setState(() => _currentIndex = index);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          NotificationListener<ScrollNotification>(
-            onNotification: _onScrollNotification,
-            child: IndexedStack(
-              index: _currentIndex,
-              children: const [
-                _DashboardTab(),
-                RoutinesScreen(),
-                HistoryScreen(),
-                AnalyticsScreen(),
-              ],
-            ),
-          ),
-          AnimatedSlide(
-            offset: _navVisible ? Offset.zero : const Offset(0, 1.5),
-            duration: const Duration(milliseconds: 280),
-            curve: Curves.easeInOutCubic,
-            child: AnimatedOpacity(
-              opacity: _navVisible ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeInOutCubic,
-              child: RFNavBar(
-                currentIndex: _currentIndex,
-                onTap: switchTab,
-                items: _navItems,
-              ),
-            ),
-          ),
+    return FloatingNavBarScaffold(
+      scaffoldBackgroundColor: AppColors.background,
+      // App-specific colour overrides — all other values use the
+      // FloatingNavBarTheme defaults which adapt to ThemeData.colorScheme.
+      theme: FloatingNavBarTheme(
+        backgroundColor: AppColors.surface,
+        borderColor: AppColors.glassBorderStrong,
+        // Chip colours (replaces old pill API)
+        selectedChipColor: AppColors.glass3,
+        selectedChipBorderColor: AppColors.primary.withValues(alpha: 0.25),
+        selectedChipShadowColor: AppColors.primary.withValues(alpha: 0.15),
+        selectedContentColor: AppColors.textPrimary,
+        inactiveIconColor: AppColors.textMuted,
+        outerGlowColor: AppColors.primary.withValues(alpha: 0.08),
+      ),
+      items: _navItems,
+      currentIndex: _currentIndex,
+      onTabChanged: switchTab,
+      body: IndexedStack(
+        index: _currentIndex,
+        children: const [
+          _DashboardTab(),
+          RoutinesScreen(),
+          HistoryScreen(),
+          AnalyticsScreen(),
         ],
       ),
     );
