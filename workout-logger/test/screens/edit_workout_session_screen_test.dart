@@ -7,7 +7,7 @@ import 'package:repforge/services/managers/program_manager.dart';
 import '../test_utils/mock_storage_service.dart';
 import '../test_utils/mock_ml_service.dart';
 import '../test_utils/test_fixtures.dart';
-import '../test_utils/test_harness.dart';
+import '../test_utils/test_robot.dart';
 
 Future<WorkoutProvider> _createProvider(MockStorageService storage, {List<WorkoutSession> sessions = const []}) async {
   for (final s in sessions) {
@@ -24,120 +24,87 @@ Future<WorkoutProvider> _createProvider(MockStorageService storage, {List<Workou
 
 void main() {
   testWidgets('Renders EditWorkoutSessionScreen with session details', (WidgetTester tester) async {
-    await TestHarness.prepareTester(tester);
-
+    final robot = TestRobot(tester);
     final storage = MockStorageService();
     final session = TestFixtures.sampleSession(notes: 'Feeling strong today');
     final provider = await _createProvider(storage, sessions: [session]);
 
-    await tester.pumpWidget(TestHarness.wrap(
+    await robot.pumpScreen(
       EditWorkoutSessionScreen(session: session),
       storage: storage,
       workoutProvider: provider,
-    ));
-    await tester.pumpAndSettle();
+    );
 
-    expect(find.text('Edit Workout'), findsOneWidget);
-    expect(find.text('Feeling strong today'), findsOneWidget);
+    robot.expectVisible('Edit Workout');
+    robot.expectVisible('Feeling strong today');
   });
 
   testWidgets('Adds a set to an existing exercise', (WidgetTester tester) async {
-    await TestHarness.prepareTester(tester);
-
+    final robot = TestRobot(tester);
     final storage = MockStorageService();
     final session = TestFixtures.sampleSession();
     final provider = await _createProvider(storage, sessions: [session]);
 
-    await tester.pumpWidget(TestHarness.wrap(
+    await robot.pumpScreen(
       EditWorkoutSessionScreen(session: session),
       storage: storage,
       workoutProvider: provider,
-    ));
-    await tester.pumpAndSettle();
+    );
 
-    // Tap Add Set
-    final addSetBtn = find.text('Add Set').first;
-    await tester.tap(addSetBtn);
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EditWorkoutSessionScreen), findsOneWidget);
+    await robot.tap(find.text('Add Set').first);
+    robot.expectVisible(EditWorkoutSessionScreen);
   });
 
   testWidgets('Deletes a set from an exercise log', (WidgetTester tester) async {
-    await TestHarness.prepareTester(tester);
-
+    final robot = TestRobot(tester);
     final storage = MockStorageService();
     final session = TestFixtures.sampleSession();
     final provider = await _createProvider(storage, sessions: [session]);
 
-    await tester.pumpWidget(TestHarness.wrap(
+    await robot.pumpScreen(
       EditWorkoutSessionScreen(session: session),
       storage: storage,
       workoutProvider: provider,
-    ));
-    await tester.pumpAndSettle();
+    );
 
-    final deleteIcons = find.byIcon(Icons.close_rounded);
-    expect(deleteIcons, findsWidgets);
-
-    await tester.tap(deleteIcons.first);
-    await tester.pumpAndSettle();
+    await robot.tap(find.byIcon(Icons.close_rounded).first);
   });
 
   testWidgets('Edits session notes and saves session', (WidgetTester tester) async {
-    await TestHarness.prepareTester(tester);
-
+    final robot = TestRobot(tester);
     final storage = MockStorageService();
     final session = TestFixtures.sampleSession();
     final provider = await _createProvider(storage, sessions: [session]);
 
-    await tester.pumpWidget(TestHarness.wrap(
+    await robot.pumpScreen(
       EditWorkoutSessionScreen(session: session),
       storage: storage,
       workoutProvider: provider,
-    ));
-    await tester.pumpAndSettle();
+    );
 
-    // Enter notes in prepopulated notes textfield
-    final notesField = find.widgetWithText(TextField, 'Sample session notes');
-    await tester.enterText(notesField, 'Updated workout session note');
-    await tester.pump();
-
-    // Tap Save
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
+    await robot.fill('Sample session notes', 'Updated workout session note');
+    await robot.tap('Save');
 
     final updated = provider.sessions.firstWhere((s) => s.id == session.id);
     expect(updated.notes, equals('Updated workout session note'));
   });
 
   testWidgets('Shows discard dialog on back navigation when modified', (WidgetTester tester) async {
-    await TestHarness.prepareTester(tester);
-
+    final robot = TestRobot(tester);
     final storage = MockStorageService();
     final session = TestFixtures.sampleSession();
     final provider = await _createProvider(storage, sessions: [session]);
 
-    await tester.pumpWidget(TestHarness.wrap(
+    await robot.pumpScreen(
       EditWorkoutSessionScreen(session: session),
       storage: storage,
       workoutProvider: provider,
-    ));
-    await tester.pumpAndSettle();
+    );
 
-    // Modify duration field
-    final durationField = find.widgetWithText(TextField, '45');
-    await tester.enterText(durationField, '90');
-    await tester.pump();
+    await robot.fill('45', '90');
+    await robot.handlePop();
 
-    // Trigger back navigation
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-
-    expect(find.text('Discard Changes?'), findsOneWidget);
-
-    // Tap Discard
-    await tester.tap(find.text('Discard'));
-    await tester.pumpAndSettle();
+    robot.expectVisible('Discard Changes?');
+    await robot.tap('Discard');
   });
 }

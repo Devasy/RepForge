@@ -898,3 +898,80 @@ class _SkeletonBoxState extends State<SkeletonBox>
     );
   }
 }
+
+// ── RFTextField ─────────────────────────────────────────────────────────────
+/// Standardized RepForge glassmorphic text input field.
+class RFTextField extends StatelessWidget {
+  const RFTextField({
+    super.key,
+    required this.controller,
+    required this.hint,
+    this.label,
+    this.keyboardType,
+    this.inputFormatters,
+    this.maxLines = 1,
+    this.onChanged,
+    this.prefixIcon,
+    this.suffixIcon,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final String? label;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final int maxLines;
+  final ValueChanged<String>? onChanged;
+  final IconData? prefixIcon;
+  final Widget? suffixIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label != null) ...[
+          Text(
+            label!,
+            style: const TextStyle(
+              fontFamily: 'GeistMono',
+              color: AppColors.textSoft,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.glassBorder),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            inputFormatters: inputFormatters,
+            maxLines: maxLines,
+            onChanged: onChanged,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+              prefixIcon: prefixIcon != null
+                  ? Icon(prefixIcon, color: AppColors.textSoft, size: 20)
+                  : null,
+              suffixIcon: suffixIcon,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
