@@ -25,7 +25,7 @@ void main() {
       workoutProvider: workout,
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.text('Settings'), findsOneWidget);
     expect(find.text('Weight Unit'), findsOneWidget);

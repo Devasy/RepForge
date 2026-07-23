@@ -25,8 +25,11 @@ void main() {
       workoutProvider: workout,
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.text('AI Coach'), findsOneWidget);
+    // When no API key is configured, the screen renders _buildNoKeyState
+    // which contains an RFEmptyState with title 'API Key Required'.
+    expect(find.text('API Key Required'), findsOneWidget);
   });
 }

@@ -27,9 +27,17 @@ void main() {
       historyManager: historyManager,
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.byType(HistoryScreen), findsOneWidget);
+    // With no sessions, the empty-history state is shown.
+    expect(
+      find.textContaining('No').evaluate().isNotEmpty ||
+          find.textContaining('empty').evaluate().isNotEmpty ||
+          find.textContaining('history').evaluate().isNotEmpty,
+      isTrue,
+      reason: 'Empty history state should be visible',
+    );
   });
 
   testWidgets('Displays session item in history list', (WidgetTester tester) async {
@@ -56,7 +64,7 @@ void main() {
       historyManager: historyManager,
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.text('Morning Leg Workout'), findsOneWidget);
   });

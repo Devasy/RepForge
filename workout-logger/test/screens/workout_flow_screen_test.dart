@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/workout_flow_screen.dart';
@@ -17,7 +18,7 @@ void main() {
       WorkoutFlowScreen(routine: routine),
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.byType(WorkoutFlowScreen), findsOneWidget);
     expect(find.text('Bench Press'), findsOneWidget);
@@ -30,8 +31,15 @@ void main() {
       const WorkoutFlowScreen(isQuickStart: true),
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.byType(WorkoutFlowScreen), findsOneWidget);
+    // Quick-start mode has no pre-set routine: the Add Exercise control is shown.
+    expect(
+      find.byIcon(Icons.add_rounded).evaluate().isNotEmpty ||
+          find.textContaining('Exercise').evaluate().isNotEmpty,
+      isTrue,
+      reason: 'Quick-start mode should show an add-exercise control or empty exercise area',
+    );
   });
 }

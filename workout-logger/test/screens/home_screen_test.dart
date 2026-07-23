@@ -63,7 +63,7 @@ void main() {
       child: const HomeScreen(),
     ));
     await tester.pumpAndSettle();
-    tester.takeException(); // Clear transient overflow warnings during floating bar layout
+    expect(tester.takeException(), isNull);
 
     expect(find.text('Home'), findsOneWidget);
     expect(find.byIcon(Icons.layers_rounded), findsOneWidget);
@@ -85,12 +85,12 @@ void main() {
       child: const HomeScreen(),
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     // Tap Routines tab (Icons.layers_rounded)
     await tester.tap(find.byIcon(Icons.layers_rounded));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     // RoutinesScreen should be displayed in IndexedStack
     expect(find.byType(RoutinesScreen), findsOneWidget);

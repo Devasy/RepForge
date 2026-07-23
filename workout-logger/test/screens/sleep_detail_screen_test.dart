@@ -10,7 +10,7 @@ void main() {
       SleepDetailScreen(initialDate: DateTime(2026, 5, 10)),
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.text('Sleep'), findsOneWidget);
   });

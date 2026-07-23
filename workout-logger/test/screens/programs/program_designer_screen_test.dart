@@ -29,7 +29,7 @@ void main() {
       workoutProvider: provider,
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.text('New Program'), findsOneWidget);
     expect(find.text('PROGRAM DETAILS'), findsOneWidget);
@@ -47,15 +47,17 @@ void main() {
       workoutProvider: provider,
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     // Tap Next without filling program name
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     // Step 1 stays active because name is empty
     expect(find.text('Step 1 of 3'), findsOneWidget);
+    // The validation SnackBar is shown
+    expect(find.text('Enter a program name to continue'), findsOneWidget);
   });
 
   testWidgets('Enters program name and navigates to Step 2', (WidgetTester tester) async {
@@ -68,7 +70,7 @@ void main() {
       workoutProvider: provider,
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     // Enter Program Name
     final nameField = find.widgetWithText(TextField, 'Program Name *');
@@ -78,7 +80,7 @@ void main() {
     // Tap Next
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.text('Step 2 of 3'), findsOneWidget);
     expect(find.text('WEEKS & DAYS'), findsOneWidget);

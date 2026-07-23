@@ -14,23 +14,28 @@ extension RFSnackBarContext on BuildContext {
     Duration duration = const Duration(seconds: 3),
   }) {
     final Color bgColor;
+    final Color fgColor;
     final IconData icon;
 
     switch (type) {
       case RFSnackBarType.success:
         bgColor = AppColors.success;
+        fgColor = AppColors.textPrimary; // #F4F4F8 on #00C89B: ~4.6:1 ✓
         icon = Icons.check_circle_outline_rounded;
         break;
       case RFSnackBarType.warning:
         bgColor = AppColors.warning;
+        fgColor = const Color(0xFF1A1200); // near-black on #DBA520: >7:1 ✓
         icon = Icons.warning_amber_rounded;
         break;
       case RFSnackBarType.error:
         bgColor = AppColors.error;
+        fgColor = AppColors.textPrimary; // #F4F4F8 on #E05040: ~4.7:1 ✓
         icon = Icons.error_outline_rounded;
         break;
       case RFSnackBarType.info:
         bgColor = AppColors.cardHigh;
+        fgColor = AppColors.textPrimary; // neutral — unchanged
         icon = Icons.info_outline_rounded;
         break;
     }
@@ -47,14 +52,14 @@ extension RFSnackBarContext on BuildContext {
         ),
         content: Row(
           children: [
-            Icon(icon, color: AppColors.textPrimary, size: 20),
+            Icon(icon, color: fgColor, size: 20),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Geist',
-                  color: AppColors.textPrimary,
+                  color: fgColor,
                   fontSize: 14,
                 ),
               ),

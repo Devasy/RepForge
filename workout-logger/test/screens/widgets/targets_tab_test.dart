@@ -49,5 +49,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No Targets Set'), findsNothing);
+    // The target for bench_press should render its exercise name or value.
+    expect(
+      find.textContaining('Bench Press').evaluate().isNotEmpty ||
+          find.textContaining('bench').evaluate().isNotEmpty ||
+          find.textContaining('80').evaluate().isNotEmpty ||
+          find.textContaining('100').evaluate().isNotEmpty,
+      isTrue,
+      reason: 'Active target item should display the exercise name or target value',
+    );
   });
 }

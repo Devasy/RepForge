@@ -20,7 +20,7 @@ void main() {
       workoutProvider: workout,
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.text('AI Program Generator'), findsOneWidget);
 
@@ -29,6 +29,6 @@ void main() {
 
     await tester.tap(suggestionChip.first);
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
   });
 }

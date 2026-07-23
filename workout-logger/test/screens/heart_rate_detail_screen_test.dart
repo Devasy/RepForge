@@ -10,8 +10,16 @@ void main() {
       HeartRateDetailScreen(initialDate: DateTime(2026, 5, 10)),
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.byType(HeartRateDetailScreen), findsOneWidget);
+    // The screen renders its title and granularity tab controls via HealthDetailShell.
+    expect(find.text('Heart Rate'), findsOneWidget);
+    expect(
+      find.text('Day').evaluate().isNotEmpty ||
+          find.text('Week').evaluate().isNotEmpty,
+      isTrue,
+      reason: 'HealthDetailShell should render granularity controls',
+    );
   });
 }

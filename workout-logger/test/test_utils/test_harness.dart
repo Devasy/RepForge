@@ -67,22 +67,13 @@ class TestHarness {
     );
   }
 
-  /// Sets device physical dimensions and handles transient RenderFlex overflow warnings during test execution.
+  /// Sets device physical dimensions for widget tests.
   static Future<void> prepareTester(WidgetTester tester, {Size size = const Size(1080, 2400)}) async {
     await tester.binding.setSurfaceSize(size);
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
 
-    final originalOnError = FlutterError.onError;
-    FlutterError.onError = (FlutterErrorDetails details) {
-      final msg = details.exceptionAsString();
-      if (!msg.contains('overflowed') && !msg.contains('RenderFlex')) {
-        originalOnError?.call(details);
-      }
-    };
-
     addTearDown(() {
-      FlutterError.onError = originalOnError;
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
       tester.binding.setSurfaceSize(null);

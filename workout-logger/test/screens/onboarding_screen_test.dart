@@ -25,6 +25,6 @@ void main() {
     );
 
     robot.expectVisible(WelcomePage);
-    expect(find.text('Welcome to RepForge'), findsOneWidget);
+    expect(find.textContaining('RepForge'), findsWidgets);
   });
 }

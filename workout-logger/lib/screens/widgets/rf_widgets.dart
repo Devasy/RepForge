@@ -901,7 +901,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
 
 // ── RFTextField ─────────────────────────────────────────────────────────────
 /// Standardized RepForge glassmorphic text input field.
-class RFTextField extends StatelessWidget {
+class RFTextField extends StatefulWidget {
   const RFTextField({
     super.key,
     required this.controller,
@@ -926,13 +926,39 @@ class RFTextField extends StatelessWidget {
   final Widget? suffixIcon;
 
   @override
+  State<RFTextField> createState() => _RFTextFieldState();
+}
+
+class _RFTextFieldState extends State<RFTextField> {
+  late final FocusNode _focusNode;
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    setState(() => _isFocused = _focusNode.hasFocus);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (label != null) ...[
+        if (widget.label != null) ...[
           Text(
-            label!,
+            widget.label!,
             style: const TextStyle(
               fontFamily: 'GeistMono',
               color: AppColors.textSoft,
@@ -946,22 +972,26 @@ class RFTextField extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.glassBorder),
+            border: Border.all(
+              color: _isFocused ? AppColors.primary : AppColors.glassBorder,
+              width: _isFocused ? 1.5 : 1.0,
+            ),
           ),
           child: TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            inputFormatters: inputFormatters,
-            maxLines: maxLines,
-            onChanged: onChanged,
+            controller: widget.controller,
+            focusNode: _focusNode,
+            keyboardType: widget.keyboardType,
+            inputFormatters: widget.inputFormatters,
+            maxLines: widget.maxLines,
+            onChanged: widget.onChanged,
             style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
             decoration: InputDecoration(
-              hintText: hint,
+              hintText: widget.hint,
               hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-              prefixIcon: prefixIcon != null
-                  ? Icon(prefixIcon, color: AppColors.textSoft, size: 20)
+              prefixIcon: widget.prefixIcon != null
+                  ? Icon(widget.prefixIcon, color: AppColors.textSoft, size: 20)
                   : null,
-              suffixIcon: suffixIcon,
+              suffixIcon: widget.suffixIcon,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md,
                 vertical: AppSpacing.sm,

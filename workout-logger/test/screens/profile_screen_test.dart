@@ -30,7 +30,7 @@ void main() {
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -800));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     robot.expectVisible('About');
   });

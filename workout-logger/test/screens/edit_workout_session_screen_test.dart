@@ -51,7 +51,14 @@ void main() {
       workoutProvider: provider,
     );
 
+    // Count set-delete icons before adding (fixture has 3 sets total = 3 close icons).
+    final initialCount = find.byIcon(Icons.close_rounded).evaluate().length;
+
     await robot.tap(find.text('Add Set').first);
+
+    // After adding a set, there should be one more close icon.
+    final updatedCount = find.byIcon(Icons.close_rounded).evaluate().length;
+    expect(updatedCount, greaterThan(initialCount));
     robot.expectVisible(EditWorkoutSessionScreen);
   });
 
@@ -67,7 +74,15 @@ void main() {
       workoutProvider: provider,
     );
 
+    // Count set-delete icons before deletion (fixture has 3 sets total = 3 close icons).
+    final initialCount = find.byIcon(Icons.close_rounded).evaluate().length;
+    expect(initialCount, greaterThan(0));
+
     await robot.tap(find.byIcon(Icons.close_rounded).first);
+
+    // After deletion, one fewer close icon should be visible.
+    final updatedCount = find.byIcon(Icons.close_rounded).evaluate().length;
+    expect(updatedCount, lessThan(initialCount));
   });
 
   testWidgets('Edits session notes and saves session', (WidgetTester tester) async {
@@ -85,8 +100,14 @@ void main() {
     await robot.fill('Sample session notes', 'Updated workout session note');
     await robot.tap('Save');
 
+    // Verify in-memory provider update.
     final updated = provider.sessions.firstWhere((s) => s.id == session.id);
     expect(updated.notes, equals('Updated workout session note'));
+
+    // Verify persistence through storage.
+    final persisted = await storage.getWorkoutSession(session.id);
+    expect(persisted, isNotNull);
+    expect(persisted!.notes, equals('Updated workout session note'));
   });
 
   testWidgets('Shows discard dialog on back navigation when modified', (WidgetTester tester) async {
@@ -106,5 +127,9 @@ void main() {
 
     robot.expectVisible('Discard Changes?');
     await robot.tap('Discard');
+
+    // After confirming discard, the dialog and the edit screen should both be gone.
+    robot.expectNotVisible('Discard Changes?');
+    robot.expectNotVisible(EditWorkoutSessionScreen);
   });
 }

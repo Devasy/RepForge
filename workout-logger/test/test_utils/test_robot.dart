@@ -31,7 +31,7 @@ class TestRobot {
       historyManager: historyManager,
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
   }
 
   /// Taps on a target matching text, icon, key, or Finder.
@@ -40,7 +40,7 @@ class TestRobot {
     expect(finder, findsOneWidget);
     await tester.tap(finder);
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
   }
 
   /// Enters text into an input field matching a label, hint, or Finder.
@@ -49,14 +49,14 @@ class TestRobot {
     expect(finder, findsOneWidget);
     await tester.enterText(finder, text);
     await tester.pump();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
   }
 
   /// Triggers a back navigation event on active Navigator.
   Future<void> handlePop() async {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
   }
 
   /// Asserts that a target matching text, type, or Finder is visible.

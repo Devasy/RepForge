@@ -21,7 +21,7 @@ class TestSweep {
       if (finder.evaluate().isNotEmpty) {
         await tester.tap(finder.first);
         await tester.pumpAndSettle();
-        tester.takeException();
+        expect(tester.takeException(), isNull);
       }
     }
   }

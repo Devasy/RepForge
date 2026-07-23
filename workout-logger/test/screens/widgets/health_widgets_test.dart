@@ -88,7 +88,7 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.text('Sleep History'), findsOneWidget);
     expect(find.text('May 10, 2026'), findsOneWidget);
