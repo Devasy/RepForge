@@ -6,9 +6,9 @@
   <p>
     <a href="https://flutter.dev/"><img src="https://img.shields.io/badge/Flutter-%2302569B.svg?style=for-the-badge&logo=Flutter&logoColor=white" alt="Flutter Badge"/></a>
     <a href="https://dart.dev/"><img src="https://img.shields.io/badge/Dart-0175C2.svg?style=for-the-badge&logo=dart&logoColor=white" alt="Dart Badge"/></a>
-    <a href="https://github.com/Devasy23/Workout-logger/stargazers"><img src="https://img.shields.io/github/stars/Devasy23/Workout-logger?style=for-the-badge&color=yellow" alt="Stars Badge"/></a>
-    <a href="https://github.com/Devasy23/Workout-logger/network/members"><img src="https://img.shields.io/github/forks/Devasy23/Workout-logger?style=for-the-badge&color=orange" alt="Forks Badge"/></a>
-    <a href="https://github.com/Devasy23/Workout-logger/issues"><img src="https://img.shields.io/github/issues/Devasy23/Workout-logger?style=for-the-badge&color=red" alt="Issues Badge"/></a>
+    <a href="https://github.com/Devasy/RepForge/stargazers"><img src="https://img.shields.io/github/stars/Devasy/RepForge?style=for-the-badge&color=yellow" alt="Stars Badge"/></a>
+    <a href="https://github.com/Devasy/RepForge/network/members"><img src="https://img.shields.io/github/forks/Devasy/RepForge?style=for-the-badge&color=orange" alt="Forks Badge"/></a>
+    <a href="https://github.com/Devasy/RepForge/issues"><img src="https://img.shields.io/github/issues/Devasy/RepForge?style=for-the-badge&color=red" alt="Issues Badge"/></a>
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License Badge"/></a>
   </p>
 </div>
@@ -49,8 +49,8 @@ Want to take RepForge for a spin or contribute? Follow these steps to build the 
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/Devasy23/Workout-logger.git
-   cd Workout-logger/workout-logger
+   git clone https://github.com/Devasy/RepForge.git
+   cd RepForge/workout-logger
    ```
 
 2. **Install dependencies:**
@@ -84,7 +84,7 @@ We believe in the power of open-source! Whether you want to fix a bug, add a fea
 5. Open a **Pull Request** and describe your changes.
 
 ### What to work on?
-Check out the **[Issues](https://github.com/Devasy23/Workout-logger/issues)** tab! If you have a new idea, feel free to open a new issue for a feature request or bug report before starting your work. Whether it's a UI tweak, performance upgrade, or a brand new workout mode, we'd love to see it!
+Check out the **[Issues](https://github.com/Devasy/RepForge/issues)** tab! If you have a new idea, feel free to open a new issue for a feature request or bug report before starting your work. Whether it's a UI tweak, performance upgrade, or a brand new workout mode, we'd love to see it!
 
 ### Development Guidelines
 - Follow standard Flutter and Dart formatting (`flutter format .`).
@@ -101,7 +101,7 @@ This project is a personal workout tracking application.
 
 **Devasy Patel**
 - Email: patel.devasy.23@gmail.com
-- GitHub: [@Devasy23](https://github.com/Devasy23)
+- GitHub: [@Devasy](https://github.com/Devasy)
 
 ---
 <div align="center">

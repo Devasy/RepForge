@@ -20,4 +20,4 @@ RepForge is fully offline by default. The optional AI Coach feature sends data t
 
 LICENSE
 
-Apache-2.0. Source code: https://github.com/Devasy23/Workout-logger
+Apache-2.0. Source code: https://github.com/Devasy/RepForge

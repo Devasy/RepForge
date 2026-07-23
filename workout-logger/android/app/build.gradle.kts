@@ -2,24 +2,25 @@ import com.android.build.gradle.internal.api.ApkVariantOutputImpl
 
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // kotlin-android is injected automatically by Flutter's built-in Kotlin support.
+    // (android.builtInKotlin=true in gradle.properties)
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.devasy.repforge"
-    compileSdk = 36
-    compileSdkExtension = 19
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+    kotlin {
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        }
     }
 
     // Strip AGP's "Dependency metadata" signing block from the APK. It embeds a
@@ -53,7 +54,7 @@ android {
         // supported. If downgrading, remove the health_connector dependency and
         // all HealthConnectService usages, then restore minSdk to flutter.minSdkVersion.
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // App display name; overridden per build type below so debug installs
