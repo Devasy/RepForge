@@ -1,4 +1,6 @@
 import com.android.build.gradle.internal.api.ApkVariantOutputImpl
+import java.io.FileInputStream
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -34,11 +36,16 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystorePath = System.getenv("KEYSTORE_PATH")
-            val storePass    = System.getenv("KEY_STORE_PASSWORD")
-            val alias        = System.getenv("KEY_ALIAS")
-            val keyPass      = System.getenv("KEY_PASSWORD")
-            if (keystorePath != null && storePass != null && alias != null && keyPass != null) {
+            val keyProperties = Properties()
+            val keyPropertiesFile = rootProject.file("key.properties")
+            if (keyPropertiesFile.exists()) {
+                keyProperties.load(FileInputStream(keyPropertiesFile))
+            }
+            val keystorePath = System.getenv("KEYSTORE_PATH") ?: keyProperties.getProperty("storeFile")
+            val storePass    = System.getenv("KEY_STORE_PASSWORD") ?: keyProperties.getProperty("storePassword")
+            val alias        = System.getenv("KEY_ALIAS") ?: keyProperties.getProperty("keyAlias")
+            val keyPass      = System.getenv("KEY_PASSWORD") ?: keyProperties.getProperty("keyPassword")
+            if (!keystorePath.isNullOrEmpty() && !storePass.isNullOrEmpty() && !alias.isNullOrEmpty() && !keyPass.isNullOrEmpty()) {
                 storeFile     = file(keystorePath)
                 storePassword = storePass
                 keyAlias      = alias
@@ -72,6 +79,12 @@ android {
             manifestPlaceholders["appLabel"] = "RepForge (Debug)"
         }
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             // Uses the production EC P-256 keystore when KEYSTORE_PATH env var is set
             // (CI injects it via GitHub Secrets). Falls back to the debug key for a
             // local `flutter run --release` without env vars configured.

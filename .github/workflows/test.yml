@@ -8,14 +8,21 @@ on:
   release:
     types: [published]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     name: Analyze & Test
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Flutter
         id: flutter-action
@@ -28,13 +35,14 @@ jobs:
           pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
 
       - name: Install dependencies
-        if: steps.flutter-action.outputs.PUB-CACHE-HIT != 'true'
+        if: steps.flutter-action.outputs.CACHE-HIT != 'true'
         working-directory: ./workout-logger
         run: flutter pub get
 
       - name: Analyze
         working-directory: ./workout-logger
         run: |
+          set -o pipefail
           # Only fail on errors, ignore warnings and info messages
           flutter analyze --no-fatal-infos --no-fatal-warnings | tee analyze_output.txt
           
@@ -53,3 +61,5 @@ jobs:
         with:
           files: workout-logger/coverage/lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: Devasy/RepForge
+
