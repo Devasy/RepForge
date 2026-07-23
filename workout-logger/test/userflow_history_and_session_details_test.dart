@@ -3,37 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/history_screen.dart';
-import 'package:repforge/screens/widgets/session_details_sheet.dart';
-import 'package:repforge/services/interfaces/health_connect_service_interface.dart';
 import 'package:repforge/services/managers/health_history_manager.dart';
 import 'package:repforge/services/managers/history_manager.dart';
 import 'package:repforge/services/managers/program_manager.dart';
 import 'package:repforge/services/settings_provider.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'test_utils/mock_storage_service.dart';
-
-class _StubHcService implements IHealthConnectService {
-  @override
-  Future<List<SleepPeriod>> readSleepSessions(DateTime start, DateTime end) async => const [];
-  @override
-  Future<List<HealthSample>> readHeartRateSamples(DateTime start, DateTime end) async => const [];
-  @override
-  Future<List<HealthSample>> readRestingHeartRate(DateTime start, DateTime end) async => const [];
-  @override
-  Future<Set<HealthReadType>> grantedReadTypes() async => {};
-  @override
-  Future<List<HealthSample>> readHrvRmssd(DateTime start, DateTime end) async => const [];
-  @override
-  Future<bool> isAvailable() async => true;
-  @override
-  Future<bool> requestPermissions() async => true;
-  @override
-  Future<bool> hasPermissions() async => true;
-  @override
-  Future<bool> requestReadPermissions() async => true;
-  @override
-  Future<bool> syncWorkoutSession(WorkoutSession session, {String? title}) async => true;
-}
+import 'test_utils/stub_health_connect_service.dart';
 
 Widget _buildTestApp({
   required WorkoutProvider workoutProvider,
@@ -67,7 +43,7 @@ void main() {
   setUp(() async {
     mockStorage = MockStorageService();
     historyManager = HistoryManager(mockStorage);
-    healthHistoryManager = HealthHistoryManager(_StubHcService(), mockStorage);
+    healthHistoryManager = HealthHistoryManager(StubHcService(), mockStorage);
     workoutProvider = WorkoutProvider(
       mockStorage,
       programManager: ProgramManager(mockStorage),
@@ -93,7 +69,11 @@ void main() {
       expect(find.text('History'), findsOneWidget);
     });
 
-    testWidgets('HistoryScreen lists sessions and opens SessionDetailsSheet', (tester) async {
+    testWidgets('HistoryScreen lists sessions and opens SessionDetailsSheet on tap', (tester) async {
+      tester.view.physicalSize = const Size(800, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
       final session = WorkoutSession(
         id: 'hist_s1',
         date: DateTime.now(),
@@ -110,6 +90,7 @@ void main() {
       );
 
       await mockStorage.saveWorkoutSession(session);
+      await historyManager.loadSessions();
       await workoutProvider.init(); // Reload sessions from storage
 
       await tester.pumpWidget(_buildTestApp(
@@ -121,28 +102,10 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // SessionDetailsSheet component test
-      bool edited = false;
-      bool deleted = false;
-
-      await tester.pumpWidget(_buildTestApp(
-        workoutProvider: workoutProvider,
-        settingsProvider: settingsProvider,
-        historyManager: historyManager,
-        healthHistoryManager: healthHistoryManager,
-        child: Scaffold(
-          body: DraggableScrollableSheet(
-            initialChildSize: 1.0,
-            builder: (ctx, scrollController) => SessionDetailsSheet(
-              session: session,
-              provider: workoutProvider,
-              scrollController: scrollController,
-              onEdit: () => edited = true,
-              onDelete: () => deleted = true,
-            ),
-          ),
-        ),
-      ));
+      // Tap session item in HistoryScreen to open SessionDetailsSheet
+      final sessionCard = find.text('Quick Workout');
+      expect(sessionCard, findsOneWidget);
+      await tester.tap(sessionCard);
       await tester.pumpAndSettle();
 
       // Verify SessionDetailsSheet displays details

@@ -21,7 +21,7 @@ void main() {
     });
 
     test('SleepStageStats properties', () {
-      final stats = SleepStageStats(
+      const stats = SleepStageStats(
         stage: 'rem',
         minBpm: 55,
         p25Bpm: 60,

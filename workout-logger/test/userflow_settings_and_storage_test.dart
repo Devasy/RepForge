@@ -59,17 +59,34 @@ void main() {
 
       expect(find.text('Settings'), findsOneWidget);
       expect(find.text('Preferences'), findsOneWidget);
+      expect(find.text('kg'), findsOneWidget);
+      expect(find.text('lbs'), findsOneWidget);
     });
 
-    testWidgets('Toggling weight unit in SettingsProvider persists to storage and updates display label', (tester) async {
+    testWidgets('Toggling weight unit in SettingsScreen persists to storage and updates display label', (tester) async {
+      await tester.pumpWidget(_buildTestApp(
+        workoutProvider: workoutProvider,
+        settingsProvider: settingsProvider,
+        apiService: apiService,
+        child: const SettingsScreen(),
+      ));
+      await tester.pumpAndSettle();
+
       expect(settingsProvider.weightUnit, equals(WeightUnit.kg));
       expect(settingsProvider.unitLabel, equals('kg'));
 
-      await settingsProvider.setWeightUnit(WeightUnit.lbs);
+      // Tap 'lbs' unit button in SettingsScreen UI
+      final lbsButton = find.text('lbs');
+      expect(lbsButton, findsOneWidget);
+      await tester.tap(lbsButton);
+      await tester.pumpAndSettle();
+
+      // Assert UI display label, provider state, and persistent storage
       expect(settingsProvider.weightUnit, equals(WeightUnit.lbs));
       expect(settingsProvider.unitLabel, equals('lbs'));
       expect(mockStorage.settings['weightUnit'], equals('lbs'));
 
+      // Set increment and verify persistence
       await settingsProvider.setWeightIncrement(5.0);
       expect(settingsProvider.weightIncrement, equals(5.0));
       expect(mockStorage.settings['weightIncrement'], equals('5.0'));

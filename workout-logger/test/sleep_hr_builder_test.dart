@@ -3,46 +3,14 @@ import 'package:repforge/models/models.dart';
 import 'package:repforge/models/sleep_hr_models.dart';
 import 'package:repforge/services/interfaces/health_connect_service_interface.dart';
 import 'package:repforge/services/utils/sleep_hr_builder.dart';
-
-class _StubHcService implements IHealthConnectService {
-  final List<SleepPeriod> sleepPeriods;
-  final List<HealthSample> hrSamples;
-  final List<HealthSample> restingHrSamples;
-
-  _StubHcService({
-    this.sleepPeriods = const [],
-    this.hrSamples = const [],
-    this.restingHrSamples = const [],
-  });
-
-  @override
-  Future<List<SleepPeriod>> readSleepSessions(DateTime start, DateTime end) async => sleepPeriods;
-  @override
-  Future<List<HealthSample>> readHeartRateSamples(DateTime start, DateTime end) async => hrSamples;
-  @override
-  Future<List<HealthSample>> readRestingHeartRate(DateTime start, DateTime end) async => restingHrSamples;
-  @override
-  Future<Set<HealthReadType>> grantedReadTypes() async => {HealthReadType.heartRate, HealthReadType.sleep};
-  @override
-  Future<List<HealthSample>> readHrvRmssd(DateTime start, DateTime end) async => const [];
-  @override
-  Future<bool> isAvailable() async => true;
-  @override
-  Future<bool> requestPermissions() async => true;
-  @override
-  Future<bool> hasPermissions() async => true;
-  @override
-  Future<bool> requestReadPermissions() async => true;
-  @override
-  Future<bool> syncWorkoutSession(WorkoutSession session, {String? title}) async => true;
-}
+import 'test_utils/stub_health_connect_service.dart';
 
 void main() {
   final granted = <HealthReadType>{HealthReadType.heartRate, HealthReadType.sleep};
 
   group('Sleep & HR Builder Utils', () {
     test('buildHrDaySnapshot returns null when no HR samples or resting HR present', () async {
-      final stubHc = _StubHcService();
+      final stubHc = StubHcService();
       final snapshot = await buildHrDaySnapshot(stubHc, DateTime(2026, 7, 23), granted);
 
       expect(snapshot, isNull);
@@ -63,7 +31,7 @@ void main() {
         value: 58.0,
       );
 
-      final stubHc = _StubHcService(
+      final stubHc = StubHcService(
         hrSamples: [sample1, sample2],
         restingHrSamples: [resting],
       );
@@ -102,7 +70,7 @@ void main() {
         value: 58.0,
       );
 
-      final stubHc = _StubHcService(
+      final stubHc = StubHcService(
         sleepPeriods: [sleepPeriod],
         hrSamples: [hrSample1, hrSample2, hrSample3],
       );

@@ -684,8 +684,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   await context.read<WorkoutProvider>().finishWorkout();
               final newPRs = await prManager.checkAndUpdatePRs(session);
               if (!mounted) return;
-              nav.pop();
-              nav.push(MaterialPageRoute(
+              nav.pushReplacement(MaterialPageRoute(
                 builder: (_) => WorkoutSummaryScreen(
                   session: session,
                   newPRs: newPRs,
