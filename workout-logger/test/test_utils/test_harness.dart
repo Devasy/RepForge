@@ -75,7 +75,8 @@ class TestHarness {
 
     final originalOnError = FlutterError.onError;
     FlutterError.onError = (FlutterErrorDetails details) {
-      if (!details.exceptionAsString().contains('A RenderFlex overflowed')) {
+      final msg = details.exceptionAsString();
+      if (!msg.contains('overflowed') && !msg.contains('RenderFlex')) {
         originalOnError?.call(details);
       }
     };

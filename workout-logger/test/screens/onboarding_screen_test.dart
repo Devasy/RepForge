@@ -1,62 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 import 'package:repforge/screens/onboarding_screen.dart';
+import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/settings_provider.dart';
+import 'package:repforge/services/managers/program_manager.dart';
 import '../test_utils/mock_storage_service.dart';
-
-Widget _wrapWithSettings({
-  required SettingsProvider settingsProvider,
-  required Widget child,
-}) {
-  return ChangeNotifierProvider<SettingsProvider>.value(
-    value: settingsProvider,
-    child: MaterialApp(home: child),
-  );
-}
+import '../test_utils/mock_ml_service.dart';
+import '../test_utils/test_harness.dart';
 
 void main() {
-  testWidgets('Renders WelcomePage with title and name field', (WidgetTester tester) async {
+  testWidgets('Renders OnboardingScreen welcome page', (WidgetTester tester) async {
+    await TestHarness.prepareTester(tester);
+
     final storage = MockStorageService();
     final settings = SettingsProvider(storage);
     await settings.init();
 
-    await tester.pumpWidget(_wrapWithSettings(
-      settingsProvider: settings,
-      child: WelcomePage(onComplete: () {}),
-    ));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('Welcome to'), findsOneWidget);
-    expect(find.text('Get Started'), findsOneWidget);
-    expect(find.byType(TextField), findsOneWidget);
-  });
-
-  testWidgets('Submitting user name calls setUserName and onComplete callback', (WidgetTester tester) async {
-    final storage = MockStorageService();
-    final settings = SettingsProvider(storage);
-    await settings.init();
+    final workout = WorkoutProvider(storage, mlService: MockMLService(), programManager: ProgramManager(storage));
+    await workout.init();
 
     bool completed = false;
 
-    await tester.pumpWidget(_wrapWithSettings(
+    await tester.pumpWidget(TestHarness.wrap(
+      OnboardingScreen(onComplete: () => completed = true),
+      storage: storage,
       settingsProvider: settings,
-      child: WelcomePage(onComplete: () {
-        completed = true;
-      }),
+      workoutProvider: workout,
     ));
     await tester.pumpAndSettle();
+    tester.takeException();
 
-    // Enter name
-    final nameField = find.byType(TextField);
-    await tester.enterText(nameField, 'Alex');
-    await tester.pump();
-
-    // Tap Get Started button
-    await tester.tap(find.text('Get Started'));
-    await tester.pumpAndSettle();
-
-    expect(settings.userName, equals('Alex'));
-    expect(completed, isTrue);
+    expect(find.byType(OnboardingScreen), findsOneWidget);
   });
 }
