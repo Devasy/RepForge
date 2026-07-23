@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/screens/onboarding_screen.dart';
 import 'package:repforge/services/workout_provider.dart';
@@ -18,16 +17,14 @@ void main() {
     final workout = WorkoutProvider(storage, mlService: MockMLService(), programManager: ProgramManager(storage));
     await workout.init();
 
-    bool completed = false;
-
     await robot.pumpScreen(
-      WelcomePage(onComplete: () => completed = true),
+      WelcomePage(onComplete: () {}),
       storage: storage,
       settingsProvider: settings,
       workoutProvider: workout,
     );
 
     robot.expectVisible(WelcomePage);
-    robot.expectVisible('Welcome to RepForge');
+    expect(find.text('Welcome to RepForge'), findsOneWidget);
   });
 }

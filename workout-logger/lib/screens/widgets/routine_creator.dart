@@ -159,13 +159,12 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                 AppSpacing.md,
               ),
               itemCount: _selectedIds.length + 1,
-              onReorder: (old, next) {
+              onReorderItem: (old, next) {
                 if (old >= _selectedIds.length ||
-                    next >= _selectedIds.length + 1) {
+                    next >= _selectedIds.length) {
                   return;
                 }
                 setState(() {
-                  if (next > old) next--;
                   final item = _selectedIds.removeAt(old);
                   _selectedIds.insert(next, item);
                 });

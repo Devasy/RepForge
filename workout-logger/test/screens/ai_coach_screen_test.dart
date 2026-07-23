@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/screens/ai_coach_screen.dart';
 import 'package:repforge/services/workout_provider.dart';

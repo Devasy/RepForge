@@ -18,7 +18,7 @@ void main() {
     await workout.init();
 
     final historyManager = HistoryManager(storage);
-    await historyManager.init();
+    await historyManager.loadSessions();
 
     await tester.pumpWidget(TestHarness.wrap(
       const HistoryScreen(),
@@ -33,6 +33,10 @@ void main() {
   });
 
   testWidgets('Displays session item in history list', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
     await TestHarness.prepareTester(tester);
 
     final storage = MockStorageService();
@@ -43,7 +47,7 @@ void main() {
     await workout.init();
 
     final historyManager = HistoryManager(storage);
-    await historyManager.init();
+    await historyManager.loadSessions();
 
     await tester.pumpWidget(TestHarness.wrap(
       const HistoryScreen(),

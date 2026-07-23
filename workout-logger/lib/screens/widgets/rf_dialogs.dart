@@ -30,7 +30,6 @@ extension RFSnackBarContext on BuildContext {
         icon = Icons.error_outline_rounded;
         break;
       case RFSnackBarType.info:
-      default:
         bgColor = AppColors.cardHigh;
         icon = Icons.info_outline_rounded;
         break;

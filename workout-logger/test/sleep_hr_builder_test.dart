@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
-import 'package:repforge/models/sleep_hr_models.dart';
 import 'package:repforge/services/interfaces/health_connect_service_interface.dart';
 import 'package:repforge/services/utils/sleep_hr_builder.dart';
 import 'test_utils/stub_health_connect_service.dart';
