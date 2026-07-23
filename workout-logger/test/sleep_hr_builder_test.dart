@@ -6,11 +6,15 @@ import 'package:repforge/services/utils/sleep_hr_builder.dart';
 import 'test_utils/stub_health_connect_service.dart';
 
 void main() {
-  final granted = <HealthReadType>{HealthReadType.heartRate, HealthReadType.sleep};
+  final granted = <HealthReadType>{
+    HealthReadType.heartRate,
+    HealthReadType.sleep,
+    HealthReadType.restingHeartRate,
+  };
 
   group('Sleep & HR Builder Utils', () {
     test('buildHrDaySnapshot returns null when no HR samples or resting HR present', () async {
-      final stubHc = StubHcService();
+      const stubHc = StubHcService();
       final snapshot = await buildHrDaySnapshot(stubHc, DateTime(2026, 7, 23), granted);
 
       expect(snapshot, isNull);
@@ -41,6 +45,7 @@ void main() {
       expect(snapshot, isNotNull);
       expect(snapshot!.minBpm, equals(70));
       expect(snapshot.maxBpm, equals(120));
+      expect(snapshot.restingBpm, equals(58));
       expect(snapshot.buckets, isNotEmpty);
     });
 
@@ -80,6 +85,19 @@ void main() {
       expect(snapshot, isNotNull);
       expect(snapshot!.segments, isNotEmpty);
       expect(snapshot.stageStats, isNotEmpty);
+
+      // Verify representative calculated values in snapshot.segments and snapshot.stageStats
+      final deepStats = snapshot.statsFor('deep');
+      expect(deepStats, isNotNull);
+      expect(deepStats!.stage, equals('deep'));
+      expect(deepStats.minBpm, equals(55));
+      expect(deepStats.maxBpm, equals(58));
+      expect(deepStats.sampleCount, equals(3));
+
+      final firstSegment = snapshot.segments.first;
+      expect(firstSegment.stage, equals('deep'));
+      expect(firstSegment.minBpm, equals(55));
+      expect(firstSegment.maxBpm, equals(58));
     });
   });
 }
