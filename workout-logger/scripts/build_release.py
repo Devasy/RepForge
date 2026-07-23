@@ -30,16 +30,10 @@ def main():
     else:
         print("No .env file found. Using existing environment variables.")
 
-    cmd = [
-        "flutter", "build", "apk",
-        "--release",
-        "--target-platform", "android-arm64",
-        "--obfuscate",
-        "--split-debug-info=build/app/outputs/symbols"
-    ]
+    cmd = "flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=build/app/outputs/symbols"
 
-    print(f"Executing: {' '.join(cmd)}")
-    result = subprocess.run(cmd, env=os.environ, shell=(sys.platform == "win32"))
+    print(f"Executing: {cmd}")
+    result = subprocess.run(cmd, env=os.environ, shell=True)
     sys.exit(result.returncode)
 
 if __name__ == "__main__":
