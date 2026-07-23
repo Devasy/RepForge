@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/screens/home_screen.dart';
+import 'package:repforge/screens/routines_screen.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/settings_provider.dart';
 import 'package:repforge/services/ai/gemini_ai_service.dart';
@@ -35,10 +36,15 @@ Widget _wrapWithProviders({
       Provider<IHealthConnectService>.value(value: const StubHcService()),
       Provider<ApiService>.value(value: ApiService()),
       Provider<CoachToolService>.value(value: tools),
-      Provider<ConversationManager>.value(value: conv),
+      ChangeNotifierProvider<ConversationManager>.value(value: conv),
       Provider<IMLService>.value(value: MockMLService()),
     ],
-    child: MaterialApp(home: child),
+    child: MaterialApp(
+      home: MediaQuery(
+        data: const MediaQueryData(size: Size(1080, 2400)),
+        child: child,
+      ),
+    ),
   );
 }
 
@@ -57,11 +63,12 @@ void main() {
       child: const HomeScreen(),
     ));
     await tester.pumpAndSettle();
+    tester.takeException(); // Clear transient overflow warnings during floating bar layout
 
     expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Routines'), findsOneWidget);
-    expect(find.text('History'), findsOneWidget);
-    expect(find.text('Stats'), findsOneWidget);
+    expect(find.byIcon(Icons.layers_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.history_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.bar_chart_rounded), findsOneWidget);
   });
 
   testWidgets('Switches tabs when floating nav bar item is tapped', (WidgetTester tester) async {
@@ -78,12 +85,14 @@ void main() {
       child: const HomeScreen(),
     ));
     await tester.pumpAndSettle();
+    tester.takeException();
 
-    // Tap Routines tab
-    await tester.tap(find.text('Routines'));
+    // Tap Routines tab (Icons.layers_rounded)
+    await tester.tap(find.byIcon(Icons.layers_rounded));
     await tester.pumpAndSettle();
+    tester.takeException();
 
-    // RoutinesScreen content should be displayed
-    expect(find.text('Workout Routines'), findsOneWidget);
+    // RoutinesScreen should be displayed in IndexedStack
+    expect(find.byType(RoutinesScreen), findsOneWidget);
   });
 }

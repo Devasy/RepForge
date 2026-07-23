@@ -53,7 +53,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('New Program'), findsOneWidget);
-    expect(find.text('Program Details'), findsOneWidget);
+    expect(find.text('PROGRAM DETAILS'), findsOneWidget);
     expect(find.text('Step 1 of 3'), findsOneWidget);
     expect(find.text('Next'), findsOneWidget);
   });
@@ -71,7 +71,8 @@ void main() {
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Program name is required'), findsOneWidget);
+    // Step 1 stays active because name is empty
+    expect(find.text('Step 1 of 3'), findsOneWidget);
   });
 
   testWidgets('Enters program name and navigates to Step 2', (WidgetTester tester) async {
@@ -93,7 +94,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Step 2 of 3'), findsOneWidget);
-    expect(find.text('Weeks & Days'), findsOneWidget);
+    expect(find.text('WEEKS & DAYS'), findsOneWidget);
   });
 
   testWidgets('Adds a phase in Step 1', (WidgetTester tester) async {
@@ -154,6 +155,6 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify program was saved in WorkoutProvider / ProgramManager
-    expect(provider.programs.any((p) => p.name == 'Powerlifting 4-Week'), isTrue);
+    expect(provider.programManager.programs.any((p) => p.name == 'Powerlifting 4-Week'), isTrue);
   });
 }

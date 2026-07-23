@@ -26,7 +26,7 @@ Widget _wrapWithProviders({
       ChangeNotifierProvider<SettingsProvider>.value(value: settingsProvider),
       ChangeNotifierProvider<GeminiAiService>.value(value: GeminiAiService()),
       Provider<CoachToolService>.value(value: coachToolService),
-      Provider<ConversationManager>.value(value: conversationManager),
+      ChangeNotifierProvider<ConversationManager>.value(value: conversationManager),
       Provider<IMLService>.value(value: MockMLService()),
     ],
     child: MaterialApp(home: child),
