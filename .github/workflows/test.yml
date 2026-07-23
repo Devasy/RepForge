@@ -61,4 +61,5 @@ jobs:
         with:
           files: workout-logger/coverage/lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: Devasy/RepForge
 

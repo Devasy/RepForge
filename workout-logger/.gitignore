@@ -52,4 +52,10 @@ app.*.map.json
 .env
 .env.*
 
+# Hive test databases and temporary directories
+*.hive
+tmp_hive_*/
+**/tmp_hive_*/
+
+
 
