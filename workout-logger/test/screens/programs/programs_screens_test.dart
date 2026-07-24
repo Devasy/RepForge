@@ -24,11 +24,9 @@ void main() {
 
     robot.expectVisible(ProgramsScreen);
 
-    // Tap action buttons if available
     final fab = find.byType(FloatingActionButton);
-    if (fab.evaluate().isNotEmpty) {
-      await robot.tap(fab.first);
-    }
+    expect(fab, findsOneWidget);
+    await robot.tap(fab.first);
   });
 
   testWidgets('Renders ImportProgramScreen, validates valid program JSON', (WidgetTester tester) async {
@@ -49,6 +47,8 @@ void main() {
       'id': 'prog_custom_1',
       'name': 'Custom Powerlifting 4-Week',
       'description': 'Heavy compound lifting',
+      'totalWeeks': 4,
+      'phases': [],
       'daysPerWeek': 4,
       'weeks': [
         {
@@ -67,13 +67,12 @@ void main() {
     });
 
     final textField = find.byType(TextField);
-    if (textField.evaluate().isNotEmpty) {
-      await robot.fill(textField.first, validJson);
-    }
+    expect(textField, findsOneWidget);
+    await robot.fill(textField.first, validJson);
 
     final validateBtn = find.text('Validate');
-    if (validateBtn.evaluate().isNotEmpty) {
-      await robot.tap(validateBtn);
-    }
+    expect(validateBtn, findsOneWidget);
+    await robot.tap(validateBtn);
+    await tester.pumpAndSettle();
   });
 }

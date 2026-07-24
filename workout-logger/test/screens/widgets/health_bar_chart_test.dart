@@ -44,14 +44,14 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.byType(SleepBarsChart), findsOneWidget);
 
     // Tap on a bar area to trigger tooltip interaction
     await tester.tap(find.byType(SleepBarsChart));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Renders HrRangeChart with heart rate min-max range data', (WidgetTester tester) async {
@@ -94,13 +94,13 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.byType(HrRangeChart), findsOneWidget);
 
     // Tap on HrRangeChart to test tap gestures
     await tester.tap(find.byType(HrRangeChart));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
   });
 }

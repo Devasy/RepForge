@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/screens/widgets/rf_widgets.dart';
+import 'package:repforge/theme/app_theme.dart';
 
 void main() {
   testWidgets('slideRoute creates valid PageRouteBuilder', (tester) async {
@@ -170,6 +171,23 @@ void main() {
     expect(find.byType(RFProgressBar), findsOneWidget);
     expect(find.byType(RestTimerRing), findsOneWidget);
     expect(find.text('Field Label'), findsOneWidget);
+
+    final containerBefore = tester.widget<Container>(
+      find.descendant(of: find.byType(RFTextField), matching: find.byType(Container)).first,
+    );
+    final boxDecBefore = containerBefore.decoration as BoxDecoration;
+    final borderBefore = boxDecBefore.border as Border;
+    expect(borderBefore.top.color, AppColors.glassBorder);
+
+    await tester.tap(find.byType(TextField));
+    await tester.pumpAndSettle();
+
+    final containerAfter = tester.widget<Container>(
+      find.descendant(of: find.byType(RFTextField), matching: find.byType(Container)).first,
+    );
+    final boxDecAfter = containerAfter.decoration as BoxDecoration;
+    final borderAfter = boxDecAfter.border as Border;
+    expect(borderAfter.top.color, AppColors.primary);
 
     await tester.enterText(find.byType(TextField), 'Test input');
     expect(controller.text, 'Test input');

@@ -34,46 +34,65 @@ void main() {
     );
 
     await tester.tap(find.text('Success'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Success Toast'), findsOneWidget);
 
     await tester.tap(find.text('Warning'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Warning Toast'), findsOneWidget);
 
     await tester.tap(find.text('Error'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Error Toast'), findsOneWidget);
 
     await tester.tap(find.text('Info'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Info Toast'), findsOneWidget);
   });
 
   testWidgets('showRFConfirmDialog renders normal and danger confirmation dialogs', (tester) async {
-    bool? result;
+    bool? dangerResult;
+    bool? cancelResult;
+
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: Builder(
-            builder: (context) => ElevatedButton(
-              onPressed: () async {
-                result = await showRFConfirmDialog(
-                  context,
-                  title: 'Delete Item',
-                  content: 'Are you sure you want to delete?',
-                  isDanger: true,
-                  confirmText: 'Delete',
-                );
-              },
-              child: const Text('Open Dialog'),
+            builder: (context) => Column(
+              children: [
+                ElevatedButton(
+                  onPressed: () async {
+                    dangerResult = await showRFConfirmDialog(
+                      context,
+                      title: 'Delete Item',
+                      content: 'Are you sure you want to delete?',
+                      isDanger: true,
+                      confirmText: 'Delete',
+                    );
+                  },
+                  child: const Text('Open Danger Dialog'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    cancelResult = await showRFConfirmDialog(
+                      context,
+                      title: 'Confirm Action',
+                      content: 'Do you want to proceed?',
+                      isDanger: false,
+                      confirmText: 'Proceed',
+                    );
+                  },
+                  child: const Text('Open Normal Dialog'),
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
 
-    await tester.tap(find.text('Open Dialog'));
+    // Test danger confirmation path
+    await tester.tap(find.text('Open Danger Dialog'));
     await tester.pumpAndSettle();
 
     expect(find.text('Delete Item'), findsOneWidget);
@@ -81,6 +100,17 @@ void main() {
 
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
-    expect(result, isTrue);
+    expect(dangerResult, isTrue);
+
+    // Test default non-danger styling path and cancellation behavior
+    await tester.tap(find.text('Open Normal Dialog'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm Action'), findsOneWidget);
+    expect(find.text('Do you want to proceed?'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(cancelResult, isFalse);
   });
 }

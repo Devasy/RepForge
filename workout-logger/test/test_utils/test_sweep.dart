@@ -7,16 +7,14 @@ class TestSweep {
   /// Iterates over a list of texts or icons, tapping each item and triggering pumpAndSettle.
   static Future<void> tapAll(WidgetTester tester, List<dynamic> targets) async {
     for (final target in targets) {
-      Finder finder;
-      if (target is String) {
-        finder = find.text(target);
-      } else if (target is IconData) {
-        finder = find.byIcon(target);
-      } else if (target is Key) {
-        finder = find.byKey(target);
-      } else {
-        continue;
-      }
+      final Finder? finder = target is String
+          ? find.text(target)
+          : target is IconData
+              ? find.byIcon(target)
+              : target is Key
+                  ? find.byKey(target)
+                  : null;
+      if (finder == null) continue;
 
       if (finder.evaluate().isNotEmpty) {
         await tester.tap(finder.first);

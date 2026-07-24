@@ -73,7 +73,7 @@ void main() {
       healthHistoryManager: customManager,
     ));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.byType(WorkoutHrSection), findsOneWidget);
   });

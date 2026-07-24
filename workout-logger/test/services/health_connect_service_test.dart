@@ -136,4 +136,19 @@ void main() {
     final hr = await service.readHeartRateSamples(start, now);
     expect(hr, isEmpty);
   });
+
+  testWidgets('HealthConnectService succeeds when platform response takes > 100ms within deadline', (WidgetTester tester) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler(
+      'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.getHealthPlatformStatus',
+      (ByteData? message) async {
+        await Future.delayed(const Duration(milliseconds: 200));
+        return null;
+      },
+    );
+
+    final service = HealthConnectService();
+    final available = await service.isAvailable();
+    expect(available, isFalse);
+  });
 }

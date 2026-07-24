@@ -41,11 +41,12 @@ void main() {
   });
 
   testWidgets('Displays session item in history list', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(800, 1800);
+    const viewportSize = Size(800, 1800);
+    tester.view.physicalSize = viewportSize;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    await TestHarness.prepareTester(tester);
+    await TestHarness.prepareTester(tester, viewportSize: viewportSize);
 
     final storage = MockStorageService();
     final session = TestFixtures.sampleSession(date: DateTime.now(), notes: 'Morning Leg Workout');
@@ -62,6 +63,7 @@ void main() {
       storage: storage,
       workoutProvider: workout,
       historyManager: historyManager,
+      viewportSize: viewportSize,
     ));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

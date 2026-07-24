@@ -10,6 +10,7 @@ import '../../data/exercise_database.dart';
 import '../workout_flow_screen.dart';
 import 'rf_widgets.dart';
 import 'rf_cards.dart';
+import 'rf_dialogs.dart';
 import 'workout_conflict_dialog.dart';
 
 // ── Start routine workout (shared helper) ─────────────────────────────────────
@@ -101,25 +102,10 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: AppColors.glassBorder),
-              ),
-              child: TextField(
-                controller: _nameController,
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: const InputDecoration(
-                  hintText: 'Routine name (e.g. Push Day)',
-                  hintStyle: TextStyle(color: AppColors.textMuted),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.md,
-                  ),
-                ),
-              ),
+            child: RFTextField(
+              controller: _nameController,
+              hintText: 'Routine name (e.g. Push Day)',
+              prefixIcon: Icons.fitness_center_rounded,
             ),
           ),
           Padding(
@@ -161,12 +147,14 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
               itemCount: _selectedIds.length + 1,
               onReorderItem: (old, next) {
                 if (old >= _selectedIds.length ||
-                    next >= _selectedIds.length) {
+                    next > _selectedIds.length) {
                   return;
                 }
                 setState(() {
                   final item = _selectedIds.removeAt(old);
-                  _selectedIds.insert(next, item);
+                  final targetIndex =
+                      next > _selectedIds.length ? _selectedIds.length : next;
+                  _selectedIds.insert(targetIndex, item);
                 });
               },
               itemBuilder: (_, i) {
@@ -408,14 +396,16 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
 
   Future<void> _save() async {
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a routine name')),
+      context.showRFSnackBar(
+        'Please enter a routine name',
+        type: RFSnackBarType.warning,
       );
       return;
     }
     if (_selectedIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one exercise')),
+      context.showRFSnackBar(
+        'Please add at least one exercise',
+        type: RFSnackBarType.warning,
       );
       return;
     }
@@ -439,8 +429,9 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save routine: $e')),
+        context.showRFSnackBar(
+          'Failed to save routine: $e',
+          type: RFSnackBarType.error,
         );
       }
     }

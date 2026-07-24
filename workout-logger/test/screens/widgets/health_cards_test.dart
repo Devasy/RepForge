@@ -85,7 +85,7 @@ void main() {
 
     await tester.pumpWidget(wrapWithReadiness(const ReadinessCard()));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.byType(ReadinessCard), findsOneWidget);
   });
@@ -128,14 +128,14 @@ void main() {
 
     await tester.pumpWidget(wrapWithReadiness(const SleepHrCard()));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.byType(SleepHrCard), findsOneWidget);
 
     // Tap SleepHrCard to trigger sheet opening
     await tester.tap(find.byType(SleepHrCard));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Renders HeartRateCard when hrDaySnapshot is present', (WidgetTester tester) async {
@@ -165,13 +165,13 @@ void main() {
 
     await tester.pumpWidget(wrapWithReadiness(const HeartRateCard()));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
 
     expect(find.byType(HeartRateCard), findsOneWidget);
 
     // Tap HeartRateCard to test navigation
     await tester.tap(find.byType(HeartRateCard));
     await tester.pumpAndSettle();
-    tester.takeException();
+    expect(tester.takeException(), isNull);
   });
 }

@@ -151,5 +151,19 @@ void main() {
 
       expect(find.text('Pull Day'), findsWidgets);
     });
+
+    testWidgets('CreateRoutineScreen supports reordering exercise into final position before Add Exercises', (tester) async {
+      await tester.pumpWidget(_buildTestApp(
+        workoutProvider: workoutProvider,
+        settingsProvider: settingsProvider,
+        child: const CreateRoutineScreen(),
+      ));
+      await tester.pumpAndSettle();
+
+      final reorderableList = tester.widget<ReorderableListView>(find.byType(ReorderableListView));
+      reorderableList.onReorder!(0, 1);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
   });
 }
