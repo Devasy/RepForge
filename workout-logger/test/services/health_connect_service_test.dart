@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:repforge/models/models.dart';
 import 'package:repforge/services/health_connect_service.dart';
 import '../test_utils/test_fixtures.dart';
 
@@ -57,6 +58,63 @@ void main() {
   testWidgets('HealthConnectService syncWorkoutSession returns false gracefully on missing platform channel', (WidgetTester tester) async {
     final service = HealthConnectService();
     final session = TestFixtures.sampleSession();
+    final success = await service.syncWorkoutSession(session, title: 'Custom Title');
+    expect(success, isFalse);
+  });
+
+  testWidgets('HealthConnectService handles sessions with zero reps and custom exercises', (WidgetTester tester) async {
+    final service = HealthConnectService();
+    final session = WorkoutSession(
+      id: 'sess_custom',
+      date: DateTime.now(),
+      duration: 30,
+      notes: 'Custom notes',
+      exercises: [
+        ExerciseLog(
+          exerciseId: 'custom_exercise_999',
+          sets: [
+            WorkoutSet(weight: 0.0, reps: 0, timestamp: DateTime.now()),
+            WorkoutSet(weight: 50.0, reps: 10, timestamp: DateTime.now().add(const Duration(minutes: 5))),
+          ],
+        ),
+      ],
+    );
+
+    final success = await service.syncWorkoutSession(session);
+    expect(success, isFalse);
+  });
+
+  testWidgets('HealthConnectService handles sessions with identical timestamps (fallback spacing)', (WidgetTester tester) async {
+    final service = HealthConnectService();
+    final now = DateTime.now();
+    final session = WorkoutSession(
+      id: 'sess_identical_ts',
+      date: now,
+      duration: 45,
+      exercises: [
+        ExerciseLog(
+          exerciseId: 'bench_press',
+          sets: [
+            WorkoutSet(weight: 60.0, reps: 10, timestamp: now),
+            WorkoutSet(weight: 70.0, reps: 8, timestamp: now),
+          ],
+        ),
+      ],
+    );
+
+    final success = await service.syncWorkoutSession(session, title: '');
+    expect(success, isFalse);
+  });
+
+  testWidgets('HealthConnectService handles empty sessions without exercises', (WidgetTester tester) async {
+    final service = HealthConnectService();
+    final session = WorkoutSession(
+      id: 'sess_empty',
+      date: DateTime.now(),
+      duration: 20,
+      exercises: [],
+    );
+
     final success = await service.syncWorkoutSession(session);
     expect(success, isFalse);
   });
