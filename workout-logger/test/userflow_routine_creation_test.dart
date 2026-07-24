@@ -136,7 +136,7 @@ void main() {
       await tester.tap(find.text('Start Routine'));
       await tester.pumpAndSettle();
 
-      expect(workoutProvider.isWorkoutActive, isTrue);
+      expect(workoutProvider.hasActiveWorkout, isTrue);
     });
 
     testWidgets('RoutineDetailScreen renders routine details', (tester) async {
