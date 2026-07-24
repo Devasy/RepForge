@@ -13,6 +13,7 @@ import 'package:repforge/services/managers/history_manager.dart';
 import 'package:repforge/services/managers/health_history_manager.dart';
 import 'package:repforge/services/managers/program_manager.dart';
 import 'package:repforge/services/managers/pr_manager.dart';
+import 'package:repforge/services/managers/readiness_manager.dart';
 import 'package:repforge/services/interfaces/health_connect_service_interface.dart';
 import 'package:repforge/services/interfaces/ml_service_interface.dart';
 import 'mock_storage_service.dart';
@@ -28,6 +29,7 @@ class TestHarness {
     SettingsProvider? settingsProvider,
     HistoryManager? historyManager,
     HealthHistoryManager? healthHistoryManager,
+    ReadinessManager? readinessManager,
     Size viewportSize = const Size(1080, 2400),
   }) {
     final mockStorage = storage ?? MockStorageService();
@@ -40,6 +42,7 @@ class TestHarness {
     final sp = settingsProvider ?? SettingsProvider(mockStorage);
     final hm = historyManager ?? HistoryManager(mockStorage);
     final hhm = healthHistoryManager ?? HealthHistoryManager(const StubHcService(), mockStorage);
+    final rm = readinessManager ?? ReadinessManager(const StubHcService(), mockStorage, sp);
     final prm = PRManager(mockStorage);
     final conv = ConversationManager(mockStorage);
     final tools = CoachToolService(wp, prm);
@@ -52,6 +55,7 @@ class TestHarness {
         ChangeNotifierProvider<PRManager>.value(value: prm),
         ChangeNotifierProvider<GeminiAiService>.value(value: GeminiAiService()),
         ChangeNotifierProvider<ConversationManager>.value(value: conv),
+        ChangeNotifierProvider<ReadinessManager>.value(value: rm),
         Provider<HealthHistoryManager>.value(value: hhm),
         Provider<IHealthConnectService>.value(value: const StubHcService()),
         Provider<ApiService>.value(value: ApiService()),

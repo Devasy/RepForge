@@ -1,8 +1,38 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/services/health_connect_service.dart';
 import '../test_utils/test_fixtures.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  const pigeonChannels = [
+    'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.getHealthPlatformStatus',
+    'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.initialize',
+    'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.requestPermissions',
+    'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.getPermissionStatus',
+    'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.readRecords',
+    'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.readRecord',
+    'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.writeRecords',
+    'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.writeRecord',
+    'dev.flutter.pigeon.health_connector_hk_ios.HealthConnectorHKIOSApi.getHealthPlatformStatus',
+    'dev.flutter.pigeon.health_connector_hk_ios.HealthConnectorHKIOSApi.initialize',
+  ];
+
+  setUp(() {
+    for (final channel in pigeonChannels) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMessageHandler(channel, (ByteData? message) async => null);
+    }
+  });
+
+  tearDown(() {
+    for (final channel in pigeonChannels) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMessageHandler(channel, null);
+    }
+  });
+
   testWidgets('HealthConnectService reports unavailable gracefully in unit tests', (WidgetTester tester) async {
     final service = HealthConnectService();
     final available = await service.isAvailable();

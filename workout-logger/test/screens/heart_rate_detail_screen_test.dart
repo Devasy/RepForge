@@ -14,7 +14,7 @@ void main() {
 
     expect(find.byType(HeartRateDetailScreen), findsOneWidget);
     // The screen renders its title and granularity tab controls via HealthDetailShell.
-    expect(find.text('Heart Rate'), findsOneWidget);
+    expect(find.text('Heart rate'), findsOneWidget);
     expect(
       find.text('Day').evaluate().isNotEmpty ||
           find.text('Week').evaluate().isNotEmpty,

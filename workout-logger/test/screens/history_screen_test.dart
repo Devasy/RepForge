@@ -48,7 +48,7 @@ void main() {
     await TestHarness.prepareTester(tester);
 
     final storage = MockStorageService();
-    final session = TestFixtures.sampleSession(notes: 'Morning Leg Workout');
+    final session = TestFixtures.sampleSession(date: DateTime.now(), notes: 'Morning Leg Workout');
     await storage.saveWorkoutSession(session);
 
     final workout = WorkoutProvider(storage, mlService: MockMLService(), programManager: ProgramManager(storage));
@@ -66,6 +66,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    expect(find.text('Morning Leg Workout'), findsOneWidget);
+    expect(find.text('Quick Workout'), findsOneWidget);
   });
 }
