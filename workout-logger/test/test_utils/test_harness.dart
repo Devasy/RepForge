@@ -30,6 +30,7 @@ class TestHarness {
     HistoryManager? historyManager,
     HealthHistoryManager? healthHistoryManager,
     ReadinessManager? readinessManager,
+    GeminiAiService? geminiAiService,
     Size viewportSize = const Size(1080, 2400),
   }) {
     final mockStorage = storage ?? MockStorageService();
@@ -43,6 +44,7 @@ class TestHarness {
     final hm = historyManager ?? HistoryManager(mockStorage);
     final hhm = healthHistoryManager ?? HealthHistoryManager(const StubHcService(), mockStorage);
     final rm = readinessManager ?? ReadinessManager(const StubHcService(), mockStorage, sp);
+    final ai = geminiAiService ?? GeminiAiService();
     final prm = PRManager(mockStorage);
     final conv = ConversationManager(mockStorage);
     final tools = CoachToolService(wp, prm);
@@ -53,7 +55,7 @@ class TestHarness {
         ChangeNotifierProvider<SettingsProvider>.value(value: sp),
         ChangeNotifierProvider<HistoryManager>.value(value: hm),
         ChangeNotifierProvider<PRManager>.value(value: prm),
-        ChangeNotifierProvider<GeminiAiService>.value(value: GeminiAiService()),
+        ChangeNotifierProvider<GeminiAiService>.value(value: ai),
         ChangeNotifierProvider<ConversationManager>.value(value: conv),
         ChangeNotifierProvider<ReadinessManager>.value(value: rm),
         Provider<HealthHistoryManager>.value(value: hhm),

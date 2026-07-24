@@ -180,7 +180,7 @@ void main() {
     expect(borderBefore.top.color, AppColors.glassBorder);
 
     await tester.tap(find.byType(TextField));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     final containerAfter = tester.widget<Container>(
       find.descendant(of: find.byType(RFTextField), matching: find.byType(Container)).first,

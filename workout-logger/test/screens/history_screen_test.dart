@@ -46,7 +46,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    await TestHarness.prepareTester(tester, viewportSize: viewportSize);
+    await TestHarness.prepareTester(tester, size: viewportSize);
 
     final storage = MockStorageService();
     final session = TestFixtures.sampleSession(date: DateTime.now(), notes: 'Morning Leg Workout');

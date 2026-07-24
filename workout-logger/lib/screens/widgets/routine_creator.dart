@@ -104,7 +104,7 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
             padding: const EdgeInsets.all(AppSpacing.md),
             child: RFTextField(
               controller: _nameController,
-              hintText: 'Routine name (e.g. Push Day)',
+              hint: 'Routine name (e.g. Push Day)',
               prefixIcon: Icons.fitness_center_rounded,
             ),
           ),

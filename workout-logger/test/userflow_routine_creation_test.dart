@@ -161,7 +161,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final reorderableList = tester.widget<ReorderableListView>(find.byType(ReorderableListView));
-      reorderableList.onReorder!(0, 1);
+      reorderableList.onReorderItem!(0, 1);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });

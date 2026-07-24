@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/settings_provider.dart';
 import 'package:repforge/services/managers/history_manager.dart';
+import 'package:repforge/services/ai/gemini_ai_service.dart';
 import 'mock_storage_service.dart';
 import 'test_harness.dart';
 
@@ -21,6 +22,7 @@ class TestRobot {
     WorkoutProvider? workoutProvider,
     SettingsProvider? settingsProvider,
     HistoryManager? historyManager,
+    GeminiAiService? geminiAiService,
   }) async {
     await TestHarness.prepareTester(tester);
     await tester.pumpWidget(TestHarness.wrap(
@@ -29,6 +31,7 @@ class TestRobot {
       workoutProvider: workoutProvider,
       settingsProvider: settingsProvider,
       historyManager: historyManager,
+      geminiAiService: geminiAiService,
     ));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

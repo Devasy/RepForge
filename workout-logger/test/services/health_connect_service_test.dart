@@ -137,10 +137,14 @@ void main() {
     expect(hr, isEmpty);
   });
 
-  testWidgets('HealthConnectService succeeds when platform response takes > 100ms within deadline', (WidgetTester tester) async {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMessageHandler(
-      'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.getHealthPlatformStatus',
+  test('HealthConnectService succeeds when platform response takes > 100ms within deadline', () async {
+    const channel = 'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.getHealthPlatformStatus';
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMessageHandler(channel, null);
+    });
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMessageHandler(
+      channel,
       (ByteData? message) async {
         await Future.delayed(const Duration(milliseconds: 200));
         return null;

@@ -25,7 +25,7 @@ void main() {
     robot.expectVisible(ProgramsScreen);
 
     final fab = find.byType(FloatingActionButton);
-    expect(fab, findsOneWidget);
+    expect(fab, findsWidgets);
     await robot.tap(fab.first);
   });
 

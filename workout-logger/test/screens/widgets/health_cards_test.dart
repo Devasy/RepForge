@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/models/sleep_hr_models.dart';
 import 'package:repforge/screens/widgets/heart_rate_card.dart';
@@ -62,12 +61,10 @@ void main() {
 
   Widget wrapWithReadiness(Widget child) {
     return TestHarness.wrap(
-      ChangeNotifierProvider<ReadinessManager>.value(
-        value: readinessManager,
-        child: child,
-      ),
+      child,
       storage: storage,
       settingsProvider: settings,
+      readinessManager: readinessManager,
     );
   }
 

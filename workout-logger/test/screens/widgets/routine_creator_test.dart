@@ -24,15 +24,15 @@ void main() {
     robot.expectVisible(CreateRoutineScreen);
 
     // Enter routine name via RFTextField
-    await robot.fill('Routine name (e.g. Push Day)', 'Upper Body Push');
+    await robot.fill(find.byType(TextField).first, 'Upper Body Push');
 
     // Tap Add Exercises button
     await robot.tap('Add Exercises');
 
     // Select exercise in sheet
-    final check = find.byType(CheckboxListTile).first;
-    if (check.evaluate().isNotEmpty) {
-      await robot.tap(check);
+    final checks = find.byType(CheckboxListTile);
+    if (checks.evaluate().isNotEmpty) {
+      await robot.tap(checks.first);
     }
   });
 
