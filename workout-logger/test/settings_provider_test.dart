@@ -20,7 +20,7 @@ void main() {
       expect(provider.readinessEnabled, isFalse);
       expect(provider.userName, isNull);
       expect(provider.geminiApiKey, isEmpty);
-      expect(provider.geminiModel, equals('gemini-2.5-flash'));
+      expect(provider.geminiModel, equals('gemini-3.6-flash'));
       expect(provider.showAdvancedMetrics, isFalse);
     });
 

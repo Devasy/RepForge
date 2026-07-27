@@ -10,6 +10,8 @@ import 'package:provider/provider.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../models/models.dart';
+import '../genui/a2ui_component.dart';
+import '../genui/a2ui_renderer.dart';
 import '../viewmodels/ai_coach_view_model.dart';
 import '../services/ai/gemini_ai_service.dart';
 import '../services/ai/coach_tool_service.dart';
@@ -745,7 +747,7 @@ class _MessageBubble extends StatelessWidget {
                         height: 1.55,
                       ),
                     )
-                  : _CoachMarkdown(text: message.text),
+                  : _CoachMessageContent(text: message.text),
             ),
           ),
         ],
@@ -785,7 +787,7 @@ class _StreamingBubble extends StatelessWidget {
               ),
               child: text.isEmpty
                   ? const RFLoadingDots()
-                  : _CoachMarkdown(text: text),
+                  : _CoachMessageContent(text: text),
             ),
           ),
         ],
@@ -795,6 +797,20 @@ class _StreamingBubble extends StatelessWidget {
 }
 
 /// Markdown renderer for coach replies, styled to the app theme.
+class _CoachMessageContent extends StatelessWidget {
+  const _CoachMessageContent({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final component = A2UiComponent.tryParse(text);
+    if (component != null) {
+      return A2UiRenderer(component: component);
+    }
+    return _CoachMarkdown(text: text);
+  }
+}
+
 class _CoachMarkdown extends StatelessWidget {
   const _CoachMarkdown({required this.text});
   final String text;

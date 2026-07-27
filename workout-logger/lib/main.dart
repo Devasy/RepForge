@@ -136,6 +136,7 @@ class WorkoutLoggerApp extends StatelessWidget {
           create: (ctx) => CoachToolService(
             ctx.read<WorkoutProvider>(),
             ctx.read<PRManager>(),
+            ctx.read<HealthHistoryManager>(),
           ),
         ),
       ],

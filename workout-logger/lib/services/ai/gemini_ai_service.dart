@@ -24,19 +24,20 @@ import '../interfaces/storage_service_interface.dart';
 // Ordered list of available Gemini models shown in the picker.
 const kGeminiModels = [
   ('gemini-2.5-flash',      'Gemini 2.5 Flash'),
-  ('gemini-2.5-flash-lite', 'Gemini 2.5 Flash Lite'),
   ('gemini-3.1-flash-lite', 'Gemini 3.1 Flash Lite'),
+  ('gemini-3.5-flash-lite', 'Gemini 3.5 Flash Lite'),
   ('gemini-3.5-flash',      'Gemini 3.5 Flash'),
+  ('gemini-3.6-flash',      'Gemini 3.6 Flash'),
 ];
 
 // Default to the latest GA model.
-const kDefaultGeminiModel = 'gemini-3.5-flash';
+const kDefaultGeminiModel = 'gemini-3.6-flash';
 
 // Upper bound on tool-resolution rounds per user turn, to bound runaway loops.
 const int _kMaxToolRounds = 5;
 
 // Retry policy for transient (5xx / 429) errors. Total attempts = 1 + retries.
-const int _kMaxRetries = 2;
+const int _kMaxRetries = 3;
 
 const String _apiBase =
     'https://generativelanguage.googleapis.com/v1beta/models';
@@ -48,6 +49,64 @@ bool _isRetryableStatus(int code) => code == 429 || (code >= 500 && code < 600);
 // Exponential backoff: 500ms, 1s, 2s …
 Duration _retryBackoff(int attempt) =>
     Duration(milliseconds: 500 * (1 << attempt));
+
+/// Extracts exact retryDelay provided by Google in 429/503 payloads.
+/// Checks error.details (google.rpc.RetryInfo) or error.message ("Please retry in Xs").
+Duration? _extractRetryDelay(String body) {
+  try {
+    final decoded = jsonDecode(body);
+    if (decoded is Map && decoded['error'] is Map) {
+      final errMap = decoded['error'] as Map;
+      // 1. Check error.details for google.rpc.RetryInfo
+      final details = errMap['details'];
+      if (details is List) {
+        for (final item in details) {
+          if (item is Map && item['retryDelay'] is String) {
+            final delayStr = (item['retryDelay'] as String).replaceAll('s', '').trim();
+            final seconds = double.tryParse(delayStr);
+            if (seconds != null && seconds > 0) {
+              final ms = (seconds * 1000).ceil() + 350;
+              return Duration(milliseconds: ms.clamp(500, 45000));
+            }
+          }
+        }
+      }
+      // 2. Regex match in error.message (e.g. "Please retry in 23.690750876s.")
+      final message = errMap['message'];
+      if (message is String) {
+        final match = RegExp(r'retry in\s+([\d.]+)\s*s', caseSensitive: false).firstMatch(message);
+        if (match != null) {
+          final seconds = double.tryParse(match.group(1)!);
+          if (seconds != null && seconds > 0) {
+            final ms = (seconds * 1000).ceil() + 350;
+            return Duration(milliseconds: ms.clamp(500, 45000));
+          }
+        }
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+bool _isDailyQuotaExhausted(String body) {
+  return body.contains('GenerateRequestsPerDay') ||
+      body.contains('free_tier_requests') ||
+      body.contains('QuotaExceeded') ||
+      body.contains('RESOURCE_EXHAUSTED');
+}
+
+String? _getFallbackModel(String currentModel) {
+  switch (currentModel) {
+    case 'gemini-3.6-flash':
+      return 'gemini-3.5-flash';
+    case 'gemini-3.5-flash':
+      return 'gemini-3.5-flash-lite';
+    case 'gemini-3.5-flash-lite':
+      return 'gemini-2.5-flash';
+    default:
+      return null;
+  }
+}
 
 // Gemini error bodies look like {"error":{"code":503,"message":"…","status":"…"}}.
 // Surface just the human-readable message rather than the whole JSON blob.
@@ -196,9 +255,8 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
           },
         if (tools != null) 'tools': tools.map((t) => t.toJson()).toList(),
         'generationConfig': {
-          // Disable thinking tokens so SDK-incompatible thoughtSignature parts
-          // are never returned by Gemini 3.x models.
-          'thinkingConfig': {'thinkingBudget': 0},
+          // Gemini 3.x thinking configuration enum (minimal, medium, high)
+          'thinkingConfig': {'thinkingLevel': 'minimal'},
           if (jsonMode) 'responseMimeType': 'application/json',
         },
       };
@@ -219,16 +277,15 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
   // Streams parsed SSE chunks from the streamGenerateContent endpoint.
   Stream<Map<String, dynamic>> _streamSse(Map<String, dynamic> body) async* {
-    final uri = Uri.parse(
-      '$_apiBase/$_model:streamGenerateContent?alt=sse&key=$_apiKey',
-    );
-
     // Establish the connection with retries. Retrying is only safe here —
     // before any bytes are yielded — so a transient 503 never reaches the user,
     // but a mid-stream failure is not retried (it would duplicate output).
     http.Client client = http.Client();
     http.StreamedResponse streamed;
     for (var attempt = 0;; attempt++) {
+      final uri = Uri.parse(
+        '$_apiBase/$_model:streamGenerateContent?alt=sse&key=$_apiKey',
+      );
       final request = http.Request('POST', uri)
         ..headers['Content-Type'] = 'application/json'
         ..body = jsonEncode(body);
@@ -238,9 +295,25 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         break;
       }
       final err = await resp.stream.bytesToString();
-      if (_isRetryableStatus(resp.statusCode) && attempt < _kMaxRetries) {
+
+      // Automatically fallback to next model when daily free quota limit is reached.
+      if (_isDailyQuotaExhausted(err)) {
+        final fallback = _getFallbackModel(_model);
+        if (fallback != null) {
+          _model = fallback;
+          notifyListeners();
+          client.close();
+          client = http.Client();
+          continue;
+        }
+      }
+
+      final customDelay = _extractRetryDelay(err);
+      if (_isRetryableStatus(resp.statusCode) &&
+          (attempt < _kMaxRetries || (customDelay != null && attempt < 4))) {
         client.close();
-        await Future.delayed(_retryBackoff(attempt));
+        final delay = customDelay ?? _retryBackoff(attempt);
+        await Future.delayed(delay);
         client = http.Client();
         continue;
       }
@@ -280,9 +353,9 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
   // Single-shot (non-streaming) generateContent call, with retry on 5xx/429.
   Future<Map<String, dynamic>> _generate(Map<String, dynamic> body) async {
-    final uri = Uri.parse('$_apiBase/$_model:generateContent?key=$_apiKey');
     final payload = jsonEncode(body);
     for (var attempt = 0;; attempt++) {
+      final uri = Uri.parse('$_apiBase/$_model:generateContent?key=$_apiKey');
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
@@ -291,8 +364,21 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
-      if (_isRetryableStatus(response.statusCode) && attempt < _kMaxRetries) {
-        await Future.delayed(_retryBackoff(attempt));
+
+      if (_isDailyQuotaExhausted(response.body)) {
+        final fallback = _getFallbackModel(_model);
+        if (fallback != null) {
+          _model = fallback;
+          notifyListeners();
+          continue;
+        }
+      }
+
+      final customDelay = _extractRetryDelay(response.body);
+      if (_isRetryableStatus(response.statusCode) &&
+          (attempt < _kMaxRetries || (customDelay != null && attempt < 4))) {
+        final delay = customDelay ?? _retryBackoff(attempt);
+        await Future.delayed(delay);
         continue;
       }
       throw Exception(_errorMessage(response.statusCode, response.body));
@@ -305,10 +391,23 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     return _textFromCandidate(candidates[0] as Map<String, dynamic>).join();
   }
 
-  // ── Coach chat (streaming + optional tool-call loop) ───────────────────────
-  // [history] is the prior conversation as alternating user/model Content.
-  // When [tools] + [onToolCall] are supplied, function calls the model emits
-  // are dispatched and their results fed back until a text answer is produced.
+  // ── Generic & domain chat (streaming + optional tool-call loop) ───────────
+  @override
+  Stream<String> streamChatReply({
+    required String userMessage,
+    required String systemPrompt,
+    required List<Content> history,
+    List<Tool>? tools,
+    Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+  }) =>
+      streamCoachReply(
+        userMessage: userMessage,
+        systemPrompt: systemPrompt,
+        history: history,
+        tools: tools,
+        onToolCall: onToolCall,
+      );
+
   @override
   Stream<String> streamCoachReply({
     required String userMessage,
@@ -394,12 +493,43 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
             });
           }
         }
-        contents.add({'role': 'function', 'parts': responseParts});
+        contents.add({'role': 'user', 'parts': responseParts});
       }
       // Exhausted the tool-round budget without a final text answer.
       yield '\n\n_(Stopped after $_kMaxToolRounds tool steps — try rephrasing.)_';
     } catch (e) {
       yield 'Error: $e';
+    }
+  }
+
+  // ── Generic domain-agnostic structured JSON generator ───────────────────
+  @override
+  Future<T> generateStructuredJson<T>({
+    required String systemPrompt,
+    required String userPrompt,
+    required T Function(Map<String, dynamic> json) fromJson,
+  }) async {
+    if (!isConfigured) {
+      throw StateError('Gemini API key not configured.');
+    }
+    try {
+      final data = await _generate(
+        _makeBody(
+          contents: [Content.text(userPrompt).toJson()],
+          system: systemPrompt,
+          jsonMode: true,
+        ),
+      );
+      _recordRawUsage(data['usageMetadata'] as Map<String, dynamic>?);
+      final raw = _textFromResponse(data);
+      if (raw.isEmpty) throw const FormatException('Empty response from Gemini.');
+
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      return fromJson(map);
+    } on FormatException catch (e) {
+      throw Exception('Could not parse JSON output: $e');
+    } catch (e) {
+      throw Exception('Gemini API error: $e');
     }
   }
 
@@ -409,10 +539,6 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     required String userPrompt,
     required List<Exercise> allExercises,
   }) async {
-    if (!isConfigured) {
-      throw StateError('Gemini API key not configured.');
-    }
-
     final exerciseList = allExercises
         .map((e) => '  "${e.id}": "${e.name} [${e.primaryMuscle}]"')
         .join('\n');
@@ -469,29 +595,17 @@ Required JSON schema (follow exactly):
     final prompt =
         'Available exercises (ID: name [primary muscle]):\n$exerciseList\n\nUser request: $userPrompt';
 
-    try {
-      final data = await _generate(
-        _makeBody(
-          contents: [Content.text(prompt).toJson()],
-          system: systemPrompt,
-          jsonMode: true,
-        ),
-      );
-      _recordRawUsage(data['usageMetadata'] as Map<String, dynamic>?);
-      final raw = _textFromResponse(data);
-      if (raw.isEmpty) throw const FormatException('Empty response from Gemini.');
-
-      final map = jsonDecode(raw) as Map<String, dynamic>;
-      // Ensure a fresh UUID so it never collides with an existing program.
-      map['id'] = const Uuid().v4();
-      map['isImported'] = true;
-      map['author'] = 'AI Coach';
-      return TrainingProgram.fromJson(map);
-    } on FormatException catch (e) {
-      throw Exception('Could not parse program JSON: $e');
-    } catch (e) {
-      throw Exception('Gemini API error: $e');
-    }
+    return generateStructuredJson<TrainingProgram>(
+      systemPrompt: systemPrompt,
+      userPrompt: prompt,
+      fromJson: (map) {
+        // Ensure a fresh UUID so it never collides with an existing program.
+        map['id'] = const Uuid().v4();
+        map['isImported'] = true;
+        map['author'] = 'AI Coach';
+        return TrainingProgram.fromJson(map);
+      },
+    );
   }
 
   // ── Weekly insights (single-shot text) ────────────────────────────────────

@@ -60,6 +60,30 @@ class _SimpleAi implements IAiService {
 
   @override
   Future<String> generateInsight(String system, String context) async => '';
+
+  @override
+  Stream<String> streamChatReply({
+    required String userMessage,
+    required String systemPrompt,
+    required List<Content> history,
+    List<Tool>? tools,
+    Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+  }) =>
+      streamCoachReply(
+        userMessage: userMessage,
+        systemPrompt: systemPrompt,
+        history: history,
+        tools: tools,
+        onToolCall: onToolCall,
+      );
+
+  @override
+  Future<T> generateStructuredJson<T>({
+    required String systemPrompt,
+    required String userPrompt,
+    required T Function(Map<String, dynamic> json) fromJson,
+  }) =>
+      throw UnimplementedError();
 }
 
 class _ThrowingAi implements IAiService {
@@ -92,6 +116,30 @@ class _ThrowingAi implements IAiService {
 
   @override
   Future<String> generateInsight(String system, String context) =>
+      throw UnimplementedError();
+
+  @override
+  Stream<String> streamChatReply({
+    required String userMessage,
+    required String systemPrompt,
+    required List<Content> history,
+    List<Tool>? tools,
+    Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+  }) =>
+      streamCoachReply(
+        userMessage: userMessage,
+        systemPrompt: systemPrompt,
+        history: history,
+        tools: tools,
+        onToolCall: onToolCall,
+      );
+
+  @override
+  Future<T> generateStructuredJson<T>({
+    required String systemPrompt,
+    required String userPrompt,
+    required T Function(Map<String, dynamic> json) fromJson,
+  }) =>
       throw UnimplementedError();
 }
 

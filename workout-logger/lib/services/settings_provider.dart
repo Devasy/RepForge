@@ -16,7 +16,7 @@ class SettingsProvider extends ChangeNotifier {
   String? _userName;
   String? _lastSeenVersion;
   String _geminiApiKey = '';
-  String _geminiModel = 'gemini-2.5-flash';
+  String _geminiModel = 'gemini-3.6-flash';
   String _weeklyInsights = '';
   DateTime? _weeklyInsightsDate;
   bool _showAdvancedMetrics = false;
@@ -54,7 +54,7 @@ class SettingsProvider extends ChangeNotifier {
     _userName = await _storage.getSetting('userName');
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
-    _geminiModel = await _storage.getSetting('geminiModel') ?? 'gemini-2.5-flash';
+    _geminiModel = await _storage.getSetting('geminiModel') ?? 'gemini-3.6-flash';
     _weeklyInsights = await _storage.getSetting('weeklyInsights') ?? '';
     final dateStr = await _storage.getSetting('weeklyInsightsDate');
     _weeklyInsightsDate = dateStr != null ? DateTime.tryParse(dateStr) : null;

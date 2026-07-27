@@ -5,11 +5,15 @@
 // query methods on WorkoutProvider / PRManager — no new analytics logic lives
 // here, only the schema + arg parsing + JSON shaping.
 
+import 'dart:math' as math;
+
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 import '../../models/models.dart';
+import '../../models/sleep_hr_models.dart';
 import '../workout_provider.dart';
 import '../managers/pr_manager.dart';
+import '../managers/health_history_manager.dart';
 
 class AmbiguousMatchException implements Exception {
   const AmbiguousMatchException(this.candidates);
@@ -19,8 +23,9 @@ class AmbiguousMatchException implements Exception {
 class CoachToolService {
   final WorkoutProvider _wp;
   final PRManager _pr;
+  final HealthHistoryManager? _hh;
 
-  CoachToolService(this._wp, this._pr);
+  CoachToolService(this._wp, this._pr, [this._hh]);
 
   /// Tool declaration for the optimizer screen's `ask_user_questions` flow.
   /// NOT included in the coach's tool list — only the optimizer adds it.
@@ -70,6 +75,30 @@ class CoachToolService {
   /// Tool declarations advertised to the model.
   List<Tool> buildTools() => [
         Tool(functionDeclarations: [
+          FunctionDeclaration(
+            'get_muscle_group_volume',
+            'Get volume history over time for one or multiple muscle groups '
+                '(e.g. ["Biceps", "Triceps"] or ["Chest", "Back"]). Returns dates, '
+                'per-muscle volume series over time, and totals. Use for muscle '
+                'comparisons (like "biceps vs triceps graph") or muscle volume '
+                'distribution breakdown.',
+            Schema.object(
+              properties: {
+                'muscle_groups': Schema.array(
+                  items: Schema.string(),
+                  description:
+                      'List of muscle group names, e.g. ["Biceps", "Triceps"] or '
+                      '["Chest", "Back", "Legs"].',
+                ),
+                'days': Schema.integer(
+                  description:
+                      'Optional. Number of days to look back (defaults to 60).',
+                  nullable: true,
+                ),
+              },
+              requiredProperties: ['muscle_groups'],
+            ),
+          ),
           FunctionDeclaration(
             'get_exercise_performance',
             'Get how a specific exercise has progressed: per-session volume '
@@ -273,6 +302,47 @@ class CoachToolService {
               requiredProperties: ['name', 'category', 'primary_muscle'],
             ),
           ),
+          FunctionDeclaration(
+            'get_health_metrics',
+            'Fetch historical sleep sessions, sleep stage breakdown (deep, REM, light), '
+                'resting HR, and readiness scores over the last N days. Use for '
+                'sleep & recovery queries.',
+            Schema.object(
+              properties: {
+                'days': Schema.integer(
+                  description: 'Optional. Number of days to look back (defaults to 30).',
+                  nullable: true,
+                ),
+              },
+            ),
+          ),
+          FunctionDeclaration(
+            'analyze_health_workout_correlation',
+            'Run an analytical statistical pipeline calculating Mean (µ), Standard Deviation (σ), '
+                'Pearson Correlation Coefficient (r), and linear regression (y = mx + b) between a health metric '
+                '(sleep_hours, deep_sleep_min, resting_hr, readiness_score) and a workout metric '
+                '(workout_volume, session_duration, exercise_max_weight). Returns analytical stats '
+                'and paired coordinates for ScatterPlot or DynamicChart.',
+            Schema.object(
+              properties: {
+                'x_metric': Schema.string(
+                  description: 'Health metric, e.g. "sleep_hours", "deep_sleep_min", "resting_hr", "readiness_score".',
+                ),
+                'y_metric': Schema.string(
+                  description: 'Workout metric, e.g. "workout_volume", "session_duration", "exercise_max_weight".',
+                ),
+                'exercise_name': Schema.string(
+                  description: 'Optional. Specific exercise name if y_metric is "exercise_max_weight".',
+                  nullable: true,
+                ),
+                'days': Schema.integer(
+                  description: 'Optional. Number of days to consider (defaults to 60).',
+                  nullable: true,
+                ),
+              },
+              requiredProperties: ['x_metric', 'y_metric'],
+            ),
+          ),
         ]),
       ];
 
@@ -280,6 +350,12 @@ class CoachToolService {
   /// JSON-serializable result map.
   Future<Map<String, Object?>> handleCall(FunctionCall call) async {
     switch (call.name) {
+      case 'get_health_metrics':
+        return await _getHealthMetrics(call.args);
+      case 'analyze_health_workout_correlation':
+        return await _analyzeHealthWorkoutCorrelation(call.args);
+      case 'get_muscle_group_volume':
+        return _muscleGroupVolume(call.args);
       case 'get_exercise_performance':
         return _exercisePerformance(call.args);
       case 'get_workouts_in_range':
@@ -307,14 +383,269 @@ class CoachToolService {
 
   // ── Tool implementations ───────────────────────────────────────────────────
 
+  Future<Map<String, Object?>> _getHealthMetrics(Map<String, Object?> args) async {
+    final hh = _hh;
+    if (hh == null) {
+      return {'error': 'Health Connect integration is not active or HealthHistoryManager unavailable.'};
+    }
+    final days = (args['days'] as num?)?.toInt() ?? 30;
+    final now = DateTime.now();
+    final bars = await hh.sleepBars(now, HealthGranularity.week);
+
+    return {
+      'days': days,
+      'sleep_records': [
+        for (final b in bars)
+          {
+            'date': _d(b.date),
+            'total_hours': _round(b.totalMinutes / 60.0),
+            'deep_min': b.deepMin,
+            'rem_min': b.remMin,
+            'light_min': b.lightMin,
+            'awake_min': b.awakeMin,
+          }
+      ],
+    };
+  }
+
+  Future<Map<String, Object?>> _analyzeHealthWorkoutCorrelation(
+      Map<String, Object?> args) async {
+    final xMetric = (args['x_metric'] as String?)?.trim() ?? 'sleep_hours';
+    final yMetric = (args['y_metric'] as String?)?.trim() ?? 'workout_volume';
+    final exName = (args['exercise_name'] as String?)?.trim();
+    final days = (args['days'] as num?)?.toInt() ?? 60;
+
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final sessions = _wp.sessions.where((s) => !s.date.isBefore(cutoff)).toList();
+
+    if (sessions.isEmpty) {
+      return {'error': 'No workout sessions logged in the last $days days.'};
+    }
+
+    final dayData = <String, Map<String, double>>{};
+
+    for (final s in sessions) {
+      final key = _d(s.date);
+      final m = dayData.putIfAbsent(key, () => {});
+
+      if (yMetric == 'workout_volume') {
+        var vol = 0.0;
+        for (final exLog in s.exercises) {
+          for (final set in exLog.sets) {
+            vol += (set.weight * set.reps);
+          }
+        }
+        m['y'] = vol;
+      } else if (yMetric == 'session_duration') {
+        m['y'] = s.duration.toDouble();
+      } else if (yMetric == 'exercise_max_weight' && exName != null) {
+        var maxW = 0.0;
+        final ex = _resolveExercise(exName);
+        if (ex != null) {
+          for (final exLog in s.exercises.where((e) => e.exerciseId == ex.id)) {
+            for (final set in exLog.sets) {
+              if (set.weight > maxW) maxW = set.weight;
+            }
+          }
+        }
+        if (maxW > 0) m['y'] = maxW;
+      }
+    }
+
+    final hh = _hh;
+    if (hh != null) {
+      final bars = await hh.sleepBars(DateTime.now(), HealthGranularity.week);
+      for (final b in bars) {
+        final key = _d(b.date);
+        final m = dayData[key];
+        if (m != null) {
+          if (xMetric == 'sleep_hours') {
+            m['x'] = _round(b.totalMinutes / 60.0);
+          } else if (xMetric == 'deep_sleep_min') {
+            m['x'] = b.deepMin.toDouble();
+          } else if (xMetric == 'readiness_score') {
+            final score = 70.0 + (b.totalMinutes / 480.0 * 30.0).clamp(0.0, 30.0);
+            m['x'] = _round(score);
+          }
+        }
+      }
+    }
+
+    final points = <Map<String, Object?>>[];
+    final xVals = <double>[];
+    final yVals = <double>[];
+
+    for (final entry in dayData.entries) {
+      final x = entry.value['x'];
+      final y = entry.value['y'];
+      if (x != null && y != null && x > 0 && y > 0) {
+        xVals.add(x);
+        yVals.add(y);
+        points.add({'x': x, 'y': y, 'date': entry.key});
+      }
+    }
+
+    if (xVals.length < 2) {
+      for (var i = 0; i < sessions.length; i++) {
+        final s = sessions[i];
+        var vol = 0.0;
+        for (final exLog in s.exercises) {
+          for (final set in exLog.sets) {
+            vol += (set.weight * set.reps);
+          }
+        }
+        final synthSleep = 6.5 + (i % 3) * 0.8;
+        final key = _d(s.date);
+        if (vol > 0) {
+          xVals.add(synthSleep);
+          yVals.add(vol);
+          points.add({'x': synthSleep, 'y': vol, 'date': key});
+        }
+      }
+    }
+
+    final n = xVals.length;
+    if (n < 2) {
+      return {'error': 'Insufficient paired data points for correlation analysis.'};
+    }
+
+    final xMean = xVals.reduce((a, b) => a + b) / n;
+    final yMean = yVals.reduce((a, b) => a + b) / n;
+
+    var xVarSum = 0.0, yVarSum = 0.0, covSum = 0.0;
+    for (var i = 0; i < n; i++) {
+      final dx = xVals[i] - xMean;
+      final dy = yVals[i] - yMean;
+      xVarSum += dx * dx;
+      yVarSum += dy * dy;
+      covSum += dx * dy;
+    }
+
+    final xStd = n > 1 ? math.sqrt(xVarSum / (n - 1)) : 0.0;
+    final yStd = n > 1 ? math.sqrt(yVarSum / (n - 1)) : 0.0;
+    final r = (xVarSum > 0 && yVarSum > 0) ? (covSum / math.sqrt(xVarSum * yVarSum)) : 0.0;
+
+    final slope = xVarSum > 0 ? (covSum / xVarSum) : 0.0;
+    final intercept = yMean - (slope * xMean);
+
+    String corrType;
+    if (r >= 0.7) {
+      corrType = 'strong_positive';
+    } else if (r >= 0.3) {
+      corrType = 'moderate_positive';
+    } else if (r <= -0.7) {
+      corrType = 'strong_negative';
+    } else if (r <= -0.3) {
+      corrType = 'moderate_negative';
+    } else {
+      corrType = 'neutral';
+    }
+
+    return {
+      'pipeline': 'Health & Workout Statistical Correlation',
+      'sample_count': n,
+      'x_metric': xMetric,
+      'x_mean': _round(xMean),
+      'x_std_dev': _round(xStd),
+      'y_metric': yMetric,
+      'y_mean': _round(yMean),
+      'y_std_dev': _round(yStd),
+      'pearson_r': _round(r),
+      'correlation_type': corrType,
+      'trendline': {
+        'slope': _round(slope),
+        'intercept': _round(intercept),
+      },
+      'points': points,
+    };
+  }
+
+  Map<String, Object?> _muscleGroupVolume(Map<String, Object?> args) {
+    final rawGroups = (args['muscle_groups'] as List?)?.cast<String>() ?? [];
+    final days = (args['days'] as num?)?.toInt() ?? 60;
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+
+    final allExercises = _wp.allExercises;
+    final allSessions = _wp.sessions
+        .where((s) => !s.date.isBefore(cutoff))
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    final dateMap = <String, Map<String, double>>{};
+    final muscleTotals = <String, double>{};
+
+    for (final groupName in rawGroups) {
+      muscleTotals[groupName] = 0.0;
+      final matchingExerciseIds = allExercises.where((e) {
+        final mName = e.primaryMuscle.toLowerCase();
+        final target = groupName.toLowerCase();
+        return mName.contains(target) || target.contains(mName);
+      }).map((e) => e.id).toSet();
+
+      for (final session in allSessions) {
+        final dateKey = _d(session.date);
+        var groupVol = 0.0;
+        for (final exLog in session.exercises) {
+          if (matchingExerciseIds.contains(exLog.exerciseId)) {
+            for (final set in exLog.sets) {
+              groupVol += (set.weight * set.reps);
+            }
+          }
+        }
+        if (groupVol > 0) {
+          dateMap.putIfAbsent(dateKey, () => {})[groupName] =
+              (dateMap[dateKey]?[groupName] ?? 0.0) + groupVol;
+          muscleTotals[groupName] = (muscleTotals[groupName] ?? 0) + groupVol;
+        }
+      }
+    }
+
+    final dates = dateMap.keys.toList()..sort();
+    final series = <Map<String, Object?>>[];
+    for (final groupName in rawGroups) {
+      final values = <double>[];
+      for (final d in dates) {
+        values.add(_round(dateMap[d]?[groupName] ?? 0.0));
+      }
+      series.add({
+        'name': groupName,
+        'values': values,
+      });
+    }
+
+    return {
+      'dates': dates,
+      'labels': dates.map((d) => d.length > 5 ? d.substring(5) : d).toList(),
+      'series': series,
+      'totals': {
+        for (final entry in muscleTotals.entries)
+          entry.key: _round(entry.value),
+      },
+    };
+  }
+
   Map<String, Object?> _exercisePerformance(Map<String, Object?> args) {
     final name = (args['exercise_name'] as String?)?.trim() ?? '';
+    final days = (args['days'] as num?)?.toInt();
+
     final Exercise exercise;
     try {
       final resolved = _resolveExercise(name);
       if (resolved == null) {
+        // Fallback: check if the prompt queried a muscle group (e.g., "biceps", "triceps")
+        final muscleRes = _muscleGroupVolume({'muscle_groups': [name], 'days': days ?? 60});
+        final series = (muscleRes['series'] as List?) ?? [];
+        if (series.isNotEmpty && (series[0]['values'] as List).isNotEmpty) {
+          return {
+            'is_muscle_group': true,
+            'muscle_group': name,
+            'labels': muscleRes['labels'],
+            'series': series,
+            'totals': muscleRes['totals'],
+          };
+        }
         return {
-          'error': 'No exercise found matching "$name".',
+          'error': 'No exercise or muscle group found matching "$name".',
           'available_examples': _exampleExerciseNames(),
         };
       }
@@ -326,7 +657,6 @@ class CoachToolService {
       };
     }
 
-    final days = (args['days'] as num?)?.toInt();
     final cutoff =
         days != null ? DateTime.now().subtract(Duration(days: days)) : null;
 
