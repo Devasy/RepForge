@@ -30,10 +30,12 @@ Builds:
       - git -C $$flutter$$ checkout -f $FLUTTER_VERSION
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get --enforce-lockfile
+      - sed -i -e 's/-Wl,/-Wl,--build-id=none,/' $PUB_CACHE/hosted/pub.dev/jni-*/src/CMakeLists.txt
     scandelete:
       - workout-logger/.pub-cache
     build:
       - export PUB_CACHE=$(pwd)/.pub-cache
+      - export LDFLAGS="-Wl,--build-id=none"
       - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform="android-arm"
 
   - versionName: 2.0.6
@@ -50,10 +52,12 @@ Builds:
       - git -C $$flutter$$ checkout -f $FLUTTER_VERSION
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get --enforce-lockfile
+      - sed -i -e 's/-Wl,/-Wl,--build-id=none,/' $PUB_CACHE/hosted/pub.dev/jni-*/src/CMakeLists.txt
     scandelete:
       - workout-logger/.pub-cache
     build:
       - export PUB_CACHE=$(pwd)/.pub-cache
+      - export LDFLAGS="-Wl,--build-id=none"
       - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform="android-arm64"
 
   - versionName: 2.0.6
@@ -70,10 +74,12 @@ Builds:
       - git -C $$flutter$$ checkout -f $FLUTTER_VERSION
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get --enforce-lockfile
+      - sed -i -e 's/-Wl,/-Wl,--build-id=none,/' $PUB_CACHE/hosted/pub.dev/jni-*/src/CMakeLists.txt
     scandelete:
       - workout-logger/.pub-cache
     build:
       - export PUB_CACHE=$(pwd)/.pub-cache
+      - export LDFLAGS="-Wl,--build-id=none"
       - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform="android-x64"
 
 AutoUpdateMode: Version
