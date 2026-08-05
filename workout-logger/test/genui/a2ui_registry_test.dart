@@ -38,6 +38,32 @@ class _FakeSpec extends A2UiSpec<_FakeProps> {
       Text(props.title, textDirection: TextDirection.ltr);
 }
 
+/// A minimal fake spec with a configurable name/aliases, for exercising
+/// registry collision detection.
+class _NamedFakeSpec extends A2UiSpec<_FakeProps> {
+  const _NamedFakeSpec(this.name, {this.aliases = const []});
+
+  @override
+  final String name;
+
+  @override
+  final List<String> aliases;
+
+  @override
+  A2UiDoc get doc => const A2UiDoc(
+        schema: 'Fake {}',
+        purpose: 'A fake component for tests.',
+        example: {'component': 'Fake', 'props': {}},
+      );
+
+  @override
+  _FakeProps parseProps(A2UiNode node) => _FakeProps(node.props.text('title'));
+
+  @override
+  Widget buildWidget(BuildContext context, _FakeProps props, A2UiTheme theme) =>
+      Text(props.title, textDirection: TextDirection.ltr);
+}
+
 void main() {
   final registry = A2UiRegistry(const [_FakeSpec()]);
 
@@ -68,6 +94,37 @@ void main() {
 
     test('exposes specs in registration order', () {
       expect(registry.specs.map((s) => s.name), ['StatCard']);
+    });
+
+    test('throws when two specs share a canonical name', () {
+      expect(
+        () => A2UiRegistry(const [
+          _NamedFakeSpec('LineChart'),
+          _NamedFakeSpec('LineChart'),
+        ]),
+        throwsStateError,
+      );
+    });
+
+    test("throws when a spec's alias matches another spec's canonical name",
+        () {
+      expect(
+        () => A2UiRegistry(const [
+          _NamedFakeSpec('LineChart'),
+          _NamedFakeSpec('BarChart', aliases: ['LineChart']),
+        ]),
+        throwsStateError,
+      );
+    });
+
+    test('throws when two specs share an alias', () {
+      expect(
+        () => A2UiRegistry(const [
+          _NamedFakeSpec('LineChart', aliases: ['Chart']),
+          _NamedFakeSpec('BarChart', aliases: ['Chart']),
+        ]),
+        throwsStateError,
+      );
     });
   });
 

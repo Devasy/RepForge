@@ -6,6 +6,10 @@ import 'a2ui_props.dart';
 /// downstream code never re-normalizes. [children] is populated by the parser
 /// for any node that carried a `children` array, which keeps container-ness out
 /// of individual specs.
+///
+/// [children] is not defensively copied (this is a `const`-constructible
+/// value type). Callers must not retain a mutable reference to the list they
+/// pass in and mutate it afterward.
 class A2UiNode {
   const A2UiNode({
     required this.name,

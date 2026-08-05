@@ -8,11 +8,34 @@ import 'a2ui_spec.dart';
 class A2UiRegistry {
   A2UiRegistry(List<A2UiSpec> specs) : _specs = List.unmodifiable(specs) {
     for (final spec in _specs) {
-      _byName[A2UiProps.normalizeKey(spec.name)] = spec;
+      _register(A2UiProps.normalizeKey(spec.name), spec);
       for (final alias in spec.aliases) {
-        _byName.putIfAbsent(A2UiProps.normalizeKey(alias), () => spec);
+        _register(A2UiProps.normalizeKey(alias), spec);
       }
     }
+  }
+
+  /// Inserts [spec] under [key], throwing if [key] is already claimed —
+  /// whether by a canonical name, an alias, or a repeat registration of the
+  /// same spec class. Collisions are checked at insertion time in
+  /// registration order so the error always names both the spec already
+  /// registered and the one that collided with it, rather than silently
+  /// overwriting or being silently dropped. (Const specs with identical
+  /// fields canonicalize to `==` instances, so identity/equality checks
+  /// can't be used to distinguish "same spec registered twice" from "two
+  /// different specs that happen to collide" — every repeat claim of a key
+  /// is treated as a collision.)
+  void _register(String key, A2UiSpec spec) {
+    final existing = _byName[key];
+    if (existing != null) {
+      throw StateError(
+        'A2UiRegistry: "$key" is claimed by both '
+        '${existing.name} and ${spec.name} (canonical name or alias '
+        'collision). Component names and aliases must be unique across '
+        'the registry.',
+      );
+    }
+    _byName[key] = spec;
   }
 
   final List<A2UiSpec> _specs;
