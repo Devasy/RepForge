@@ -265,12 +265,13 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final isFirst = idx == 0;
     final isLast = idx >= totalExercises - 1;
 
+    final selectedHandle = log?.handle;
     final recommendations = exercise != null
-        ? provider.getRecommendations(exercise.id)
+        ? provider.getRecommendations(exercise.id, handle: selectedHandle)
         : <SetRecommendation>[];
 
     final lastSession = exercise != null
-        ? provider.getLastSessionForExercise(exercise.id)
+        ? provider.getLastSessionForExercise(exercise.id, handle: selectedHandle)
         : null;
 
     return Column(
@@ -316,6 +317,12 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               lastSession: lastSession,
               settings: settings,
               exerciseId: exercise?.id,
+              availableHandles: exercise?.availableHandles,
+              selectedHandle: selectedHandle,
+              onHandleChanged: (h) {
+                provider.setExerciseHandle(h);
+                _loadLastSessionData();
+              },
               programSlot: _slot(idx, p: provider),
               programWeek: _resolvedWeek(provider),
               onWeightChanged: (v) => setState(() => _currentWeight = v),

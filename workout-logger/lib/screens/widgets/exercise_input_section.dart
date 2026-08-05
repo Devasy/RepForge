@@ -37,6 +37,9 @@ class ExerciseInputSection extends StatelessWidget {
     this.programSlot,
     this.programWeek,
     this.exerciseId,
+    this.availableHandles,
+    this.selectedHandle,
+    this.onHandleChanged,
   });
 
   final double currentWeight;
@@ -63,15 +66,31 @@ class ExerciseInputSection extends StatelessWidget {
   final ProgramExerciseSlot? programSlot;
   final ProgramWeek? programWeek;
   final String? exerciseId;
+  final List<String>? availableHandles;
+  final String? selectedHandle;
+  final ValueChanged<String?>? onHandleChanged;
 
   @override
   Widget build(BuildContext context) {
+    final isAssistedBW = exerciseId == 'pull_ups' || exerciseId == 'chin_ups' || exerciseId == 'dips' || exerciseId == 'push_ups';
+    final effectiveWeight = (settings.userBodyWeight - currentWeight).clamp(0.0, 500.0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Program metadata
         if (programSlot != null && programWeek != null)
           _ProgramMetaBanner(slot: programSlot!, week: programWeek!),
+
+        // Handle / Attachment Selector
+        if (availableHandles != null && availableHandles!.isNotEmpty) ...[
+          _HandleSelector(
+            availableHandles: availableHandles!,
+            selectedHandle: selectedHandle,
+            onChanged: onHandleChanged,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
 
         // AI suggestion
         if (recommendations.isNotEmpty)
@@ -95,6 +114,27 @@ class ExerciseInputSection extends StatelessWidget {
             onWeightChanged: onWeightChanged,
             onRepsChanged: onRepsChanged,
           ),
+          if (isAssistedBW) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.fitness_center_rounded, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Effective Volume Load: ${effectiveWeight.toStringAsFixed(1)} ${settings.unitLabel} (${settings.userBodyWeight} BW − ${currentWeight.toStringAsFixed(1)} Assist) × $currentReps reps',
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSoft, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
         ],
 
@@ -134,6 +174,70 @@ class ExerciseInputSection extends StatelessWidget {
         // Last session
         const SizedBox(height: AppSpacing.lg),
         _LastSessionSection(lastSession: lastSession, settings: settings),
+      ],
+    );
+  }
+}
+
+// ── Handle Selector ──────────────────────────────────────────────────────────
+class _HandleSelector extends StatelessWidget {
+  const _HandleSelector({
+    required this.availableHandles,
+    required this.selectedHandle,
+    required this.onChanged,
+  });
+
+  final List<String> availableHandles;
+  final String? selectedHandle;
+  final ValueChanged<String?>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = selectedHandle ?? availableHandles.first;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ATTACHMENT / HANDLE VARIATION',
+          style: TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: availableHandles.map((handle) {
+              final isSelected = active == handle;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: FilterChip(
+                  label: Text(handle),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected && onChanged != null) {
+                      onChanged!(handle);
+                    }
+                  },
+                  selectedColor: AppColors.primary.withValues(alpha: 0.25),
+                  backgroundColor: AppColors.surface,
+                  checkmarkColor: AppColors.primary,
+                  labelStyle: TextStyle(
+                    color: isSelected ? AppColors.primary : AppColors.textSoft,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  side: BorderSide(
+                    color: isSelected ? AppColors.primary : AppColors.glassBorder,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ],
     );
   }

@@ -343,6 +343,22 @@ class CoachToolService {
               requiredProperties: ['x_metric', 'y_metric'],
             ),
           ),
+          FunctionDeclaration(
+            'get_sleeping_hr_analytics',
+            'Fetch and compute sleeping heart rate statistics over the past N days (e.g. 14 days). '
+                'Returns overnight p5 (5th percentile sleeping HR floor), p25, median, p75, p95, mean, min, max, '
+                'standard deviation (stdev), variance, linear trend (slope/direction), and nightly time-series data '
+                'formatted for GenUI components (DynamicChart line plot with series for p5, p25, mean, and StatCards). '
+                'Use whenever the user asks to analyze sleeping HR, overnight HR variation, or recovery trends.',
+            Schema.object(
+              properties: {
+                'days': Schema.integer(
+                  description: 'Optional. Number of days to analyze (defaults to 14).',
+                  nullable: true,
+                ),
+              },
+            ),
+          ),
         ]),
       ];
 
@@ -350,6 +366,8 @@ class CoachToolService {
   /// JSON-serializable result map.
   Future<Map<String, Object?>> handleCall(FunctionCall call) async {
     switch (call.name) {
+      case 'get_sleeping_hr_analytics':
+        return await _getSleepingHrAnalytics(call.args);
       case 'get_health_metrics':
         return await _getHealthMetrics(call.args);
       case 'analyze_health_workout_correlation':
@@ -382,6 +400,129 @@ class CoachToolService {
   }
 
   // ── Tool implementations ───────────────────────────────────────────────────
+
+  Future<Map<String, Object?>> _getSleepingHrAnalytics(
+      Map<String, Object?> args) async {
+    final hh = _hh;
+    if (hh == null) {
+      return {
+        'error':
+            'Health Connect integration is not active or HealthHistoryManager unavailable.'
+      };
+    }
+
+    final days = (args['days'] as num?)?.toInt() ?? 14;
+    final now = DateTime.now();
+    final dailyStats = <Map<String, Object?>>[];
+    final p5List = <double>[];
+    final p25List = <double>[];
+    final meanList = <double>[];
+    final labels = <String>[];
+
+    for (var i = days - 1; i >= 0; i--) {
+      final morning = now.subtract(Duration(days: i));
+      final dateStr = _d(morning);
+      final snap = await hh.sleepNight(morning);
+
+      if (snap != null) {
+        final p5 = snap.p5Bpm.toDouble();
+        final p95 = snap.p95Bpm.toDouble();
+
+        double meanBpm = 0;
+        double stdevBpm = 0;
+        double varianceBpm = 0;
+        double p25Bpm = p5;
+
+        if (snap.segments.isNotEmpty) {
+          final avgs = snap.segments.map((s) => s.avgBpm).toList()..sort();
+          meanBpm = avgs.reduce((a, b) => a + b) / avgs.length;
+          p25Bpm = avgs[(avgs.length * 0.25).floor().clamp(0, avgs.length - 1)];
+
+          final varSum =
+              avgs.fold(0.0, (sum, x) => sum + (x - meanBpm) * (x - meanBpm));
+          varianceBpm = varSum / avgs.length;
+          stdevBpm = math.sqrt(varianceBpm);
+        } else {
+          meanBpm = (p5 + p95) / 2.0;
+        }
+
+        p5List.add(p5);
+        p25List.add(_round(p25Bpm));
+        meanList.add(_round(meanBpm));
+        labels.add('${morning.month}/${morning.day}');
+
+        dailyStats.add({
+          'date': dateStr,
+          'p5_bpm': snap.p5Bpm,
+          'p25_bpm': _round(p25Bpm),
+          'mean_bpm': _round(meanBpm),
+          'p95_bpm': snap.p95Bpm,
+          'stdev': _round(stdevBpm),
+          'variance': _round(varianceBpm),
+          'segment_count': snap.segments.length,
+        });
+      }
+    }
+
+    if (p5List.isEmpty) {
+      return {
+        'error': 'No sleeping heart rate records found in the last $days days.'
+      };
+    }
+
+    final p5Mean = p5List.reduce((a, b) => a + b) / p5List.length;
+    final p5VarSum =
+        p5List.fold(0.0, (sum, x) => sum + (x - p5Mean) * (x - p5Mean));
+    final p5Variance = p5VarSum / p5List.length;
+    final p5Stdev = math.sqrt(p5Variance);
+
+    double slope = 0.0;
+    if (p5List.length > 1) {
+      final n = p5List.length;
+      double sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+      for (var i = 0; i < n; i++) {
+        sumX += i;
+        sumY += p5List[i];
+        sumXY += i * p5List[i];
+        sumXX += i * i;
+      }
+      final denom = n * sumXX - sumX * sumX;
+      if (denom != 0) {
+        slope = (n * sumXY - sumX * sumY) / denom;
+      }
+    }
+
+    final trendDirection =
+        slope < -0.1 ? 'improving' : (slope > 0.1 ? 'elevated' : 'stable');
+
+    return {
+      'days_analyzed': days,
+      'valid_nights_count': p5List.length,
+      'overall_summary': {
+        'mean_p5_sleeping_hr': _round(p5Mean),
+        'stdev_p5_sleeping_hr': _round(p5Stdev),
+        'variance_p5_sleeping_hr': _round(p5Variance),
+        'min_p5_sleeping_hr': p5List.reduce(math.min),
+        'max_p5_sleeping_hr': p5List.reduce(math.max),
+        'linear_trend_slope': _round(slope),
+        'trend_direction': trendDirection,
+      },
+      'daily_breakdown': dailyStats,
+      'genui_chart_props': {
+        'component': 'DynamicChart',
+        'props': {
+          'type': 'line',
+          'title': 'Overnight Sleeping HR Trend ($days Days)',
+          'labels': labels,
+          'series': [
+            {'name': 'P5 Sleeping HR', 'values': p5List},
+            {'name': 'P25 HR', 'values': p25List},
+            {'name': 'Mean HR', 'values': meanList},
+          ],
+        },
+      },
+    };
+  }
 
   Future<Map<String, Object?>> _getHealthMetrics(Map<String, Object?> args) async {
     final hh = _hh;

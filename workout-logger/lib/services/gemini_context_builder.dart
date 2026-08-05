@@ -50,11 +50,10 @@ class GeminiContextBuilder {
         'bold, tables) where it aids clarity.',
       )
       ..writeln()
-      ..writeln('GENUI / A2UI DASHBOARD MODE:')
       ..writeln(
         'When the user asks for a dashboard, chart, visual summary, KPI view, '
-        'health & recovery analysis, statistical correlation, or analytics panel: '
-        '1) Call the relevant query or analytics tools (e.g. get_muscle_group_volume, get_health_metrics, analyze_health_workout_correlation). '
+        'health & recovery analysis, sleeping HR variation, statistical correlation, or analytics panel: '
+        '1) Call the relevant query or analytics tools (e.g. get_sleeping_hr_analytics, get_muscle_group_volume, get_health_metrics, analyze_health_workout_correlation). '
         '2) Return ONLY one valid JSON object using this A2UI shape: '
         '{"component":"GridContainer","props":{"columns":1|2,"children":[...]}}. '
         'Do not wrap it in Markdown and do not add conversational text.',
@@ -72,15 +71,18 @@ class GeminiContextBuilder {
       )
       ..writeln(
         'CHART & COMPONENT SELECTION GUIDELINES: '
-        '1) STATISTICAL CORRELATIONS (e.g. "does sleep affect my bench press / volume?", "correlation between readiness and max weight"): '
+        '1) SLEEPING HR ANALYTICS (e.g. "analyse how my sleeping hr is varying across past 14 days"): '
+        'Call get_sleeping_hr_analytics first. Then render a GridContainer with a DynamicChart (type: "line", series for P5 Sleeping HR, P25 HR, Mean HR) '
+        'alongside StatCards displaying Mean P5 HR, StdDev (σ), Variance (σ²), and Linear Trend. '
+        '2) STATISTICAL CORRELATIONS (e.g. "does sleep affect my bench press / volume?"): '
         'Call analyze_health_workout_correlation first, then render a ScatterPlot component with points, trendline, and correlation coefficient (r). '
-        '2) RECOVERY & HOLISTIC SUMMARIES: Use RadarChart for multi-axis balance (e.g. Readiness, Sleep, Volume, Intensity) or MetricGauge for Readiness scores. '
-        '3) COMPARISONS (e.g. "biceps vs triceps"): Use DynamicChart with type:"line" or type:"bar" and multiple series objects. '
-        '4) DISTRIBUTIONS / BREAKDOWNS: Use DynamicChart with type:"pie". '
+        '3) RECOVERY & HOLISTIC SUMMARIES: Use RadarChart for multi-axis balance (e.g. Readiness, Sleep, Volume, Intensity) or MetricGauge for Readiness scores. '
+        '4) COMPARISONS (e.g. "biceps vs triceps"): Use DynamicChart with type:"line" or type:"bar" and multiple series objects. '
+        '5) DISTRIBUTIONS / BREAKDOWNS: Use DynamicChart with type:"pie". '
         'Trends must be "up", "down", or "neutral". All numerical values must be numbers.',
       )
       ..writeln(
-        'Vary the layout thoughtfully based on the query: combine StatCards, ScatterPlots, RadarCharts, MetricGauges, or DataListGroups. Keep components scannable and clean.',
+        'Vary the layout thoughtfully based on the query: combine StatCards, DynamicCharts, ScatterPlots, RadarCharts, MetricGauges, or DataListGroups. Keep components scannable and clean.',
       )
       ..writeln(
         'If local data is unavailable or insufficient for the requested '

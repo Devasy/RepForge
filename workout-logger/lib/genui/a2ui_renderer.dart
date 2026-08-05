@@ -47,12 +47,12 @@ class _A2GridContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final columns = (data['columns'] as num).toInt();
+    final columns = (data['columns'] as num?)?.toInt() ?? 1;
     final children = component.children;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final effectiveColumns = constraints.maxWidth < 340 ? 1 : columns;
+        final effectiveColumns = constraints.maxWidth < 420 ? 1 : columns;
         if (effectiveColumns == 1) {
           return Column(
             mainAxisSize: MainAxisSize.min,
@@ -105,7 +105,12 @@ class _A2StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trend = data['trend'] as String;
+    final trendRaw = data['trend']?.toString().toLowerCase() ?? 'neutral';
+    final trend = (trendRaw == 'up' || trendRaw == 'improving' || trendRaw == 'positive')
+        ? 'up'
+        : ((trendRaw == 'down' || trendRaw == 'declining' || trendRaw == 'decline' || trendRaw == 'negative')
+            ? 'down'
+            : 'neutral');
     final trendColor = switch (trend) {
       'up' => AppColors.success,
       'down' => AppColors.error,
@@ -116,6 +121,16 @@ class _A2StatCard extends StatelessWidget {
       'down' => Icons.trending_down_rounded,
       _ => Icons.trending_flat_rounded,
     };
+
+    final title = data['title']?.toString() ?? 'Metric';
+    final val = data['value'];
+    final unit = data['unit']?.toString();
+    final rawValStr = val is String ? val : (val != null ? val.toString() : '—');
+    final valueStr = (unit != null && unit.isNotEmpty && !rawValStr.contains(unit))
+        ? '$rawValStr $unit'
+        : rawValStr;
+
+    final subtitle = data['subtitle']?.toString();
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -128,7 +143,7 @@ class _A2StatCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  data['title'] as String,
+                  title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -146,7 +161,7 @@ class _A2StatCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             fit: BoxFit.scaleDown,
             child: Text(
-              data['value'] as String,
+              valueStr,
               style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 22,
@@ -154,7 +169,7 @@ class _A2StatCard extends StatelessWidget {
               ),
             ),
           ),
-          if (data['subtitle'] case final String subtitle) ...[
+          if (subtitle != null && subtitle.isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
               subtitle,
@@ -240,9 +255,9 @@ class _A2DynamicChart extends StatelessWidget {
       final result = <_SeriesData>[];
       for (final item in rawSeries) {
         if (item is Map<String, Object?>) {
-          final name = item['name'] as String? ?? 'Series';
+          final name = item['name']?.toString() ?? 'Series';
           final vals = (item['values'] as List?)
-                  ?.map((v) => (v as num).toDouble())
+                  ?.map((v) => v is num ? v.toDouble() : (double.tryParse(v?.toString() ?? '') ?? 0.0))
                   .toList() ??
               const [];
           result.add(_SeriesData(name: name, values: vals));
@@ -252,8 +267,10 @@ class _A2DynamicChart extends StatelessWidget {
     }
 
     if (data['values'] case final List rawVals when rawVals.isNotEmpty) {
-      final vals = rawVals.map((v) => (v as num).toDouble()).toList();
-      return [_SeriesData(name: data['title'] as String? ?? 'Value', values: vals)];
+      final vals = rawVals
+          .map((v) => v is num ? v.toDouble() : (double.tryParse(v?.toString() ?? '') ?? 0.0))
+          .toList();
+      return [_SeriesData(name: data['title']?.toString() ?? 'Value', values: vals)];
     }
 
     return const [];

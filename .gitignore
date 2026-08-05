@@ -94,3 +94,6 @@ repforge_backup_*.json
 tmp_hive_*/
 **/tmp_hive_*/
 
+
+# Subagent-driven-development scratch workspace
+.superpowers/

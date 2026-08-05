@@ -70,6 +70,7 @@ class Exercise {
   final List<MuscleActivation> muscleActivations;
   final String category; // 'compound' or 'isolation'
   final bool isCustom; // User-created exercise
+  final List<String>? availableHandles; // Attachment/handle options e.g. ['Rope', 'Bar']
 
   Exercise({
     required this.id,
@@ -77,6 +78,7 @@ class Exercise {
     required this.muscleActivations,
     required this.category,
     this.isCustom = false,
+    this.availableHandles,
   });
 
   String get primaryMuscle {
@@ -93,6 +95,7 @@ class Exercise {
     'muscleActivations': muscleActivations.map((m) => m.toJson()).toList(),
     'category': category,
     'isCustom': isCustom,
+    'availableHandles': availableHandles,
   };
 
   factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
@@ -103,6 +106,7 @@ class Exercise {
         .toList(),
     category: json['category'],
     isCustom: json['isCustom'] ?? false,
+    availableHandles: (json['availableHandles'] as List?)?.cast<String>(),
   );
 }
 
@@ -115,6 +119,9 @@ class WorkoutSet {
   final List<DropsetEntry>? drops; // For dropsets
   final int? timeTaken; // seconds
   final DateTime timestamp;
+  final double? assistWeight;
+  final double? extraWeight;
+  final String? handle;
 
   WorkoutSet({
     required this.weight,
@@ -123,17 +130,31 @@ class WorkoutSet {
     this.drops,
     this.timeTaken,
     DateTime? timestamp,
+    this.assistWeight,
+    this.extraWeight,
+    this.handle,
   }) : timestamp = timestamp ?? DateTime.now();
 
-  double get volume {
-    double vol = weight * reps;
+  double calculateVolume({double userBodyWeight = 70.0, bool isAssistedBW = false}) {
+    double effW;
+    if (isAssistedBW) {
+      final assist = assistWeight ?? weight;
+      final extra = extraWeight ?? 0.0;
+      effW = max(0.0, userBodyWeight - assist + extra);
+    } else {
+      effW = weight;
+    }
+    double vol = effW * reps;
     if (isDropset && drops != null) {
       for (var drop in drops!) {
-        vol += drop.weight * drop.reps;
+        final dropEff = isAssistedBW ? max(0.0, userBodyWeight - drop.weight + (extraWeight ?? 0.0)) : drop.weight;
+        vol += dropEff * drop.reps;
       }
     }
     return vol;
   }
+
+  double get volume => calculateVolume();
 
   Map<String, dynamic> toJson() => {
     'weight': weight,
@@ -142,6 +163,9 @@ class WorkoutSet {
     'drops': drops?.map((d) => d.toJson()).toList(),
     'timeTaken': timeTaken,
     'timestamp': timestamp.toIso8601String(),
+    'assistWeight': assistWeight,
+    'extraWeight': extraWeight,
+    'handle': handle,
   };
 
   factory WorkoutSet.fromJson(Map<String, dynamic> json) => WorkoutSet(
@@ -153,6 +177,9 @@ class WorkoutSet {
         : null,
     timeTaken: json['timeTaken'],
     timestamp: DateTime.parse(json['timestamp']),
+    assistWeight: (json['assistWeight'] as num?)?.toDouble(),
+    extraWeight: (json['extraWeight'] as num?)?.toDouble(),
+    handle: json['handle'] as String?,
   );
 
   WorkoutSet copyWith({
@@ -162,6 +189,9 @@ class WorkoutSet {
     Object? drops = _sentinel,
     Object? timeTaken = _sentinel,
     Object? timestamp = _sentinel,
+    Object? assistWeight = _sentinel,
+    Object? extraWeight = _sentinel,
+    Object? handle = _sentinel,
   }) => WorkoutSet(
     weight: weight == _sentinel ? this.weight : weight as double,
     reps: reps == _sentinel ? this.reps : reps as int,
@@ -169,6 +199,9 @@ class WorkoutSet {
     drops: drops == _sentinel ? this.drops : drops as List<DropsetEntry>?,
     timeTaken: timeTaken == _sentinel ? this.timeTaken : timeTaken as int?,
     timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime?,
+    assistWeight: assistWeight == _sentinel ? this.assistWeight : assistWeight as double?,
+    extraWeight: extraWeight == _sentinel ? this.extraWeight : extraWeight as double?,
+    handle: handle == _sentinel ? this.handle : handle as String?,
   );
 }
 
@@ -195,8 +228,17 @@ class ExerciseLog {
   final String exerciseId;
   final List<WorkoutSet> sets;
   final String? notes;
+  final String? handle;
 
-  ExerciseLog({required this.exerciseId, required this.sets, this.notes});
+  ExerciseLog({
+    required this.exerciseId,
+    required this.sets,
+    this.notes,
+    this.handle,
+  });
+
+  double calculateTotalVolume({double userBodyWeight = 70.0, bool isAssistedBW = false}) =>
+      sets.fold(0.0, (sum, set) => sum + set.calculateVolume(userBodyWeight: userBodyWeight, isAssistedBW: isAssistedBW));
 
   double get totalVolume => sets.fold(0.0, (sum, set) => sum + set.volume);
 
@@ -204,24 +246,28 @@ class ExerciseLog {
     'exerciseId': exerciseId,
     'sets': sets.map((s) => s.toJson()).toList(),
     'notes': notes,
+    'handle': handle,
   };
 
   factory ExerciseLog.fromJson(Map<String, dynamic> json) => ExerciseLog(
     exerciseId: json['exerciseId'],
     sets: (json['sets'] as List).map((s) => WorkoutSet.fromJson(s)).toList(),
     notes: json['notes'],
+    handle: json['handle'] as String?,
   );
 
   ExerciseLog copyWith({
     Object? exerciseId = _sentinel,
     Object? sets = _sentinel,
     Object? notes = _sentinel,
+    Object? handle = _sentinel,
   }) => ExerciseLog(
     exerciseId: exerciseId == _sentinel
         ? this.exerciseId
         : exerciseId as String,
     sets: sets == _sentinel ? this.sets : sets as List<WorkoutSet>,
     notes: notes == _sentinel ? this.notes : notes as String?,
+    handle: handle == _sentinel ? this.handle : handle as String?,
   );
 }
 

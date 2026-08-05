@@ -26,7 +26,6 @@ import 'ml_service.dart';
 import 'strategies/target_calculator.dart';
 import 'managers/program_manager.dart';
 import 'managers/history_manager.dart';
-import 'utils/exercise_history.dart';
 
 enum StartWorkoutConflictAction { resume, discardAndStart, cancel }
 
@@ -504,14 +503,31 @@ class WorkoutProvider extends ChangeNotifier {
     return _currentExerciseLogs[_currentExerciseIndex];
   }
 
-  /// Add a set to current exercise
-  void addSet(WorkoutSet set) {
+  /// Set handle variation for current exercise
+  void setExerciseHandle(String? handle) {
     if (_currentExerciseIndex < _currentExerciseLogs.length) {
       final currentLog = _currentExerciseLogs[_currentExerciseIndex];
       _currentExerciseLogs[_currentExerciseIndex] = ExerciseLog(
         exerciseId: currentLog.exerciseId,
-        sets: [...currentLog.sets, set],
+        sets: currentLog.sets.map((s) => s.copyWith(handle: handle)).toList(),
         notes: currentLog.notes,
+        handle: handle,
+      );
+      notifyListeners();
+      unawaited(_persistDraft());
+    }
+  }
+
+  /// Add a set to current exercise
+  void addSet(WorkoutSet set) {
+    if (_currentExerciseIndex < _currentExerciseLogs.length) {
+      final currentLog = _currentExerciseLogs[_currentExerciseIndex];
+      final setWithHandle = set.copyWith(handle: set.handle ?? currentLog.handle);
+      _currentExerciseLogs[_currentExerciseIndex] = ExerciseLog(
+        exerciseId: currentLog.exerciseId,
+        sets: [...currentLog.sets, setWithHandle],
+        notes: currentLog.notes,
+        handle: currentLog.handle,
       );
       notifyListeners();
       unawaited(_persistDraft());
@@ -637,26 +653,64 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== RECOMMENDATIONS ====================
 
-  /// Get set recommendations for an exercise.
+  /// Get set recommendations for an exercise, optionally scoped by [handle].
   ///
-  /// Uses the most-recently-dated session that contains this exercise as the
-  /// basis for the recommendation. Order in `_sessions` is not assumed.
-  List<SetRecommendation> getRecommendations(String exerciseId) {
-    final lastLog = findMostRecentExerciseLog(exerciseId, _sessions);
+  /// Uses up to 3 past sessions for this exercise (and handle variation) as the
+  /// basis for trend analysis and deload recovery.
+  List<SetRecommendation> getRecommendations(String exerciseId, {String? handle}) {
+    final recent = getRecentSessionsForExercise(exerciseId, handle: handle, limit: 3);
 
-    if (lastLog == null || lastLog.sets.isEmpty) {
+    if (recent.isEmpty) {
       return _mlService.getDefaultRecommendations(3);
     }
 
     return _mlService.recommendSets(
-      lastSession: lastLog.sets,
+      lastSession: recent.first,
+      pastSessions: recent,
       growthModel: _growthModels[exerciseId],
     );
   }
 
+  /// Get up to [limit] recent sessions for [exerciseId], optionally matching [handle].
+  List<List<WorkoutSet>> getRecentSessionsForExercise(
+    String exerciseId, {
+    String? handle,
+    int limit = 3,
+  }) {
+    final sortedSessions = [..._sessions]..sort((a, b) => b.date.compareTo(a.date));
+    final results = <List<WorkoutSet>>[];
+    for (final s in sortedSessions) {
+      for (final exLog in s.exercises.where((e) => e.exerciseId == exerciseId)) {
+        if (handle != null &&
+            handle.isNotEmpty &&
+            exLog.handle != null &&
+            exLog.handle != handle) {
+          continue;
+        }
+        if (exLog.sets.isNotEmpty) {
+          results.add(exLog.sets);
+          if (results.length >= limit) return results;
+        }
+      }
+    }
+    return results;
+  }
+
   /// Get the most recent exercise log for [exerciseId], or null if never logged.
-  ExerciseLog? getLastSessionForExercise(String exerciseId) {
-    return findMostRecentExerciseLog(exerciseId, _sessions);
+  ExerciseLog? getLastSessionForExercise(String exerciseId, {String? handle}) {
+    final sortedSessions = [..._sessions]..sort((a, b) => b.date.compareTo(a.date));
+    for (final s in sortedSessions) {
+      for (final exLog in s.exercises.where((e) => e.exerciseId == exerciseId)) {
+        if (handle != null &&
+            handle.isNotEmpty &&
+            exLog.handle != null &&
+            exLog.handle != handle) {
+          continue;
+        }
+        return exLog;
+      }
+    }
+    return null;
   }
 
   // ==================== SESSION MANAGEMENT ====================

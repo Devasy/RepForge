@@ -21,11 +21,23 @@ class A2UiComponent {
   final Map<String, dynamic> props;
 
   static A2UiComponent? tryParse(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty || !trimmed.startsWith('{')) return null;
+    var trimmed = text.trim();
+    if (trimmed.startsWith('```')) {
+      final firstLineEnd = trimmed.indexOf('\n');
+      if (firstLineEnd != -1) {
+        trimmed = trimmed.substring(firstLineEnd + 1);
+      }
+      if (trimmed.endsWith('```')) {
+        trimmed = trimmed.substring(0, trimmed.length - 3).trim();
+      }
+    }
+    final firstBrace = trimmed.indexOf('{');
+    final lastBrace = trimmed.lastIndexOf('}');
+    if (firstBrace == -1 || lastBrace == -1 || firstBrace >= lastBrace) return null;
+    final jsonSubstring = trimmed.substring(firstBrace, lastBrace + 1);
 
     try {
-      final decoded = jsonDecode(trimmed);
+      final decoded = jsonDecode(jsonSubstring);
       if (decoded is! Map<String, dynamic>) return null;
       return fromJson(decoded);
     } catch (_) {
@@ -53,97 +65,61 @@ class A2UiComponent {
   static bool _validProps(String component, Map<String, dynamic> props) {
     switch (component) {
       case 'StatCard':
-        return props['title'] is String &&
-            props['value'] is String &&
-            _optionalString(props, 'subtitle') &&
-            _oneOf(props['trend'], const ['up', 'down', 'neutral']);
+        final hasTitle = props['title'] is String || props['title'] is num;
+        final hasVal = props['value'] is String || props['value'] is num;
+        return hasTitle && hasVal;
       case 'DynamicChart':
-        final typeOk = _oneOf(props['type'], const ['line', 'bar', 'pie']);
-        final titleOk = props['title'] is String;
+        final typeOk = !props.containsKey('type') || _oneOf(props['type'], const ['line', 'bar', 'pie']);
+        final titleOk = props['title'] is String || props['title'] is num || !props.containsKey('title');
         final labelsOk = _stringList(props['labels']) != null;
         final singleValOk = _numList(props['values']) != null;
         final seriesOk = props['series'] is List &&
-            (props['series'] as List).isNotEmpty &&
-            (props['series'] as List).every((s) =>
-                s is Map<String, dynamic> &&
-                s['name'] is String &&
-                _numList(s['values']) != null);
+            (props['series'] as List).isNotEmpty;
         return typeOk && titleOk && labelsOk && (singleValOk || seriesOk);
       case 'DataListGroup':
         final items = props['items'];
-        return props['title'] is String &&
-            items is List &&
-            items.every((item) {
-              if (item is! Map<String, dynamic>) return false;
-              return item['primaryText'] is String &&
-                  item['secondaryText'] is String &&
-                  item['trailingValue'] is String;
-            });
+        return (props['title'] is String || !props.containsKey('title')) && items is List;
       case 'FilterChips':
         final options = _stringList(props['options']);
-        return options != null &&
-            props['activeOption'] is String &&
-            options.contains(props['activeOption']);
+        return options != null;
       case 'GridContainer':
-        final columns = props['columns'];
         final children = props['children'];
-        return (columns == 1 || columns == 2) &&
-            children is List &&
+        return children is List &&
             children.every(
               (child) =>
                   child is Map<String, dynamic> && fromJson(child) != null,
             );
       case 'ScatterPlot':
         final points = props['points'];
-        final pointsOk = points is List &&
-            points.isNotEmpty &&
-            points.every((p) => p is Map<String, dynamic> && p['x'] is num && p['y'] is num);
-        final corrOk = !props.containsKey('correlation') || props['correlation'] is num;
-        final trendOk = !props.containsKey('trendline') ||
-            (props['trendline'] is Map<String, dynamic> &&
-                (props['trendline'] as Map)['slope'] is num &&
-                (props['trendline'] as Map)['intercept'] is num);
-        return props['title'] is String &&
-            props['xLabel'] is String &&
-            props['yLabel'] is String &&
-            pointsOk &&
-            corrOk &&
-            trendOk;
+        return points is List && points.isNotEmpty;
       case 'RadarChart':
         final axesOk = _stringList(props['axes']) != null;
         final series = props['series'];
-        final seriesOk = series is List &&
-            series.isNotEmpty &&
-            series.every((s) =>
-                s is Map<String, dynamic> &&
-                s['name'] is String &&
-                _numList(s['values']) != null);
-        return props['title'] is String && axesOk && seriesOk;
+        return axesOk && series is List && series.isNotEmpty;
       case 'MetricGauge':
-        final valOk = props['value'] is num;
-        final minOk = !props.containsKey('min') || props['min'] is num;
-        final maxOk = !props.containsKey('max') || props['max'] is num;
-        final unitOk = _optionalString(props, 'unit');
-        final statusOk = _optionalString(props, 'status');
-        return props['title'] is String && valOk && minOk && maxOk && unitOk && statusOk;
+        return (props['value'] is num || props['value'] is String);
     }
     return false;
   }
 
-  static bool _optionalString(Map<String, dynamic> props, String key) =>
-      !props.containsKey(key) || props[key] is String;
+  static bool _optionalStringOrNum(Map<String, dynamic> props, String key) =>
+      !props.containsKey(key) || props[key] is String || props[key] is num;
 
   static bool _oneOf(Object? value, List<String> options) =>
       value is String && options.contains(value);
 
   static List<String>? _stringList(Object? value) {
-    if (value is! List || value.any((item) => item is! String)) return null;
-    return value.cast<String>();
+    if (value is! List) return null;
+    return value.map((item) => item?.toString() ?? '').toList();
   }
 
   static List<double>? _numList(Object? value) {
-    if (value is! List || value.any((item) => item is! num)) return null;
-    return value.map((item) => (item as num).toDouble()).toList();
+    if (value is! List) return null;
+    return value
+        .map((item) => item is num
+            ? item.toDouble()
+            : (double.tryParse(item?.toString() ?? '') ?? 0.0))
+        .toList();
   }
 
   List<A2UiComponent> get children {
@@ -157,11 +133,13 @@ class A2UiComponent {
   }
 
   List<String> get stringLabels =>
-      (props['labels'] as List?)?.cast<String>() ?? const [];
+      (props['labels'] as List?)?.map((item) => item?.toString() ?? '').toList() ?? const [];
 
   List<double> get numericValues =>
       (props['values'] as List?)
-          ?.map((value) => (value as num).toDouble())
+          ?.map((value) => value is num
+              ? value.toDouble()
+              : (double.tryParse(value?.toString() ?? '') ?? 0.0))
           .toList() ??
       const [];
 }

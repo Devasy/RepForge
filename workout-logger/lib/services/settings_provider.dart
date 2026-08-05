@@ -21,6 +21,8 @@ class SettingsProvider extends ChangeNotifier {
   DateTime? _weeklyInsightsDate;
   bool _showAdvancedMetrics = false;
 
+  double _userBodyWeight = 70.0;
+
   WeightUnit get weightUnit => _weightUnit;
   double get weightIncrement => _weightIncrement;
   String get unitLabel => _weightUnit == WeightUnit.kg ? 'kg' : 'lbs';
@@ -33,6 +35,7 @@ class SettingsProvider extends ChangeNotifier {
   String get weeklyInsights => _weeklyInsights;
   DateTime? get weeklyInsightsDate => _weeklyInsightsDate;
   bool get showAdvancedMetrics => _showAdvancedMetrics;
+  double get userBodyWeight => _userBodyWeight;
 
   SettingsProvider(this._storage);
 
@@ -44,6 +47,9 @@ class SettingsProvider extends ChangeNotifier {
     _weightIncrement = increment != null
         ? (double.tryParse(increment) ?? _defaultIncrement)
         : _defaultIncrement;
+
+    final bw = await _storage.getSetting('userBodyWeight');
+    _userBodyWeight = bw != null ? (double.tryParse(bw) ?? 70.0) : 70.0;
 
     final hcEnabled = await _storage.getSetting('healthConnectEnabled');
     _healthConnectEnabled = hcEnabled == 'true';
@@ -60,6 +66,12 @@ class SettingsProvider extends ChangeNotifier {
     _weeklyInsightsDate = dateStr != null ? DateTime.tryParse(dateStr) : null;
     final advMetrics = await _storage.getSetting('showAdvancedMetrics');
     _showAdvancedMetrics = advMetrics == 'true';
+  }
+
+  Future<void> setUserBodyWeight(double weight) async {
+    _userBodyWeight = weight;
+    await _storage.saveSetting('userBodyWeight', weight.toString());
+    notifyListeners();
   }
 
   Future<void> setUserName(String name) async {
