@@ -28,7 +28,11 @@ class A2UiParser {
   A2UiNode? parse(String text) {
     final json = _extractJson(text);
     if (json == null) return null;
-    if (json is List) return _wrap(json);
+    // A bare top-level array is ambiguous when it holds exactly one item —
+    // it may be an intentional list or just a single component that happens
+    // to be array-wrapped, so a single item collapses to itself rather than
+    // being wrapped in a container.
+    if (json is List) return _wrap(json, collapseSingle: true);
     if (json is Map) return parseJson(A2UiProps.stringKeyed(json));
     return null;
   }
@@ -40,11 +44,18 @@ class A2UiParser {
     final spec = rawName == null ? null : registry.specFor(rawName);
 
     if (spec == null) {
-      // No component key — try each envelope shape before giving up.
+      // No component key — try each envelope shape before giving up. An
+      // envelope key is an explicit "this is a container of components"
+      // signal from the model, so even a single-item envelope still
+      // produces a GridContainer rather than collapsing to the bare child.
       for (final key in _envelopeKeys) {
         final candidate = json[key];
         if (candidate is List) {
-          final wrapped = _wrap(candidate, columns: props.integer('columns', or: 1));
+          final wrapped = _wrap(
+            candidate,
+            columns: props.integer('columns', or: 1),
+            collapseSingle: false,
+          );
           if (wrapped != null) return wrapped;
         }
       }
@@ -107,7 +118,19 @@ class A2UiParser {
   bool _declaresChildren(Map<String, Object?> props) =>
       A2UiProps(props).lookup('children') is List;
 
-  A2UiNode? _wrap(List<Object?> items, {int columns = 1}) {
+  /// Wraps [items] in a `GridContainer`, dropping any item that isn't a
+  /// recognised component. When [collapseSingle] is true, a single
+  /// surviving child is returned bare instead of wrapped — used for the
+  /// bare top-level array case, where a one-item array is ambiguous
+  /// between "a list with one component" and "just a component". Envelope
+  /// keys (`components`, `children`, `ui`, `elements`) pass
+  /// `collapseSingle: false` because naming an envelope key is an explicit
+  /// request for a container, even with one child.
+  A2UiNode? _wrap(
+    List<Object?> items, {
+    int columns = 1,
+    required bool collapseSingle,
+  }) {
     final children = <A2UiNode>[];
     for (final item in items) {
       if (item is! Map) continue;
@@ -115,7 +138,7 @@ class A2UiParser {
       if (node != null) children.add(node);
     }
     if (children.isEmpty) return null;
-    if (children.length == 1) return children.single;
+    if (collapseSingle && children.length == 1) return children.single;
     return A2UiNode(
       name: _containerName,
       props: A2UiProps({'columns': columns}),
@@ -123,31 +146,83 @@ class A2UiParser {
     );
   }
 
-  /// Pulls the outermost JSON object or array out of [text], tolerating
-  /// fences and surrounding prose. Returns null when nothing decodes.
+  /// Pulls a JSON object or array out of [text], tolerating fences and
+  /// surrounding prose. Returns null when nothing decodes.
+  ///
+  /// Rather than slicing from the first `{`/`[` to the last `}`/`]` in the
+  /// whole text (which breaks the moment prose contains any stray brace,
+  /// e.g. "add reps {optional}"), this scans every position that could
+  /// start a JSON value, walks forward with a bracket-depth counter that
+  /// tracks whether it's inside a string literal (so quoted brackets don't
+  /// affect balance and `\"` doesn't end a string early), and attempts
+  /// `jsonDecode` on each balanced span found. Among all spans that decode
+  /// successfully to a Map or List, the longest one wins: the actual
+  /// payload is normally the largest well-formed JSON structure in the
+  /// text, while incidental prose braces either fail to decode (not valid
+  /// JSON) or are short.
   static Object? _extractJson(String text) {
     final t = stripFences(text);
     if (t.isEmpty) return null;
 
-    final candidates = <String>[];
-    final firstBrace = t.indexOf('{');
-    final lastBrace = t.lastIndexOf('}');
-    if (firstBrace != -1 && lastBrace > firstBrace) {
-      candidates.add(t.substring(firstBrace, lastBrace + 1));
-    }
-    final firstBracket = t.indexOf('[');
-    final lastBracket = t.lastIndexOf(']');
-    if (firstBracket != -1 && lastBracket > firstBracket) {
-      candidates.add(t.substring(firstBracket, lastBracket + 1));
-    }
+    String? bestCandidate;
+    Object? bestValue;
 
-    for (final candidate in candidates) {
+    for (var i = 0; i < t.length; i++) {
+      final ch = t[i];
+      if (ch != '{' && ch != '[') continue;
+      final end = _findBalancedEnd(t, i);
+      if (end == -1) continue;
+
+      final candidate = t.substring(i, end + 1);
+      Object? decoded;
       try {
-        return jsonDecode(candidate);
+        decoded = jsonDecode(candidate);
       } catch (_) {
         continue;
       }
+      if (decoded is! Map && decoded is! List) continue;
+
+      if (bestCandidate == null || candidate.length > bestCandidate.length) {
+        bestCandidate = candidate;
+        bestValue = decoded;
+      }
     }
-    return null;
+
+    return bestValue;
+  }
+
+  /// Returns the index of the character that closes the bracket opened at
+  /// [start] (a `{` or `[`), or -1 if the text ends before it balances.
+  /// Characters inside a `"..."` string literal never affect the depth
+  /// count, and a `\` inside a string escapes the next character so `\"`
+  /// doesn't end the string early.
+  static int _findBalancedEnd(String t, int start) {
+    var depth = 0;
+    var inString = false;
+    var escaped = false;
+    for (var i = start; i < t.length; i++) {
+      final ch = t[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (ch == '\\') {
+          escaped = true;
+        } else if (ch == '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (ch == '"') {
+        inString = true;
+        continue;
+      }
+      if (ch == '{' || ch == '[') {
+        depth++;
+      } else if (ch == '}' || ch == ']') {
+        depth--;
+        if (depth == 0) return i;
+      }
+    }
+    return -1;
   }
 }

@@ -56,4 +56,48 @@ void main() {
     expect(parser.looksLikeUi('{"comp'), isTrue);
     expect(parser.looksLikeUi('Your bench'), isFalse);
   });
+
+  group('stray braces in surrounding prose', () {
+    test('ignores a stray brace before the payload', () {
+      final node = parser.parse(
+        'Note: use {this} format. {"component":"StatCard","title":"A"}',
+      );
+      expect(node?.name, 'StatCard');
+      expect(node?.props.text('title'), 'A');
+    });
+
+    test('ignores a stray brace after the payload', () {
+      final node = parser.parse(
+        'Here: {"component":"StatCard","title":"A"} Cool, right? {ok}',
+      );
+      expect(node?.name, 'StatCard');
+      expect(node?.props.text('title'), 'A');
+    });
+
+    test('still extracts the object from ordinary surrounding prose', () {
+      final node = parser.parse(
+        'Here you go:\n{"component":"StatCard","title":"V"}\nHope that helps!',
+      );
+      expect(node?.name, 'StatCard');
+    });
+  });
+
+  group('singleton collapse behavior', () {
+    test('a single-item envelope still wraps in a GridContainer', () {
+      final node = parser.parse(
+        '{"components":[{"component":"StatCard","title":"A","value":"1"}]}',
+      );
+      expect(node?.name, 'GridContainer');
+      expect(node?.children, hasLength(1));
+      expect(node?.children.single.name, 'StatCard');
+    });
+
+    test('a single-item bare array collapses to the bare component', () {
+      final node = parser.parse(
+        '[{"component":"StatCard","title":"A","value":"1"}]',
+      );
+      expect(node?.name, 'StatCard');
+      expect(node?.children, isEmpty);
+    });
+  });
 }
