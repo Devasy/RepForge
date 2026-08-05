@@ -119,17 +119,18 @@ class A2UiProps {
     if (v is! List) return const [];
     return [
       for (final item in v)
-        if (item is Map) A2UiProps(_asStringKeyed(item)),
+        if (item is Map) A2UiProps(stringKeyed(item)),
     ];
   }
 
   A2UiProps object(String key) {
     final v = lookup(key);
-    if (v is Map) return A2UiProps(_asStringKeyed(v));
+    if (v is Map) return A2UiProps(stringKeyed(v));
     return empty;
   }
 
-  static Map<String, Object?> _asStringKeyed(Map<Object?, Object?> input) => {
+  /// Re-keys a decoded JSON map to `Map<String, Object?>`.
+  static Map<String, Object?> stringKeyed(Map<Object?, Object?> input) => {
         for (final entry in input.entries) entry.key.toString(): entry.value,
       };
 
