@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:repforge/genui/a2ui.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/gemini_context_builder.dart';
 
@@ -83,6 +84,35 @@ void main() {
       expect(result, contains('Bench Press 1×sets (1000kg vol)'));
       expect(result, contains('LAST WEEK — 1 sessions'));
       expect(result, contains('Mon: Bench Press'));
+    });
+  });
+
+  group('coach prompt A2UI section', () {
+    final prompt = GeminiContextBuilder.buildCoachSystemPrompt(
+      now: DateTime(2026, 8, 5),
+    );
+
+    test('embeds the generated A2UI section', () {
+      expect(prompt, contains(buildA2UiPromptSection(defaultA2UiRegistry)));
+    });
+
+    test('no longer hand-writes component schemas', () {
+      // The old prose listed props inline; the generated section owns that now.
+      expect(prompt, isNot(contains('StatCard {title,value,subtitle?,trend}')));
+      expect(prompt, isNot(contains('RadarChart {title,axes:[string]')));
+    });
+
+    test('domain playbook survives and names components only', () {
+      expect(prompt, contains('biceps vs triceps'));
+      expect(prompt, contains('get_sleeping_hr_analytics'));
+    });
+
+    test('is stable for a fixed date so the cache prefix stays byte-identical',
+        () {
+      expect(
+        GeminiContextBuilder.buildCoachSystemPrompt(now: DateTime(2026, 8, 5)),
+        prompt,
+      );
     });
   });
 }
