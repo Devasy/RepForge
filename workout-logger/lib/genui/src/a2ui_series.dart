@@ -44,12 +44,12 @@ class A2UiSeries {
 
   /// Largest value across [series], or 0 when there is nothing to plot.
   static double maxValue(List<A2UiSeries> series) {
-    var max = 0.0;
+    double? max;
     for (final s in series) {
       for (final v in s.values) {
-        if (v > max) max = v;
+        if (max == null || v > max) max = v;
       }
     }
-    return max;
+    return max ?? 0.0;
   }
 }

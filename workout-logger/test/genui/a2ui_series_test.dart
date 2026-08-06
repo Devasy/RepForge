@@ -37,7 +37,7 @@ void main() {
       expect(series.single.values, [7.0, 8.0]);
     });
 
-    test('reads the axes alias so radar payloads work unchanged', () {
+    test("coerces a stringified number inside a series entry's values", () {
       final series = A2UiSeries.extract(const A2UiProps({
         'series': [
           {'name': 'Current', 'values': ['85', 90]}
@@ -71,6 +71,31 @@ void main() {
       expect(A2UiSeries.extract(const A2UiProps({})), isEmpty);
       expect(A2UiSeries.extract(const A2UiProps({'values': 'nope'})), isEmpty);
     });
+
+    test('falls back to values: when every series entry drops to empty values', () {
+      final series = A2UiSeries.extract(
+        const A2UiProps({
+          'series': [
+            {'name': 'A', 'values': []},
+            {'name': 'B', 'values': ['x', 'y']}, // unparseable, also drops
+          ],
+          'values': [10, 20],
+        }),
+        fallbackName: 'Fallback',
+      );
+      expect(series, hasLength(1));
+      expect(series.single.name, 'Fallback');
+      expect(series.single.values, [10.0, 20.0]);
+    });
+
+    test('falls back to values: when series is an empty list', () {
+      final series = A2UiSeries.extract(
+        const A2UiProps({'series': [], 'values': [5, 6]}),
+        fallbackName: 'Fallback',
+      );
+      expect(series, hasLength(1));
+      expect(series.single.values, [5.0, 6.0]);
+    });
   });
 
   group('A2UiSeries.maxValue', () {
@@ -86,6 +111,15 @@ void main() {
 
     test('returns 0 for empty input', () {
       expect(A2UiSeries.maxValue(const []), 0);
+    });
+
+    test('returns the true max when all values are negative', () {
+      expect(
+        A2UiSeries.maxValue(const [
+          A2UiSeries(name: 'a', values: [-5, -2]),
+        ]),
+        -2.0,
+      );
     });
   });
 }
