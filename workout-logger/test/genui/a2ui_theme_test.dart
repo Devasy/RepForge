@@ -2,8 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/genui/src/a2ui_panels.dart';
 import 'package:repforge/genui/src/a2ui_theme.dart';
-import 'package:repforge/theme/a2ui_app_theme.dart';
-import 'package:repforge/theme/app_theme.dart';
+
+/// A theme deliberately distinct from [A2UiTheme.dark] in every field the
+/// injection tests check, so those tests can only pass if
+/// [A2UiThemeProvider.of] genuinely performed the InheritedWidget lookup
+/// rather than falling through to the default.
+const _injectedTestTheme = A2UiTheme(
+  surface: Color(0xFF000001),
+  border: Color(0xFF000002),
+  divider: Color(0xFF000003),
+  textPrimary: Color(0xFF000004),
+  textSoft: Color(0xFF000005),
+  textMuted: Color(0xFF000006),
+  textFaint: Color(0xFF000007),
+  accent: Color(0xFF00FF00),
+  positive: Color(0xFF000008),
+  negative: Color(0xFF000009),
+  seriesPalette: [Color(0xFF00000A)],
+  spacing: 99,
+  radius: 98,
+  pillRadius: 97,
+);
 
 void main() {
   group('A2UiThemeProvider', () {
@@ -19,19 +38,40 @@ void main() {
       expect(resolved.accent, A2UiTheme.dark.accent);
     });
 
-    testWidgets('supplies the injected theme to descendants', (tester) async {
-      late A2UiTheme resolved;
+    testWidgets(
+        'supplies the injected theme to descendants and falls back for '
+        'non-descendants', (tester) async {
+      late A2UiTheme resolvedInside;
+      late A2UiTheme resolvedOutside;
       await tester.pumpWidget(
-        A2UiThemeProvider(
-          theme: repforgeA2UiTheme,
-          child: Builder(builder: (context) {
-            resolved = A2UiThemeProvider.of(context);
-            return const SizedBox.shrink();
-          }),
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              A2UiThemeProvider(
+                theme: _injectedTestTheme,
+                child: Builder(builder: (context) {
+                  resolvedInside = A2UiThemeProvider.of(context);
+                  return const SizedBox.shrink();
+                }),
+              ),
+              // Sibling of the provider, not a descendant of it: must still
+              // fall back to A2UiTheme.dark.
+              Builder(builder: (context) {
+                resolvedOutside = A2UiThemeProvider.of(context);
+                return const SizedBox.shrink();
+              }),
+            ],
+          ),
         ),
       );
-      expect(resolved.accent, AppColors.primary);
-      expect(resolved.surface, AppColors.card);
+
+      expect(resolvedInside.accent, _injectedTestTheme.accent);
+      expect(resolvedInside.surface, _injectedTestTheme.surface);
+      expect(resolvedInside.spacing, _injectedTestTheme.spacing);
+
+      expect(resolvedOutside.accent, A2UiTheme.dark.accent);
+      expect(resolvedOutside.surface, A2UiTheme.dark.surface);
     });
   });
 
@@ -77,6 +117,47 @@ void main() {
       ));
       expect(find.text('Biceps'), findsOneWidget);
       expect(find.text('Triceps'), findsOneWidget);
+    });
+  });
+
+  group('A2UiPanel', () {
+    testWidgets(
+        'pads with theme.spacing, decorates with theme colors, and renders '
+        'its child by default', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+          body: A2UiPanel(
+            theme: A2UiTheme.dark,
+            child: Text('probe'),
+          ),
+        ),
+      ));
+
+      expect(find.text('probe'), findsOneWidget);
+
+      final container = tester.widget<Container>(find.byType(Container));
+      expect(container.padding, EdgeInsets.all(A2UiTheme.dark.spacing));
+
+      final decoration = container.decoration as BoxDecoration;
+      expect(decoration.color, A2UiTheme.dark.surface);
+      expect(decoration.border, Border.all(color: A2UiTheme.dark.border));
+    });
+
+    testWidgets('uses zero padding when padded is false', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+          body: A2UiPanel(
+            theme: A2UiTheme.dark,
+            padded: false,
+            child: Text('probe'),
+          ),
+        ),
+      ));
+
+      expect(find.text('probe'), findsOneWidget);
+
+      final container = tester.widget<Container>(find.byType(Container));
+      expect(container.padding, EdgeInsets.zero);
     });
   });
 }
