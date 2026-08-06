@@ -103,8 +103,19 @@ class A2UiParser {
     return t.trim();
   }
 
+  // `children` is a structural, tree-shape key, not a semantic content key
+  // like `title` or `items` — so unlike other props it must NOT go through
+  // A2UiProps.lookup's alias resolution. `keyAliases['children']` includes
+  // `items` as a convenience alias, but `items` is also DataListGroup's own
+  // canonical key for its (non-component) data rows; resolving it here would
+  // make the parser mistake a DataListGroup's `items` list for child nodes,
+  // fail to parse any of them as components, and then discard the whole node
+  // as if it had declared-but-empty children. Reading the literal `children`
+  // key only mirrors the precedent already set by `_envelopeKeys` below,
+  // which likewise treats `children` as a precise structural signal and
+  // deliberately does not include `items` as a synonym for it.
   List<A2UiNode> _parseChildren(A2UiProps props) {
-    final raw = props.lookup('children');
+    final raw = props.raw['children'];
     if (raw is! List) return const [];
     final out = <A2UiNode>[];
     for (final child in raw) {
@@ -115,8 +126,7 @@ class A2UiParser {
     return out;
   }
 
-  bool _declaresChildren(Map<String, Object?> props) =>
-      A2UiProps(props).lookup('children') is List;
+  bool _declaresChildren(Map<String, Object?> props) => props['children'] is List;
 
   /// Wraps [items] in a `GridContainer`, dropping any item that isn't a
   /// recognised component. When [collapseSingle] is true, a single
