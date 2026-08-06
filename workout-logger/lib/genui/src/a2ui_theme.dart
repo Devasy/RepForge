@@ -65,3 +65,27 @@ class A2UiTheme {
     pillRadius: 999,
   );
 }
+
+/// Supplies an [A2UiTheme] to the renderer subtree.
+///
+/// Absent a provider, [of] returns [A2UiTheme.dark] so the package renders
+/// standalone in tests and previews.
+class A2UiThemeProvider extends InheritedWidget {
+  const A2UiThemeProvider({
+    super.key,
+    required this.theme,
+    required super.child,
+  });
+
+  final A2UiTheme theme;
+
+  static A2UiTheme of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<A2UiThemeProvider>()
+          ?.theme ??
+      A2UiTheme.dark;
+
+  @override
+  bool updateShouldNotify(A2UiThemeProvider oldWidget) =>
+      oldWidget.theme != theme;
+}
