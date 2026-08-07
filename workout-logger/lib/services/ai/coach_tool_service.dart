@@ -347,8 +347,8 @@ class CoachToolService {
             'get_sleeping_hr_analytics',
             'Fetch and compute sleeping heart rate statistics over the past N days (e.g. 14 days). '
                 'Returns overnight p5 (5th percentile sleeping HR floor), p25, median, p75, p95, mean, min, max, '
-                'standard deviation (stdev), variance, linear trend (slope/direction), and nightly time-series data '
-                'formatted for GenUI components (DynamicChart line plot with series for p5, p25, mean, and StatCards). '
+                'standard deviation (stdev), variance, linear trend (slope/direction), and nightly '
+                'time-series data as labels + series ready to chart. '
                 'Use whenever the user asks to analyze sleeping HR, overnight HR variation, or recovery trends.',
             Schema.object(
               properties: {
@@ -508,19 +508,15 @@ class CoachToolService {
         'trend_direction': trendDirection,
       },
       'daily_breakdown': dailyStats,
-      'genui_chart_props': {
-        'component': 'DynamicChart',
-        'props': {
-          'type': 'line',
-          'title': 'Overnight Sleeping HR Trend ($days Days)',
-          'labels': labels,
-          'series': [
-            {'name': 'P5 Sleeping HR', 'values': p5List},
-            {'name': 'P25 HR', 'values': p25List},
-            {'name': 'Mean HR', 'values': meanList},
-          ],
-        },
-      },
+      // Domain-neutral series the model can shape into any component. The tool
+      // layer deliberately does not name A2UI components: presentation is the
+      // prompt's decision, not the data layer's.
+      'labels': labels,
+      'series': [
+        {'name': 'P5 Sleeping HR', 'values': p5List},
+        {'name': 'P25 HR', 'values': p25List},
+        {'name': 'Mean HR', 'values': meanList},
+      ],
     };
   }
 

@@ -206,7 +206,8 @@ void main() {
       coachToolService = CoachToolService(wp, pr, hh);
     });
 
-    test('get_sleeping_hr_analytics computes p5, p25, mean, stdev, variance, and GenUI props', () async {
+    test('get_sleeping_hr_analytics computes p5, p25, mean, stdev, variance and chart series',
+        () async {
       final call = FunctionCall('get_sleeping_hr_analytics', {'days': 14});
       final res = await coachToolService.handleCall(call);
 
@@ -220,11 +221,12 @@ void main() {
       expect(summary.containsKey('variance_p5_sleeping_hr'), isTrue);
       expect(summary.containsKey('trend_direction'), isTrue);
 
-      final genuiChart = res['genui_chart_props'] as Map<String, dynamic>;
-      expect(genuiChart['component'], 'DynamicChart');
-      final props = genuiChart['props'] as Map<String, dynamic>;
-      expect(props['type'], 'line');
-      expect((props['series'] as List).length, 3); // P5, P25, Mean
+      expect(res['labels'], isA<List<String>>());
+      final series = res['series']! as List;
+      expect(series, hasLength(3)); // P5, P25, Mean
+      expect((series[0] as Map)['name'], 'P5 Sleeping HR');
+      expect((series[0] as Map)['values'], hasLength(14));
+      expect(res.containsKey('genui_chart_props'), isFalse);
     });
   });
 
