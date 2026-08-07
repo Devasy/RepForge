@@ -40,7 +40,7 @@ class HealthDetailShell extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          const Positioned.fill(child: AmbientGlow()),
+          const AmbientGlow(),
           SafeArea(
             child: Column(
               children: [

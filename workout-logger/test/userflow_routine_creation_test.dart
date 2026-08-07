@@ -119,5 +119,51 @@ void main() {
 
       expect(find.text('Legs & Core Routine'), findsWidgets);
     });
+
+    testWidgets('startRoutineWorkoutFlow starts routine workout without conflict', (tester) async {
+      final routine = Routine(id: 'r1', name: 'Push Day', exerciseIds: ['bench_press']);
+      await tester.pumpWidget(_buildTestApp(
+        workoutProvider: workoutProvider,
+        settingsProvider: settingsProvider,
+        child: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () => startRoutineWorkoutFlow(context, routine),
+            child: const Text('Start Routine'),
+          ),
+        ),
+      ));
+
+      await tester.tap(find.text('Start Routine'));
+      await tester.pumpAndSettle();
+
+      expect(workoutProvider.hasActiveWorkout, isTrue);
+    });
+
+    testWidgets('RoutineDetailScreen renders routine details', (tester) async {
+      final routine = Routine(id: 'r2', name: 'Pull Day', exerciseIds: ['barbell_row']);
+
+      await tester.pumpWidget(_buildTestApp(
+        workoutProvider: workoutProvider,
+        settingsProvider: settingsProvider,
+        child: RoutineDetailScreen(routine: routine),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pull Day'), findsWidgets);
+    });
+
+    testWidgets('CreateRoutineScreen supports reordering exercise into final position before Add Exercises', (tester) async {
+      await tester.pumpWidget(_buildTestApp(
+        workoutProvider: workoutProvider,
+        settingsProvider: settingsProvider,
+        child: const CreateRoutineScreen(),
+      ));
+      await tester.pumpAndSettle();
+
+      final reorderableList = tester.widget<ReorderableListView>(find.byType(ReorderableListView));
+      reorderableList.onReorderItem!(0, 1);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
   });
 }

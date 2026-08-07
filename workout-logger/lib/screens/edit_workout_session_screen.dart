@@ -9,6 +9,7 @@ import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
+import 'widgets/rf_dialogs.dart';
 import 'widgets/editable_exercise_card.dart';
 
 class EditWorkoutSessionScreen extends StatefulWidget {
@@ -206,50 +207,20 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
 
   Future<bool> _onWillPop() async {
     if (!_hasChanges) return true;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardHigh,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        title: const Text(
-          'Discard Changes?',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: const Text(
-          'You have unsaved changes. Discard them?',
-          style: TextStyle(color: AppColors.textSoft),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: AppColors.textSoft),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
+    final result = await showRFConfirmDialog(
+      context,
+      title: 'Discard Changes?',
+      content: 'You have unsaved changes. Discard them?',
+      confirmText: 'Discard',
+      isDanger: true,
     );
     return result ?? false;
   }
 
   void _snack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: const TextStyle(color: AppColors.textPrimary)),
-        backgroundColor: isError ? AppColors.error : AppColors.cardHigh,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-      ),
+    context.showRFSnackBar(
+      msg,
+      type: isError ? RFSnackBarType.error : RFSnackBarType.info,
     );
   }
 

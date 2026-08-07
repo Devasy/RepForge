@@ -898,3 +898,110 @@ class _SkeletonBoxState extends State<SkeletonBox>
     );
   }
 }
+
+// ── RFTextField ─────────────────────────────────────────────────────────────
+/// Standardized RepForge glassmorphic text input field.
+class RFTextField extends StatefulWidget {
+  const RFTextField({
+    super.key,
+    required this.controller,
+    required this.hint,
+    this.label,
+    this.keyboardType,
+    this.inputFormatters,
+    this.maxLines = 1,
+    this.onChanged,
+    this.prefixIcon,
+    this.suffixIcon,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final String? label;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final int maxLines;
+  final ValueChanged<String>? onChanged;
+  final IconData? prefixIcon;
+  final Widget? suffixIcon;
+
+  @override
+  State<RFTextField> createState() => _RFTextFieldState();
+}
+
+class _RFTextFieldState extends State<RFTextField> {
+  late final FocusNode _focusNode;
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    setState(() => _isFocused = _focusNode.hasFocus);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.label != null) ...[
+          Text(
+            widget.label!,
+            style: const TextStyle(
+              fontFamily: 'GeistMono',
+              color: AppColors.textSoft,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: _isFocused ? AppColors.primary : AppColors.glassBorder,
+              width: _isFocused ? 1.5 : 1.0,
+            ),
+          ),
+          child: TextField(
+            controller: widget.controller,
+            focusNode: _focusNode,
+            keyboardType: widget.keyboardType,
+            inputFormatters: widget.inputFormatters,
+            maxLines: widget.maxLines,
+            onChanged: widget.onChanged,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+              prefixIcon: widget.prefixIcon != null
+                  ? Icon(widget.prefixIcon, color: AppColors.textSoft, size: 20)
+                  : null,
+              suffixIcon: widget.suffixIcon,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+

@@ -536,7 +536,10 @@ class _NavCellState extends State<_NavCell>
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(9999),
-                child: Row(
+                child: ClipRect(
+                  child: OverflowBox(
+                    maxWidth: double.infinity,
+                    child: Row(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -603,7 +606,9 @@ class _NavCellState extends State<_NavCell>
                   ],
                 ),
               ),
-            );
+            ),
+          ),
+          );
           },
         ),
       ),
