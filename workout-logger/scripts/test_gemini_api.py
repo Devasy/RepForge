@@ -61,7 +61,11 @@ def extract_retry_delay(body_str: str) -> float | None:
 
 
 def is_daily_quota_exhausted(body: str) -> bool:
-    return "GenerateRequestsPerDay" in body or "free_tier_requests" in body or "QuotaExceeded" in body or "RESOURCE_EXHAUSTED" in body
+    # Mirrors Dart _isDailyQuotaExhausted: only daily-limit-specific
+    # identifiers. Generic "QuotaExceeded"/"RESOURCE_EXHAUSTED" markers also
+    # fire for per-minute rate limits, which should retry-with-delay instead
+    # of triggering a model fallback.
+    return "GenerateRequestsPerDay" in body or "free_tier_requests" in body
 
 
 def get_fallback_model(current_model: str) -> str | None:
@@ -73,11 +77,28 @@ def get_fallback_model(current_model: str) -> str | None:
     return fallbacks.get(current_model)
 
 
+def thinking_config_for(model: str) -> dict:
+    """Mirrors Dart _thinkingConfig: gemini-2.5-flash predates the Gemini 3.x
+    thinkingLevel enum and only understands the older thinkingBudget shape."""
+    if model == "gemini-2.5-flash":
+        return {"thinkingBudget": 0}
+    return {"thinkingLevel": "minimal"}
+
+
 def post_generate_content_with_retry(model: str, api_key: str, payload: dict, max_attempts: int = 4) -> dict:
     current_model = model
-    data_bytes = json.dumps(payload).encode("utf-8")
 
     for attempt in range(max_attempts):
+        # Rebuild the request body for whichever model is currently selected —
+        # a daily-quota fallback mid-retry can switch to a model needing a
+        # different thinkingConfig shape (see thinking_config_for()), so the
+        # previous model's config must not be reused verbatim.
+        body = dict(payload)
+        gen_cfg = dict(body.get("generationConfig", {}))
+        gen_cfg["thinkingConfig"] = thinking_config_for(current_model)
+        body["generationConfig"] = gen_cfg
+        data_bytes = json.dumps(body).encode("utf-8")
+
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
         req = urllib.request.Request(
             url,
@@ -242,6 +263,7 @@ def main() -> None:
             func_response_parts = [{
                 "functionResponse": {
                     "name": fc["name"],
+                    **({"id": fc["id"]} if "id" in fc else {}),
                     "response": {
                         "dates": ["2026-07-06", "2026-07-09", "2026-07-16"],
                         "series": [

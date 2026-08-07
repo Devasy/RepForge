@@ -88,11 +88,13 @@ Duration? _extractRetryDelay(String body) {
   return null;
 }
 
+// Deliberately narrow: only match identifiers Gemini uses for DAILY-scale
+// quota metrics. Generic markers like "QuotaExceeded"/"RESOURCE_EXHAUSTED"
+// also fire for per-minute rate limits, which should fall through to the
+// normal retry-with-delay handling instead of triggering a model fallback.
 bool _isDailyQuotaExhausted(String body) {
   return body.contains('GenerateRequestsPerDay') ||
-      body.contains('free_tier_requests') ||
-      body.contains('QuotaExceeded') ||
-      body.contains('RESOURCE_EXHAUSTED');
+      body.contains('free_tier_requests');
 }
 
 String? _getFallbackModel(String currentModel) {
@@ -255,11 +257,19 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
           },
         if (tools != null) 'tools': tools.map((t) => t.toJson()).toList(),
         'generationConfig': {
-          // Gemini 3.x thinking configuration enum (minimal, medium, high)
-          'thinkingConfig': {'thinkingLevel': 'minimal'},
+          'thinkingConfig': _thinkingConfig,
           if (jsonMode) 'responseMimeType': 'application/json',
         },
       };
+
+  // gemini-2.5-flash predates the Gemini 3.x thinking-level enum and only
+  // understands the older thinkingBudget (integer token budget) shape;
+  // 3.x models take thinkingLevel (minimal/medium/high). Since the daily
+  // quota fallback chain can land on either family mid-conversation, the
+  // config shape must match whichever model is currently selected.
+  Map<String, dynamic> get _thinkingConfig => _model == 'gemini-2.5-flash'
+      ? {'thinkingBudget': 0}
+      : {'thinkingLevel': 'minimal'};
 
   // Extracts non-thought text strings from a candidate object.
   Iterable<String> _textFromCandidate(Map<String, dynamic> candidate) sync* {
@@ -439,6 +449,11 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         // we echo this turn back to the API in the next round.
         final rawModelParts = <Map<String, dynamic>>[];
         final calls = <FunctionCall>[];
+        // Parallel to `calls` — the SDK's FunctionCall type has no `id`
+        // field, so ids are tracked alongside it and matched back up when
+        // building functionResponse parts (needed to correlate responses in
+        // multi-tool-call turns).
+        final callIds = <String?>[];
         Map<String, dynamic>? lastUsage;
 
         await for (final chunk in _streamSse(body)) {
@@ -461,6 +476,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
                   (fc['args'] as Map<String, dynamic>? ?? {})
                       .cast<String, Object?>(),
                 ));
+                callIds.add(fc['id'] as String?);
               }
             }
           }
@@ -478,16 +494,23 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
         // Resolve every call and feed the results back as one function turn.
         final responseParts = <Map<String, dynamic>>[];
-        for (final call in calls) {
+        for (var i = 0; i < calls.length; i++) {
+          final call = calls[i];
+          final id = callIds[i];
           try {
             final result = await onToolCall(call);
             responseParts.add({
-              'functionResponse': {'name': call.name, 'response': result}
+              'functionResponse': {
+                'name': call.name,
+                'id': ?id,
+                'response': result,
+              }
             });
           } catch (e) {
             responseParts.add({
               'functionResponse': {
                 'name': call.name,
+                'id': ?id,
                 'response': {'error': '$e'}
               }
             });

@@ -25,7 +25,8 @@ class CoachToolService {
   final PRManager _pr;
   final HealthHistoryManager? _hh;
 
-  CoachToolService(this._wp, this._pr, [this._hh]);
+  CoachToolService(this._wp, this._pr, {HealthHistoryManager? healthHistory})
+      : _hh = healthHistory;
 
   /// Tool declaration for the optimizer screen's `ask_user_questions` flow.
   /// NOT included in the coach's tool list — only the optimizer adds it.
@@ -304,9 +305,9 @@ class CoachToolService {
           ),
           FunctionDeclaration(
             'get_health_metrics',
-            'Fetch historical sleep sessions, sleep stage breakdown (deep, REM, light), '
-                'resting HR, and readiness scores over the last N days. Use for '
-                'sleep & recovery queries.',
+            'Fetch historical sleep sessions and sleep stage breakdown (deep, REM, '
+                'light, awake minutes) over the last N days. Use for sleep & '
+                'recovery queries.',
             Schema.object(
               properties: {
                 'days': Schema.integer(
@@ -320,13 +321,13 @@ class CoachToolService {
             'analyze_health_workout_correlation',
             'Run an analytical statistical pipeline calculating Mean (µ), Standard Deviation (σ), '
                 'Pearson Correlation Coefficient (r), and linear regression (y = mx + b) between a health metric '
-                '(sleep_hours, deep_sleep_min, resting_hr, readiness_score) and a workout metric '
+                '(sleep_hours, deep_sleep_min, readiness_score) and a workout metric '
                 '(workout_volume, session_duration, exercise_max_weight). Returns analytical stats '
                 'and paired coordinates ready to visualize.',
             Schema.object(
               properties: {
                 'x_metric': Schema.string(
-                  description: 'Health metric, e.g. "sleep_hours", "deep_sleep_min", "resting_hr", "readiness_score".',
+                  description: 'Health metric, e.g. "sleep_hours", "deep_sleep_min", "readiness_score".',
                 ),
                 'y_metric': Schema.string(
                   description: 'Workout metric, e.g. "workout_volume", "session_duration", "exercise_max_weight".',
@@ -411,7 +412,10 @@ class CoachToolService {
       };
     }
 
-    final days = (args['days'] as num?)?.toInt() ?? 14;
+    // Clamp before the per-day loop below — an unbounded model-supplied value
+    // (e.g. `days: 99999`) would otherwise fan out into a huge number of
+    // sequential hh.sleepNight() lookups.
+    final days = _limitArg(args, 14, key: 'days', max: 60);
     final now = DateTime.now();
     final dailyStats = <Map<String, Object?>>[];
     final p5List = <double>[];
@@ -525,9 +529,15 @@ class CoachToolService {
     if (hh == null) {
       return {'error': 'Health Connect integration is not active or HealthHistoryManager unavailable.'};
     }
-    final days = (args['days'] as num?)?.toInt() ?? 30;
+    final days = _limitArg(args, 30, key: 'days', max: 31);
     final now = DateTime.now();
-    final bars = await hh.sleepBars(now, HealthGranularity.week);
+    // Week granularity only covers the last 7 days; anything wider needs the
+    // month bucket. Both return per-night bars, so trim to the exact window.
+    final granularity =
+        days <= 7 ? HealthGranularity.week : HealthGranularity.month;
+    final allBars = await hh.sleepBars(now, granularity);
+    final bars =
+        allBars.length > days ? allBars.sublist(allBars.length - days) : allBars;
 
     return {
       'days': days,
@@ -622,25 +632,6 @@ class CoachToolService {
       }
     }
 
-    if (xVals.length < 2) {
-      for (var i = 0; i < sessions.length; i++) {
-        final s = sessions[i];
-        var vol = 0.0;
-        for (final exLog in s.exercises) {
-          for (final set in exLog.sets) {
-            vol += (set.weight * set.reps);
-          }
-        }
-        final synthSleep = 6.5 + (i % 3) * 0.8;
-        final key = _d(s.date);
-        if (vol > 0) {
-          xVals.add(synthSleep);
-          yVals.add(vol);
-          points.add({'x': synthSleep, 'y': vol, 'date': key});
-        }
-      }
-    }
-
     final n = xVals.length;
     if (n < 2) {
       return {'error': 'Insufficient paired data points for correlation analysis.'};
@@ -713,11 +704,27 @@ class CoachToolService {
 
     for (final groupName in rawGroups) {
       muscleTotals[groupName] = 0.0;
-      final matchingExerciseIds = allExercises.where((e) {
-        final mName = e.primaryMuscle.toLowerCase();
-        final target = groupName.toLowerCase();
-        return mName.contains(target) || target.contains(mName);
-      }).map((e) => e.id).toSet();
+
+      // Resolve the requested display name to its muscle group ID first —
+      // `Exercise.primaryMuscle` is itself an ID (e.g. "quads"), not a
+      // display name, so comparing it against the raw group name via
+      // substring matching is unreliable (false misses for e.g. "Quadriceps"
+      // vs id "quads", false matches for unrelated short ids). Matching by
+      // resolved ID also lets us include secondary muscle activations, not
+      // just each exercise's primary one.
+      MuscleGroup? resolvedGroup;
+      try {
+        resolvedGroup = _resolveMuscleGroup(groupName);
+      } on AmbiguousMatchException {
+        resolvedGroup = null;
+      }
+      if (resolvedGroup == null) continue;
+      final targetId = resolvedGroup.id;
+
+      final matchingExerciseIds = allExercises
+          .where((e) => e.muscleActivations.any((m) => m.muscleGroupId == targetId))
+          .map((e) => e.id)
+          .toSet();
 
       for (final session in allSessions) {
         final dateKey = _d(session.date);
@@ -1330,10 +1337,13 @@ class CoachToolService {
   double _round(double v) => (v * 10).round() / 10;
   double? _roundOrNull(double? v) => v == null ? null : _round(v);
 
-  /// Read an optional `limit` arg, clamped to [1, 40]; [fallback] when absent.
-  int _limitArg(Map<String, Object?> args, int fallback) {
-    final n = (args['limit'] as num?)?.toInt();
+  /// Read an optional numeric arg (defaults to the `limit` key), clamped to
+  /// [1, max]; [fallback] when absent. Reused by any tool that accepts a
+  /// model-supplied bound (e.g. `limit`, `days`) to prevent runaway loops.
+  int _limitArg(Map<String, Object?> args, int fallback,
+      {String key = 'limit', int max = 40}) {
+    final n = (args[key] as num?)?.toInt();
     if (n == null) return fallback;
-    return n.clamp(1, 40);
+    return n.clamp(1, max);
   }
 }
