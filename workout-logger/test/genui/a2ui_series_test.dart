@@ -122,4 +122,29 @@ void main() {
       );
     });
   });
+
+  group('A2UiSeries.minValue', () {
+    test('returns the smallest value across all series', () {
+      expect(
+        A2UiSeries.minValue(const [
+          A2UiSeries(name: 'a', values: [1, 9]),
+          A2UiSeries(name: 'b', values: [4, 2]),
+        ]),
+        1,
+      );
+    });
+
+    test('returns 0 for empty input', () {
+      expect(A2UiSeries.minValue(const []), 0);
+    });
+
+    test('returns the true min when all values are negative', () {
+      expect(
+        A2UiSeries.minValue(const [
+          A2UiSeries(name: 'a', values: [-5, -2]),
+        ]),
+        -5.0,
+      );
+    });
+  });
 }

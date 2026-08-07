@@ -95,6 +95,18 @@ void main() {
       expect(p.labels, ['Mon', '', '']);
     });
 
+    test('pads labels using the longest of multiple series, not just the first',
+        () {
+      final p = parse({
+        'labels': ['Mon'],
+        'series': [
+          {'name': 'Short', 'values': [1, 2]},
+          {'name': 'Long', 'values': [1, 2, 3, 4]},
+        ],
+      });
+      expect(p.labels, ['Mon', '', '', '']);
+    });
+
     test('hasData is false when there is nothing to plot', () {
       expect(parse({}).hasData, isFalse);
       expect(parse({'labels': ['a', 'b']}).hasData, isFalse);
@@ -183,6 +195,34 @@ void main() {
         (tester) async {
       await pump(tester, {'labels': ['A', 'B'], 'values': [0, 0]});
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('all-negative line chart brackets its data within minY/maxY',
+        (tester) async {
+      await pump(tester, {
+        'type': 'line',
+        'labels': ['A', 'B', 'C'],
+        'values': [-10, -5, -3],
+      });
+      expect(tester.takeException(), isNull);
+      final data = tester.widget<LineChart>(find.byType(LineChart)).data;
+      expect(data.minY, lessThanOrEqualTo(-10));
+      expect(data.maxY, greaterThanOrEqualTo(-3));
+      expect(data.minY, lessThan(data.maxY));
+    });
+
+    testWidgets('all-negative bar chart brackets its data within minY/maxY',
+        (tester) async {
+      await pump(tester, {
+        'type': 'bar',
+        'labels': ['A', 'B', 'C'],
+        'values': [-10, -5, -3],
+      });
+      expect(tester.takeException(), isNull);
+      final data = tester.widget<BarChart>(find.byType(BarChart)).data;
+      expect(data.minY, lessThanOrEqualTo(-10));
+      expect(data.maxY, greaterThanOrEqualTo(-3));
+      expect(data.minY, lessThan(data.maxY));
     });
   });
 

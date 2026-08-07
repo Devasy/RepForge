@@ -162,11 +162,11 @@ class DynamicChartSpec extends A2UiSpec<DynamicChartProps> {
   }
 
   Widget _line(DynamicChartProps props, A2UiTheme theme) {
-    final maxY = A2UiSeries.maxValue(props.series);
+    final (minY, maxY) = _yBounds(props.series);
     return LineChart(
       LineChartData(
-        minY: 0,
-        maxY: maxY <= 0 ? 1 : maxY * 1.15,
+        minY: minY,
+        maxY: maxY,
         gridData: a2uiGridData(theme),
         borderData: FlBorderData(show: false),
         titlesData: a2uiTitlesData(props.labels, theme),
@@ -192,11 +192,11 @@ class DynamicChartSpec extends A2UiSpec<DynamicChartProps> {
   }
 
   Widget _bar(DynamicChartProps props, A2UiTheme theme) {
-    final maxY = A2UiSeries.maxValue(props.series);
+    final (minY, maxY) = _yBounds(props.series);
     return BarChart(
       BarChartData(
-        minY: 0,
-        maxY: maxY <= 0 ? 1 : maxY * 1.15,
+        minY: minY,
+        maxY: maxY,
         gridData: a2uiGridData(theme),
         borderData: FlBorderData(show: false),
         titlesData: a2uiTitlesData(props.labels, theme),
@@ -291,6 +291,30 @@ class DynamicChartSpec extends A2UiSpec<DynamicChartProps> {
       ],
     );
   }
+}
+
+/// Y-axis bounds for [series], shared by `_line` and `_bar` so both charts
+/// agree on the same visible range.
+///
+/// When every value is non-negative, the axis starts at 0 (existing
+/// behavior), with a 15% headroom margin above the max — clamped to a
+/// minimum span of 1 so an all-zero series doesn't collapse to a
+/// zero-height axis.
+///
+/// When any value is negative, both bounds are derived from the true min
+/// and max (via [A2UiSeries.minValue]/[A2UiSeries.maxValue], which return
+/// real negative extrema rather than clamping to 0) so every data point —
+/// including an all-negative series — falls within the visible range with
+/// a margin, instead of silently rendering off-chart.
+(double, double) _yBounds(List<A2UiSeries> series) {
+  final max = A2UiSeries.maxValue(series);
+  final min = A2UiSeries.minValue(series);
+  if (min >= 0) {
+    return (0, max <= 0 ? 1 : max * 1.15);
+  }
+  final minY = min * 1.15;
+  final maxY = max <= 0 ? max * 0.85 : max * 1.15;
+  return (minY, maxY);
 }
 
 /// Horizontal-only grid lines in the theme's border colour.

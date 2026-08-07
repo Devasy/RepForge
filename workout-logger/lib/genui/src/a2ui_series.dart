@@ -52,4 +52,19 @@ class A2UiSeries {
     }
     return max ?? 0.0;
   }
+
+  /// Smallest value across [series], or 0 when there is nothing to plot.
+  ///
+  /// Mirrors [maxValue]: returns the true minimum (which may be negative or
+  /// positive) rather than clamping to 0, so callers can distinguish "no
+  /// data" from "all values are positive/negative".
+  static double minValue(List<A2UiSeries> series) {
+    double? min;
+    for (final s in series) {
+      for (final v in s.values) {
+        if (min == null || v < min) min = v;
+      }
+    }
+    return min ?? 0.0;
+  }
 }
