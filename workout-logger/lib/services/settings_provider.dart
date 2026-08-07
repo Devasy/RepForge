@@ -49,7 +49,8 @@ class SettingsProvider extends ChangeNotifier {
         : _defaultIncrement;
 
     final bw = await _storage.getSetting('userBodyWeight');
-    _userBodyWeight = bw != null ? (double.tryParse(bw) ?? 70.0) : 70.0;
+    final parsedBw = bw != null ? double.tryParse(bw) : null;
+    _userBodyWeight = _isValidBodyWeight(parsedBw) ? parsedBw! : 70.0;
 
     final hcEnabled = await _storage.getSetting('healthConnectEnabled');
     _healthConnectEnabled = hcEnabled == 'true';
@@ -68,7 +69,12 @@ class SettingsProvider extends ChangeNotifier {
     _showAdvancedMetrics = advMetrics == 'true';
   }
 
+  /// A valid bodyweight must be finite (not NaN/Infinity) and strictly positive.
+  static bool _isValidBodyWeight(double? weight) =>
+      weight != null && weight.isFinite && weight > 0;
+
   Future<void> setUserBodyWeight(double weight) async {
+    if (!_isValidBodyWeight(weight)) return;
     _userBodyWeight = weight;
     await _storage.saveSetting('userBodyWeight', weight.toString());
     notifyListeners();

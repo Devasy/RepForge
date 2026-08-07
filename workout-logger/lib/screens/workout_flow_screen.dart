@@ -168,7 +168,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final exercise = provider.currentExercise;
     if (exercise == null) return;
 
-    final last = provider.getLastSessionForExercise(exercise.id);
+    final currentHandle = provider.currentExerciseLog?.handle;
+    final last = provider.getLastSessionForExercise(
+      exercise.id,
+      handle: currentHandle,
+    );
     if (last != null && last.sets.isNotEmpty) {
       final lastSet = last.sets.last;
       setState(() {
@@ -541,15 +545,26 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _completeSet() {
     final provider = context.read<WorkoutProvider>();
+    final settings = context.read<SettingsProvider>();
     final idx = provider.currentExerciseIndex;
     final currentSlot = _slot(idx, p: provider);
     final nextSlot = _slot(idx + 1, p: provider);
+
+    // For bodyweight-assisted exercises (assisted dips/pull-ups/etc.) the
+    // weight input represents the assist load, not the lifted load. Snapshot
+    // the assist weight and the bodyweight it was computed against so
+    // historical volume stays correct even if the user's bodyweight later
+    // changes in settings.
+    final isAssistedBW =
+        isAssistedBodyweightExercise(provider.currentExercise?.id);
 
     final set = WorkoutSet(
       weight: _currentWeight,
       reps: _currentReps,
       isDropset: _isDropset,
       drops: _isDropset ? List.from(_drops) : null,
+      assistWeight: isAssistedBW ? _currentWeight : null,
+      bodyWeightAtLog: isAssistedBW ? settings.userBodyWeight : null,
     );
 
     provider.addSet(set);

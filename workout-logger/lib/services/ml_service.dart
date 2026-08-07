@@ -377,13 +377,26 @@ class MLService implements IMLService {
       final s1 = pastSessions[1];
 
       if (s0.isNotEmpty && s1.isNotEmpty) {
-        final w0 = s0.map((s) => s.weight).reduce(max);
-        final w1 = s1.map((s) => s.weight).reduce(max);
+        // Use effective load (bodyweight − assist + extra for assisted-BW
+        // sets), not raw set.weight, so assist changes on machines like
+        // assisted dips/pull-ups aren't misread as a deload/progression.
+        final w0 = s0.map((s) => s.effectiveWeight).reduce(max);
+        final w1 = s1.map((s) => s.effectiveWeight).reduce(max);
         final v0 = s0.fold(0.0, (sum, s) => sum + s.volume);
         final v1 = s1.fold(0.0, (sum, s) => sum + s.volume);
 
+        // Only treat this as "recovering from a deload" if the most recent
+        // session (s0) is actually recent — otherwise an old, unrelated dip
+        // between two stale sessions after a long break would be
+        // misread as an active deload to recover from.
+        final mostRecentTimestamp =
+            s0.map((s) => s.timestamp).reduce((a, b) => a.isAfter(b) ? a : b);
+        final isRecent =
+            DateTime.now().difference(mostRecentTimestamp).inDays <= 21;
+
         // If the last session (s0) was a deload (weight < 85% of s1 or volume < 70% of s1)
-        if ((w1 > 0 && w0 < w1 * 0.85) || (v1 > 0 && v0 < v1 * 0.70)) {
+        if (isRecent &&
+            ((w1 > 0 && w0 < w1 * 0.85) || (v1 > 0 && v0 < v1 * 0.70))) {
           refSets = s1;
           isPostDeloadRecovery = true;
         }
@@ -451,8 +464,11 @@ class MLService implements IMLService {
         weight: set.weight,
         reps: set.reps,
         confidence: 'high',
+        // No raw weight value embedded here — the recommended weight/unit
+        // is already surfaced via SetRecommendation.weight and formatted by
+        // the presentation layer according to the user's unit preference.
         reasoning:
-            'Resuming training after deload — anchored on pre-deload baseline (${set.weight}kg × ${set.reps} reps)',
+            'Resuming training after deload — anchored on pre-deload baseline (${set.reps} reps)',
       );
     }
 

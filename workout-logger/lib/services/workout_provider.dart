@@ -503,13 +503,18 @@ class WorkoutProvider extends ChangeNotifier {
     return _currentExerciseLogs[_currentExerciseIndex];
   }
 
-  /// Set handle variation for current exercise
+  /// Set handle variation for current exercise.
+  ///
+  /// Locked once a set has been logged for this exercise instance — changing
+  /// the selector afterward must not retroactively relabel already-recorded
+  /// sets, so the handle is a no-op past that point.
   void setExerciseHandle(String? handle) {
     if (_currentExerciseIndex < _currentExerciseLogs.length) {
       final currentLog = _currentExerciseLogs[_currentExerciseIndex];
+      if (currentLog.sets.isNotEmpty) return;
       _currentExerciseLogs[_currentExerciseIndex] = ExerciseLog(
         exerciseId: currentLog.exerciseId,
-        sets: currentLog.sets.map((s) => s.copyWith(handle: handle)).toList(),
+        sets: currentLog.sets,
         notes: currentLog.notes,
         handle: handle,
       );
@@ -672,45 +677,62 @@ class WorkoutProvider extends ChangeNotifier {
   }
 
   /// Get up to [limit] recent sessions for [exerciseId], optionally matching [handle].
+  ///
+  /// When [handle] is given, requires an EXACT handle match (excluding logs
+  /// with a null or different handle) so a "Cable curl" lookup never
+  /// surfaces "Barbell curl" history. Falls back to legacy (handle-less)
+  /// matching only when no exact match exists at all.
   List<List<WorkoutSet>> getRecentSessionsForExercise(
     String exerciseId, {
     String? handle,
     int limit = 3,
   }) {
     final sortedSessions = [..._sessions]..sort((a, b) => b.date.compareTo(a.date));
-    final results = <List<WorkoutSet>>[];
-    for (final s in sortedSessions) {
-      for (final exLog in s.exercises.where((e) => e.exerciseId == exerciseId)) {
-        if (handle != null &&
-            handle.isNotEmpty &&
-            exLog.handle != null &&
-            exLog.handle != handle) {
-          continue;
-        }
-        if (exLog.sets.isNotEmpty) {
-          results.add(exLog.sets);
-          if (results.length >= limit) return results;
+    final useHandle = handle != null && handle.isNotEmpty;
+
+    List<List<WorkoutSet>> collect(bool Function(ExerciseLog) matches) {
+      final results = <List<WorkoutSet>>[];
+      for (final s in sortedSessions) {
+        for (final exLog in s.exercises.where((e) => e.exerciseId == exerciseId)) {
+          if (!matches(exLog)) continue;
+          if (exLog.sets.isNotEmpty) {
+            results.add(exLog.sets);
+            if (results.length >= limit) return results;
+          }
         }
       }
+      return results;
     }
-    return results;
+
+    if (useHandle) {
+      final exact = collect((exLog) => exLog.handle == handle);
+      if (exact.isNotEmpty) return exact;
+    }
+    return collect((_) => true);
   }
 
   /// Get the most recent exercise log for [exerciseId], or null if never logged.
+  ///
+  /// Same exact-match-first, legacy-fallback semantics as
+  /// [getRecentSessionsForExercise] — see its doc for details.
   ExerciseLog? getLastSessionForExercise(String exerciseId, {String? handle}) {
     final sortedSessions = [..._sessions]..sort((a, b) => b.date.compareTo(a.date));
-    for (final s in sortedSessions) {
-      for (final exLog in s.exercises.where((e) => e.exerciseId == exerciseId)) {
-        if (handle != null &&
-            handle.isNotEmpty &&
-            exLog.handle != null &&
-            exLog.handle != handle) {
-          continue;
+    final useHandle = handle != null && handle.isNotEmpty;
+
+    ExerciseLog? find(bool Function(ExerciseLog) matches) {
+      for (final s in sortedSessions) {
+        for (final exLog in s.exercises.where((e) => e.exerciseId == exerciseId)) {
+          if (matches(exLog)) return exLog;
         }
-        return exLog;
       }
+      return null;
     }
-    return null;
+
+    if (useHandle) {
+      final exact = find((exLog) => exLog.handle == handle);
+      if (exact != null) return exact;
+    }
+    return find((_) => true);
   }
 
   // ==================== SESSION MANAGEMENT ====================

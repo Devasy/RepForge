@@ -7,6 +7,19 @@ import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 
+// Exercise IDs treated as bodyweight-assisted (e.g. an assisted-dip/pull-up
+// machine). Computed once here so the load panel and the input row never
+// drift out of sync on which exercises count as "assisted".
+const Set<String> _assistedBodyweightExerciseIds = {
+  'pull_ups',
+  'chin_ups',
+  'dips',
+  'push_ups',
+};
+
+bool isAssistedBodyweightExercise(String? exerciseId) =>
+    exerciseId != null && _assistedBodyweightExerciseIds.contains(exerciseId);
+
 // ── ExerciseInputSection ──────────────────────────────────────────────────────
 // Renders: AI suggestion card, weight/reps inputs, dropset section,
 // LOG SET button, previous sets, last session info, program metadata banner.
@@ -72,8 +85,11 @@ class ExerciseInputSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isAssistedBW = exerciseId == 'pull_ups' || exerciseId == 'chin_ups' || exerciseId == 'dips' || exerciseId == 'push_ups';
+    final isAssistedBW = isAssistedBodyweightExercise(exerciseId);
     final effectiveWeight = (settings.userBodyWeight - currentWeight).clamp(0.0, 500.0);
+    final effectiveWeightDisplay = settings.toDisplay(effectiveWeight);
+    final bodyWeightDisplay = settings.toDisplay(settings.userBodyWeight);
+    final currentWeightDisplay = settings.toDisplay(currentWeight);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,6 +104,10 @@ class ExerciseInputSection extends StatelessWidget {
             availableHandles: availableHandles!,
             selectedHandle: selectedHandle,
             onChanged: onHandleChanged,
+            // Once a set has been logged for this exercise instance, the
+            // handle is locked — the selector must not let the user (or
+            // silently appear to) relabel already-recorded sets.
+            locked: previousSets.isNotEmpty,
           ),
           const SizedBox(height: AppSpacing.sm),
         ],
@@ -110,7 +130,7 @@ class ExerciseInputSection extends StatelessWidget {
             currentWeight: currentWeight,
             currentReps: currentReps,
             settings: settings,
-            exerciseId: exerciseId,
+            isAssistedBW: isAssistedBW,
             onWeightChanged: onWeightChanged,
             onRepsChanged: onRepsChanged,
           ),
@@ -128,7 +148,7 @@ class ExerciseInputSection extends StatelessWidget {
                   const Icon(Icons.fitness_center_rounded, size: 14, color: AppColors.primary),
                   const SizedBox(width: 6),
                   Text(
-                    'Effective Volume Load: ${effectiveWeight.toStringAsFixed(1)} ${settings.unitLabel} (${settings.userBodyWeight} BW − ${currentWeight.toStringAsFixed(1)} Assist) × $currentReps reps',
+                    'Effective Volume Load: ${effectiveWeightDisplay.toStringAsFixed(1)} ${settings.unitLabel} (${bodyWeightDisplay.toStringAsFixed(1)} BW − ${currentWeightDisplay.toStringAsFixed(1)} Assist) × $currentReps reps',
                     style: const TextStyle(fontSize: 11, color: AppColors.textSoft, fontWeight: FontWeight.w500),
                   ),
                 ],
@@ -185,15 +205,19 @@ class _HandleSelector extends StatelessWidget {
     required this.availableHandles,
     required this.selectedHandle,
     required this.onChanged,
+    this.locked = false,
   });
 
   final List<String> availableHandles;
   final String? selectedHandle;
   final ValueChanged<String?>? onChanged;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
-    final active = selectedHandle ?? availableHandles.first;
+    // Only show a chip as selected once the user (or a restored draft) has
+    // actually chosen it — never default-highlight the first handle just
+    // because nothing has been persisted yet.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -211,17 +235,19 @@ class _HandleSelector extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: availableHandles.map((handle) {
-              final isSelected = active == handle;
+              final isSelected = selectedHandle == handle;
               return Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: FilterChip(
                   label: Text(handle),
                   selected: isSelected,
-                  onSelected: (selected) {
-                    if (selected && onChanged != null) {
-                      onChanged!(handle);
-                    }
-                  },
+                  onSelected: locked
+                      ? null
+                      : (selected) {
+                          if (selected && onChanged != null) {
+                            onChanged!(handle);
+                          }
+                        },
                   selectedColor: AppColors.primary.withValues(alpha: 0.25),
                   backgroundColor: AppColors.surface,
                   checkmarkColor: AppColors.primary,
@@ -363,7 +389,7 @@ class _InputRow extends StatelessWidget {
     required this.settings,
     required this.onWeightChanged,
     required this.onRepsChanged,
-    this.exerciseId,
+    this.isAssistedBW = false,
   });
 
   final double currentWeight;
@@ -371,12 +397,10 @@ class _InputRow extends StatelessWidget {
   final SettingsProvider settings;
   final ValueChanged<double> onWeightChanged;
   final ValueChanged<int> onRepsChanged;
-  final String? exerciseId;
+  final bool isAssistedBW;
 
   @override
   Widget build(BuildContext context) {
-    final isAssistedBW =
-        exerciseId == 'pull_ups' || exerciseId == 'chin_ups';
     final weightLabel =
         isAssistedBW ? 'Assist (${settings.unitLabel})' : settings.unitLabel;
     final displayWeight = settings.toDisplay(currentWeight);

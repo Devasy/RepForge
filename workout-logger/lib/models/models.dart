@@ -122,6 +122,7 @@ class WorkoutSet {
   final double? assistWeight;
   final double? extraWeight;
   final String? handle;
+  final double? bodyWeightAtLog;
 
   WorkoutSet({
     required this.weight,
@@ -133,21 +134,36 @@ class WorkoutSet {
     this.assistWeight,
     this.extraWeight,
     this.handle,
+    this.bodyWeightAtLog,
   }) : timestamp = timestamp ?? DateTime.now();
 
-  double calculateVolume({double userBodyWeight = 70.0, bool isAssistedBW = false}) {
-    double effW;
-    if (isAssistedBW) {
-      final assist = assistWeight ?? weight;
-      final extra = extraWeight ?? 0.0;
-      effW = max(0.0, userBodyWeight - assist + extra);
-    } else {
-      effW = weight;
-    }
+  /// Per-rep effective load for the main (non-drop) entry of this set: for
+  /// assisted-bodyweight sets (i.e. [assistWeight] is set) this is
+  /// `bodyweight − assist + extra`, snapshotted against [bodyWeightAtLog]
+  /// (falling back to 70.0) so historical values stay correct even if the
+  /// user's current bodyweight later changes. Conventional (non-assisted)
+  /// sets just use [weight]. Use this (not raw [weight]) wherever a
+  /// "how heavy was this set" comparison needs to be consistent with
+  /// [calculateVolume] for assisted-bodyweight exercises.
+  double get effectiveWeight {
+    final assist = assistWeight;
+    if (assist == null) return weight;
+    final bw = bodyWeightAtLog ?? 70.0;
+    return max(0.0, bw - assist + (extraWeight ?? 0.0));
+  }
+
+  double calculateVolume({double? userBodyWeight, bool? isAssistedBW}) {
+    final assisted = isAssistedBW ?? (assistWeight != null);
+    final bw = bodyWeightAtLog ?? userBodyWeight ?? 70.0;
+    final effW = assisted
+        ? max(0.0, bw - (assistWeight ?? weight) + (extraWeight ?? 0.0))
+        : weight;
     double vol = effW * reps;
     if (isDropset && drops != null) {
-      for (var drop in drops!) {
-        final dropEff = isAssistedBW ? max(0.0, userBodyWeight - drop.weight + (extraWeight ?? 0.0)) : drop.weight;
+      for (final drop in drops!) {
+        final dropEff = assisted
+            ? max(0.0, bw - drop.weight + (extraWeight ?? 0.0))
+            : drop.weight;
         vol += dropEff * drop.reps;
       }
     }
@@ -166,6 +182,7 @@ class WorkoutSet {
     'assistWeight': assistWeight,
     'extraWeight': extraWeight,
     'handle': handle,
+    'bodyWeightAtLog': bodyWeightAtLog,
   };
 
   factory WorkoutSet.fromJson(Map<String, dynamic> json) => WorkoutSet(
@@ -180,6 +197,7 @@ class WorkoutSet {
     assistWeight: (json['assistWeight'] as num?)?.toDouble(),
     extraWeight: (json['extraWeight'] as num?)?.toDouble(),
     handle: json['handle'] as String?,
+    bodyWeightAtLog: (json['bodyWeightAtLog'] as num?)?.toDouble(),
   );
 
   WorkoutSet copyWith({
@@ -192,6 +210,7 @@ class WorkoutSet {
     Object? assistWeight = _sentinel,
     Object? extraWeight = _sentinel,
     Object? handle = _sentinel,
+    Object? bodyWeightAtLog = _sentinel,
   }) => WorkoutSet(
     weight: weight == _sentinel ? this.weight : weight as double,
     reps: reps == _sentinel ? this.reps : reps as int,
@@ -202,6 +221,7 @@ class WorkoutSet {
     assistWeight: assistWeight == _sentinel ? this.assistWeight : assistWeight as double?,
     extraWeight: extraWeight == _sentinel ? this.extraWeight : extraWeight as double?,
     handle: handle == _sentinel ? this.handle : handle as String?,
+    bodyWeightAtLog: bodyWeightAtLog == _sentinel ? this.bodyWeightAtLog : bodyWeightAtLog as double?,
   );
 }
 
@@ -237,7 +257,7 @@ class ExerciseLog {
     this.handle,
   });
 
-  double calculateTotalVolume({double userBodyWeight = 70.0, bool isAssistedBW = false}) =>
+  double calculateTotalVolume({double? userBodyWeight, bool? isAssistedBW}) =>
       sets.fold(0.0, (sum, set) => sum + set.calculateVolume(userBodyWeight: userBodyWeight, isAssistedBW: isAssistedBW));
 
   double get totalVolume => sets.fold(0.0, (sum, set) => sum + set.volume);
