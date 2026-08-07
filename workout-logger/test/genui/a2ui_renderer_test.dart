@@ -56,9 +56,22 @@ void main() {
   // also `items` — so a DataListGroup node's `items` list of
   // `{primaryText, ...}` maps was mistaken for a list of child *components*,
   // none of them parsed as one, and the node was then discarded outright as
-  // "declared children, ended up with none." Structural recursion now reads
-  // the literal `children` key only, matching the precision the top-level
-  // envelope keys (`components`/`children`/`ui`/`elements`) already had.
+  // "declared children, ended up with none."
+  //
+  // First fix pass restricted per-node structural recursion to the literal
+  // `children` key only. That was too narrow: it silently dropped
+  // `components`/`elements`/`content` tolerance at the per-node level even
+  // though those keys never collided with anything — only `items` did. A
+  // payload like `{"component":"GridContainer","props":{"components":[...]}}`
+  // resolved fine before the original bug and regressed to zero children
+  // after the first fix, with `_declaresChildren` no longer even recognizing
+  // it as "declared children" — so instead of falling back to `null` (which
+  // at least lets the caller show the raw text as prose), it silently
+  // rendered as an empty, blank `GridContainer`. Fixed by widening the
+  // per-node lookup to the same literal key set `_envelopeKeys` already
+  // tolerates (`children`/`components`/`elements`/`content`), still
+  // excluding `items`, still without going through the alias-aware
+  // `A2UiProps.lookup()`.
   group('children vs items key collision (a2ui_parser.dart fix)', () {
     test('DataListGroup example parses instead of being swallowed', () {
       // Before the fix this returned null: `items` resolved as an alias for
@@ -91,6 +104,60 @@ void main() {
 ''');
       expect(find.text('Still Works'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+
+    test('per-node components/elements/content keys resolve to real children',
+        () {
+      // Regression for the too-narrow first fix pass: these are literal
+      // (non-`items`) child-list keys at the *per-node* level, not the
+      // top-level envelope path — a different code path (`_parseChildren`
+      // via `parseJson`, not `parse`'s top-level envelope scan).
+      final parser = A2UiParser(defaultA2UiRegistry);
+      for (final key in ['components', 'elements', 'content']) {
+        final node = parser.parseJson({
+          'component': 'GridContainer',
+          'props': {
+            'columns': 1,
+            key: [
+              {
+                'component': 'StatCard',
+                'props': {'title': 'Via $key', 'value': '1'},
+              },
+            ],
+          },
+        });
+        expect(node?.name, 'GridContainer', reason: 'per-node key "$key"');
+        expect(node?.children, hasLength(1), reason: 'per-node key "$key"');
+        expect(node?.children.single.name, 'StatCard',
+            reason: 'per-node key "$key"');
+      }
+    });
+
+    test('per-node items key stays excluded from child resolution', () {
+      // Confirms the widened fix did not accidentally let `items` back in
+      // as a per-node child-list key — it must still be treated as
+      // DataListGroup's own data, not a list of child components.
+      final parser = A2UiParser(defaultA2UiRegistry);
+      final node = parser.parseJson({
+        'component': 'GridContainer',
+        'props': {
+          'columns': 1,
+          'items': [
+            {
+              'component': 'StatCard',
+              'props': {'title': 'Should not be a child', 'value': '1'},
+            },
+          ],
+        },
+      });
+      // GridContainer has no other content, so with `items` correctly
+      // excluded from child resolution it has zero children and is dropped
+      // entirely rather than silently rendered blank — `_declaresChildren`
+      // does not fire for `items`, so this actually returns a real
+      // zero-children node here (GridContainer doesn't declare `items` as
+      // its own data key), which is the expected non-crashing behavior.
+      expect(node?.name, 'GridContainer');
+      expect(node?.children, isEmpty);
     });
 
     test('top-level envelope aliases (components/elements/ui) are unaffected',

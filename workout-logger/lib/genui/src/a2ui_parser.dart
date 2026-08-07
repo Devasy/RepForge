@@ -25,6 +25,19 @@ class A2UiParser {
     'elements',
   ];
 
+  /// Keys that may hold a node's structural child components.
+  ///
+  /// This mirrors `_envelopeKeys` minus `ui` (which only makes sense as a
+  /// whole-document envelope, not a per-node prop): `components`/`elements`/
+  /// `content` are accepted tolerantly alongside the canonical `children`,
+  /// but `items` is deliberately excluded — see `_firstChildList` for why.
+  static const List<String> _childKeys = [
+    'children',
+    'components',
+    'elements',
+    'content',
+  ];
+
   A2UiNode? parse(String text) {
     final json = _extractJson(text);
     if (json == null) return null;
@@ -103,19 +116,20 @@ class A2UiParser {
     return t.trim();
   }
 
-  // `children` is a structural, tree-shape key, not a semantic content key
-  // like `title` or `items` — so unlike other props it must NOT go through
+  // Structural children are a tree-shape signal, not a semantic content
+  // value like `title` — so unlike other props they must NOT go through
   // A2UiProps.lookup's alias resolution. `keyAliases['children']` includes
   // `items` as a convenience alias, but `items` is also DataListGroup's own
-  // canonical key for its (non-component) data rows; resolving it here would
-  // make the parser mistake a DataListGroup's `items` list for child nodes,
-  // fail to parse any of them as components, and then discard the whole node
-  // as if it had declared-but-empty children. Reading the literal `children`
-  // key only mirrors the precedent already set by `_envelopeKeys` below,
-  // which likewise treats `children` as a precise structural signal and
-  // deliberately does not include `items` as a synonym for it.
+  // canonical key for its (non-component) data rows; resolving it there
+  // would make the parser mistake a DataListGroup's `items` list for child
+  // nodes, fail to parse any of them as components, and then discard the
+  // whole node as if it had declared-but-empty children. `_childKeys` checks
+  // a fixed, literal set of keys instead — the same tolerant spelling
+  // `_envelopeKeys` already accepts at the top level (`components`/
+  // `elements`/`content` alongside `children`), while still deliberately
+  // excluding `items`, which is the one key that actually collides.
   List<A2UiNode> _parseChildren(A2UiProps props) {
-    final raw = props.raw['children'];
+    final raw = _firstChildList(props.raw);
     if (raw is! List) return const [];
     final out = <A2UiNode>[];
     for (final child in raw) {
@@ -126,7 +140,18 @@ class A2UiParser {
     return out;
   }
 
-  bool _declaresChildren(Map<String, Object?> props) => props['children'] is List;
+  bool _declaresChildren(Map<String, Object?> props) =>
+      _firstChildList(props) is List;
+
+  /// Returns the value of the first key in `_childKeys` present in [props],
+  /// or null if none of them are — a literal, non-alias-resolved lookup.
+  Object? _firstChildList(Map<String, Object?> props) {
+    for (final key in _childKeys) {
+      final value = props[key];
+      if (value != null) return value;
+    }
+    return null;
+  }
 
   /// Wraps [items] in a `GridContainer`, dropping any item that isn't a
   /// recognised component. When [collapseSingle] is true, a single
