@@ -114,5 +114,52 @@ void main() {
         prompt,
       );
     });
+
+    // Pins the hand-written "WHICH COMPONENT TO REACH FOR" playbook against
+    // drift: this prose can't be generated from the registry (it's
+    // domain-specific routing guidance a domain-free lib/genui/ package can't
+    // know about), so if a component named here is ever renamed or removed
+    // from the registry, this test must fail loudly rather than the mismatch
+    // going silent the way it did before the registry refactor.
+    test(
+        'every component named in the WHICH COMPONENT TO REACH FOR playbook '
+        'resolves in the default registry', () {
+      // Names as semantically referenced by the prose (e.g. the prose says
+      // "StatCards" — the plural reads naturally in a sentence but the
+      // canonical component is "StatCard"; `contains` below tolerates the
+      // trailing "s").
+      const mentionedComponents = [
+        'DynamicChart',
+        'StatCard',
+        'ScatterPlot',
+        'RadarChart',
+        'MetricGauge',
+        'DataListGroup',
+      ];
+
+      for (final name in mentionedComponents) {
+        expect(
+          prompt,
+          contains(name),
+          reason: '"$name" is expected in the component-routing playbook '
+              'but was not found — did the prose get edited?',
+        );
+        expect(
+          defaultA2UiRegistry.specFor(name),
+          isNotNull,
+          reason: '"$name" is named in the component-routing playbook but '
+              'does not resolve in defaultA2UiRegistry — it was likely '
+              'renamed or removed without updating the prose.',
+        );
+      }
+    });
+
+    test('default registry has exactly the expected number of components',
+        () {
+      // A deliberate, visible tripwire: if a component is ever added or
+      // removed, this assertion should force a conscious update rather than
+      // the count silently drifting.
+      expect(defaultA2UiRegistry.specs.length, 8);
+    });
   });
 }

@@ -20,9 +20,11 @@ void main() {
     // The whole point of the refactor: this package must be liftable into
     // another app without dragging RepForge's models, theme or services along.
     final violations = <String>[];
+    var scannedFileCount = 0;
     final dir = Directory('lib/genui');
     for (final entity in dir.listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      scannedFileCount++;
       final lines = entity.readAsStringSync().split('\n');
       for (var i = 0; i < lines.length; i++) {
         final trimmed = lines[i].trimLeft();
@@ -32,6 +34,15 @@ void main() {
         }
       }
     }
+
+    // Guards against a vacuous pass: if `lib/genui` were ever empty or
+    // unreachable (wrong CWD, a path typo), the loop above would scan zero
+    // files and `violations` would be trivially empty. The package has 20+
+    // Dart files at time of writing; a sane floor below that still catches a
+    // broken scan without being brittle to file-count churn.
+    expect(scannedFileCount, greaterThan(15),
+        reason: 'expected to scan a substantial number of lib/genui files, '
+            'but only found $scannedFileCount — is the CWD wrong?');
 
     expect(violations, isEmpty,
         reason: 'genui must stay domain-free:\n${violations.join('\n')}');
@@ -74,9 +85,11 @@ void main() {
 
   test('component renderers contain no casts on model-supplied data', () {
     final violations = <String>[];
+    var scannedFileCount = 0;
     final dir = Directory('lib/genui/src/components');
     for (final entity in dir.listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      scannedFileCount++;
       final lines = entity.readAsStringSync().split('\n');
       for (var i = 0; i < lines.length; i++) {
         if (RegExp(r"\bas (String|num|int|double|List|Map|bool|Object|dynamic)\b")
@@ -85,6 +98,14 @@ void main() {
         }
       }
     }
+
+    // Same vacuous-pass guard as above: there are 8 component files at time
+    // of writing, so a floor comfortably below that still catches a broken
+    // scan (wrong CWD, empty/unreachable directory) without being brittle.
+    expect(scannedFileCount, greaterThan(5),
+        reason: 'expected to scan several component files, but only found '
+            '$scannedFileCount — is the CWD wrong?');
+
     expect(violations, isEmpty,
         reason: 'use A2UiProps accessors, not casts:\n${violations.join('\n')}');
   });

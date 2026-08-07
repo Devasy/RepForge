@@ -1,5 +1,8 @@
+import 'package:flutter/widgets.dart';
+
 import 'a2ui_props.dart';
 import 'a2ui_spec.dart';
+import 'default_registry.dart';
 
 /// Normalized-name → spec lookup.
 ///
@@ -49,4 +52,28 @@ class A2UiRegistry {
       _byName[A2UiProps.normalizeKey(rawName)];
 
   String? canonicalName(String rawName) => specFor(rawName)?.name;
+}
+
+/// Supplies an [A2UiRegistry] to the renderer subtree.
+///
+/// Absent a provider, [of] returns [defaultA2UiRegistry] so the package
+/// renders standalone in tests and previews.
+class A2UiRegistryProvider extends InheritedWidget {
+  const A2UiRegistryProvider({
+    super.key,
+    required this.registry,
+    required super.child,
+  });
+
+  final A2UiRegistry registry;
+
+  static A2UiRegistry of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<A2UiRegistryProvider>()
+          ?.registry ??
+      defaultA2UiRegistry;
+
+  @override
+  bool updateShouldNotify(A2UiRegistryProvider oldWidget) =>
+      oldWidget.registry != registry;
 }

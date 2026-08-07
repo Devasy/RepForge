@@ -71,6 +71,10 @@ class FilterChipsSpec extends A2UiSpec<FilterChipsProps> {
     FilterChipsProps props,
     A2UiTheme theme,
   ) {
+    // Deliberately blank rather than an empty-state panel — chips are
+    // decorative chrome describing a dashboard's scope, not data the model
+    // attempted to show; an empty panel here would be noise, not a useful
+    // error signal.
     if (!props.hasData) return const SizedBox.shrink();
 
     return Wrap(

@@ -78,8 +78,6 @@ class A2UiProps {
     return null;
   }
 
-  bool has(String key) => lookup(key) != null;
-
   String? textOrNull(String key) {
     final v = lookup(key);
     if (v == null) return null;
@@ -121,12 +119,6 @@ class A2UiProps {
       for (final item in v)
         if (item is Map) A2UiProps(stringKeyed(item)),
     ];
-  }
-
-  A2UiProps object(String key) {
-    final v = lookup(key);
-    if (v is Map) return A2UiProps(stringKeyed(v));
-    return empty;
   }
 
   /// Re-keys a decoded JSON map to `Map<String, Object?>`.
