@@ -322,7 +322,7 @@ class CoachToolService {
                 'Pearson Correlation Coefficient (r), and linear regression (y = mx + b) between a health metric '
                 '(sleep_hours, deep_sleep_min, resting_hr, readiness_score) and a workout metric '
                 '(workout_volume, session_duration, exercise_max_weight). Returns analytical stats '
-                'and paired coordinates for ScatterPlot or DynamicChart.',
+                'and paired coordinates ready to visualize.',
             Schema.object(
               properties: {
                 'x_metric': Schema.string(

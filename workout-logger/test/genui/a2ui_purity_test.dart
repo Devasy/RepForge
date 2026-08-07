@@ -2,36 +2,33 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+/// Matches an `import`/`export` path that reaches into one of RepForge's
+/// app-specific top-level directories, regardless of how many `../` hops
+/// precede it (e.g. `'../theme/...'`, `'../../../theme/...'`) or whether it
+/// is written as a `package:repforge/...` path.
+final RegExp _forbiddenPathPattern = RegExp(
+  r"""['"](?:(?:\.\./)+|package:repforge/)(theme|models|services|screens)/""",
+);
+
+/// Matches an `import` or `export` directive line, so we only flag genuine
+/// dependency declarations and not, say, doc comments that happen to mention
+/// a forbidden directory name.
+final RegExp _directiveLine = RegExp(r'^(import|export)\s');
+
 void main() {
   test('lib/genui imports nothing app-specific', () {
     // The whole point of the refactor: this package must be liftable into
     // another app without dragging RepForge's models, theme or services along.
-    const forbidden = [
-      "'../theme/",
-      "'../models/",
-      "'../services/",
-      "'../screens/",
-      "'../../theme/",
-      "'../../models/",
-      "'../../services/",
-      "'../../screens/",
-      'package:repforge/theme',
-      'package:repforge/models',
-      'package:repforge/services',
-      'package:repforge/screens',
-    ];
-
     final violations = <String>[];
     final dir = Directory('lib/genui');
     for (final entity in dir.listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
-      final source = entity.readAsStringSync();
-      for (final line in source.split('\n')) {
-        if (!line.trimLeft().startsWith('import ')) continue;
-        for (final needle in forbidden) {
-          if (line.contains(needle)) {
-            violations.add('${entity.path}: ${line.trim()}');
-          }
+      final lines = entity.readAsStringSync().split('\n');
+      for (var i = 0; i < lines.length; i++) {
+        final trimmed = lines[i].trimLeft();
+        if (!_directiveLine.hasMatch(trimmed)) continue;
+        if (_forbiddenPathPattern.hasMatch(trimmed)) {
+          violations.add('${entity.path}:${i + 1}: ${lines[i].trim()}');
         }
       }
     }
@@ -40,14 +37,49 @@ void main() {
         reason: 'genui must stay domain-free:\n${violations.join('\n')}');
   });
 
+  test('forbidden-path regex catches the violation shapes it must', () {
+    // Regression test for the guard itself: a depth-blind, literal
+    // needle-list version of this check silently passed a real
+    // `'../../../theme/app_theme.dart'` import from
+    // lib/genui/src/components/ (three `../` hops) because only one- and
+    // two-hop needles were listed. Pin down that every realistic depth and
+    // form of a forbidden import is actually matched, using in-memory
+    // strings rather than mutating real source files.
+    const mustMatch = [
+      "import '../theme/app_theme.dart';",
+      "import '../../theme/app_theme.dart';",
+      "import '../../../theme/app_theme.dart';",
+      "import '../../../../models/models.dart';",
+      "import 'package:repforge/theme/app_theme.dart';",
+      "import 'package:repforge/models/models.dart';",
+      "export 'package:repforge/services/workout_provider.dart';",
+      "import '../screens/home_screen.dart';",
+    ];
+    for (final line in mustMatch) {
+      expect(_forbiddenPathPattern.hasMatch(line), isTrue,
+          reason: 'expected forbidden-path regex to match: $line');
+    }
+
+    const mustNotMatch = [
+      "import 'package:flutter/material.dart';",
+      "import 'a2ui_registry.dart';",
+      "import '../src/a2ui_parser.dart';",
+      "import 'package:repforge/genui/a2ui.dart';",
+    ];
+    for (final line in mustNotMatch) {
+      expect(_forbiddenPathPattern.hasMatch(line), isFalse,
+          reason: 'expected forbidden-path regex NOT to match: $line');
+    }
+  });
+
   test('component renderers contain no casts on model-supplied data', () {
     final violations = <String>[];
     final dir = Directory('lib/genui/src/components');
-    for (final entity in dir.listSync()) {
+    for (final entity in dir.listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
       final lines = entity.readAsStringSync().split('\n');
       for (var i = 0; i < lines.length; i++) {
-        if (RegExp(r"\bas (String|num|int|double|List|Map)\b")
+        if (RegExp(r"\bas (String|num|int|double|List|Map|bool|Object|dynamic)\b")
             .hasMatch(lines[i])) {
           violations.add('${entity.path}:${i + 1}: ${lines[i].trim()}');
         }

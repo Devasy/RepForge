@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/genui/a2ui.dart';
@@ -52,6 +53,16 @@ const _payloads = <String>[
   // Deeply nested grids.
   '{"component":"GridContainer","children":[{"component":"GridContainer","children":['
       '{"component":"StatCard","title":"A","value":1}]}]}',
+  // Grid using "components" as an alias for "children" (regression: Task 13
+  // widened the parser's per-node child-key lookup to accept
+  // components/elements/content, not just children).
+  '{"component":"GridContainer","props":{"components":['
+      '{"component":"StatCard","title":"A","value":1}]}}',
+  // All-negative DynamicChart values (regression: Task 8 fixed the axis
+  // bounds — via A2UiSeries.minValue/_yBounds — so an all-negative series
+  // is bracketed instead of silently clamped to a 0-start axis that
+  // excludes every real data point).
+  '{"component":"DynamicChart","props":{"title":"T","labels":["A","B","C"],"values":[-50,-30,-10]}}',
   // Empty data everywhere.
   '{"component":"DynamicChart","props":{"title":"T","labels":[],"series":[]}}',
   // Hostile types.
@@ -102,6 +113,51 @@ void main() {
         home: Scaffold(body: A2UiRenderer(node: node!)),
       ));
       expect(find.textContaining('No chart data'), findsOneWidget);
+    });
+  });
+
+  // These two regressions were both SILENT-VISUAL, not throwing — a
+  // no-exception check structurally can't catch either, so each gets a
+  // positive assertion pinning the actual fixed behavior, not just
+  // "didn't crash".
+  group('silent-visual regressions stay fixed', () {
+    testWidgets(
+        'all-negative DynamicChart values render an axis that brackets '
+        'the data instead of clamping to a 0-start range (Task 8)',
+        (tester) async {
+      final node = _parser.parse(
+        '{"component":"DynamicChart","props":{"title":"T",'
+        '"labels":["A","B","C"],"values":[-50,-30,-10]}}',
+      )!;
+
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: A2UiRenderer(node: node)),
+      ));
+
+      final chart = tester.widget<LineChart>(find.byType(LineChart));
+      // The true minimum is -50; a broken axis that clamps at 0 would give
+      // minY == 0 and silently drop every point off the visible chart.
+      expect(chart.data.minY, lessThan(-10));
+      expect(chart.data.maxY, greaterThanOrEqualTo(-10));
+    });
+
+    test(
+        'GridContainer accepts "components" as an alias for "children" '
+        'and actually populates the node tree (Task 13)', () {
+      final node = _parser.parse(
+        '{"component":"GridContainer","props":{"components":['
+        '{"component":"StatCard","title":"A","value":1}]}}',
+      );
+
+      expect(node, isNotNull);
+      // A broken alias lookup would still parse without throwing but leave
+      // children empty, silently rendering an empty grid.
+      expect(node!.children, isNotEmpty);
+      expect(node.children.single.name, 'StatCard');
     });
   });
 }
