@@ -51,6 +51,14 @@ abstract class A2UiSpec<P extends Object> {
   /// the parser's job, not this method's.
   P parseProps(A2UiNode node);
 
+  // `buildWidget`/`render` deliberately keep positional arguments rather than
+  // named ones: this is a build-style API (context, then the thing being
+  // built, then ambient config), mirroring Flutter's own `Widget
+  // build(BuildContext context)` convention that every implementation and
+  // call site in this codebase already follows. Every implementation is a
+  // one-line override, so argument-order mistakes surface immediately as a
+  // type error rather than silently compiling wrong — named parameters would
+  // add call-site noise without a corresponding safety win here.
   Widget buildWidget(BuildContext context, P props, A2UiTheme theme);
 
   /// Type-erased entry point used by the renderer.

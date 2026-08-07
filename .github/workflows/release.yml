@@ -48,7 +48,17 @@ jobs:
         working-directory: ./workout-logger
         run: |
           flutter pub get
-          find $PUB_CACHE -name "CMakeLists.txt" -exec sed -i -e 's/-Wl,/-Wl,--build-id=none,/' {} + 2>/dev/null || true
+          : "${PUB_CACHE:?PUB_CACHE is not set}"
+          mapfile -t targets < <(find "$PUB_CACHE" -type f -path '*/jni-*/src/CMakeLists.txt')
+          if [ "${#targets[@]}" -eq 0 ]; then
+            echo "Error: no jni-*/src/CMakeLists.txt files found under \$PUB_CACHE" >&2
+            exit 1
+          fi
+          for f in "${targets[@]}"; do
+            if ! grep -q -- '-Wl,--build-id=none' "$f"; then
+              sed -i -e 's/-Wl,/-Wl,--build-id=none,/' "$f"
+            fi
+          done
 
       - name: Bump version
         if: github.event_name == 'push'

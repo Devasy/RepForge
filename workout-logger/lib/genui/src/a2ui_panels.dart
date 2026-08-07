@@ -58,9 +58,13 @@ class A2UiPanelTitle extends StatelessWidget {
           ),
         ),
         if (label != null && label.isNotEmpty)
-          Text(
-            label,
-            style: TextStyle(color: theme.textFaint, fontSize: 11),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: theme.textFaint, fontSize: 11),
+            ),
           ),
       ],
     );

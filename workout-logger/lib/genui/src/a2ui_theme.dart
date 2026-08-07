@@ -39,7 +39,14 @@ class A2UiTheme {
   final double pillRadius;
 
   /// Colour for series index [i], cycling through [seriesPalette].
-  Color seriesColor(int i) => seriesPalette[i % seriesPalette.length];
+  Color seriesColor(int i) {
+    assert(
+      seriesPalette.isNotEmpty,
+      'seriesPalette must not be empty — seriesColor() indexes into it '
+      'with a modulo, which throws on an empty list.',
+    );
+    return seriesPalette[i % seriesPalette.length];
+  }
 
   /// Neutral dark default so the package renders standalone.
   static const A2UiTheme dark = A2UiTheme(

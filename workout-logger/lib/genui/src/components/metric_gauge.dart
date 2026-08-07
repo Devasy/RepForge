@@ -217,6 +217,7 @@ class _GaugeArcPainter extends CustomPainter {
   @override
   bool shouldRepaint(_GaugeArcPainter oldDelegate) =>
       oldDelegate.progress != progress ||
+      oldDelegate.track != track ||
       oldDelegate.from != from ||
       oldDelegate.to != to;
 }

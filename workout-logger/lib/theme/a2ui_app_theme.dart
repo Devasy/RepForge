@@ -1,4 +1,5 @@
-import '../genui/src/a2ui_theme.dart';
+import 'package:repforge/genui/a2ui.dart';
+
 import 'app_theme.dart';
 
 /// Maps RepForge design tokens onto the domain-free [A2UiTheme] the GenUI

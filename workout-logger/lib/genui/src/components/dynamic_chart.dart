@@ -221,8 +221,22 @@ class DynamicChartSpec extends A2UiSpec<DynamicChartProps> {
   }
 
   Widget _pie(DynamicChartProps props, A2UiTheme theme) {
-    final values = props.series.first.values;
-    final total = values.fold<double>(0, (sum, v) => sum + v);
+    final rawValues = props.series.first.values;
+    // A pie slice needs a positive share of the whole; negative or zero
+    // entries have no geometric meaning. Filter them out, but keep each
+    // surviving entry's ORIGINAL index so theme.seriesColor(i) and
+    // props.labels[i] — both indexed by original position — stay aligned.
+    final positive = <int>[
+      for (var i = 0; i < rawValues.length; i++)
+        if (rawValues[i] > 0) i,
+    ];
+    if (positive.isEmpty) {
+      return A2UiEmptyPanel(
+        message: '${props.title}: No positive values to chart',
+        theme: theme,
+      );
+    }
+    final total = positive.fold<double>(0, (sum, i) => sum + rawValues[i]);
 
     return Row(
       children: [
@@ -232,14 +246,12 @@ class DynamicChartSpec extends A2UiSpec<DynamicChartProps> {
               sectionsSpace: 2,
               centerSpaceRadius: 32,
               sections: [
-                for (var i = 0; i < values.length; i++)
+                for (final i in positive)
                   PieChartSectionData(
-                    value: values[i],
+                    value: rawValues[i],
                     color: theme.seriesColor(i),
                     radius: 44,
-                    title: total <= 0
-                        ? ''
-                        : '${(values[i] / total * 100).round()}%',
+                    title: '${(rawValues[i] / total * 100).round()}%',
                     titleStyle: TextStyle(
                       color: theme.textPrimary,
                       fontSize: 11,
@@ -257,7 +269,7 @@ class DynamicChartSpec extends A2UiSpec<DynamicChartProps> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (var i = 0; i < values.length; i++)
+                for (final i in positive)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
@@ -274,7 +286,7 @@ class DynamicChartSpec extends A2UiSpec<DynamicChartProps> {
                         Expanded(
                           child: Text(
                             '${i < props.labels.length ? props.labels[i] : ''} '
-                            '(${values[i].round()})',
+                            '(${rawValues[i].round()})',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style:

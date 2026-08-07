@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'a2ui_node.dart';
@@ -27,7 +28,12 @@ class A2UiRenderer extends StatelessWidget {
   Widget build(BuildContext context) {
     final resolvedRegistry = registry ?? A2UiRegistryProvider.of(context);
     final spec = resolvedRegistry.specFor(node.name);
-    if (spec == null) return const SizedBox.shrink();
+    if (spec == null) {
+      if (kDebugMode) {
+        debugPrint('A2UiRenderer: no spec registered for "${node.name}"');
+      }
+      return const SizedBox.shrink();
+    }
     return A2UiRegistryProvider(
       registry: resolvedRegistry,
       child: spec.render(context, node, A2UiThemeProvider.of(context)),

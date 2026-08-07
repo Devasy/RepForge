@@ -87,7 +87,12 @@ class StatCardSpec extends A2UiSpec<StatCardProps> {
     final String value;
     if (rawValue == null) {
       value = '—';
-    } else if (unit == null || unit.isEmpty || rawValue.contains(unit)) {
+    } else if (unit == null ||
+        unit.isEmpty ||
+        rawValue.trimRight().endsWith(unit)) {
+      // Only a trailing-suffix match counts as "already present" — a naive
+      // substring check would false-positive on e.g. value "10 reps" with
+      // unit "s" (a substring of "reps"), silently dropping a real unit.
       value = rawValue;
     } else {
       value = '$rawValue $unit';

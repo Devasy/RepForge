@@ -79,7 +79,17 @@ class A2UiParser {
     final rawProps = json['props'];
     final Map<String, Object?> effective;
     if (rawProps is Map) {
-      effective = A2UiProps.stringKeyed(rawProps);
+      final merged = A2UiProps.stringKeyed(rawProps);
+      // A model may write a node's children as a sibling of `props` rather
+      // than nested inside it, e.g. `{component, props:{...}, children:[...]}`.
+      // Fold any such outer child-key into `effective` when `props` doesn't
+      // already define it — `props` always wins on a genuine conflict.
+      for (final key in _childKeys) {
+        if (!merged.containsKey(key) && json.containsKey(key)) {
+          merged[key] = json[key];
+        }
+      }
+      effective = merged;
     } else {
       effective = Map<String, Object?>.from(json)..remove('component');
     }
@@ -208,6 +218,18 @@ class A2UiParser {
   static Object? _extractJson(String text) {
     final t = stripFences(text);
     if (t.isEmpty) return null;
+
+    // Fast path: the common case is a reply that's nothing but JSON, with no
+    // surrounding prose. Trying the whole trimmed text first avoids the
+    // per-position balanced-span scan below for that case; it changes no
+    // behaviour, since a fully-decodable whole string is always the longest
+    // possible candidate the scan could have found anyway.
+    try {
+      final whole = jsonDecode(t);
+      if (whole is Map || whole is List) return whole;
+    } catch (_) {
+      // Not decodable as-is — fall through to the scan for prose-wrapped JSON.
+    }
 
     String? bestCandidate;
     Object? bestValue;
