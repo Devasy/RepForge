@@ -89,6 +89,23 @@ void main() {
     test('never throws on hostile input', () {
       expect(() => parse({'points': 5, 'correlation': []}), returnsNormally);
     });
+
+    test('drops structurally invalid point entries (nested objects, list entries)',
+        () {
+      final p = parse({
+        'points': [
+          {'x': 1, 'y': 2},
+          {
+            'x': {'nested': true},
+            'y': 5,
+          },
+          [3, 4],
+          'garbage',
+        ],
+      });
+      expect(p.points, hasLength(1));
+      expect(p.points.single.x, 1);
+    });
   });
 
   group('ScatterPlotProps bounds', () {
@@ -113,6 +130,19 @@ void main() {
       expect(b.maxX, greaterThanOrEqualTo(10));
       expect(b.minY, lessThanOrEqualTo(0));
       expect(b.maxY, greaterThanOrEqualTo(100));
+    });
+
+    test('brackets an all-negative coordinate spread', () {
+      final b = parse({
+        'points': [
+          {'x': -20, 'y': -10},
+          {'x': -5, 'y': -3},
+        ],
+      }).bounds;
+      expect(b.minX, lessThanOrEqualTo(-20));
+      expect(b.maxX, greaterThanOrEqualTo(-5));
+      expect(b.minY, lessThanOrEqualTo(-10));
+      expect(b.maxY, greaterThanOrEqualTo(-3));
     });
   });
 
