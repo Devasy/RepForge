@@ -134,5 +134,23 @@ void main() {
       expect(parser.looksLikeUi(''), isFalse);
       expect(parser.looksLikeUi('**Great** work'), isFalse);
     });
+
+    test('is true for a prose sentence followed by an unclosed fence', () {
+      // A model that narrates before opening a fenced payload: the fence
+      // isn't at position 0, so a naive "starts with ``` " check misses it.
+      expect(
+        parser.looksLikeUi(
+          'Here is your data:\n```json\n{"component":"Stat',
+        ),
+        isTrue,
+      );
+    });
+
+    test('is false for plain prose containing no fence or JSON at all', () {
+      expect(
+        parser.looksLikeUi('Your bench is trending nicely, keep going!'),
+        isFalse,
+      );
+    });
   });
 }

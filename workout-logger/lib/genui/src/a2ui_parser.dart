@@ -101,8 +101,18 @@ class A2UiParser {
   /// UI can show a "building" indicator instead of raw JSON.
   bool looksLikeUi(String partialText) {
     final t = stripFences(partialText).trimLeft();
-    if (t.isEmpty) return false;
-    return t.startsWith('{') || t.startsWith('[');
+    if (t.isNotEmpty && (t.startsWith('{') || t.startsWith('['))) return true;
+
+    // `stripFences` only strips a *leading* fence, so a model that writes a
+    // sentence before opening a fenced block (e.g. "Here's your data:\n```json\n{...")
+    // falls through to here. Cheaply check for a ``` fence opened anywhere
+    // in the streamed-so-far text that hasn't been closed yet — that's a
+    // strong signal a payload is arriving inside it, without re-scanning or
+    // parsing the whole string on every frame.
+    final openFence = partialText.indexOf('```');
+    if (openFence == -1) return false;
+    final closeFence = partialText.indexOf('```', openFence + 3);
+    return closeFence == -1;
   }
 
   /// Removes a leading ``` fence (with or without a language tag) and a
