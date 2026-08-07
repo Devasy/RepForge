@@ -140,8 +140,10 @@ void main() {
 
       final chart = tester.widget<LineChart>(find.byType(LineChart));
       // The true minimum is -50; a broken axis that clamps at 0 would give
-      // minY == 0 and silently drop every point off the visible chart.
-      expect(chart.data.minY, lessThan(-10));
+      // minY == 0 and silently drop every point off the visible chart. The
+      // axis must actually bracket the real minimum, not just dip below
+      // some weak threshold that a partially-broken bound could still clear.
+      expect(chart.data.minY, lessThanOrEqualTo(-50));
       expect(chart.data.maxY, greaterThanOrEqualTo(-10));
     });
 

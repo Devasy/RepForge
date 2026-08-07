@@ -37,8 +37,23 @@ void main() {
     final markerIndex = section.indexOf('WORKED EXAMPLE:');
     expect(markerIndex, greaterThan(-1));
     final start = section.indexOf('{', markerIndex);
-    final end = section.lastIndexOf('}');
     expect(start, greaterThan(-1));
+    // Walk forward counting brace depth so the extracted region is exactly
+    // the balanced JSON object starting at `start`, regardless of whether
+    // prompt content appended after the worked example also contains '}'.
+    var depth = 0;
+    var end = -1;
+    for (var i = start; i < section.length; i++) {
+      if (section[i] == '{') depth++;
+      if (section[i] == '}') {
+        depth--;
+        if (depth == 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    expect(end, greaterThan(-1));
     final example = section.substring(start, end + 1);
 
     final decoded = jsonDecode(example);

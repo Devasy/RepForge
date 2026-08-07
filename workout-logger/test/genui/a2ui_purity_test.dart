@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// precede it (e.g. `'../theme/...'`, `'../../../theme/...'`) or whether it
 /// is written as a `package:repforge/...` path.
 final RegExp _forbiddenPathPattern = RegExp(
-  r"""['"](?:(?:\.\./)+|package:repforge/)(theme|models|services|screens)/""",
+  r"""['"](?:(?:\.\./)+|package:repforge/)(theme|models|services|screens|data)/""",
 );
 
 /// Matches an `import` or `export` directive line, so we only flag genuine
@@ -65,6 +65,8 @@ void main() {
       "import 'package:repforge/models/models.dart';",
       "export 'package:repforge/services/workout_provider.dart';",
       "import '../screens/home_screen.dart';",
+      "import '../../data/exercise_database.dart';",
+      "import 'package:repforge/data/exercise_database.dart';",
     ];
     for (final line in mustMatch) {
       expect(_forbiddenPathPattern.hasMatch(line), isTrue,

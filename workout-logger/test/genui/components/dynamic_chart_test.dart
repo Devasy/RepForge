@@ -160,6 +160,37 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets(
+        'pie chart with mixed-sign values renders only the positive slice',
+        (tester) async {
+      // Regression test for the fix in DynamicChart._pie: negative/zero
+      // values have no geometric meaning in a pie and must be filtered out
+      // before building sections, rather than crashing or silently
+      // corrupting the percentage math.
+      await pump(tester, {
+        'type': 'pie',
+        'labels': ['Chest', 'Back'],
+        'values': [60, -40],
+      });
+      expect(tester.takeException(), isNull);
+      final pieChart = tester.widget<PieChart>(find.byType(PieChart));
+      expect(pieChart.data.sections, hasLength(1));
+      expect(pieChart.data.sections.single.title, '100%');
+    });
+
+    testWidgets('pie chart with all-negative values falls back to the '
+        'empty panel instead of throwing', (tester) async {
+      await pump(tester, {
+        'type': 'pie',
+        'labels': ['Chest', 'Back'],
+        'values': [-60, -40],
+      });
+      expect(tester.takeException(), isNull);
+      expect(find.byType(PieChart), findsNothing);
+      expect(find.textContaining('No positive values to chart'),
+          findsOneWidget);
+    });
+
     testWidgets('renders a legend only for multi-series non-pie charts',
         (tester) async {
       await pump(tester, {

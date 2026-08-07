@@ -135,7 +135,10 @@ void main() {
 
       expect(find.text('probe'), findsOneWidget);
 
-      final container = tester.widget<Container>(find.byType(Container));
+      final container = tester.widget<Container>(find.descendant(
+        of: find.byType(A2UiPanel),
+        matching: find.byType(Container),
+      ));
       expect(container.padding, EdgeInsets.all(A2UiTheme.dark.spacing));
 
       final decoration = container.decoration as BoxDecoration;
@@ -156,7 +159,10 @@ void main() {
 
       expect(find.text('probe'), findsOneWidget);
 
-      final container = tester.widget<Container>(find.byType(Container));
+      final container = tester.widget<Container>(find.descendant(
+        of: find.byType(A2UiPanel),
+        matching: find.byType(Container),
+      ));
       expect(container.padding, EdgeInsets.zero);
     });
   });

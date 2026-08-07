@@ -14,7 +14,7 @@ Future<void> pump(WidgetTester tester, Map<String, Object?> props) async {
       body: Builder(
         builder: (context) => const StatCardSpec().render(
           context,
-          A2UiNode(name: 'StatCard', props: A2UiProps({})),
+          A2UiNode(name: 'StatCard', props: A2UiProps(props)),
           A2UiTheme.dark,
         ),
       ),
@@ -55,6 +55,17 @@ void main() {
       expect(parse({'value': '88 kg', 'unit': 'kg'}).value, '88 kg');
     });
 
+    test('appends the unit when it only appears as a substring elsewhere in '
+        'the value, not as the actual trailing unit', () {
+      // Regression test: a naive `.contains(unit)` check is a false positive
+      // here — 'reps' contains the letter 's' — even though the value does
+      // NOT actually end with the unit 's' (it ends with "total"). The fix
+      // checks the trimmed value's actual suffix instead of a raw substring
+      // `contains`, so the unit must still be appended.
+      expect(parse({'value': '12 reps total', 'unit': 's'}).value,
+          '12 reps total s');
+    });
+
     test('accepts loose trend synonyms', () {
       for (final up in ['up', 'improving', 'positive', 'RISING']) {
         expect(parse({'trend': up}).trend, A2UiTrend.up, reason: up);
@@ -79,25 +90,12 @@ void main() {
 
   group('StatCard rendering', () {
     testWidgets('renders title, value and subtitle', (tester) async {
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => const StatCardSpec().render(
-              context,
-              const A2UiNode(
-                name: 'StatCard',
-                props: A2UiProps({
-                  'title': 'Volume',
-                  'value': '12k',
-                  'subtitle': 'week',
-                  'trend': 'up',
-                }),
-              ),
-              A2UiTheme.dark,
-            ),
-          ),
-        ),
-      ));
+      await pump(tester, {
+        'title': 'Volume',
+        'value': '12k',
+        'subtitle': 'week',
+        'trend': 'up',
+      });
       expect(find.text('Volume'), findsOneWidget);
       expect(find.text('12k'), findsOneWidget);
       expect(find.text('week'), findsOneWidget);
