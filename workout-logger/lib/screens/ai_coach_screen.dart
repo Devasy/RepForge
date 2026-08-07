@@ -10,8 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../models/models.dart';
-import '../genui/a2ui_component.dart';
-import '../genui/a2ui_renderer.dart';
+import '../genui/a2ui.dart';
 import '../viewmodels/ai_coach_view_model.dart';
 import '../services/ai/gemini_ai_service.dart';
 import '../services/ai/coach_tool_service.dart';
@@ -747,7 +746,7 @@ class _MessageBubble extends StatelessWidget {
                         height: 1.55,
                       ),
                     )
-                  : _CoachMessageContent(text: message.text),
+                  : CoachMessageContent(text: message.text),
             ),
           ),
         ],
@@ -787,7 +786,7 @@ class _StreamingBubble extends StatelessWidget {
               ),
               child: text.isEmpty
                   ? const RFLoadingDots()
-                  : _CoachMessageContent(text: text),
+                  : CoachMessageContent(text: text, streaming: true),
             ),
           ),
         ],
@@ -796,18 +795,79 @@ class _StreamingBubble extends StatelessWidget {
   }
 }
 
-/// Markdown renderer for coach replies, styled to the app theme.
-class _CoachMessageContent extends StatelessWidget {
-  const _CoachMessageContent({required this.text});
+/// Renders one coach reply: an A2UI dashboard when the text is a UI payload,
+/// otherwise Markdown.
+///
+/// Public so widget tests can drive it directly. Parsing is memoized per text
+/// value — the old code re-parsed on every rebuild, including on every partial
+/// frame of a stream.
+class CoachMessageContent extends StatefulWidget {
+  const CoachMessageContent({
+    super.key,
+    required this.text,
+    this.streaming = false,
+  });
+
   final String text;
+
+  /// True while tokens are still arriving, so a half-written JSON payload
+  /// shows a placeholder instead of raw braces.
+  final bool streaming;
+
+  @override
+  State<CoachMessageContent> createState() => _CoachMessageContentState();
+}
+
+class _CoachMessageContentState extends State<CoachMessageContent> {
+  static final _parser = A2UiParser(defaultA2UiRegistry);
+
+  A2UiNode? _node;
+  String? _parsedFrom;
+
+  @override
+  void didUpdateWidget(CoachMessageContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text) _parsedFrom = null;
+  }
+
+  A2UiNode? get _resolved {
+    if (_parsedFrom != widget.text) {
+      _parsedFrom = widget.text;
+      _node = _parser.parse(widget.text);
+    }
+    return _node;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final component = A2UiComponent.tryParse(text);
-    if (component != null) {
-      return A2UiRenderer(component: component);
+    final node = _resolved;
+    if (node != null) return A2UiRenderer(node: node);
+
+    // Mid-stream JSON: hide the braces behind a progress row rather than
+    // letting the Markdown renderer spill raw payload into the bubble.
+    if (widget.streaming && _parser.looksLikeUi(widget.text)) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            'Building dashboard…',
+            style: TextStyle(
+              fontFamily: 'Geist',
+              color: AppColors.textMuted,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      );
     }
-    return _CoachMarkdown(text: text);
+
+    return _CoachMarkdown(text: widget.text);
   }
 }
 

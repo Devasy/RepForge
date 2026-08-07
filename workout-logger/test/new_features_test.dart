@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/models/sleep_hr_models.dart';
-import 'package:repforge/genui/a2ui_component.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'package:repforge/services/interfaces/health_connect_service_interface.dart';
 import 'package:repforge/services/interfaces/storage_service_interface.dart';
@@ -229,41 +228,4 @@ void main() {
     });
   });
 
-  group('GenUI Component Resilience Tests', () {
-    test('successfully parses GenUI JSON payload with numeric StatCard value and custom trend', () {
-      const rawJson = '{"component":"GridContainer","props":{"columns":2,"children":[{"component":"DynamicChart","props":{"type":"line","title":"Sleeping Heart Rate (Last 14 Days)","labels":["7/20","7/21","7/22","7/23","7/24","7/25","7/26","7/27","7/28","7/29","7/30","7/31","8/1","8/2"],"series":[{"name":"P5 Sleeping HR","values":[51,56,64,63,56,54,50,53,52,54,53,56,54,55]},{"name":"P25 HR","values":[55.1,59.6,70.1,68,59.5,57.2,53.1,56.7,55.7,58.2,55.5,59.9,57.2,58.1]},{"name":"Mean HR","values":[59.6,62,74.2,72.5,63.9,60.2,56.3,58.9,59.8,61,62.8,63,60.9,60.2]}]}},{"component":"GridContainer","props":{"columns":2,"children":[{"component":"StatCard","props":{"title":"Mean P5 Sleeping HR","value":55.1,"subtitle":"14-day average floor","trend":"improving"}},{"component":"StatCard","props":{"title":"P5 StdDev (σ)","value":3.9,"subtitle":"Low variation","trend":"neutral"}},{"component":"StatCard","props":{"title":"P5 Variance (σ²)","value":14.9,"subtitle":"Nightly stability","trend":"neutral"}},{"component":"StatCard","props":{"title":"Linear Trend","value":"-0.3 bpm/day","subtitle":"Improving recovery floor","trend":"up"}}]}}]}}';
-
-      final comp = A2UiComponent.tryParse(rawJson);
-      expect(comp, isNotNull);
-      expect(comp!.component, 'GridContainer');
-      expect(comp.children.length, 2);
-    });
-
-    test('successfully parses GenUI JSON payload wrapped in Markdown code fences', () {
-      const codeFenceJson = '''
-```json
-{
-  "component": "GridContainer",
-  "props": {
-    "columns": 2,
-    "children": [
-      {
-        "component": "StatCard",
-        "props": {
-          "title": "Mean P5 Floor",
-          "value": 55.1,
-          "trend": "up"
-        }
-      }
-    ]
-  }
-}
-```
-''';
-
-      final comp = A2UiComponent.tryParse(codeFenceJson);
-      expect(comp, isNotNull);
-      expect(comp!.component, 'GridContainer');
-    });
-  });
 }
