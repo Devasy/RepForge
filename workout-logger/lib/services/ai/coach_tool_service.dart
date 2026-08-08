@@ -391,6 +391,9 @@ class CoachToolService {
             'targets(id, exercise_id, target_type, target_value, current_value, '
             'estimated_completion_date, created_at, is_completed)\n'
             'personal_records(exercise_id, best_weight, best_reps, best_volume, achieved_at)\n'
+            'When joining tables, select explicit columns with aliases (e.g. s.id AS '
+            'session_id, l.id AS log_id) instead of SELECT *, since duplicate column '
+            'names across joined tables will silently collide.\n'
             'Only SELECT/WITH statements are allowed, one statement per call.',
         Schema.object(
           properties: {
