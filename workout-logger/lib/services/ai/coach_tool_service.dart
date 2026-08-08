@@ -14,6 +14,7 @@ import '../../models/sleep_hr_models.dart';
 import '../workout_provider.dart';
 import '../managers/pr_manager.dart';
 import '../managers/health_history_manager.dart';
+import 'sql_query_service.dart';
 
 class AmbiguousMatchException implements Exception {
   const AmbiguousMatchException(this.candidates);
@@ -24,9 +25,15 @@ class CoachToolService {
   final WorkoutProvider _wp;
   final PRManager _pr;
   final HealthHistoryManager? _hh;
+  final SqlQueryService? _sql;
 
-  CoachToolService(this._wp, this._pr, {HealthHistoryManager? healthHistory})
-      : _hh = healthHistory;
+  CoachToolService(
+    this._wp,
+    this._pr, {
+    HealthHistoryManager? healthHistory,
+    SqlQueryService? sqlQuery,
+  })  : _hh = healthHistory,
+        _sql = sqlQuery;
 
   /// Tool declaration for the optimizer screen's `ask_user_questions` flow.
   /// NOT included in the coach's tool list — only the optimizer adds it.
@@ -360,8 +367,44 @@ class CoachToolService {
               },
             ),
           ),
+          if (_sql != null) _runSqlQueryDeclaration,
         ]),
       ];
+
+  /// Schema-aware declaration for run_sql_query — only included when a
+  /// SqlQueryService is wired (i.e. the app has cut over to SQLite).
+  FunctionDeclaration get _runSqlQueryDeclaration => FunctionDeclaration(
+        'run_sql_query',
+        'Run a read-only SQL SELECT query directly against the workout database '
+            'for questions the other tools cannot answer (custom joins, filters, '
+            'or aggregations). Tables:\n'
+            'sessions(id, date, routine_id, duration_min, notes, hc_synced_at)\n'
+            'exercise_logs(id, session_id, exercise_id, notes, handle)\n'
+            'sets(id, exercise_log_id, weight, reps, is_dropset, drops_json, '
+            'time_taken, timestamp, assist_weight, extra_weight, handle)\n'
+            'exercises(id, name, category, is_custom, available_handles) — custom '
+            'exercises only; built-ins are not stored here\n'
+            'muscle_groups(id, name, growth_rate, last_updated)\n'
+            'exercise_muscle_activations(exercise_id, muscle_group_id, activation_percentage)\n'
+            'routines(id, name, created_at)\n'
+            'routine_exercises(routine_id, exercise_id, position)\n'
+            'targets(id, exercise_id, target_type, target_value, current_value, '
+            'estimated_completion_date, created_at, is_completed)\n'
+            'personal_records(exercise_id, best_weight, best_reps, best_volume, achieved_at)\n'
+            'Only SELECT/WITH statements are allowed, one statement per call.',
+        Schema.object(
+          properties: {
+            'query': Schema.string(
+              description: 'A single read-only SQL SELECT statement.',
+            ),
+            'limit': Schema.integer(
+              description: 'Optional. Max rows to return (default 200, max 500).',
+              nullable: true,
+            ),
+          },
+          requiredProperties: ['query'],
+        ),
+      );
 
   /// Dispatch a model function call to the matching query and return a
   /// JSON-serializable result map.
@@ -395,6 +438,13 @@ class CoachToolService {
         return await _updateRoutine(call.args);
       case 'add_custom_exercise':
         return await _addCustomExercise(call.args);
+      case 'run_sql_query':
+        final sql = _sql;
+        if (sql == null) return {'error': 'SQL query tool is not available.'};
+        return await sql.runQuery(
+          (call.args['query'] as String?) ?? '',
+          limit: (call.args['limit'] as num?)?.toInt(),
+        );
       default:
         return {'error': 'Unknown tool: ${call.name}'};
     }
