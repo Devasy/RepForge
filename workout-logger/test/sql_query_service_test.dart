@@ -18,6 +18,8 @@ void main() {
       await db.execute('CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)');
       await db.insert('widgets', {'id': 1, 'name': 'foo'});
       await db.insert('widgets', {'id': 2, 'name': 'bar'});
+      await db.execute('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)');
+      await db.insert('settings', {'key': 'geminiApiKey', 'value': 'super-secret-key'});
     });
   });
 
@@ -56,5 +58,24 @@ void main() {
     final service = SqlQueryService(dbPath);
     final result = await service.runQuery('SELECT * FROM does_not_exist');
     expect(result['error'], isNotNull);
+  });
+
+  test('rejects queries reading the settings table', () async {
+    final service = SqlQueryService(dbPath);
+    final result = await service.runQuery('SELECT * FROM settings');
+    expect(result['error'], contains('restricted table'));
+  });
+
+  test('rejects queries reading sqlite_master', () async {
+    final service = SqlQueryService(dbPath);
+    final result = await service.runQuery('SELECT * FROM sqlite_master');
+    expect(result['error'], contains('restricted table'));
+  });
+
+  test('trailing line comment does not break the LIMIT wrapper', () async {
+    final service = SqlQueryService(dbPath);
+    final result = await service.runQuery('SELECT * FROM widgets -- get all');
+    expect(result['error'], isNull);
+    expect(result['row_count'], 2);
   });
 }

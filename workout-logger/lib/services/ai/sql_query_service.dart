@@ -84,7 +84,10 @@ class SqlQueryService {
     Database? db;
     try {
       db = await openReadOnlyDatabase(databasePath);
-      final rows = await db.rawQuery('SELECT * FROM ($safeQuery) LIMIT ?', [cappedLimit]);
+      final rows = await db.rawQuery(
+        'SELECT * FROM (\n$safeQuery\n) LIMIT ?',
+        [cappedLimit],
+      );
       return {'row_count': rows.length, 'rows': rows};
     } catch (e) {
       return {'error': 'Query failed: $e'};
