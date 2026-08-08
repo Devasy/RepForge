@@ -73,6 +73,7 @@ class SqliteStorageService implements IStorageService {
       timestamp TEXT NOT NULL,
       assist_weight REAL,
       extra_weight REAL,
+      body_weight_at_log REAL,
       handle TEXT
     )''',
     '''CREATE TABLE targets (
@@ -240,6 +241,7 @@ class SqliteStorageService implements IStorageService {
             'timestamp': set.timestamp.toIso8601String(),
             'assist_weight': set.assistWeight,
             'extra_weight': set.extraWeight,
+            'body_weight_at_log': set.bodyWeightAtLog,
             'handle': set.handle,
           });
         }
@@ -281,6 +283,7 @@ class SqliteStorageService implements IStorageService {
                   timestamp: DateTime.parse(s['timestamp'] as String),
                   assistWeight: (s['assist_weight'] as num?)?.toDouble(),
                   extraWeight: (s['extra_weight'] as num?)?.toDouble(),
+                  bodyWeightAtLog: (s['body_weight_at_log'] as num?)?.toDouble(),
                   handle: s['handle'] as String?,
                 ))
             .toList();

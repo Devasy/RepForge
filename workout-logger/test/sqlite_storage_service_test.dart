@@ -123,5 +123,22 @@ void main() {
       final result = await storage.getSessionsForExercise('deadlift');
       expect(result.map((s) => s.id), ['c1']);
     });
+
+    test('saveWorkoutSession + getWorkoutSession round-trips bodyWeightAtLog', () async {
+      final session = WorkoutSession(
+        id: 's4',
+        date: DateTime(2026, 7, 5),
+        duration: 25,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'assisted_pullup',
+            sets: [WorkoutSet(weight: 20, reps: 8, bodyWeightAtLog: 75.5)],
+          ),
+        ],
+      );
+      await storage.saveWorkoutSession(session);
+      final fetched = await storage.getWorkoutSession('s4');
+      expect(fetched!.exercises.single.sets.single.bodyWeightAtLog, 75.5);
+    });
   });
 }
