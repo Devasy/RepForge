@@ -106,7 +106,7 @@ void main() async {
 class WorkoutLoggerApp extends StatelessWidget {
   // Singleton instances created once at app startup
   // This ensures the same instances are used throughout the app lifecycle
-  static final IStorageService _storageService = _resolvedStorageService!;
+  static final IStorageService _storageService = _resolvedStorageService ?? StorageService();
   static final IMLService _mlService = MLService();
   static final IHealthConnectService _healthConnectService = HealthConnectService();
   static final ProgramManager _programManager = ProgramManager(_storageService);
