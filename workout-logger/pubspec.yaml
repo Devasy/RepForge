@@ -39,7 +39,10 @@ dependencies:
   # Local storage
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  
+
+  # SQLite persistence (replacing Hive)
+  sqflite: ^2.4.2
+
   # State management
   provider: ^6.1.1
   
@@ -79,6 +82,9 @@ dev_dependencies:
   # Testing
   mockito: ^5.4.4
   build_runner: ^2.4.8
+
+  # sqflite testing on the Dart VM (flutter test has no platform binding)
+  sqflite_common_ffi: ^2.3.4+4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
