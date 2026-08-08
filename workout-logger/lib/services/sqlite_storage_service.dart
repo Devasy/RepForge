@@ -471,37 +471,121 @@ class SqliteStorageService implements IStorageService {
     return rows.map(_targetFromRow).toList();
   }
 
-  // ==================== MUSCLE GROUPS / EXERCISES (Task 4) ====================
+  // ==================== MUSCLE GROUPS ====================
 
   @override
-  Future<void> updateMuscleGroupGrowthRate(String muscleGroupId, double rate) =>
-      throw UnimplementedError();
+  Future<void> updateMuscleGroupGrowthRate(String muscleGroupId, double rate) async {
+    await _db.update(
+      'muscle_groups',
+      {'growth_rate': rate, 'last_updated': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [muscleGroupId],
+    );
+  }
+
+  MuscleGroup _muscleGroupFromRow(Map<String, Object?> row) => MuscleGroup(
+        id: row['id'] as String,
+        name: row['name'] as String,
+        growthRate: (row['growth_rate'] as num).toDouble(),
+        lastUpdated: DateTime.parse(row['last_updated'] as String),
+      );
 
   @override
   Future<List<MuscleGroup>> getAllMuscleGroups() async {
     final rows = await _db.query('muscle_groups');
-    return rows
-        .map((row) => MuscleGroup(
-              id: row['id'] as String,
-              name: row['name'] as String,
-              growthRate: (row['growth_rate'] as num).toDouble(),
-              lastUpdated: DateTime.parse(row['last_updated'] as String),
-            ))
-        .toList();
+    return rows.map(_muscleGroupFromRow).toList();
   }
 
   @override
-  Future<MuscleGroup?> getMuscleGroup(String id) => throw UnimplementedError();
+  Future<MuscleGroup?> getMuscleGroup(String id) async {
+    final rows = await _db.query('muscle_groups', where: 'id = ?', whereArgs: [id]);
+    return rows.isEmpty ? null : _muscleGroupFromRow(rows.first);
+  }
+
+  // ==================== CUSTOM EXERCISES ====================
+
   @override
-  Future<void> saveCustomExercise(Exercise exercise) => throw UnimplementedError();
+  Future<void> saveCustomExercise(Exercise exercise) async {
+    await _db.transaction((txn) async {
+      await txn.delete('exercise_muscle_activations', where: 'exercise_id = ?', whereArgs: [exercise.id]);
+      await txn.insert(
+        'exercises',
+        {
+          'id': exercise.id,
+          'name': exercise.name,
+          'category': exercise.category,
+          'is_custom': 1,
+          'available_handles':
+              exercise.availableHandles == null ? null : jsonEncode(exercise.availableHandles),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      for (final ma in exercise.muscleActivations) {
+        await txn.insert('exercise_muscle_activations', {
+          'exercise_id': exercise.id,
+          'muscle_group_id': ma.muscleGroupId,
+          'activation_percentage': ma.activationPercentage,
+        });
+      }
+    });
+  }
+
+  Future<Exercise> _loadCustomExerciseRow(Map<String, Object?> row) async {
+    final activations = await _db.query(
+      'exercise_muscle_activations',
+      where: 'exercise_id = ?',
+      whereArgs: [row['id']],
+    );
+    return Exercise(
+      id: row['id'] as String,
+      name: row['name'] as String,
+      category: row['category'] as String,
+      isCustom: true,
+      availableHandles: row['available_handles'] == null
+          ? null
+          : (jsonDecode(row['available_handles'] as String) as List).cast<String>(),
+      muscleActivations: activations
+          .map((a) => MuscleActivation(
+                muscleGroupId: a['muscle_group_id'] as String,
+                activationPercentage: a['activation_percentage'] as int,
+              ))
+          .toList(),
+    );
+  }
+
   @override
-  Future<List<Exercise>> getCustomExercises() => throw UnimplementedError();
+  Future<List<Exercise>> getCustomExercises() async {
+    final rows = await _db.query('exercises');
+    final result = <Exercise>[];
+    for (final row in rows) {
+      result.add(await _loadCustomExerciseRow(row));
+    }
+    return result;
+  }
+
   @override
-  Future<void> deleteCustomExercise(String id) => throw UnimplementedError();
+  Future<void> deleteCustomExercise(String id) async {
+    await _db.transaction((txn) async {
+      await txn.delete('exercise_muscle_activations', where: 'exercise_id = ?', whereArgs: [id]);
+      await txn.delete('exercises', where: 'id = ?', whereArgs: [id]);
+    });
+  }
+
   @override
-  Future<List<Exercise>> getAllExercises() => throw UnimplementedError();
+  Future<List<Exercise>> getAllExercises() async {
+    final builtIn = ExerciseDatabase.getAll();
+    final custom = await getCustomExercises();
+    return [...builtIn, ...custom];
+  }
+
   @override
-  Future<Exercise?> getExercise(String id) => throw UnimplementedError();
+  Future<Exercise?> getExercise(String id) async {
+    final builtIn = ExerciseDatabase.getById(id);
+    if (builtIn != null) return builtIn;
+    final rows = await _db.query('exercises', where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return null;
+    return _loadCustomExerciseRow(rows.first);
+  }
 
   // ==================== SETTINGS / PROGRAMS / PRs / CONVERSATIONS (Task 5) ====================
 

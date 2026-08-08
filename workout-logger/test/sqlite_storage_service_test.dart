@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/sqlite_storage_service.dart';
+import 'package:repforge/data/exercise_database.dart';
 
 void main() {
   late SqliteStorageService storage;
@@ -200,6 +201,72 @@ void main() {
       await storage.saveTarget(Target(id: 't4', exerciseId: 'deadlift', targetType: 'weight', targetValue: 180));
       final result = await storage.getTargetsForExercise('squat');
       expect(result.map((t) => t.id), ['t3']);
+    });
+  });
+
+  group('SqliteStorageService — muscle groups', () {
+    test('updateMuscleGroupGrowthRate updates an existing group', () async {
+      final groups = await storage.getAllMuscleGroups();
+      final chest = groups.firstWhere((g) => g.name == 'Chest');
+      await storage.updateMuscleGroupGrowthRate(chest.id, 2.5);
+      final updated = await storage.getMuscleGroup(chest.id);
+      expect(updated!.growthRate, 2.5);
+    });
+  });
+
+  group('SqliteStorageService — custom exercises', () {
+    test('saveCustomExercise + getExercise round-trips muscle activations', () async {
+      final exercise = Exercise(
+        id: 'custom1',
+        name: 'Cable Crossover',
+        category: 'isolation',
+        isCustom: true,
+        muscleActivations: [
+          MuscleActivation(muscleGroupId: 'chest', activationPercentage: 80),
+          MuscleActivation(muscleGroupId: 'triceps', activationPercentage: 20),
+        ],
+      );
+      await storage.saveCustomExercise(exercise);
+
+      final fetched = await storage.getExercise('custom1');
+      expect(fetched, isNotNull);
+      expect(fetched!.name, 'Cable Crossover');
+      expect(fetched.muscleActivations.length, 2);
+      expect(fetched.primaryMuscle, 'chest');
+    });
+
+    test('getExercise falls back to built-in exercises', () async {
+      final builtIns = ExerciseDatabase.getAll();
+      final known = builtIns.first;
+      final fetched = await storage.getExercise(known.id);
+      expect(fetched!.name, known.name);
+    });
+
+    test('getAllExercises merges built-in and custom', () async {
+      await storage.saveCustomExercise(Exercise(
+        id: 'custom2',
+        name: 'My Exercise',
+        category: 'compound',
+        isCustom: true,
+        muscleActivations: [MuscleActivation(muscleGroupId: 'back', activationPercentage: 100)],
+      ));
+      final all = await storage.getAllExercises();
+      expect(all.any((e) => e.id == 'custom2'), isTrue);
+      expect(all.length, greaterThan(1));
+    });
+
+    test('deleteCustomExercise removes it and its activations', () async {
+      await storage.saveCustomExercise(Exercise(
+        id: 'custom3',
+        name: 'Temp',
+        category: 'isolation',
+        isCustom: true,
+        muscleActivations: [MuscleActivation(muscleGroupId: 'biceps', activationPercentage: 100)],
+      ));
+      await storage.deleteCustomExercise('custom3');
+      expect(await storage.getExercise('custom3'), isNull);
+      final custom = await storage.getCustomExercises();
+      expect(custom.any((e) => e.id == 'custom3'), isFalse);
     });
   });
 }
