@@ -269,4 +269,105 @@ void main() {
       expect(custom.any((e) => e.id == 'custom3'), isFalse);
     });
   });
+
+  group('SqliteStorageService — settings', () {
+    test('saveSetting + getSetting round-trips, overwrite replaces value', () async {
+      await storage.saveSetting('user_name', 'Alex');
+      expect(await storage.getSetting('user_name'), 'Alex');
+      await storage.saveSetting('user_name', 'Sam');
+      expect(await storage.getSetting('user_name'), 'Sam');
+    });
+
+    test('getSetting returns null for unknown key', () async {
+      expect(await storage.getSetting('does_not_exist'), isNull);
+    });
+  });
+
+  group('SqliteStorageService — personal records', () {
+    test('savePersonalRecord + getPersonalRecord round-trips', () async {
+      await storage.savePersonalRecord(PersonalRecord(
+        exerciseId: 'bench_press',
+        bestWeight: 90,
+        bestReps: 5,
+        bestVolume: 450,
+        achievedAt: DateTime(2026, 4, 1),
+      ));
+      final pr = await storage.getPersonalRecord('bench_press');
+      expect(pr!.bestWeight, 90);
+    });
+
+    test('getAllPersonalRecords returns everything saved', () async {
+      await storage.savePersonalRecord(PersonalRecord(
+        exerciseId: 'squat', bestWeight: 150, bestReps: 3, bestVolume: 450, achievedAt: DateTime(2026, 3, 1),
+      ));
+      final all = await storage.getAllPersonalRecords();
+      expect(all.any((r) => r.exerciseId == 'squat'), isTrue);
+    });
+  });
+
+  group('SqliteStorageService — training programs', () {
+    test('saveTrainingProgram + getTrainingProgram round-trips phases/weeks', () async {
+      final program = TrainingProgram(
+        id: 'p1',
+        name: '12-Week Strength',
+        totalWeeks: 12,
+        phases: [],
+        weeks: [],
+      );
+      await storage.saveTrainingProgram(program);
+      final fetched = await storage.getTrainingProgram('p1');
+      expect(fetched!.name, '12-Week Strength');
+      expect(fetched.totalWeeks, 12);
+    });
+
+    test('deleteTrainingProgram removes it', () async {
+      await storage.saveTrainingProgram(TrainingProgram(id: 'p2', name: 'X', totalWeeks: 4, phases: [], weeks: []));
+      await storage.deleteTrainingProgram('p2');
+      expect(await storage.getTrainingProgram('p2'), isNull);
+    });
+  });
+
+  group('SqliteStorageService — conversations', () {
+    test('saveConversation + getConversation round-trips messages', () async {
+      final conversation = Conversation(
+        id: 'c1',
+        title: 'Progress check',
+        messages: [ChatMessage(role: 'user', text: 'How is my bench doing?')],
+      );
+      await storage.saveConversation(conversation);
+      final fetched = await storage.getConversation('c1');
+      expect(fetched!.messages.single.text, 'How is my bench doing?');
+    });
+
+    test('getAllConversations returns most-recently-updated first', () async {
+      await storage.saveConversation(Conversation(
+        id: 'c2', title: 'Old', updatedAt: DateTime(2026, 1, 1), messages: [],
+      ));
+      await storage.saveConversation(Conversation(
+        id: 'c3', title: 'New', updatedAt: DateTime(2026, 6, 1), messages: [],
+      ));
+      final all = await storage.getAllConversations();
+      expect(all.first.id, 'c3');
+    });
+
+    test('deleteConversation removes it', () async {
+      await storage.saveConversation(Conversation(id: 'c4', title: 'Temp', messages: []));
+      await storage.deleteConversation('c4');
+      expect(await storage.getConversation('c4'), isNull);
+    });
+  });
+
+  group('SqliteStorageService — quick stats', () {
+    test('getQuickStats aggregates the last 7 days', () async {
+      await storage.saveWorkoutSession(WorkoutSession(
+        id: 'stat1',
+        date: DateTime.now(),
+        duration: 30,
+        exercises: [ExerciseLog(exerciseId: 'bench_press', sets: [WorkoutSet(weight: 60, reps: 10)])],
+      ));
+      final stats = await storage.getQuickStats();
+      expect(stats['totalWorkouts'], greaterThanOrEqualTo(1));
+      expect(stats['weeklyWorkouts'], greaterThanOrEqualTo(1));
+    });
+  });
 }

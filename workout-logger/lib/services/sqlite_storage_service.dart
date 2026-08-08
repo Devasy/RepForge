@@ -587,36 +587,180 @@ class SqliteStorageService implements IStorageService {
     return _loadCustomExerciseRow(rows.first);
   }
 
-  // ==================== SETTINGS / PROGRAMS / PRs / CONVERSATIONS (Task 5) ====================
+  // ==================== SETTINGS ====================
 
   @override
-  Future<void> saveSetting(String key, String value) => throw UnimplementedError();
+  Future<void> saveSetting(String key, String value) async {
+    await _db.insert('settings', {'key': key, 'value': value},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
   @override
-  Future<String?> getSetting(String key) => throw UnimplementedError();
+  Future<String?> getSetting(String key) async {
+    final rows = await _db.query('settings', where: 'key = ?', whereArgs: [key]);
+    return rows.isEmpty ? null : rows.first['value'] as String?;
+  }
+
+  // ==================== TRAINING PROGRAMS ====================
+
   @override
-  Future<void> saveTrainingProgram(TrainingProgram program) => throw UnimplementedError();
+  Future<void> saveTrainingProgram(TrainingProgram program) async {
+    await _db.insert(
+      'training_programs',
+      {
+        'id': program.id,
+        'name': program.name,
+        'description': program.description,
+        'total_weeks': program.totalWeeks,
+        'author': program.author,
+        'is_imported': program.isImported ? 1 : 0,
+        'created_at': program.createdAt.toIso8601String(),
+        'phases_json': jsonEncode(program.phases.map((p) => p.toJson()).toList()),
+        'weeks_json': jsonEncode(program.weeks.map((w) => w.toJson()).toList()),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  TrainingProgram _programFromRow(Map<String, Object?> row) => TrainingProgram(
+        id: row['id'] as String,
+        name: row['name'] as String,
+        description: row['description'] as String?,
+        totalWeeks: row['total_weeks'] as int,
+        phases: (jsonDecode(row['phases_json'] as String) as List)
+            .map((p) => TrainingPhase.fromJson(p as Map<String, dynamic>))
+            .toList(),
+        weeks: (jsonDecode(row['weeks_json'] as String) as List)
+            .map((w) => ProgramWeek.fromJson(w as Map<String, dynamic>))
+            .toList(),
+        author: row['author'] as String?,
+        isImported: (row['is_imported'] as int) == 1,
+        createdAt: DateTime.parse(row['created_at'] as String),
+      );
+
   @override
-  Future<List<TrainingProgram>> getAllTrainingPrograms() => throw UnimplementedError();
+  Future<List<TrainingProgram>> getAllTrainingPrograms() async {
+    final rows = await _db.query('training_programs', orderBy: 'created_at DESC');
+    return rows.map(_programFromRow).toList();
+  }
+
   @override
-  Future<TrainingProgram?> getTrainingProgram(String id) => throw UnimplementedError();
+  Future<TrainingProgram?> getTrainingProgram(String id) async {
+    final rows = await _db.query('training_programs', where: 'id = ?', whereArgs: [id]);
+    return rows.isEmpty ? null : _programFromRow(rows.first);
+  }
+
   @override
-  Future<void> deleteTrainingProgram(String id) => throw UnimplementedError();
+  Future<void> deleteTrainingProgram(String id) async {
+    await _db.delete('training_programs', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ==================== PERSONAL RECORDS ====================
+
   @override
-  Future<void> savePersonalRecord(PersonalRecord record) => throw UnimplementedError();
+  Future<void> savePersonalRecord(PersonalRecord record) async {
+    await _db.insert(
+      'personal_records',
+      {
+        'exercise_id': record.exerciseId,
+        'best_weight': record.bestWeight,
+        'best_reps': record.bestReps,
+        'best_volume': record.bestVolume,
+        'achieved_at': record.achievedAt.toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  PersonalRecord _prFromRow(Map<String, Object?> row) => PersonalRecord(
+        exerciseId: row['exercise_id'] as String,
+        bestWeight: (row['best_weight'] as num).toDouble(),
+        bestReps: row['best_reps'] as int,
+        bestVolume: (row['best_volume'] as num).toDouble(),
+        achievedAt: DateTime.parse(row['achieved_at'] as String),
+      );
+
   @override
-  Future<PersonalRecord?> getPersonalRecord(String exerciseId) => throw UnimplementedError();
+  Future<PersonalRecord?> getPersonalRecord(String exerciseId) async {
+    final rows = await _db.query('personal_records', where: 'exercise_id = ?', whereArgs: [exerciseId]);
+    return rows.isEmpty ? null : _prFromRow(rows.first);
+  }
+
   @override
-  Future<List<PersonalRecord>> getAllPersonalRecords() => throw UnimplementedError();
+  Future<List<PersonalRecord>> getAllPersonalRecords() async {
+    final rows = await _db.query('personal_records');
+    return rows.map(_prFromRow).toList();
+  }
+
+  // ==================== AI CONVERSATIONS ====================
+
   @override
-  Future<void> saveConversation(Conversation conversation) => throw UnimplementedError();
+  Future<void> saveConversation(Conversation conversation) async {
+    await _db.insert(
+      'conversations',
+      {
+        'id': conversation.id,
+        'title': conversation.title,
+        'kind': conversation.kind,
+        'created_at': conversation.createdAt.toIso8601String(),
+        'updated_at': conversation.updatedAt.toIso8601String(),
+        'messages_json': jsonEncode(conversation.messages.map((m) => m.toJson()).toList()),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Conversation _conversationFromRow(Map<String, Object?> row) => Conversation(
+        id: row['id'] as String,
+        title: row['title'] as String,
+        kind: row['kind'] as String,
+        createdAt: DateTime.parse(row['created_at'] as String),
+        updatedAt: DateTime.parse(row['updated_at'] as String),
+        messages: (jsonDecode(row['messages_json'] as String) as List)
+            .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
+            .toList(),
+      );
+
   @override
-  Future<List<Conversation>> getAllConversations() => throw UnimplementedError();
+  Future<List<Conversation>> getAllConversations() async {
+    final rows = await _db.query('conversations', orderBy: 'updated_at DESC');
+    return rows.map(_conversationFromRow).toList();
+  }
+
   @override
-  Future<Conversation?> getConversation(String id) => throw UnimplementedError();
+  Future<Conversation?> getConversation(String id) async {
+    final rows = await _db.query('conversations', where: 'id = ?', whereArgs: [id]);
+    return rows.isEmpty ? null : _conversationFromRow(rows.first);
+  }
+
   @override
-  Future<void> deleteConversation(String id) => throw UnimplementedError();
+  Future<void> deleteConversation(String id) async {
+    await _db.delete('conversations', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ==================== STATS ====================
+
   @override
-  Future<Map<String, dynamic>> getQuickStats() => throw UnimplementedError();
+  Future<Map<String, dynamic>> getQuickStats() async {
+    final sessions = await getAllWorkoutSessions();
+    final now = DateTime.now();
+    final weekAgo = now.subtract(const Duration(days: 7));
+    final weekSessions = sessions.where((s) => s.date.isAfter(weekAgo)).toList();
+
+    double weeklyVolume = 0;
+    int exercisesCompleted = 0;
+    for (var session in weekSessions) {
+      weeklyVolume += session.totalVolume;
+      exercisesCompleted += session.exercises.length;
+    }
+
+    return {
+      'totalWorkouts': sessions.length,
+      'weeklyWorkouts': weekSessions.length,
+      'weeklyVolume': weeklyVolume,
+      'exercisesThisWeek': exercisesCompleted,
+    };
+  }
 
   // ==================== EXPORT / IMPORT (Task 6) ====================
 
