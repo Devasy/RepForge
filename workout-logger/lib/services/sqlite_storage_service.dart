@@ -350,29 +350,126 @@ class SqliteStorageService implements IStorageService {
     return all.where((s) => !s.date.isBefore(lo) && !s.date.isAfter(hi)).toList();
   }
 
-  // ==================== ROUTINES (Task 3) ====================
+  // ==================== ROUTINES ====================
 
   @override
-  Future<void> saveRoutine(Routine routine) => throw UnimplementedError();
-  @override
-  Future<List<Routine>> getAllRoutines() => throw UnimplementedError();
-  @override
-  Future<Routine?> getRoutine(String id) => throw UnimplementedError();
-  @override
-  Future<void> deleteRoutine(String id) => throw UnimplementedError();
+  Future<void> saveRoutine(Routine routine) async {
+    await _db.transaction((txn) async {
+      await txn.delete('routine_exercises', where: 'routine_id = ?', whereArgs: [routine.id]);
+      await txn.insert(
+        'routines',
+        {
+          'id': routine.id,
+          'name': routine.name,
+          'created_at': routine.createdAt.toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      for (var i = 0; i < routine.exerciseIds.length; i++) {
+        await txn.insert('routine_exercises', {
+          'routine_id': routine.id,
+          'exercise_id': routine.exerciseIds[i],
+          'position': i,
+        });
+      }
+    });
+  }
 
-  // ==================== TARGETS (Task 3) ====================
+  Future<Routine> _loadRoutineRow(Map<String, Object?> row) async {
+    final exRows = await _db.query(
+      'routine_exercises',
+      where: 'routine_id = ?',
+      whereArgs: [row['id']],
+      orderBy: 'position ASC',
+    );
+    return Routine(
+      id: row['id'] as String,
+      name: row['name'] as String,
+      exerciseIds: exRows.map((r) => r['exercise_id'] as String).toList(),
+      createdAt: DateTime.parse(row['created_at'] as String),
+    );
+  }
 
   @override
-  Future<void> saveTarget(Target target) => throw UnimplementedError();
+  Future<List<Routine>> getAllRoutines() async {
+    final rows = await _db.query('routines');
+    final result = <Routine>[];
+    for (final row in rows) {
+      result.add(await _loadRoutineRow(row));
+    }
+    return result;
+  }
+
   @override
-  Future<List<Target>> getAllTargets() => throw UnimplementedError();
+  Future<Routine?> getRoutine(String id) async {
+    final rows = await _db.query('routines', where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return null;
+    return _loadRoutineRow(rows.first);
+  }
+
   @override
-  Future<Target?> getTarget(String id) => throw UnimplementedError();
+  Future<void> deleteRoutine(String id) async {
+    await _db.transaction((txn) async {
+      await txn.delete('routine_exercises', where: 'routine_id = ?', whereArgs: [id]);
+      await txn.delete('routines', where: 'id = ?', whereArgs: [id]);
+    });
+  }
+
+  // ==================== TARGETS ====================
+
   @override
-  Future<void> deleteTarget(String id) => throw UnimplementedError();
+  Future<void> saveTarget(Target target) async {
+    await _db.insert(
+      'targets',
+      {
+        'id': target.id,
+        'exercise_id': target.exerciseId,
+        'target_type': target.targetType,
+        'target_value': target.targetValue,
+        'current_value': target.currentValue,
+        'estimated_completion_date': target.estimatedCompletionDate?.toIso8601String(),
+        'created_at': target.createdAt.toIso8601String(),
+        'is_completed': target.isCompleted ? 1 : 0,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Target _targetFromRow(Map<String, Object?> row) => Target(
+        id: row['id'] as String,
+        exerciseId: row['exercise_id'] as String,
+        targetType: row['target_type'] as String,
+        targetValue: (row['target_value'] as num).toDouble(),
+        currentValue: (row['current_value'] as num).toDouble(),
+        estimatedCompletionDate: row['estimated_completion_date'] == null
+            ? null
+            : DateTime.parse(row['estimated_completion_date'] as String),
+        createdAt: DateTime.parse(row['created_at'] as String),
+        isCompleted: (row['is_completed'] as int) == 1,
+      );
+
   @override
-  Future<List<Target>> getTargetsForExercise(String exerciseId) => throw UnimplementedError();
+  Future<List<Target>> getAllTargets() async {
+    final rows = await _db.query('targets');
+    return rows.map(_targetFromRow).toList();
+  }
+
+  @override
+  Future<Target?> getTarget(String id) async {
+    final rows = await _db.query('targets', where: 'id = ?', whereArgs: [id]);
+    return rows.isEmpty ? null : _targetFromRow(rows.first);
+  }
+
+  @override
+  Future<void> deleteTarget(String id) async {
+    await _db.delete('targets', where: 'id = ?', whereArgs: [id]);
+  }
+
+  @override
+  Future<List<Target>> getTargetsForExercise(String exerciseId) async {
+    final rows = await _db.query('targets', where: 'exercise_id = ?', whereArgs: [exerciseId]);
+    return rows.map(_targetFromRow).toList();
+  }
 
   // ==================== MUSCLE GROUPS / EXERCISES (Task 4) ====================
 

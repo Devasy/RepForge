@@ -141,4 +141,65 @@ void main() {
       expect(fetched!.exercises.single.sets.single.bodyWeightAtLog, 75.5);
     });
   });
+
+  group('SqliteStorageService — routines', () {
+    test('saveRoutine + getRoutine round-trips ordered exercise ids', () async {
+      await storage.saveRoutine(Routine(
+        id: 'r1',
+        name: 'Push Day',
+        exerciseIds: ['bench_press', 'shoulder_press', 'triceps_pushdown'],
+      ));
+      final fetched = await storage.getRoutine('r1');
+      expect(fetched!.name, 'Push Day');
+      expect(fetched.exerciseIds, ['bench_press', 'shoulder_press', 'triceps_pushdown']);
+    });
+
+    test('saveRoutine overwrites exercise order on re-save', () async {
+      await storage.saveRoutine(Routine(id: 'r2', name: 'Pull Day', exerciseIds: ['a', 'b']));
+      await storage.saveRoutine(Routine(id: 'r2', name: 'Pull Day', exerciseIds: ['b', 'a', 'c']));
+      final fetched = await storage.getRoutine('r2');
+      expect(fetched!.exerciseIds, ['b', 'a', 'c']);
+    });
+
+    test('deleteRoutine removes it', () async {
+      await storage.saveRoutine(Routine(id: 'r3', name: 'Legs', exerciseIds: ['squat']));
+      await storage.deleteRoutine('r3');
+      expect(await storage.getRoutine('r3'), isNull);
+    });
+
+    test('getAllRoutines returns all saved routines', () async {
+      await storage.saveRoutine(Routine(id: 'r4', name: 'A', exerciseIds: []));
+      await storage.saveRoutine(Routine(id: 'r5', name: 'B', exerciseIds: []));
+      final all = await storage.getAllRoutines();
+      expect(all.map((r) => r.id), containsAll(['r4', 'r5']));
+    });
+  });
+
+  group('SqliteStorageService — targets', () {
+    test('saveTarget + getTarget round-trips', () async {
+      await storage.saveTarget(Target(
+        id: 't1',
+        exerciseId: 'bench_press',
+        targetType: 'weight',
+        targetValue: 100,
+        currentValue: 70,
+      ));
+      final fetched = await storage.getTarget('t1');
+      expect(fetched!.targetValue, 100);
+      expect(fetched.currentValue, 70);
+    });
+
+    test('deleteTarget removes it', () async {
+      await storage.saveTarget(Target(id: 't2', exerciseId: 'squat', targetType: 'weight', targetValue: 150));
+      await storage.deleteTarget('t2');
+      expect(await storage.getTarget('t2'), isNull);
+    });
+
+    test('getTargetsForExercise filters by exercise id', () async {
+      await storage.saveTarget(Target(id: 't3', exerciseId: 'squat', targetType: 'weight', targetValue: 150));
+      await storage.saveTarget(Target(id: 't4', exerciseId: 'deadlift', targetType: 'weight', targetValue: 180));
+      final result = await storage.getTargetsForExercise('squat');
+      expect(result.map((t) => t.id), ['t3']);
+    });
+  });
 }
