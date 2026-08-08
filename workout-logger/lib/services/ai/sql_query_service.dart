@@ -33,6 +33,13 @@ class SqlQueryService {
     'TRIGGER',
   ];
 
+  static const _forbiddenIdentifiers = [
+    'SETTINGS',
+    'SQLITE_MASTER',
+    'SQLITE_TEMP_MASTER',
+    'SQLITE_SCHEMA',
+  ];
+
   String _sanitize(String rawQuery) {
     var q = rawQuery.trim();
     if (q.endsWith(';')) {
@@ -49,6 +56,14 @@ class SqlQueryService {
       if (RegExp('\\b$kw\\b').hasMatch(upper)) {
         throw SqlValidationException('Query contains a forbidden keyword: $kw');
       }
+    }
+    for (final id in _forbiddenIdentifiers) {
+      if (RegExp('\\b$id\\b').hasMatch(upper)) {
+        throw SqlValidationException('Query references a restricted table: $id');
+      }
+    }
+    if (upper.contains('PRAGMA_')) {
+      throw SqlValidationException('Query references a restricted table: PRAGMA_*');
     }
     return q;
   }
