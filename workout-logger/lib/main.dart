@@ -7,8 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'package:hive_flutter/hive_flutter.dart';
 import 'services/debug_log_buffer.dart';
 import 'services/storage_service.dart';
+import 'services/sqlite_storage_service.dart';
+import 'services/storage_migration_service.dart';
+import 'services/ai/sql_query_service.dart';
 import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
 import 'services/ai/coach_tool_service.dart';
@@ -31,6 +35,42 @@ import 'genui/a2ui.dart';
 import 'theme/a2ui_app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
+
+/// Resolved once in main() before runApp(). Read lazily by
+/// WorkoutLoggerApp._storageService's static initializer, which only runs
+/// on first access (during build()) — by then this is already set.
+IStorageService? _resolvedStorageService;
+
+/// One-time, flag-gated, reversible Hive -> SQLite cutover. See
+/// docs/superpowers/specs/2026-08-08-sqlite-migration-and-coach-sql-tool-design.md §6.
+Future<void> _resolveStorageBackend() async {
+  await Hive.initFlutter();
+  final settingsBox = await Hive.openBox<String>('settings');
+  final alreadyMigrated = settingsBox.get('storage_migrated_v1') == 'true';
+
+  if (alreadyMigrated) {
+    final sqlite = SqliteStorageService();
+    await sqlite.init();
+    _resolvedStorageService = sqlite;
+    return;
+  }
+
+  final hiveStorage = StorageService();
+  await hiveStorage.init();
+  final sqliteStorage = SqliteStorageService();
+  await sqliteStorage.init();
+
+  var migrationSucceeded = false;
+  try {
+    await StorageMigrationService(hiveStorage, sqliteStorage).migrate();
+    await hiveStorage.saveSetting('storage_migrated_v1', 'true');
+    migrationSucceeded = true;
+  } catch (e, st) {
+    debugPrint('Storage migration to SQLite failed, staying on Hive: $e\n$st');
+  }
+
+  _resolvedStorageService = migrationSucceeded ? sqliteStorage : hiveStorage;
+}
 
 void main() async {
   DebugLogBuffer.attach();
@@ -58,13 +98,15 @@ void main() async {
     ),
   );
 
+  await _resolveStorageBackend();
+
   runApp(const WorkoutLoggerApp());
 }
 
 class WorkoutLoggerApp extends StatelessWidget {
   // Singleton instances created once at app startup
   // This ensures the same instances are used throughout the app lifecycle
-  static final IStorageService _storageService = StorageService();
+  static final IStorageService _storageService = _resolvedStorageService!;
   static final IMLService _mlService = MLService();
   static final IHealthConnectService _healthConnectService = HealthConnectService();
   static final ProgramManager _programManager = ProgramManager(_storageService);
@@ -134,11 +176,16 @@ class WorkoutLoggerApp extends StatelessWidget {
           ),
         ),
         // CoachToolService backs AI tool calls; reads from WorkoutProvider + PRManager.
+        // run_sql_query is only offered once the app has cut over to SQLite —
+        // it needs a live database file to open a read-only connection against.
         Provider<CoachToolService>(
           create: (ctx) => CoachToolService(
             ctx.read<WorkoutProvider>(),
             ctx.read<PRManager>(),
             healthHistory: ctx.read<HealthHistoryManager>(),
+            sqlQuery: _storageService is SqliteStorageService
+                ? SqlQueryService((_storageService as SqliteStorageService).databasePath)
+                : null,
           ),
         ),
       ],
