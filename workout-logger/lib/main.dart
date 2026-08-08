@@ -11,7 +11,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'services/debug_log_buffer.dart';
 import 'services/storage_service.dart';
 import 'services/sqlite_storage_service.dart';
-import 'services/storage_migration_service.dart';
+import 'services/storage_backend_resolver.dart';
 import 'services/ai/sql_query_service.dart';
 import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
@@ -44,9 +44,12 @@ IStorageService? _resolvedStorageService;
 /// One-time, flag-gated, reversible Hive -> SQLite cutover. See
 /// docs/superpowers/specs/2026-08-08-sqlite-migration-and-coach-sql-tool-design.md §6.
 Future<void> _resolveStorageBackend() async {
+  // Hive stays initialized here even post-cutover: ApiService reads/writes
+  // an installation id directly against this settings box, independent of
+  // IStorageService. Do not remove this unconditional init.
   await Hive.initFlutter();
   final settingsBox = await Hive.openBox<String>('settings');
-  final alreadyMigrated = settingsBox.get('storage_migrated_v1') == 'true';
+  final alreadyMigrated = settingsBox.get(storageMigratedFlagKey) == 'true';
 
   if (alreadyMigrated) {
     final sqlite = SqliteStorageService();
@@ -58,18 +61,20 @@ Future<void> _resolveStorageBackend() async {
   final hiveStorage = StorageService();
   await hiveStorage.init();
   final sqliteStorage = SqliteStorageService();
-  await sqliteStorage.init();
 
-  var migrationSucceeded = false;
   try {
-    await StorageMigrationService(hiveStorage, sqliteStorage).migrate();
-    await hiveStorage.saveSetting('storage_migrated_v1', 'true');
-    migrationSucceeded = true;
+    await sqliteStorage.init();
   } catch (e, st) {
-    debugPrint('Storage migration to SQLite failed, staying on Hive: $e\n$st');
+    debugPrint('SQLite init failed, staying on Hive: $e\n$st');
+    _resolvedStorageService = hiveStorage;
+    return;
   }
 
-  _resolvedStorageService = migrationSucceeded ? sqliteStorage : hiveStorage;
+  _resolvedStorageService = await resolveStorageBackend(
+    hiveStorage: hiveStorage,
+    sqliteStorage: sqliteStorage,
+    alreadyMigrated: false,
+  );
 }
 
 void main() async {
