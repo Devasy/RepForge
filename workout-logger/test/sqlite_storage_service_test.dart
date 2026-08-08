@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:repforge/models/models.dart';
@@ -368,6 +369,57 @@ void main() {
       final stats = await storage.getQuickStats();
       expect(stats['totalWorkouts'], greaterThanOrEqualTo(1));
       expect(stats['weeklyWorkouts'], greaterThanOrEqualTo(1));
+    });
+  });
+
+  group('SqliteStorageService — export/import', () {
+    test('exportAllData includes sessions, routines, settings', () async {
+      await storage.saveWorkoutSession(WorkoutSession(
+        id: 'exp1', date: DateTime(2026, 5, 1), duration: 20,
+        exercises: [ExerciseLog(exerciseId: 'row', sets: [WorkoutSet(weight: 40, reps: 10)])],
+      ));
+      await storage.saveRoutine(Routine(id: 'exp_r1', name: 'Export Routine', exerciseIds: ['row']));
+      await storage.saveSetting('unit', 'kg');
+
+      final json = await storage.exportAllData();
+      final data = jsonDecode(json) as Map<String, dynamic>;
+
+      expect((data['sessions'] as List).any((s) => s['id'] == 'exp1'), isTrue);
+      expect((data['routines'] as List).any((r) => r['id'] == 'exp_r1'), isTrue);
+      expect((data['settings'] as Map)['unit'], 'kg');
+    });
+
+    test('importData merges without overwriting existing ids', () async {
+      await storage.saveWorkoutSession(WorkoutSession(
+        id: 'imp1', date: DateTime(2026, 1, 1), duration: 15,
+        exercises: [ExerciseLog(exerciseId: 'row', sets: [WorkoutSet(weight: 30, reps: 12)])],
+      ));
+
+      final payload = jsonEncode({
+        'sessions': [
+          {
+            'id': 'imp1', // already exists — must be skipped
+            'date': DateTime(2099, 1, 1).toIso8601String(),
+            'duration': 999,
+            'exercises': [],
+          },
+          {
+            'id': 'imp2', // new — must be imported
+            'date': DateTime(2026, 2, 1).toIso8601String(),
+            'duration': 25,
+            'exercises': [],
+          },
+        ],
+        'settings': {'imported_key': 'imported_value'},
+      });
+
+      await storage.importData(payload);
+
+      final existing = await storage.getWorkoutSession('imp1');
+      expect(existing!.duration, 15); // untouched
+      final imported = await storage.getWorkoutSession('imp2');
+      expect(imported!.duration, 25);
+      expect(await storage.getSetting('imported_key'), 'imported_value');
     });
   });
 }

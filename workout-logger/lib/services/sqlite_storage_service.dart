@@ -762,10 +762,139 @@ class SqliteStorageService implements IStorageService {
     };
   }
 
-  // ==================== EXPORT / IMPORT (Task 6) ====================
+  // ==================== EXPORT / IMPORT ====================
+
+  Map<String, dynamic>? _normalizeImportItem(dynamic item) {
+    if (item is Map<String, dynamic>) return item;
+    if (item is Map) return Map<String, dynamic>.from(item);
+    if (item is String) {
+      try {
+        final decoded = jsonDecode(item);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
 
   @override
-  Future<String> exportAllData() => throw UnimplementedError();
+  Future<String> exportAllData() async {
+    final sessions = await getAllWorkoutSessions();
+    final routines = await getAllRoutines();
+    final targets = await getAllTargets();
+    final muscleGroups = await getAllMuscleGroups();
+    final customExercises = await getCustomExercises();
+    final conversations = await getAllConversations();
+    final settingsRows = await _db.query('settings');
+    final settingsMap = <String, String>{
+      for (final row in settingsRows)
+        if (row['value'] != null) row['key'] as String: row['value'] as String,
+    };
+
+    final data = {
+      'sessions': sessions.map((s) => s.toJson()).toList(),
+      'routines': routines.map((r) => r.toJson()).toList(),
+      'targets': targets.map((t) => t.toJson()).toList(),
+      'muscleGroups': muscleGroups.map((m) => m.toJson()).toList(),
+      'customExercises': customExercises.map((e) => e.toJson()).toList(),
+      'conversations': conversations.map((c) => c.toJson()).toList(),
+      'settings': settingsMap,
+      'exportDate': DateTime.now().toIso8601String(),
+      'appVersion': _appVersion,
+    };
+    return jsonEncode(data);
+  }
+
   @override
-  Future<void> importData(String jsonData) => throw UnimplementedError();
+  Future<void> importData(String jsonData) async {
+    final data = jsonDecode(jsonData) as Map<String, dynamic>;
+
+    final sessions = data['sessions'];
+    if (sessions is List) {
+      for (final item in sessions) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final session = WorkoutSession.fromJson(map);
+        if (await getWorkoutSession(session.id) == null) {
+          await saveWorkoutSession(session);
+        }
+      }
+    }
+
+    final routines = data['routines'];
+    if (routines is List) {
+      for (final item in routines) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final routine = Routine.fromJson(map);
+        if (await getRoutine(routine.id) == null) {
+          await saveRoutine(routine);
+        }
+      }
+    }
+
+    final targets = data['targets'];
+    if (targets is List) {
+      for (final item in targets) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final target = Target.fromJson(map);
+        if (await getTarget(target.id) == null) {
+          await saveTarget(target);
+        }
+      }
+    }
+
+    final muscleGroups = data['muscleGroups'];
+    if (muscleGroups is List) {
+      for (final item in muscleGroups) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final mg = MuscleGroup.fromJson(map);
+        if (await getMuscleGroup(mg.id) == null) {
+          await _db.insert('muscle_groups', {
+            'id': mg.id,
+            'name': mg.name,
+            'growth_rate': mg.growthRate,
+            'last_updated': mg.lastUpdated.toIso8601String(),
+          });
+        }
+      }
+    }
+
+    final customExercises = data['customExercises'];
+    if (customExercises is List) {
+      for (final item in customExercises) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final exercise = Exercise.fromJson(map);
+        final rows = await _db.query('exercises', where: 'id = ?', whereArgs: [exercise.id]);
+        if (rows.isEmpty) {
+          await saveCustomExercise(exercise);
+        }
+      }
+    }
+
+    if (data['settings'] is Map) {
+      final settings = data['settings'] as Map<String, dynamic>;
+      for (final entry in settings.entries) {
+        if (await getSetting(entry.key) == null) {
+          await saveSetting(entry.key, entry.value.toString());
+        }
+      }
+    }
+
+    final conversations = data['conversations'];
+    if (conversations is List) {
+      for (final item in conversations) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final conversation = Conversation.fromJson(map);
+        if (await getConversation(conversation.id) == null) {
+          await saveConversation(conversation);
+        }
+      }
+    }
+  }
 }
