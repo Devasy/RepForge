@@ -2,6 +2,7 @@
 // persistence backend. See docs/superpowers/specs/2026-08-08-sqlite-migration-and-coach-sql-tool-design.md
 // for the schema and migration design this implements.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -23,15 +24,15 @@ class SqliteStorageService implements IStorageService {
   /// [_schemaStatements] so `onUpgrade` can run exactly these statements
   /// against pre-v2 databases without re-running the full v1 DDL.
   static const List<String> _healthSchemaStatements = [
-    '''CREATE TABLE IF NOT EXISTS health_samples (
+    '''CREATE TABLE health_samples (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
       timestamp TEXT NOT NULL,
       value REAL NOT NULL
     )''',
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_health_samples_unique ON health_samples(type, timestamp)',
-    'CREATE INDEX IF NOT EXISTS idx_health_samples_type_ts ON health_samples(type, timestamp)',
-    '''CREATE TABLE IF NOT EXISTS sleep_sessions (
+    'CREATE UNIQUE INDEX idx_health_samples_unique ON health_samples(type, timestamp)',
+    'CREATE INDEX idx_health_samples_type_ts ON health_samples(type, timestamp)',
+    '''CREATE TABLE sleep_sessions (
       id TEXT PRIMARY KEY,
       start_ts TEXT NOT NULL,
       end_ts TEXT NOT NULL,
@@ -40,14 +41,14 @@ class SqliteStorageService implements IStorageService {
       rem_min INTEGER,
       awake_min INTEGER
     )''',
-    'CREATE INDEX IF NOT EXISTS idx_sleep_sessions_start ON sleep_sessions(start_ts)',
-    '''CREATE TABLE IF NOT EXISTS sleep_stage_intervals (
+    'CREATE INDEX idx_sleep_sessions_start ON sleep_sessions(start_ts)',
+    '''CREATE TABLE sleep_stage_intervals (
       sleep_session_id TEXT NOT NULL,
       start_ts TEXT NOT NULL,
       end_ts TEXT NOT NULL,
       stage TEXT NOT NULL
     )''',
-    'CREATE INDEX IF NOT EXISTS idx_sleep_stage_session ON sleep_stage_intervals(sleep_session_id)',
+    'CREATE INDEX idx_sleep_stage_session ON sleep_stage_intervals(sleep_session_id)',
   ];
 
   static const List<String> _schemaStatements = [
@@ -152,38 +153,23 @@ class SqliteStorageService implements IStorageService {
     'CREATE INDEX idx_exercise_logs_session ON exercise_logs(session_id)',
     'CREATE INDEX idx_exercise_logs_exercise ON exercise_logs(exercise_id)',
     'CREATE INDEX idx_sessions_date ON sessions(date)',
-    '''CREATE TABLE IF NOT EXISTS health_samples (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      type TEXT NOT NULL,
-      timestamp TEXT NOT NULL,
-      value REAL NOT NULL
-    )''',
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_health_samples_unique ON health_samples(type, timestamp)',
-    'CREATE INDEX IF NOT EXISTS idx_health_samples_type_ts ON health_samples(type, timestamp)',
-    '''CREATE TABLE IF NOT EXISTS sleep_sessions (
-      id TEXT PRIMARY KEY,
-      start_ts TEXT NOT NULL,
-      end_ts TEXT NOT NULL,
-      light_min INTEGER,
-      deep_min INTEGER,
-      rem_min INTEGER,
-      awake_min INTEGER
-    )''',
-    'CREATE INDEX IF NOT EXISTS idx_sleep_sessions_start ON sleep_sessions(start_ts)',
-    '''CREATE TABLE IF NOT EXISTS sleep_stage_intervals (
-      sleep_session_id TEXT NOT NULL,
-      start_ts TEXT NOT NULL,
-      end_ts TEXT NOT NULL,
-      stage TEXT NOT NULL
-    )''',
-    'CREATE INDEX IF NOT EXISTS idx_sleep_stage_session ON sleep_stage_intervals(sleep_session_id)',
+    ..._healthSchemaStatements,
   ];
 
   final String? _databasePathOverride;
   final int _instanceId;
   late Database _db;
   bool _initialized = false;
-  bool _isTestDatabase = false;
+  String? _tempDatabasePath;
+  bool _generatedTempPath = false;
+
+  static final _finalizer = Finalizer<String>((path) {
+    try {
+      File(path).deleteSync();
+    } catch (_) {
+      // Ignore errors during cleanup
+    }
+  });
 
   String _appVersion = const String.fromEnvironment(
     'APP_VERSION',
@@ -212,11 +198,16 @@ class SqliteStorageService implements IStorageService {
     }
 
     var dbPath = _databasePathOverride ?? '${await getDatabasesPath()}/$_dbName';
-    _isTestDatabase = dbPath.contains('sqlite_v1_upgrade');
 
-    // For in-memory databases in tests, use temporary files to support read-only connections
+    // For in-memory databases in tests, create unique isolated databases per instance
+    // to support multiple concurrent test databases. Uses temp files because sqflite FFI's
+    // shared-cache memory URIs don't support read-only secondary connections.
     if (dbPath == ':memory:') {
-      dbPath = '${Directory.systemTemp.path}${Platform.pathSeparator}repforge_test_${DateTime.now().microsecondsSinceEpoch}_$_instanceId.db';
+      _tempDatabasePath = '${Directory.systemTemp.path}${Platform.pathSeparator}repforge_test_${DateTime.now().microsecondsSinceEpoch}_$_instanceId.db';
+      dbPath = _tempDatabasePath!;
+      _generatedTempPath = true;
+      // Register finalizer to clean up temp file when instance is garbage collected
+      _finalizer.attach(this, dbPath, detach: this);
     }
 
     _db = await openDatabase(
@@ -244,19 +235,14 @@ class SqliteStorageService implements IStorageService {
       await _seedDefaultMuscleGroups();
     }
 
-    // Ensure health tables exist (workaround for version tracking issues with in-memory databases)
-    for (final statement in _healthSchemaStatements) {
-      await _db.execute(statement);
-    }
-
-    // Close test databases after initialization to allow file cleanup
-    if (_isTestDatabase) {
-      await _db.close();
-      _initialized = true;
-      return;
-    }
-
     _initialized = true;
+
+    // For explicitly provided file paths (not generated from :memory:), close the write
+    // connection after initialization. This allows tests to delete temp files. Read-only
+    // queries (via rawQuery) open their own connections to the same file.
+    if (_databasePathOverride != null && !_generatedTempPath) {
+      await _db.close();
+    }
   }
 
   Future<void> _seedDefaultMuscleGroups() async {
