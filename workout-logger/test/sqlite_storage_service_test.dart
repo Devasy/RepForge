@@ -19,6 +19,15 @@ void main() {
     await storage.init();
   });
 
+  tearDown(() async {
+    final path = storage.databasePath;
+    await storage.close();
+    final file = File(path);
+    if (await file.exists()) {
+      await file.delete();
+    }
+  });
+
   group('SqliteStorageService — init', () {
     test('seeds default muscle groups', () async {
       final groups = await storage.getAllMuscleGroups();

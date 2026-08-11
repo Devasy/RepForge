@@ -2,7 +2,6 @@
 // persistence backend. See docs/superpowers/specs/2026-08-08-sqlite-migration-and-coach-sql-tool-design.md
 // for the schema and migration design this implements.
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -160,16 +159,6 @@ class SqliteStorageService implements IStorageService {
   final int _instanceId;
   late Database _db;
   bool _initialized = false;
-  String? _tempDatabasePath;
-  bool _generatedTempPath = false;
-
-  static final _finalizer = Finalizer<String>((path) {
-    try {
-      File(path).deleteSync();
-    } catch (_) {
-      // Ignore errors during cleanup
-    }
-  });
 
   String _appVersion = const String.fromEnvironment(
     'APP_VERSION',
@@ -203,11 +192,7 @@ class SqliteStorageService implements IStorageService {
     // to support multiple concurrent test databases. Uses temp files because sqflite FFI's
     // shared-cache memory URIs don't support read-only secondary connections.
     if (dbPath == ':memory:') {
-      _tempDatabasePath = '${Directory.systemTemp.path}${Platform.pathSeparator}repforge_test_${DateTime.now().microsecondsSinceEpoch}_$_instanceId.db';
-      dbPath = _tempDatabasePath!;
-      _generatedTempPath = true;
-      // Register finalizer to clean up temp file when instance is garbage collected
-      _finalizer.attach(this, dbPath, detach: this);
+      dbPath = '${Directory.systemTemp.path}${Platform.pathSeparator}repforge_test_${DateTime.now().microsecondsSinceEpoch}_$_instanceId.db';
     }
 
     _db = await openDatabase(
@@ -237,10 +222,10 @@ class SqliteStorageService implements IStorageService {
 
     _initialized = true;
 
-    // For explicitly provided file paths (not generated from :memory:), close the write
-    // connection after initialization. This allows tests to delete temp files. Read-only
-    // queries (via rawQuery) open their own connections to the same file.
-    if (_databasePathOverride != null && !_generatedTempPath) {
+    // For explicitly provided file paths, close the write connection after initialization.
+    // This allows tests to delete temp files. Read-only queries (via rawQuery) open
+    // their own connections to the same file.
+    if (_databasePathOverride != null && _databasePathOverride != ':memory:') {
       await _db.close();
     }
   }
