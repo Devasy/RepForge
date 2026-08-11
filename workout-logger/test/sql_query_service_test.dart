@@ -97,4 +97,52 @@ void main() {
     expect(second['error'], isNull);
     expect(second['row_count'], 2);
   });
+
+  test('can join workouts against sleep and HR data', () async {
+    await seedDb.execute('''CREATE TABLE health_samples (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      value REAL NOT NULL
+    )''');
+    await seedDb.execute('''CREATE TABLE sleep_sessions (
+      id TEXT PRIMARY KEY,
+      start_ts TEXT NOT NULL,
+      end_ts TEXT NOT NULL,
+      light_min INTEGER,
+      deep_min INTEGER,
+      rem_min INTEGER,
+      awake_min INTEGER
+    )''');
+    await seedDb.insert('health_samples', {
+      'type': 'resting_heart_rate',
+      'timestamp': '2026-08-10T07:00:00.000',
+      'value': 58.0,
+    });
+    await seedDb.insert('sleep_sessions', {
+      'id': '2026-08-09T23:00:00.000',
+      'start_ts': '2026-08-09T23:00:00.000',
+      'end_ts': '2026-08-10T07:00:00.000',
+      'light_min': 200,
+      'deep_min': 70,
+      'rem_min': 90,
+      'awake_min': 5,
+    });
+
+    final service = SqlQueryService(dbPath);
+    final result = await service.runQuery('''
+      SELECT w.name AS widget_name, s.deep_min AS deep_min, h.value AS resting_hr
+      FROM widgets w, sleep_sessions s
+      JOIN health_samples h ON h.type = 'resting_heart_rate'
+      WHERE w.id = 1
+    ''');
+
+    expect(result['error'], isNull);
+    expect(result['row_count'], 1);
+    expect((result['rows'] as List).first, {
+      'widget_name': 'foo',
+      'deep_min': 70,
+      'resting_hr': 58.0,
+    });
+  });
 }
