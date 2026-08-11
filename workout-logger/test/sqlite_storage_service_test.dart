@@ -61,6 +61,19 @@ void main() {
       expect(rows.first['value'], 65.0);
     });
 
+    test('upsertHealthSamples stores timestamps converted to local, not UTC', () async {
+      final utcTime = DateTime.utc(2026, 8, 10, 21, 0);
+      await storage.upsertHealthSamples('heart_rate', [HealthSample(time: utcTime, value: 60)]);
+
+      final rows = await rawQuery(
+        storage,
+        "SELECT timestamp FROM health_samples WHERE type = 'heart_rate'",
+      );
+      final stored = rows.first['timestamp'] as String;
+      expect(stored.contains('Z'), isFalse);
+      expect(stored, utcTime.toLocal().toIso8601String());
+    });
+
     test('upsertSleepSessions replaces stage intervals for a re-synced session', () async {
       final start = DateTime(2026, 8, 10, 23);
       final end = DateTime(2026, 8, 11, 7);

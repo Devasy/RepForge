@@ -54,7 +54,15 @@ Future<void> _resolveStorageBackend() async {
 
   if (alreadyMigrated) {
     final sqlite = SqliteStorageService();
-    await sqlite.init();
+    try {
+      await sqlite.init();
+    } catch (e, st) {
+      debugPrint('SQLite init failed, staying on Hive: $e\n$st');
+      final hiveStorage = StorageService();
+      await hiveStorage.init();
+      _resolvedStorageService = hiveStorage;
+      return;
+    }
     _resolvedStorageService = sqlite;
     return;
   }

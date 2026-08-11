@@ -23,15 +23,15 @@ class SqliteStorageService implements IStorageService {
   /// [_schemaStatements] so `onUpgrade` can run exactly these statements
   /// against pre-v2 databases without re-running the full v1 DDL.
   static const List<String> _healthSchemaStatements = [
-    '''CREATE TABLE health_samples (
+    '''CREATE TABLE IF NOT EXISTS health_samples (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
       timestamp TEXT NOT NULL,
       value REAL NOT NULL
     )''',
-    'CREATE UNIQUE INDEX idx_health_samples_unique ON health_samples(type, timestamp)',
-    'CREATE INDEX idx_health_samples_type_ts ON health_samples(type, timestamp)',
-    '''CREATE TABLE sleep_sessions (
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_health_samples_unique ON health_samples(type, timestamp)',
+    'CREATE INDEX IF NOT EXISTS idx_health_samples_type_ts ON health_samples(type, timestamp)',
+    '''CREATE TABLE IF NOT EXISTS sleep_sessions (
       id TEXT PRIMARY KEY,
       start_ts TEXT NOT NULL,
       end_ts TEXT NOT NULL,
@@ -40,14 +40,14 @@ class SqliteStorageService implements IStorageService {
       rem_min INTEGER,
       awake_min INTEGER
     )''',
-    'CREATE INDEX idx_sleep_sessions_start ON sleep_sessions(start_ts)',
-    '''CREATE TABLE sleep_stage_intervals (
+    'CREATE INDEX IF NOT EXISTS idx_sleep_sessions_start ON sleep_sessions(start_ts)',
+    '''CREATE TABLE IF NOT EXISTS sleep_stage_intervals (
       sleep_session_id TEXT NOT NULL,
       start_ts TEXT NOT NULL,
       end_ts TEXT NOT NULL,
       stage TEXT NOT NULL
     )''',
-    'CREATE INDEX idx_sleep_stage_session ON sleep_stage_intervals(sleep_session_id)',
+    'CREATE INDEX IF NOT EXISTS idx_sleep_stage_session ON sleep_stage_intervals(sleep_session_id)',
   ];
 
   static const List<String> _schemaStatements = [
@@ -171,6 +171,7 @@ class SqliteStorageService implements IStorageService {
 
   Future<void> close() async {
     await _db.close();
+    _initialized = false;
   }
 
   @override
@@ -821,7 +822,7 @@ class SqliteStorageService implements IStorageService {
         'health_samples',
         {
           'type': type,
-          'timestamp': s.time.toIso8601String(),
+          'timestamp': s.time.toLocal().toIso8601String(),
           'value': s.value,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
@@ -834,7 +835,7 @@ class SqliteStorageService implements IStorageService {
     if (periods.isEmpty) return;
     await _db.transaction((txn) async {
       for (final p in periods) {
-        final id = p.start.toIso8601String();
+        final id = p.start.toLocal().toIso8601String();
         await txn.delete(
           'sleep_stage_intervals',
           where: 'sleep_session_id = ?',
@@ -844,8 +845,8 @@ class SqliteStorageService implements IStorageService {
           'sleep_sessions',
           {
             'id': id,
-            'start_ts': p.start.toIso8601String(),
-            'end_ts': p.end.toIso8601String(),
+            'start_ts': p.start.toLocal().toIso8601String(),
+            'end_ts': p.end.toLocal().toIso8601String(),
             'light_min': p.lightMinutes,
             'deep_min': p.deepMinutes,
             'rem_min': p.remMinutes,
@@ -856,8 +857,8 @@ class SqliteStorageService implements IStorageService {
         for (final seg in p.stageTimeline) {
           await txn.insert('sleep_stage_intervals', {
             'sleep_session_id': id,
-            'start_ts': seg.start.toIso8601String(),
-            'end_ts': seg.end.toIso8601String(),
+            'start_ts': seg.start.toLocal().toIso8601String(),
+            'end_ts': seg.end.toLocal().toIso8601String(),
             'stage': seg.stage,
           });
         }

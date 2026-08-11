@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -11,6 +12,7 @@ class _RecordingHcService implements IHealthConnectService {
   List<HealthSample> heartRateSamples = const [];
   List<HealthSample> restingHrSamples = const [];
   bool throwOnHeartRate = false;
+  Set<HealthReadType> grantedTypes = HealthReadType.values.toSet();
 
   @override
   Future<List<SleepPeriod>> readSleepSessions(DateTime start, DateTime end) async {
@@ -38,7 +40,7 @@ class _RecordingHcService implements IHealthConnectService {
   }
 
   @override
-  Future<Set<HealthReadType>> grantedReadTypes() async => HealthReadType.values.toSet();
+  Future<Set<HealthReadType>> grantedReadTypes() async => grantedTypes;
   @override
   Future<bool> isAvailable() async => true;
   @override
@@ -75,6 +77,15 @@ void main() {
     storage = SqliteStorageService(databasePathOverride: inMemoryDatabasePath);
     await storage.init();
     hc = _RecordingHcService();
+  });
+
+  tearDown(() async {
+    final path = storage.databasePath;
+    await storage.close();
+    final file = File(path);
+    if (await file.exists()) {
+      await file.delete();
+    }
   });
 
   test('first sync backfills 90 days plus the 3-day lookback', () async {
@@ -163,5 +174,25 @@ void main() {
       "SELECT COUNT(*) AS c FROM health_samples WHERE type = 'resting_heart_rate'",
     );
     expect(rows.first['c'], 1);
+  });
+
+  test('an ungranted stream is skipped entirely and its watermark never advances', () async {
+    final now = DateTime(2026, 8, 11, 9);
+    // Permission not yet granted for heart rate — simulates first launch
+    // before the user has opened Health Connect settings.
+    hc.grantedTypes = {
+      HealthReadType.sleep,
+      HealthReadType.restingHeartRate,
+      HealthReadType.hrv,
+    };
+    final service = HealthDataSyncService(hc, storage, now: () => now);
+
+    await service.sync(force: true);
+
+    // The reader for the ungranted stream must never even be called.
+    expect(hc.calls.any((c) => c.method == 'heart_rate'), isFalse);
+    // And critically, its watermark must stay unset so a later grant still
+    // triggers the full 90-day backfill instead of resuming from `now`.
+    expect(await storage.getSetting('health_sync.heart_rate'), isNull);
   });
 }

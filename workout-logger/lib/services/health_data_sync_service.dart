@@ -26,11 +26,20 @@ class HealthDataSyncService {
     'resting_heart_rate': 'health_sync.resting_heart_rate',
     'hrv_rmssd': 'health_sync.hrv_rmssd',
   };
+  static const Map<String, HealthReadType> _sampleReadTypes = {
+    'heart_rate': HealthReadType.heartRate,
+    'resting_heart_rate': HealthReadType.restingHeartRate,
+    'hrv_rmssd': HealthReadType.hrv,
+  };
 
   /// Pulls any new sleep/HR data since the last sync into SQLite. Skipped if
   /// the last sync ran under 30 minutes ago, unless [force] is true. Each of
   /// the 4 underlying data streams fails independently and best-effort —
-  /// one stream throwing never blocks the others or this call.
+  /// one stream throwing never blocks the others or this call. Streams whose
+  /// permission hasn't been granted yet are skipped entirely — their
+  /// watermark is left untouched so the first sync after granting permission
+  /// still performs the full backfill instead of resuming from a watermark
+  /// that was silently advanced while unauthorized.
   Future<void> sync({bool force = false}) async {
     final now = _now();
     if (!force) {
@@ -39,10 +48,21 @@ class HealthDataSyncService {
       if (lastRun != null && now.difference(lastRun) < _throttleWindow) return;
     }
 
-    await _syncSleep(now);
-    await _syncSamples('heart_rate', now, _hc.readHeartRateSamples);
-    await _syncSamples('resting_heart_rate', now, _hc.readRestingHeartRate);
-    await _syncSamples('hrv_rmssd', now, _hc.readHrvRmssd);
+    final granted = await _hc.grantedReadTypes();
+
+    if (granted.contains(HealthReadType.sleep)) {
+      await _syncSleep(now);
+    }
+    for (final entry in _sampleReadTypes.entries) {
+      if (!granted.contains(entry.value)) continue;
+      final reader = switch (entry.key) {
+        'heart_rate' => _hc.readHeartRateSamples,
+        'resting_heart_rate' => _hc.readRestingHeartRate,
+        'hrv_rmssd' => _hc.readHrvRmssd,
+        _ => throw StateError('unknown stream ${entry.key}'),
+      };
+      await _syncSamples(entry.key, now, reader);
+    }
 
     await _storage.saveSetting(_lastRunKey, now.toIso8601String());
   }

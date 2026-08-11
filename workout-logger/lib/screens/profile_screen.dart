@@ -201,7 +201,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     try {
       final sync = context.read<HealthDataSyncService?>();
       if (sync == null) {
-        _showSnack('Health data sync is not available.', AppColors.error);
+        if (mounted) {
+          _showSnack('Health data sync is not available.', AppColors.error);
+        }
         return;
       }
       await sync.sync(force: true);
