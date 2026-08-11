@@ -135,6 +135,7 @@ void main() {
       final names = tableRows.map((r) => r['name'] as String).toSet();
       expect(names, containsAll(['health_samples', 'sleep_sessions', 'sleep_stage_intervals']));
 
+      await upgraded.close();
       await File(path).delete();
     });
   });

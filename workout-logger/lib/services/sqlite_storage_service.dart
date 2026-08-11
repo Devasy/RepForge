@@ -221,13 +221,6 @@ class SqliteStorageService implements IStorageService {
     }
 
     _initialized = true;
-
-    // For explicitly provided file paths, close the write connection after initialization.
-    // This allows tests to delete temp files. Read-only queries (via rawQuery) open
-    // their own connections to the same file.
-    if (_databasePathOverride != null && _databasePathOverride != ':memory:') {
-      await _db.close();
-    }
   }
 
   Future<void> _seedDefaultMuscleGroups() async {
