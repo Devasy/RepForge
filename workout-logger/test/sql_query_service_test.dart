@@ -78,4 +78,23 @@ void main() {
     expect(result['error'], isNull);
     expect(result['row_count'], 2);
   });
+
+  test('does not close the app\'s shared connection to the same path', () async {
+    final service = SqlQueryService(dbPath);
+
+    final first = await service.runQuery('SELECT * FROM widgets ORDER BY id');
+    expect(first['error'], isNull);
+
+    // Regression: opening a read-only connection at the same path as an
+    // already-open shared connection returns that shared instance unless
+    // singleInstance: false is passed. Closing it after the first query
+    // would then break every later access to the app's real connection —
+    // including seedDb here, standing in for the app's live database.
+    final rows = await seedDb.rawQuery('SELECT * FROM widgets ORDER BY id');
+    expect(rows.length, 2);
+
+    final second = await service.runQuery('SELECT * FROM widgets ORDER BY id');
+    expect(second['error'], isNull);
+    expect(second['row_count'], 2);
+  });
 }

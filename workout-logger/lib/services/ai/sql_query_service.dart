@@ -83,7 +83,12 @@ class SqlQueryService {
 
     Database? db;
     try {
-      db = await openReadOnlyDatabase(databasePath);
+      // singleInstance: false is required here: sqflite's default open
+      // helper is keyed only by path (ignoring the readOnly flag), so an
+      // ordinary openReadOnlyDatabase() call against the same path as the
+      // app's live connection just returns that shared instance. Closing
+      // it below would then close the app's only database connection.
+      db = await openReadOnlyDatabase(databasePath, singleInstance: false);
       final rows = await db.rawQuery(
         'SELECT * FROM (\n$safeQuery\n) LIMIT ?',
         [cappedLimit],
