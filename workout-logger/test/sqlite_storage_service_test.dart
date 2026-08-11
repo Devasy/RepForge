@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:repforge/models/models.dart';
@@ -23,6 +24,109 @@ void main() {
       final groups = await storage.getAllMuscleGroups();
       expect(groups, isNotEmpty);
       expect(groups.any((g) => g.name == 'Chest'), isTrue);
+    });
+  });
+
+  Future<List<Map<String, Object?>>> rawQuery(
+    SqliteStorageService s,
+    String sql, [
+    List<Object?>? args,
+  ]) async {
+    final db = await openReadOnlyDatabase(s.databasePath, singleInstance: false);
+    final rows = await db.rawQuery(sql, args);
+    await db.close();
+    return rows;
+  }
+
+  group('SqliteStorageService — health data', () {
+    test('upsertHealthSamples replaces duplicates on (type, timestamp)', () async {
+      final t = DateTime(2026, 8, 10, 22, 30);
+      await storage.upsertHealthSamples('heart_rate', [HealthSample(time: t, value: 60)]);
+      await storage.upsertHealthSamples('heart_rate', [HealthSample(time: t, value: 65)]);
+
+      final rows = await rawQuery(
+        storage,
+        "SELECT value FROM health_samples WHERE type = 'heart_rate'",
+      );
+      expect(rows.length, 1);
+      expect(rows.first['value'], 65.0);
+    });
+
+    test('upsertSleepSessions replaces stage intervals for a re-synced session', () async {
+      final start = DateTime(2026, 8, 10, 23);
+      final end = DateTime(2026, 8, 11, 7);
+
+      await storage.upsertSleepSessions([
+        SleepPeriod(
+          start: start,
+          end: end,
+          lightMinutes: 200,
+          deepMinutes: 60,
+          remMinutes: 100,
+          awakeMinutes: 10,
+          stageTimeline: [
+            SleepStageInterval(start: start, end: start.add(const Duration(hours: 1)), stage: 'light'),
+          ],
+        ),
+      ]);
+
+      await storage.upsertSleepSessions([
+        SleepPeriod(
+          start: start,
+          end: end,
+          lightMinutes: 190,
+          deepMinutes: 70,
+          remMinutes: 100,
+          awakeMinutes: 10,
+          stageTimeline: [
+            SleepStageInterval(start: start, end: start.add(const Duration(hours: 2)), stage: 'deep'),
+          ],
+        ),
+      ]);
+
+      final sessions = await rawQuery(storage, 'SELECT id, deep_min FROM sleep_sessions');
+      expect(sessions.length, 1);
+      expect(sessions.first['deep_min'], 70);
+
+      final intervals = await rawQuery(
+        storage,
+        'SELECT stage FROM sleep_stage_intervals WHERE sleep_session_id = ?',
+        [sessions.first['id']],
+      );
+      expect(intervals.length, 1);
+      expect(intervals.first['stage'], 'deep');
+    });
+  });
+
+  group('SqliteStorageService — schema upgrade', () {
+    test('onUpgrade adds health tables to a pre-existing v1 database', () async {
+      final path =
+          '${Directory.systemTemp.path}/sqlite_v1_upgrade_${DateTime.now().microsecondsSinceEpoch}.db';
+      final v1 = await openDatabase(
+        path,
+        version: 1,
+        onCreate: (db, v) async {
+          await db.execute('''CREATE TABLE muscle_groups (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            growth_rate REAL NOT NULL DEFAULT 0,
+            last_updated TEXT NOT NULL
+          )''');
+        },
+      );
+      await v1.close();
+
+      final upgraded = SqliteStorageService(databasePathOverride: path);
+      await upgraded.init();
+
+      final tableRows = await rawQuery(
+        upgraded,
+        "SELECT name FROM sqlite_master WHERE type = 'table'",
+      );
+      final names = tableRows.map((r) => r['name'] as String).toSet();
+      expect(names, containsAll(['health_samples', 'sleep_sessions', 'sleep_stage_intervals']));
+
+      await File(path).delete();
     });
   });
 

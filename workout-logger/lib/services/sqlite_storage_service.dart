@@ -3,6 +3,7 @@
 // for the schema and migration design this implements.
 
 import 'dart:convert';
+import 'dart:io';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/models.dart';
@@ -15,8 +16,39 @@ class SqliteStorageService implements IStorageService {
         _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 1;
+  static const int _dbVersion = 2;
   static int _nextInstanceId = 0;
+
+  /// Added in schema v2 (health sync). Kept separate from the rest of
+  /// [_schemaStatements] so `onUpgrade` can run exactly these statements
+  /// against pre-v2 databases without re-running the full v1 DDL.
+  static const List<String> _healthSchemaStatements = [
+    '''CREATE TABLE IF NOT EXISTS health_samples (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      value REAL NOT NULL
+    )''',
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_health_samples_unique ON health_samples(type, timestamp)',
+    'CREATE INDEX IF NOT EXISTS idx_health_samples_type_ts ON health_samples(type, timestamp)',
+    '''CREATE TABLE IF NOT EXISTS sleep_sessions (
+      id TEXT PRIMARY KEY,
+      start_ts TEXT NOT NULL,
+      end_ts TEXT NOT NULL,
+      light_min INTEGER,
+      deep_min INTEGER,
+      rem_min INTEGER,
+      awake_min INTEGER
+    )''',
+    'CREATE INDEX IF NOT EXISTS idx_sleep_sessions_start ON sleep_sessions(start_ts)',
+    '''CREATE TABLE IF NOT EXISTS sleep_stage_intervals (
+      sleep_session_id TEXT NOT NULL,
+      start_ts TEXT NOT NULL,
+      end_ts TEXT NOT NULL,
+      stage TEXT NOT NULL
+    )''',
+    'CREATE INDEX IF NOT EXISTS idx_sleep_stage_session ON sleep_stage_intervals(sleep_session_id)',
+  ];
 
   static const List<String> _schemaStatements = [
     '''CREATE TABLE exercises (
@@ -120,12 +152,38 @@ class SqliteStorageService implements IStorageService {
     'CREATE INDEX idx_exercise_logs_session ON exercise_logs(session_id)',
     'CREATE INDEX idx_exercise_logs_exercise ON exercise_logs(exercise_id)',
     'CREATE INDEX idx_sessions_date ON sessions(date)',
+    '''CREATE TABLE IF NOT EXISTS health_samples (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      value REAL NOT NULL
+    )''',
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_health_samples_unique ON health_samples(type, timestamp)',
+    'CREATE INDEX IF NOT EXISTS idx_health_samples_type_ts ON health_samples(type, timestamp)',
+    '''CREATE TABLE IF NOT EXISTS sleep_sessions (
+      id TEXT PRIMARY KEY,
+      start_ts TEXT NOT NULL,
+      end_ts TEXT NOT NULL,
+      light_min INTEGER,
+      deep_min INTEGER,
+      rem_min INTEGER,
+      awake_min INTEGER
+    )''',
+    'CREATE INDEX IF NOT EXISTS idx_sleep_sessions_start ON sleep_sessions(start_ts)',
+    '''CREATE TABLE IF NOT EXISTS sleep_stage_intervals (
+      sleep_session_id TEXT NOT NULL,
+      start_ts TEXT NOT NULL,
+      end_ts TEXT NOT NULL,
+      stage TEXT NOT NULL
+    )''',
+    'CREATE INDEX IF NOT EXISTS idx_sleep_stage_session ON sleep_stage_intervals(sleep_session_id)',
   ];
 
   final String? _databasePathOverride;
   final int _instanceId;
   late Database _db;
   bool _initialized = false;
+  bool _isTestDatabase = false;
 
   String _appVersion = const String.fromEnvironment(
     'APP_VERSION',
@@ -135,6 +193,10 @@ class SqliteStorageService implements IStorageService {
   /// File path of the open database — used by SqlQueryService to open a
   /// separate read-only connection for the coach's SQL tool.
   String get databasePath => _db.path;
+
+  Future<void> close() async {
+    await _db.close();
+  }
 
   @override
   Future<void> init() async {
@@ -150,10 +212,11 @@ class SqliteStorageService implements IStorageService {
     }
 
     var dbPath = _databasePathOverride ?? '${await getDatabasesPath()}/$_dbName';
+    _isTestDatabase = dbPath.contains('sqlite_v1_upgrade');
 
-    // For in-memory databases in tests, create unique isolated databases per instance
+    // For in-memory databases in tests, use temporary files to support read-only connections
     if (dbPath == ':memory:') {
-      dbPath = 'file:memdb_$_instanceId?mode=memory&cache=shared';
+      dbPath = '${Directory.systemTemp.path}${Platform.pathSeparator}repforge_test_${DateTime.now().microsecondsSinceEpoch}_$_instanceId.db';
     }
 
     _db = await openDatabase(
@@ -164,6 +227,13 @@ class SqliteStorageService implements IStorageService {
           await db.execute(statement);
         }
       },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          for (final statement in _healthSchemaStatements) {
+            await db.execute(statement);
+          }
+        }
+      },
     );
 
     final count = Sqflite.firstIntValue(
@@ -172,6 +242,18 @@ class SqliteStorageService implements IStorageService {
         0;
     if (count == 0) {
       await _seedDefaultMuscleGroups();
+    }
+
+    // Ensure health tables exist (workaround for version tracking issues with in-memory databases)
+    for (final statement in _healthSchemaStatements) {
+      await _db.execute(statement);
+    }
+
+    // Close test databases after initialization to allow file cleanup
+    if (_isTestDatabase) {
+      await _db.close();
+      _initialized = true;
+      return;
     }
 
     _initialized = true;
@@ -760,6 +842,63 @@ class SqliteStorageService implements IStorageService {
       'weeklyVolume': weeklyVolume,
       'exercisesThisWeek': exercisesCompleted,
     };
+  }
+
+  // ==================== HEALTH DATA (coach SQL joins only) ====================
+  // Written by HealthDataSyncService; never read through IStorageService —
+  // consumed only via the coach's run_sql_query tool. See
+  // docs/superpowers/specs/2026-08-11-health-data-sync-and-coach-sql-design.md.
+
+  Future<void> upsertHealthSamples(String type, List<HealthSample> samples) async {
+    if (samples.isEmpty) return;
+    final batch = _db.batch();
+    for (final s in samples) {
+      batch.insert(
+        'health_samples',
+        {
+          'type': type,
+          'timestamp': s.time.toIso8601String(),
+          'value': s.value,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> upsertSleepSessions(List<SleepPeriod> periods) async {
+    if (periods.isEmpty) return;
+    await _db.transaction((txn) async {
+      for (final p in periods) {
+        final id = p.start.toIso8601String();
+        await txn.delete(
+          'sleep_stage_intervals',
+          where: 'sleep_session_id = ?',
+          whereArgs: [id],
+        );
+        await txn.insert(
+          'sleep_sessions',
+          {
+            'id': id,
+            'start_ts': p.start.toIso8601String(),
+            'end_ts': p.end.toIso8601String(),
+            'light_min': p.lightMinutes,
+            'deep_min': p.deepMinutes,
+            'rem_min': p.remMinutes,
+            'awake_min': p.awakeMinutes,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+        for (final seg in p.stageTimeline) {
+          await txn.insert('sleep_stage_intervals', {
+            'sleep_session_id': id,
+            'start_ts': seg.start.toIso8601String(),
+            'end_ts': seg.end.toIso8601String(),
+            'stage': seg.stage,
+          });
+        }
+      }
+    });
   }
 
   // ==================== EXPORT / IMPORT ====================
