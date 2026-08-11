@@ -17,6 +17,7 @@ import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
 import 'services/ai/coach_tool_service.dart';
 import 'services/health_connect_service.dart';
+import 'services/health_data_sync_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
 import 'services/interfaces/health_connect_service_interface.dart';
@@ -130,6 +131,17 @@ class WorkoutLoggerApp extends StatelessWidget {
   // Serves arbitrary-range sleep/HR data to the detail screens.
   static final HealthHistoryManager _healthHistoryManager =
       HealthHistoryManager(_healthConnectService, _storageService);
+  // Populates the SQLite health tables the coach's run_sql_query tool joins
+  // against workout data. Null under the pre-migration Hive fallback path —
+  // there's no live SQLite database file to sync into. Mirrors the
+  // sqlQuery ? ... : null guard used for CoachToolService below.
+  static final HealthDataSyncService? _healthDataSyncService =
+      _storageService is SqliteStorageService
+          ? HealthDataSyncService(
+              _healthConnectService,
+              _storageService as SqliteStorageService,
+            )
+          : null;
   static final GeminiAiService _geminiService =
       GeminiAiService(storage: _storageService);
   static final ConversationManager _conversationManager =
@@ -162,6 +174,7 @@ class WorkoutLoggerApp extends StatelessWidget {
         ChangeNotifierProvider<PRManager>.value(value: _prManager),
         ChangeNotifierProvider<ReadinessManager>.value(value: _readinessManager),
         Provider<HealthHistoryManager>.value(value: _healthHistoryManager),
+        Provider<HealthDataSyncService?>.value(value: _healthDataSyncService),
         // GeminiAiService is the single AI backend instance. It's a ChangeNotifier
         // (settings UI watches isConfigured/model), so it's provided as such.
         // Consumers that should depend on the abstraction (the coach ViewModel,
@@ -234,6 +247,7 @@ class _AppInitializerState extends State<AppInitializer> {
     final api = context.read<ApiService>();
     final gemini = context.read<GeminiAiService>();
     final readiness = context.read<ReadinessManager>();
+    final healthDataSync = context.read<HealthDataSyncService?>();
 
     try {
       await provider.init();
@@ -257,6 +271,10 @@ class _AppInitializerState extends State<AppInitializer> {
       // Fire-and-forget readiness refresh — must run after settings.init()
       // so the opt-in flag is loaded; never blocks or fails app init.
       readiness.refresh();
+
+      // Fire-and-forget: populates the SQLite tables run_sql_query joins
+      // against. No-op under the pre-migration Hive fallback (null there).
+      healthDataSync?.sync();
 
       // Fire-and-forget analytics in background.
       api.sendHeartbeat();
