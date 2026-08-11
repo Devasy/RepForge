@@ -239,6 +239,8 @@ class HealthConnectSection extends StatelessWidget {
     required this.onToggle,
     required this.isReadinessLoading,
     required this.onReadinessToggle,
+    required this.isHealthSyncLoading,
+    required this.onHealthSyncNow,
   });
 
   final SettingsProvider settings;
@@ -246,6 +248,8 @@ class HealthConnectSection extends StatelessWidget {
   final Future<void> Function(bool) onToggle;
   final bool isReadinessLoading;
   final Future<void> Function(bool) onReadinessToggle;
+  final bool isHealthSyncLoading;
+  final VoidCallback? onHealthSyncNow;
 
   static const _hcColor = Color(0xFF00BFA5);
 
@@ -344,6 +348,19 @@ class HealthConnectSection extends StatelessWidget {
               ),
             ],
           ),
+          if (settings.readinessEnabled) ...[
+            const SizedBox(height: AppSpacing.sm),
+            const Divider(color: AppColors.glassBorder, height: 1),
+            const SizedBox(height: AppSpacing.sm),
+            _ActionTile(
+              icon: Icons.sync_rounded,
+              iconColor: _hcColor,
+              title: 'Sync coach data now',
+              subtitle: "Pull recent sleep & heart rate into the coach's database",
+              loading: isHealthSyncLoading,
+              onTap: onHealthSyncNow,
+            ),
+          ],
         ],
       ),
     );

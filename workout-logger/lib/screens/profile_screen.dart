@@ -17,6 +17,7 @@ import '../services/settings_provider.dart';
 import '../services/api_service.dart';
 import '../services/interfaces/health_connect_service_interface.dart';
 import '../services/managers/readiness_manager.dart';
+import '../services/health_data_sync_service.dart';
 import '../theme/app_theme.dart';
 import 'widgets/profile_sections.dart';
 
@@ -34,6 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isBackingUp = false;
   bool _isRequestingHcPermission = false;
   bool _isRequestingReadinessPermission = false;
+  bool _isSyncingHealthData = false;
   String _appVersion = '';
 
   @override
@@ -191,6 +193,23 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } finally {
       if (mounted) setState(() => _isRequestingReadinessPermission = false);
+    }
+  }
+
+  Future<void> _syncHealthDataNow() async {
+    setState(() => _isSyncingHealthData = true);
+    try {
+      final sync = context.read<HealthDataSyncService?>();
+      if (sync == null) {
+        _showSnack('Health data sync is not available.', AppColors.error);
+        return;
+      }
+      await sync.sync(force: true);
+      if (mounted) _showSnack('Coach data synced!', AppColors.success);
+    } catch (e) {
+      if (mounted) _showSnack('Sync failed. Try again later.', AppColors.error);
+    } finally {
+      if (mounted) setState(() => _isSyncingHealthData = false);
     }
   }
 
@@ -374,6 +393,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       await settings.setReadinessEnabled(false);
                     }
                   },
+                  isHealthSyncLoading: _isSyncingHealthData,
+                  onHealthSyncNow: _isSyncingHealthData ? null : _syncHealthDataNow,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DataManagementSection(
