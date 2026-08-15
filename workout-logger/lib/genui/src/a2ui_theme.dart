@@ -45,6 +45,7 @@ class A2UiTheme {
       'seriesPalette must not be empty — seriesColor() indexes into it '
       'with a modulo, which throws on an empty list.',
     );
+    if (seriesPalette.isEmpty) return accent;
     return seriesPalette[i % seriesPalette.length];
   }
 

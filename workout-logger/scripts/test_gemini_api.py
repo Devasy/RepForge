@@ -87,8 +87,9 @@ def thinking_config_for(model: str) -> dict:
 
 def post_generate_content_with_retry(model: str, api_key: str, payload: dict, max_attempts: int = 4) -> dict:
     current_model = model
+    attempt = 0
 
-    for attempt in range(max_attempts):
+    while True:
         # Rebuild the request body for whichever model is currently selected —
         # a daily-quota fallback mid-retry can switch to a model needing a
         # different thinkingConfig shape (see thinking_config_for()), so the
@@ -124,6 +125,7 @@ def post_generate_content_with_retry(model: str, api_key: str, payload: dict, ma
                 if attempt < max_attempts - 1:
                     print(f"  --> Waiting {retry_sec:.2f}s before retry...")
                     time.sleep(retry_sec)
+                    attempt += 1
                     continue
             print(f"\n[!] HTTP {e.code} Error Body:\n{body}")
             raise e

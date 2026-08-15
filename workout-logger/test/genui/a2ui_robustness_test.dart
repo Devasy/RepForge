@@ -75,19 +75,25 @@ const _payloads = <String>[
   '',
 ];
 
+/// Truncated payload text used as a stable test name, so a failure identifies
+/// the payload directly instead of an index that shifts whenever `_payloads`
+/// gains or loses an entry.
+String _label(String payload) =>
+    payload.isEmpty ? '<empty>' : payload.substring(0, payload.length.clamp(0, 60));
+
 void main() {
   group('parser never throws', () {
-    for (var i = 0; i < _payloads.length; i++) {
-      test('payload $i', () {
-        expect(() => _parser.parse(_payloads[i]), returnsNormally);
+    for (final payload in _payloads) {
+      test(_label(payload), () {
+        expect(() => _parser.parse(payload), returnsNormally);
       });
     }
   });
 
   group('renderer never throws', () {
-    for (var i = 0; i < _payloads.length; i++) {
-      testWidgets('payload $i', (tester) async {
-        final node = _parser.parse(_payloads[i]);
+    for (final payload in _payloads) {
+      testWidgets(_label(payload), (tester) async {
+        final node = _parser.parse(payload);
         if (node == null) return;
 
         tester.view.physicalSize = const Size(400, 900);

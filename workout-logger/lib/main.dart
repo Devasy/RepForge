@@ -136,8 +136,8 @@ class WorkoutLoggerApp extends StatelessWidget {
         // CoachToolService backs AI tool calls; reads from WorkoutProvider + PRManager.
         Provider<CoachToolService>(
           create: (ctx) => CoachToolService(
-            ctx.read<WorkoutProvider>(),
-            ctx.read<PRManager>(),
+            workoutProvider: ctx.read<WorkoutProvider>(),
+            prManager: ctx.read<PRManager>(),
             healthHistory: ctx.read<HealthHistoryManager>(),
           ),
         ),

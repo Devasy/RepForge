@@ -222,7 +222,7 @@ RoutineOptimizerViewModel _buildVm(IAiService ai) {
   final pr = PRManager(storage);
   final conversations = ConversationManager(storage, kind: 'optimizer');
   final settings = SettingsProvider(storage);
-  final coachTools = CoachToolService(wp, pr);
+  final coachTools = CoachToolService(workoutProvider: wp, prManager: pr);
   return RoutineOptimizerViewModel(
     ai: ai,
     coachTools: coachTools,

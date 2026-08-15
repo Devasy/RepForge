@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/genui/src/a2ui_node.dart';
+import 'package:repforge/genui/src/a2ui_panels.dart';
 import 'package:repforge/genui/src/a2ui_props.dart';
 import 'package:repforge/genui/src/a2ui_theme.dart';
 import 'package:repforge/genui/src/components/dynamic_chart.dart';
@@ -203,6 +204,24 @@ void main() {
       });
       expect(find.text('Biceps'), findsOneWidget);
       expect(find.text('Triceps'), findsOneWidget);
+      expect(find.byType(A2UiLegend), findsOneWidget);
+
+      await pump(tester, {
+        'type': 'line',
+        'labels': ['A'],
+        'values': [1],
+      });
+      expect(find.byType(A2UiLegend), findsNothing);
+
+      await pump(tester, {
+        'type': 'pie',
+        'labels': ['A', 'B'],
+        'series': [
+          {'name': 'Biceps', 'values': [1]},
+          {'name': 'Triceps', 'values': [2]},
+        ],
+      });
+      expect(find.byType(A2UiLegend), findsNothing);
     });
 
     testWidgets('renders an empty panel with no data', (tester) async {
