@@ -59,7 +59,7 @@ void main() {
       pr = PRManager(storage);
       await pr.backfillFromSessions(provider.sessions);
 
-      tools = CoachToolService(provider, pr);
+      tools = CoachToolService(workoutProvider: provider, prManager: pr);
     });
 
     test('exposes the expected tool declarations', () {

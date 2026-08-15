@@ -31,7 +31,7 @@ void main() {
       programManager: ProgramManager(storage),
     );
     geminiService = GeminiAiService(storage: storage);
-    coachToolService = CoachToolService(workoutProvider, prManager);
+    coachToolService = CoachToolService(workoutProvider: workoutProvider, prManager: prManager);
     healthConnectService = HealthConnectService();
 
     await workoutProvider.init();

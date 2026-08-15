@@ -27,6 +27,8 @@ import 'services/managers/readiness_manager.dart';
 import 'services/managers/health_history_manager.dart';
 import 'services/managers/conversation_manager.dart';
 import 'theme/app_theme.dart';
+import 'genui/a2ui.dart';
+import 'theme/a2ui_app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 
@@ -134,16 +136,20 @@ class WorkoutLoggerApp extends StatelessWidget {
         // CoachToolService backs AI tool calls; reads from WorkoutProvider + PRManager.
         Provider<CoachToolService>(
           create: (ctx) => CoachToolService(
-            ctx.read<WorkoutProvider>(),
-            ctx.read<PRManager>(),
+            workoutProvider: ctx.read<WorkoutProvider>(),
+            prManager: ctx.read<PRManager>(),
+            healthHistory: ctx.read<HealthHistoryManager>(),
           ),
         ),
       ],
-      child: MaterialApp(
-        title: 'Workout Logger',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
-        home: const AppInitializer(),
+      child: A2UiThemeProvider(
+        theme: repforgeA2UiTheme,
+        child: MaterialApp(
+          title: 'Workout Logger',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.darkTheme,
+          home: const AppInitializer(),
+        ),
       ),
     );
   }

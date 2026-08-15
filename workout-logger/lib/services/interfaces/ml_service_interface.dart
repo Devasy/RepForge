@@ -75,11 +75,15 @@ abstract class IMLService {
     DateTime? asOf,
   });
 
-  /// Get recommended sets based on last session and growth model.
+  /// Get recommended sets based on last session, recent-session trend, and growth model.
+  /// [pastSessions], if provided, only has its first two entries read for
+  /// deload/recovery detection: index 0 is the latest prior session, index 1
+  /// is the session immediately before that. Any further entries are ignored.
   /// [minReps]/[maxReps] define the double-progression rep range.
   /// Pass [recoveryScores] + [primaryMuscleIds] for recovery-aware advice.
   List<SetRecommendation> recommendSets({
     required List<WorkoutSet> lastSession,
+    List<List<WorkoutSet>>? pastSessions,
     GrowthModel? growthModel,
     int minReps = 6,
     int maxReps = 12,

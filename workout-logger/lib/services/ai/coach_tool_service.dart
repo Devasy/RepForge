@@ -5,11 +5,15 @@
 // query methods on WorkoutProvider / PRManager — no new analytics logic lives
 // here, only the schema + arg parsing + JSON shaping.
 
+import 'dart:math' as math;
+
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 import '../../models/models.dart';
+import '../../models/sleep_hr_models.dart';
 import '../workout_provider.dart';
 import '../managers/pr_manager.dart';
+import '../managers/health_history_manager.dart';
 
 class AmbiguousMatchException implements Exception {
   const AmbiguousMatchException(this.candidates);
@@ -19,8 +23,15 @@ class AmbiguousMatchException implements Exception {
 class CoachToolService {
   final WorkoutProvider _wp;
   final PRManager _pr;
+  final HealthHistoryManager? _hh;
 
-  CoachToolService(this._wp, this._pr);
+  CoachToolService({
+    required WorkoutProvider workoutProvider,
+    required PRManager prManager,
+    HealthHistoryManager? healthHistory,
+  })  : _wp = workoutProvider,
+        _pr = prManager,
+        _hh = healthHistory;
 
   /// Tool declaration for the optimizer screen's `ask_user_questions` flow.
   /// NOT included in the coach's tool list — only the optimizer adds it.
@@ -70,6 +81,30 @@ class CoachToolService {
   /// Tool declarations advertised to the model.
   List<Tool> buildTools() => [
         Tool(functionDeclarations: [
+          FunctionDeclaration(
+            'get_muscle_group_volume',
+            'Get volume history over time for one or multiple muscle groups '
+                '(e.g. ["Biceps", "Triceps"] or ["Chest", "Back"]). Returns dates, '
+                'per-muscle volume series over time, and totals. Use for muscle '
+                'comparisons (like "biceps vs triceps graph") or muscle volume '
+                'distribution breakdown.',
+            Schema.object(
+              properties: {
+                'muscle_groups': Schema.array(
+                  items: Schema.string(),
+                  description:
+                      'List of muscle group names, e.g. ["Biceps", "Triceps"] or '
+                      '["Chest", "Back", "Legs"].',
+                ),
+                'days': Schema.integer(
+                  description:
+                      'Optional. Number of days to look back (defaults to 60).',
+                  nullable: true,
+                ),
+              },
+              requiredProperties: ['muscle_groups'],
+            ),
+          ),
           FunctionDeclaration(
             'get_exercise_performance',
             'Get how a specific exercise has progressed: per-session volume '
@@ -273,6 +308,63 @@ class CoachToolService {
               requiredProperties: ['name', 'category', 'primary_muscle'],
             ),
           ),
+          FunctionDeclaration(
+            'get_health_metrics',
+            'Fetch historical sleep sessions and sleep stage breakdown (deep, REM, '
+                'light, awake minutes) over the last N days. Use for sleep & '
+                'recovery queries.',
+            Schema.object(
+              properties: {
+                'days': Schema.integer(
+                  description: 'Optional. Number of days to look back (defaults to 30).',
+                  nullable: true,
+                ),
+              },
+            ),
+          ),
+          FunctionDeclaration(
+            'analyze_health_workout_correlation',
+            'Run an analytical statistical pipeline calculating Mean (µ), Standard Deviation (σ), '
+                'Pearson Correlation Coefficient (r), and linear regression (y = mx + b) between a health metric '
+                '(sleep_hours, deep_sleep_min) and a workout metric '
+                '(workout_volume, session_duration, exercise_max_weight). Returns analytical stats '
+                'and paired coordinates ready to visualize.',
+            Schema.object(
+              properties: {
+                'x_metric': Schema.string(
+                  description: 'Health metric, e.g. "sleep_hours", "deep_sleep_min".',
+                ),
+                'y_metric': Schema.string(
+                  description: 'Workout metric, e.g. "workout_volume", "session_duration", "exercise_max_weight".',
+                ),
+                'exercise_name': Schema.string(
+                  description: 'Optional. Specific exercise name if y_metric is "exercise_max_weight".',
+                  nullable: true,
+                ),
+                'days': Schema.integer(
+                  description: 'Optional. Number of days to consider (defaults to 60).',
+                  nullable: true,
+                ),
+              },
+              requiredProperties: ['x_metric', 'y_metric'],
+            ),
+          ),
+          FunctionDeclaration(
+            'get_sleeping_hr_analytics',
+            'Fetch and compute sleeping heart rate statistics over the past N days (e.g. 14 days). '
+                'Returns overnight p5 (5th percentile sleeping HR floor), p25, median, p75, p95, mean, min, max, '
+                'standard deviation (stdev), variance, linear trend (slope/direction), and nightly '
+                'time-series data as labels + series ready to chart. '
+                'Use whenever the user asks to analyze sleeping HR, overnight HR variation, or recovery trends.',
+            Schema.object(
+              properties: {
+                'days': Schema.integer(
+                  description: 'Optional. Number of days to analyze (defaults to 14).',
+                  nullable: true,
+                ),
+              },
+            ),
+          ),
         ]),
       ];
 
@@ -280,6 +372,14 @@ class CoachToolService {
   /// JSON-serializable result map.
   Future<Map<String, Object?>> handleCall(FunctionCall call) async {
     switch (call.name) {
+      case 'get_sleeping_hr_analytics':
+        return await _getSleepingHrAnalytics(call.args);
+      case 'get_health_metrics':
+        return await _getHealthMetrics(call.args);
+      case 'analyze_health_workout_correlation':
+        return await _analyzeHealthWorkoutCorrelation(call.args);
+      case 'get_muscle_group_volume':
+        return _muscleGroupVolume(call.args);
       case 'get_exercise_performance':
         return _exercisePerformance(call.args);
       case 'get_workouts_in_range':
@@ -307,14 +407,391 @@ class CoachToolService {
 
   // ── Tool implementations ───────────────────────────────────────────────────
 
+  Future<Map<String, Object?>> _getSleepingHrAnalytics(
+      Map<String, Object?> args) async {
+    final hh = _hh;
+    if (hh == null) {
+      return {
+        'error':
+            'Health Connect integration is not active or HealthHistoryManager unavailable.'
+      };
+    }
+
+    // Clamp before the per-day loop below — an unbounded model-supplied value
+    // (e.g. `days: 99999`) would otherwise fan out into a huge number of
+    // sequential hh.sleepNight() lookups.
+    final days = _limitArg(args, 14, key: 'days', max: 60);
+    final now = DateTime.now();
+    final dailyStats = <Map<String, Object?>>[];
+    final p5List = <double>[];
+    final p25List = <double>[];
+    final meanList = <double>[];
+    final labels = <String>[];
+
+    for (var i = days - 1; i >= 0; i--) {
+      final morning = now.subtract(Duration(days: i));
+      final dateStr = _d(morning);
+      final snap = await hh.sleepNight(morning);
+
+      if (snap != null) {
+        final p5 = snap.p5Bpm.toDouble();
+        final p95 = snap.p95Bpm.toDouble();
+
+        double meanBpm = 0;
+        double stdevBpm = 0;
+        double varianceBpm = 0;
+        double p25Bpm = p5;
+
+        if (snap.segments.isNotEmpty) {
+          final avgs = snap.segments.map((s) => s.avgBpm).toList()..sort();
+          meanBpm = avgs.reduce((a, b) => a + b) / avgs.length;
+          p25Bpm = avgs[(avgs.length * 0.25).floor().clamp(0, avgs.length - 1)];
+
+          final varSum =
+              avgs.fold(0.0, (sum, x) => sum + (x - meanBpm) * (x - meanBpm));
+          varianceBpm = varSum / avgs.length;
+          stdevBpm = math.sqrt(varianceBpm);
+        } else {
+          meanBpm = (p5 + p95) / 2.0;
+        }
+
+        p5List.add(p5);
+        p25List.add(_round(p25Bpm));
+        meanList.add(_round(meanBpm));
+        labels.add('${morning.month}/${morning.day}');
+
+        dailyStats.add({
+          'date': dateStr,
+          'p5_bpm': snap.p5Bpm,
+          'p25_bpm': _round(p25Bpm),
+          'mean_bpm': _round(meanBpm),
+          'p95_bpm': snap.p95Bpm,
+          'stdev': _round(stdevBpm),
+          'variance': _round(varianceBpm),
+          'segment_count': snap.segments.length,
+        });
+      }
+    }
+
+    if (p5List.isEmpty) {
+      return {
+        'error': 'No sleeping heart rate records found in the last $days days.'
+      };
+    }
+
+    final p5Mean = p5List.reduce((a, b) => a + b) / p5List.length;
+    final p5VarSum =
+        p5List.fold(0.0, (sum, x) => sum + (x - p5Mean) * (x - p5Mean));
+    final p5Variance = p5VarSum / p5List.length;
+    final p5Stdev = math.sqrt(p5Variance);
+
+    double slope = 0.0;
+    if (p5List.length > 1) {
+      final n = p5List.length;
+      double sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+      for (var i = 0; i < n; i++) {
+        sumX += i;
+        sumY += p5List[i];
+        sumXY += i * p5List[i];
+        sumXX += i * i;
+      }
+      final denom = n * sumXX - sumX * sumX;
+      if (denom != 0) {
+        slope = (n * sumXY - sumX * sumY) / denom;
+      }
+    }
+
+    final trendDirection =
+        slope < -0.1 ? 'improving' : (slope > 0.1 ? 'elevated' : 'stable');
+
+    return {
+      'days_analyzed': days,
+      'valid_nights_count': p5List.length,
+      'overall_summary': {
+        'mean_p5_sleeping_hr': _round(p5Mean),
+        'stdev_p5_sleeping_hr': _round(p5Stdev),
+        'variance_p5_sleeping_hr': _round(p5Variance),
+        'min_p5_sleeping_hr': p5List.reduce(math.min),
+        'max_p5_sleeping_hr': p5List.reduce(math.max),
+        'linear_trend_slope': _round(slope),
+        'trend_direction': trendDirection,
+      },
+      'daily_breakdown': dailyStats,
+      // Domain-neutral series the model can shape into any component. The tool
+      // layer deliberately does not name A2UI components: presentation is the
+      // prompt's decision, not the data layer's.
+      'labels': labels,
+      'series': [
+        {'name': 'P5 Sleeping HR', 'values': p5List},
+        {'name': 'P25 HR', 'values': p25List},
+        {'name': 'Mean HR', 'values': meanList},
+      ],
+    };
+  }
+
+  Future<Map<String, Object?>> _getHealthMetrics(Map<String, Object?> args) async {
+    final hh = _hh;
+    if (hh == null) {
+      return {'error': 'Health Connect integration is not active or HealthHistoryManager unavailable.'};
+    }
+    final days = _limitArg(args, 30, key: 'days', max: 31);
+    final now = DateTime.now();
+    // Week granularity only covers the last 7 days; anything wider needs the
+    // month bucket. Both return per-night bars, so trim to the exact window.
+    final granularity =
+        days <= 7 ? HealthGranularity.week : HealthGranularity.month;
+    final allBars = await hh.sleepBars(now, granularity);
+    final bars =
+        allBars.length > days ? allBars.sublist(allBars.length - days) : allBars;
+
+    return {
+      'days': days,
+      'sleep_records': [
+        for (final b in bars)
+          {
+            'date': _d(b.date),
+            'total_hours': _round(b.totalMinutes / 60.0),
+            'deep_min': b.deepMin,
+            'rem_min': b.remMin,
+            'light_min': b.lightMin,
+            'awake_min': b.awakeMin,
+          }
+      ],
+    };
+  }
+
+  Future<Map<String, Object?>> _analyzeHealthWorkoutCorrelation(
+      Map<String, Object?> args) async {
+    final xMetric = (args['x_metric'] as String?)?.trim() ?? 'sleep_hours';
+    final yMetric = (args['y_metric'] as String?)?.trim() ?? 'workout_volume';
+    final exName = (args['exercise_name'] as String?)?.trim();
+    final days = (args['days'] as num?)?.toInt() ?? 60;
+
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final sessions = _wp.sessions.where((s) => !s.date.isBefore(cutoff)).toList();
+
+    if (sessions.isEmpty) {
+      return {'error': 'No workout sessions logged in the last $days days.'};
+    }
+
+    final dayData = <String, Map<String, double>>{};
+
+    for (final s in sessions) {
+      final key = _d(s.date);
+      final m = dayData.putIfAbsent(key, () => {});
+
+      if (yMetric == 'workout_volume') {
+        var vol = 0.0;
+        for (final exLog in s.exercises) {
+          for (final set in exLog.sets) {
+            vol += (set.weight * set.reps);
+          }
+        }
+        m['y'] = vol;
+      } else if (yMetric == 'session_duration') {
+        m['y'] = s.duration.toDouble();
+      } else if (yMetric == 'exercise_max_weight' && exName != null) {
+        var maxW = 0.0;
+        final ex = _resolveExercise(exName);
+        if (ex != null) {
+          for (final exLog in s.exercises.where((e) => e.exerciseId == ex.id)) {
+            for (final set in exLog.sets) {
+              if (set.weight > maxW) maxW = set.weight;
+            }
+          }
+        }
+        if (maxW > 0) m['y'] = maxW;
+      }
+    }
+
+    final hh = _hh;
+    if (hh != null) {
+      final bars = await hh.sleepBars(DateTime.now(), HealthGranularity.week);
+      for (final b in bars) {
+        final key = _d(b.date);
+        final m = dayData[key];
+        if (m != null) {
+          if (xMetric == 'sleep_hours') {
+            m['x'] = _round(b.totalMinutes / 60.0);
+          } else if (xMetric == 'deep_sleep_min') {
+            m['x'] = b.deepMin.toDouble();
+          }
+        }
+      }
+    }
+
+    final points = <Map<String, Object?>>[];
+    final xVals = <double>[];
+    final yVals = <double>[];
+
+    for (final entry in dayData.entries) {
+      final x = entry.value['x'];
+      final y = entry.value['y'];
+      if (x != null && y != null && x > 0 && y > 0) {
+        xVals.add(x);
+        yVals.add(y);
+        points.add({'x': x, 'y': y, 'date': entry.key});
+      }
+    }
+
+    final n = xVals.length;
+    if (n < 2) {
+      return {'error': 'Insufficient paired data points for correlation analysis.'};
+    }
+
+    final xMean = xVals.reduce((a, b) => a + b) / n;
+    final yMean = yVals.reduce((a, b) => a + b) / n;
+
+    var xVarSum = 0.0, yVarSum = 0.0, covSum = 0.0;
+    for (var i = 0; i < n; i++) {
+      final dx = xVals[i] - xMean;
+      final dy = yVals[i] - yMean;
+      xVarSum += dx * dx;
+      yVarSum += dy * dy;
+      covSum += dx * dy;
+    }
+
+    final xStd = n > 1 ? math.sqrt(xVarSum / (n - 1)) : 0.0;
+    final yStd = n > 1 ? math.sqrt(yVarSum / (n - 1)) : 0.0;
+    final r = (xVarSum > 0 && yVarSum > 0) ? (covSum / math.sqrt(xVarSum * yVarSum)) : 0.0;
+
+    final slope = xVarSum > 0 ? (covSum / xVarSum) : 0.0;
+    final intercept = yMean - (slope * xMean);
+
+    String corrType;
+    if (r >= 0.7) {
+      corrType = 'strong_positive';
+    } else if (r >= 0.3) {
+      corrType = 'moderate_positive';
+    } else if (r <= -0.7) {
+      corrType = 'strong_negative';
+    } else if (r <= -0.3) {
+      corrType = 'moderate_negative';
+    } else {
+      corrType = 'neutral';
+    }
+
+    return {
+      'pipeline': 'Health & Workout Statistical Correlation',
+      'sample_count': n,
+      'x_metric': xMetric,
+      'x_mean': _round(xMean),
+      'x_std_dev': _round(xStd),
+      'y_metric': yMetric,
+      'y_mean': _round(yMean),
+      'y_std_dev': _round(yStd),
+      'pearson_r': _round(r),
+      'correlation_type': corrType,
+      'trendline': {
+        'slope': _round(slope),
+        'intercept': _round(intercept),
+      },
+      'points': points,
+    };
+  }
+
+  Map<String, Object?> _muscleGroupVolume(Map<String, Object?> args) {
+    final rawGroups = (args['muscle_groups'] as List?)?.cast<String>() ?? [];
+    final days = (args['days'] as num?)?.toInt() ?? 60;
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+
+    final allExercises = _wp.allExercises;
+    final allSessions = _wp.sessions
+        .where((s) => !s.date.isBefore(cutoff))
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    final dateMap = <String, Map<String, double>>{};
+    final muscleTotals = <String, double>{};
+
+    for (final groupName in rawGroups) {
+      muscleTotals[groupName] = 0.0;
+
+      // Resolve the requested display name to its muscle group ID first —
+      // `Exercise.primaryMuscle` is itself an ID (e.g. "quads"), not a
+      // display name, so comparing it against the raw group name via
+      // substring matching is unreliable (false misses for e.g. "Quadriceps"
+      // vs id "quads", false matches for unrelated short ids). Matching by
+      // resolved ID also lets us include secondary muscle activations, not
+      // just each exercise's primary one.
+      MuscleGroup? resolvedGroup;
+      try {
+        resolvedGroup = _resolveMuscleGroup(groupName);
+      } on AmbiguousMatchException {
+        resolvedGroup = null;
+      }
+      if (resolvedGroup == null) continue;
+      final targetId = resolvedGroup.id;
+
+      final matchingExerciseIds = allExercises
+          .where((e) => e.muscleActivations.any((m) => m.muscleGroupId == targetId))
+          .map((e) => e.id)
+          .toSet();
+
+      for (final session in allSessions) {
+        final dateKey = _d(session.date);
+        var groupVol = 0.0;
+        for (final exLog in session.exercises) {
+          if (matchingExerciseIds.contains(exLog.exerciseId)) {
+            for (final set in exLog.sets) {
+              groupVol += (set.weight * set.reps);
+            }
+          }
+        }
+        if (groupVol > 0) {
+          dateMap.putIfAbsent(dateKey, () => {})[groupName] =
+              (dateMap[dateKey]?[groupName] ?? 0.0) + groupVol;
+          muscleTotals[groupName] = (muscleTotals[groupName] ?? 0) + groupVol;
+        }
+      }
+    }
+
+    final dates = dateMap.keys.toList()..sort();
+    final series = <Map<String, Object?>>[];
+    for (final groupName in rawGroups) {
+      final values = <double>[];
+      for (final d in dates) {
+        values.add(_round(dateMap[d]?[groupName] ?? 0.0));
+      }
+      series.add({
+        'name': groupName,
+        'values': values,
+      });
+    }
+
+    return {
+      'dates': dates,
+      'labels': dates.map((d) => d.length > 5 ? d.substring(5) : d).toList(),
+      'series': series,
+      'totals': {
+        for (final entry in muscleTotals.entries)
+          entry.key: _round(entry.value),
+      },
+    };
+  }
+
   Map<String, Object?> _exercisePerformance(Map<String, Object?> args) {
     final name = (args['exercise_name'] as String?)?.trim() ?? '';
+    final days = (args['days'] as num?)?.toInt();
+
     final Exercise exercise;
     try {
       final resolved = _resolveExercise(name);
       if (resolved == null) {
+        // Fallback: check if the prompt queried a muscle group (e.g., "biceps", "triceps")
+        final muscleRes = _muscleGroupVolume({'muscle_groups': [name], 'days': days ?? 60});
+        final series = (muscleRes['series'] as List?) ?? [];
+        if (series.isNotEmpty && (series[0]['values'] as List).isNotEmpty) {
+          return {
+            'is_muscle_group': true,
+            'muscle_group': name,
+            'labels': muscleRes['labels'],
+            'series': series,
+            'totals': muscleRes['totals'],
+          };
+        }
         return {
-          'error': 'No exercise found matching "$name".',
+          'error': 'No exercise or muscle group found matching "$name".',
           'available_examples': _exampleExerciseNames(),
         };
       }
@@ -326,7 +803,6 @@ class CoachToolService {
       };
     }
 
-    final days = (args['days'] as num?)?.toInt();
     final cutoff =
         days != null ? DateTime.now().subtract(Duration(days: days)) : null;
 
@@ -863,10 +1339,13 @@ class CoachToolService {
   double _round(double v) => (v * 10).round() / 10;
   double? _roundOrNull(double? v) => v == null ? null : _round(v);
 
-  /// Read an optional `limit` arg, clamped to [1, 40]; [fallback] when absent.
-  int _limitArg(Map<String, Object?> args, int fallback) {
-    final n = (args['limit'] as num?)?.toInt();
+  /// Read an optional numeric arg (defaults to the `limit` key), clamped to
+  /// [1, max]; [fallback] when absent. Reused by any tool that accepts a
+  /// model-supplied bound (e.g. `limit`, `days`) to prevent runaway loops.
+  int _limitArg(Map<String, Object?> args, int fallback,
+      {String key = 'limit', int max = 40}) {
+    final n = (args[key] as num?)?.toInt();
     if (n == null) return fallback;
-    return n.clamp(1, 40);
+    return n.clamp(1, max);
   }
 }

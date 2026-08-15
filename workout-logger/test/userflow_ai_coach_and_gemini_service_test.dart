@@ -33,7 +33,7 @@ void main() {
     conversationManager = ConversationManager(storage);
     prManager = PRManager(storage);
     geminiService = GeminiAiService();
-    coachToolService = CoachToolService(workoutProvider, prManager);
+    coachToolService = CoachToolService(workoutProvider: workoutProvider, prManager: prManager);
 
     await workoutProvider.init();
     await settingsProvider.init();

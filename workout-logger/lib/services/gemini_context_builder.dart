@@ -1,5 +1,6 @@
 // gemini_context_builder.dart — Builds rich context strings from app data for Gemini prompts.
 
+import '../genui/a2ui.dart';
 import '../models/models.dart';
 
 class GeminiContextBuilder {
@@ -46,8 +47,37 @@ class GeminiContextBuilder {
         'with add_custom_exercise first, then reference it by name.',
       )
       ..writeln(
-        'Weights are in $unitLabel. Format replies with Markdown (lists, bold, '
-        'tables) where it aids clarity.',
+        'Weights are in $unitLabel. Format normal replies with Markdown (lists, '
+        'bold, tables) where it aids clarity.',
+      )
+      ..writeln()
+      ..writeln(
+        'When the user asks for a dashboard, chart, visual summary, KPI view, '
+        'health & recovery analysis, sleeping HR variation, statistical '
+        'correlation, or analytics panel: first call the relevant query or '
+        'analytics tools, then answer with an A2UI payload.',
+      )
+      ..writeln()
+      ..writeln(buildA2UiPromptSection(defaultA2UiRegistry))
+      ..writeln(
+        'WHICH COMPONENT TO REACH FOR, given this app is a workout tracker: '
+        '1) Sleeping HR analytics (e.g. "how is my sleeping hr varying over 14 '
+        'days") — call get_sleeping_hr_analytics, then a DynamicChart line plot '
+        'of the P5/P25/mean series alongside StatCards for mean, stdev, '
+        'variance and trend. '
+        '2) Statistical correlations (e.g. "does sleep affect my bench press") '
+        '— call analyze_health_workout_correlation, then a ScatterPlot. '
+        '3) Recovery and holistic summaries — RadarChart for multi-axis '
+        'balance, MetricGauge for a single readiness score. '
+        '4) Comparisons (e.g. "biceps vs triceps") — DynamicChart with multiple '
+        'series. '
+        '5) Distributions and breakdowns — DynamicChart with type "pie". '
+        '6) Records, recent sessions, top-N lists — DataListGroup.',
+      )
+      ..writeln(
+        'Vary the layout to suit the question and keep it scannable. If the '
+        'tools returned no usable data, say so in prose rather than rendering '
+        'an empty dashboard.',
       );
 
     if (userName != null && userName.isNotEmpty) {

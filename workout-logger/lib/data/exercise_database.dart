@@ -116,6 +116,7 @@ class ExerciseDatabase {
         MuscleActivation(muscleGroupId: MuscleGroups.chest, activationPercentage: 85),
       ],
       category: 'isolation',
+      availableHandles: ['D-Handles', 'Single Arm'],
     ),
     Exercise(
       id: 'pec_deck',
@@ -156,6 +157,7 @@ class ExerciseDatabase {
         MuscleActivation(muscleGroupId: MuscleGroups.rearDelts, activationPercentage: 15),
       ],
       category: 'compound',
+      availableHandles: ['Wide Bar', 'Close Grip V-Bar', 'Neutral Handles'],
     ),
     Exercise(
       id: 'pull_ups',
@@ -206,6 +208,7 @@ class ExerciseDatabase {
         MuscleActivation(muscleGroupId: MuscleGroups.biceps, activationPercentage: 25),
       ],
       category: 'compound',
+      availableHandles: ['V-Bar', 'Straight Bar', 'D-Handles'],
     ),
     Exercise(
       id: 't_bar_row',
@@ -238,6 +241,7 @@ class ExerciseDatabase {
         MuscleActivation(muscleGroupId: MuscleGroups.back, activationPercentage: 20),
       ],
       category: 'isolation',
+      availableHandles: ['Rope', 'V-Bar'],
     ),
 
     // ==================== SHOULDERS ====================
@@ -378,6 +382,7 @@ class ExerciseDatabase {
         MuscleActivation(muscleGroupId: MuscleGroups.biceps, activationPercentage: 95),
       ],
       category: 'isolation',
+      availableHandles: ['Barbell', 'Dumbbell', 'EZ-Bar', 'Cable Rope'],
     ),
     Exercise(
       id: 'hammer_curl',
@@ -411,6 +416,7 @@ class ExerciseDatabase {
         MuscleActivation(muscleGroupId: MuscleGroups.triceps, activationPercentage: 90),
       ],
       category: 'isolation',
+      availableHandles: ['Rope', 'Bar', 'V-Bar'],
     ),
     Exercise(
       id: 'skull_crushers',
@@ -427,6 +433,7 @@ class ExerciseDatabase {
         MuscleActivation(muscleGroupId: MuscleGroups.triceps, activationPercentage: 90),
       ],
       category: 'isolation',
+      availableHandles: ['Rope', 'Bar', 'Dumbbell'],
     ),
     Exercise(
       id: 'close_grip_bench',
@@ -478,6 +485,7 @@ class ExerciseDatabase {
         MuscleActivation(muscleGroupId: MuscleGroups.core, activationPercentage: 90),
       ],
       category: 'isolation',
+      availableHandles: ['Rope', 'Bar'],
     ),
   ];
 
