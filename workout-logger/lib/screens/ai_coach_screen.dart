@@ -255,7 +255,10 @@ class _AiCoachViewState extends State<_AiCoachView> {
       itemCount: messages.length + (vm.isLoading ? 1 : 0),
       itemBuilder: (_, i) {
         if (i == messages.length) {
-          return _StreamingBubble(text: vm.streamingText);
+          return _StreamingBubble(
+            text: vm.streamingText,
+            toolCalls: vm.streamingToolCalls,
+          );
         }
         return _MessageBubble(message: messages[i]);
       },
@@ -704,49 +707,60 @@ class _MessageBubble extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
           ],
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm + 2,
-              ),
-              decoration: BoxDecoration(
-                gradient: isUser
-                    ? const LinearGradient(
-                        colors: [AppColors.primary, Color(0xFF5B21B6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isUser ? null : AppColors.glass3,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(AppRadius.lg),
-                  topRight: const Radius.circular(AppRadius.lg),
-                  bottomLeft: Radius.circular(isUser ? AppRadius.lg : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : AppRadius.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isUser && (message.toolCalls?.isNotEmpty ?? false))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: _ToolCallChips(toolNames: message.toolCalls!),
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm + 2,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: isUser
+                        ? const LinearGradient(
+                            colors: [AppColors.primary, Color(0xFF5B21B6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: isUser ? null : AppColors.glass3,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(AppRadius.lg),
+                      topRight: const Radius.circular(AppRadius.lg),
+                      bottomLeft: Radius.circular(isUser ? AppRadius.lg : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : AppRadius.lg),
+                    ),
+                    border: isUser
+                        ? null
+                        : Border.all(color: AppColors.glassBorder),
+                    boxShadow: isUser
+                        ? [
+                            BoxShadow(
+                              color: AppColors.primaryGlow(0.25),
+                              blurRadius: 12,
+                              spreadRadius: -4,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: isUser
+                      ? Text(
+                          message.text,
+                          style: TextStyle(fontFamily: 'Geist',
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            height: 1.55,
+                          ),
+                        )
+                      : CoachMessageContent(text: message.text),
                 ),
-                border: isUser
-                    ? null
-                    : Border.all(color: AppColors.glassBorder),
-                boxShadow: isUser
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primaryGlow(0.25),
-                          blurRadius: 12,
-                          spreadRadius: -4,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: isUser
-                  ? Text(
-                      message.text,
-                      style: TextStyle(fontFamily: 'Geist', 
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        height: 1.55,
-                      ),
-                    )
-                  : CoachMessageContent(text: message.text),
+              ],
             ),
           ),
         ],
@@ -756,8 +770,9 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _StreamingBubble extends StatelessWidget {
-  const _StreamingBubble({required this.text});
+  const _StreamingBubble({required this.text, this.toolCalls = const []});
   final String text;
+  final List<String> toolCalls;
 
   @override
   Widget build(BuildContext context) {
@@ -769,28 +784,97 @@ class _StreamingBubble extends StatelessWidget {
           _AiAvatar(),
           const SizedBox(width: AppSpacing.sm),
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm + 2,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.glass3,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(AppRadius.lg),
-                  topRight: Radius.circular(AppRadius.lg),
-                  bottomLeft: Radius.circular(4),
-                  bottomRight: Radius.circular(AppRadius.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (toolCalls.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: _ToolCallChips(toolNames: toolCalls, active: true),
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm + 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.glass3,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(AppRadius.lg),
+                      topRight: Radius.circular(AppRadius.lg),
+                      bottomLeft: Radius.circular(4),
+                      bottomRight: Radius.circular(AppRadius.lg),
+                    ),
+                    border: Border.all(color: AppColors.glassBorder),
+                  ),
+                  child: text.isEmpty
+                      ? const RFLoadingDots()
+                      : CoachMessageContent(text: text, streaming: true),
                 ),
-                border: Border.all(color: AppColors.glassBorder),
-              ),
-              child: text.isEmpty
-                  ? const RFLoadingDots()
-                  : CoachMessageContent(text: text, streaming: true),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Tool-call indicator chips ─────────────────────────────────────────────────
+
+/// Small pill row showing which coach tools were invoked while producing a
+/// reply. [active] pulses subtly to indicate a tool call is in flight.
+class _ToolCallChips extends StatelessWidget {
+  const _ToolCallChips({required this.toolNames, this.active = false});
+  final List<String> toolNames;
+  final bool active;
+
+  // Dedupe while preserving first-seen order — a tool can be called more
+  // than once per turn (e.g. re-checking after an update), but the chip row
+  // only needs to say *which* tools ran, not how many times.
+  List<String> get _unique => <String>{...toolNames}.toList();
+
+  String _label(String toolName) => toolName
+      .split('_')
+      .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final name in _unique)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(AppRadius.full),
+              border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  active ? Icons.bolt_rounded : Icons.build_rounded,
+                  color: AppColors.secondary,
+                  size: 11,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _label(name),
+                  style: TextStyle(fontFamily: 'GeistMono',
+                    color: AppColors.secondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

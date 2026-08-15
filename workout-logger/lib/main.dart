@@ -262,7 +262,11 @@ class _AppInitializerState extends State<AppInitializer> {
     try {
       await provider.init();
       await settings.init();
-      gemini.init(settings.geminiApiKey, model: settings.geminiModel);
+      gemini.init(
+        settings.geminiApiKey,
+        model: settings.geminiModel,
+        maxToolRounds: settings.geminiMaxToolRounds,
+      );
       try {
         await gemini.loadUsage();
       } catch (e, st) {

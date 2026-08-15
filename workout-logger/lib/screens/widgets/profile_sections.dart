@@ -789,6 +789,10 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   bool _obscure = true;
   bool _saving = false;
 
+  // Live value shown while dragging the slider; null when not dragging (in
+  // which case the persisted settings value is shown instead).
+  double? _draggingMaxToolRounds;
+
   @override
   void initState() {
     super.initState();
@@ -821,6 +825,12 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     final gemini = context.read<GeminiAiService>();
     await settings.setGeminiModel(modelId);
     gemini.updateModel(modelId);
+  }
+
+  Future<void> _commitMaxToolRounds(int rounds) async {
+    final settings = context.read<SettingsProvider>();
+    await settings.setGeminiMaxToolRounds(rounds);
+    setState(() => _draggingMaxToolRounds = null);
   }
 
   @override
@@ -949,6 +959,66 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
               );
             }).toList(),
           ),
+          const SizedBox(height: AppSpacing.md),
+          const _SectionLabel('MAX TOOL-CALL STEPS'),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'How many tool rounds the coach can take per message before it must reply. Raise this if it stops mid-task; lower it to limit token usage.',
+            style: TextStyle(fontFamily: 'Geist',
+              color: AppColors.textFaint,
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Builder(builder: (context) {
+            final liveValue =
+                _draggingMaxToolRounds ?? settings.geminiMaxToolRounds.toDouble();
+            return Row(
+              children: [
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: AppColors.primary,
+                      inactiveTrackColor: AppColors.glassBorderStrong,
+                      thumbColor: AppColors.primary,
+                      overlayColor: AppColors.primary.withValues(alpha: 0.15),
+                      valueIndicatorColor: AppColors.primary,
+                      trackHeight: 3,
+                    ),
+                    child: Slider(
+                      value: liveValue,
+                      min: kMinMaxToolRounds.toDouble(),
+                      max: kMaxMaxToolRounds.toDouble(),
+                      divisions: kMaxMaxToolRounds - kMinMaxToolRounds,
+                      label: '${liveValue.round()}',
+                      onChanged: (v) {
+                        setState(() => _draggingMaxToolRounds = v);
+                        context.read<GeminiAiService>().updateMaxToolRounds(v.round());
+                      },
+                      onChangeEnd: (v) => _commitMaxToolRounds(v.round()),
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                  ),
+                  child: Text(
+                    '${liveValue.round()}',
+                    style: TextStyle(fontFamily: 'GeistMono',
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }),
           const SizedBox(height: AppSpacing.md),
           SizedBox(
             width: double.infinity,

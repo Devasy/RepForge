@@ -2,6 +2,8 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'ai/gemini_ai_service.dart'
+    show kDefaultMaxToolRounds, kMinMaxToolRounds, kMaxMaxToolRounds;
 import 'interfaces/storage_service_interface.dart';
 
 enum WeightUnit { kg, lbs }
@@ -17,6 +19,7 @@ class SettingsProvider extends ChangeNotifier {
   String? _lastSeenVersion;
   String _geminiApiKey = '';
   String _geminiModel = 'gemini-3.6-flash';
+  int _geminiMaxToolRounds = kDefaultMaxToolRounds;
   String _weeklyInsights = '';
   DateTime? _weeklyInsightsDate;
   bool _showAdvancedMetrics = false;
@@ -32,6 +35,7 @@ class SettingsProvider extends ChangeNotifier {
   String? get lastSeenVersion => _lastSeenVersion;
   String get geminiApiKey => _geminiApiKey;
   String get geminiModel => _geminiModel;
+  int get geminiMaxToolRounds => _geminiMaxToolRounds;
   String get weeklyInsights => _weeklyInsights;
   DateTime? get weeklyInsightsDate => _weeklyInsightsDate;
   bool get showAdvancedMetrics => _showAdvancedMetrics;
@@ -62,6 +66,9 @@ class SettingsProvider extends ChangeNotifier {
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
     _geminiModel = await _storage.getSetting('geminiModel') ?? 'gemini-3.6-flash';
+    final maxRounds = await _storage.getSetting('geminiMaxToolRounds');
+    _geminiMaxToolRounds =
+        maxRounds != null ? (int.tryParse(maxRounds) ?? kDefaultMaxToolRounds) : kDefaultMaxToolRounds;
     _weeklyInsights = await _storage.getSetting('weeklyInsights') ?? '';
     final dateStr = await _storage.getSetting('weeklyInsightsDate');
     _weeklyInsightsDate = dateStr != null ? DateTime.tryParse(dateStr) : null;
@@ -133,6 +140,12 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setGeminiModel(String model) async {
     _geminiModel = model;
     await _storage.saveSetting('geminiModel', model);
+    notifyListeners();
+  }
+
+  Future<void> setGeminiMaxToolRounds(int rounds) async {
+    _geminiMaxToolRounds = rounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
+    await _storage.saveSetting('geminiMaxToolRounds', _geminiMaxToolRounds.toString());
     notifyListeners();
   }
 

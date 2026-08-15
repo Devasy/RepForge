@@ -33,8 +33,11 @@ const kGeminiModels = [
 // Default to the latest GA model.
 const kDefaultGeminiModel = 'gemini-3.6-flash';
 
-// Upper bound on tool-resolution rounds per user turn, to bound runaway loops.
-const int _kMaxToolRounds = 5;
+// Default/minimum/maximum upper bound on tool-resolution rounds per user
+// turn, to bound runaway loops. User-configurable via Profile → AI Features.
+const int kDefaultMaxToolRounds = 5;
+const int kMinMaxToolRounds = 3;
+const int kMaxMaxToolRounds = 25;
 
 // Retry policy for transient (5xx / 429) errors. Total attempts = 1 + retries.
 const int _kMaxRetries = 3;
@@ -140,6 +143,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
   String _apiKey = '';
   String _model = kDefaultGeminiModel;
+  int _maxToolRounds = kDefaultMaxToolRounds;
 
   // Cumulative token usage across all AI calls (persisted).
   int _promptTokens = 0;
@@ -153,6 +157,9 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   @override
   String get currentModel => _model;
 
+  /// Upper bound on tool-resolution rounds per user turn.
+  int get maxToolRounds => _maxToolRounds;
+
   /// Cumulative input (prompt) tokens billed across all AI calls.
   int get promptTokensUsed => _promptTokens;
 
@@ -165,9 +172,13 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   /// Number of AI requests recorded.
   int get aiRequestCount => _requestCount;
 
-  void init(String apiKey, {String model = kDefaultGeminiModel}) {
+  void init(String apiKey, {
+    String model = kDefaultGeminiModel,
+    int maxToolRounds = kDefaultMaxToolRounds,
+  }) {
     _apiKey = apiKey.trim();
     _model = model;
+    _maxToolRounds = maxToolRounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
   }
 
   /// Load persisted cumulative token usage (call once at startup).
@@ -241,6 +252,11 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
   void updateModel(String model) {
     _model = model;
+    notifyListeners();
+  }
+
+  void updateMaxToolRounds(int rounds) {
+    _maxToolRounds = rounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
     notifyListeners();
   }
 
@@ -453,7 +469,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         Content.text(userMessage).toJson(),
       ];
 
-      for (var round = 0; round < _kMaxToolRounds; round++) {
+      for (var round = 0; round < _maxToolRounds; round++) {
         final body = _makeBody(
           contents: contents,
           system: systemPrompt,
@@ -535,7 +551,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         contents.add({'role': 'user', 'parts': responseParts});
       }
       // Exhausted the tool-round budget without a final text answer.
-      yield '\n\n_(Stopped after $_kMaxToolRounds tool steps — try rephrasing.)_';
+      yield '\n\n_(Stopped after $_maxToolRounds tool steps — try rephrasing.)_';
     } catch (e) {
       yield 'Error: $e';
     }

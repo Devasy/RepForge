@@ -949,12 +949,16 @@ class ChatMessage {
   final String role; // 'user' | 'model'
   final String text;
   final DateTime timestamp;
+  // Names of tools the model called (in order) while producing this reply.
+  // Null/empty for user messages and replies that used no tools.
+  final List<String>? toolCalls;
 
   ChatMessage({
     String? id,
     required this.role,
     required this.text,
     DateTime? timestamp,
+    this.toolCalls,
   })  : id = id ?? _uuid.v4(),
         timestamp = timestamp ?? DateTime.now();
 
@@ -963,6 +967,7 @@ class ChatMessage {
     'role': role,
     'text': text,
     'timestamp': timestamp.toIso8601String(),
+    if (toolCalls != null && toolCalls!.isNotEmpty) 'toolCalls': toolCalls,
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
@@ -970,17 +975,22 @@ class ChatMessage {
     role: json['role'] as String,
     text: json['text'] as String,
     timestamp: DateTime.parse(json['timestamp'] as String),
+    toolCalls: (json['toolCalls'] as List?)?.cast<String>(),
   );
 
   ChatMessage copyWith({
     Object? role = _sentinel,
     Object? text = _sentinel,
     Object? timestamp = _sentinel,
+    Object? toolCalls = _sentinel,
   }) => ChatMessage(
     id: id,
     role: role == _sentinel ? this.role : role as String,
     text: text == _sentinel ? this.text : text as String,
     timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime,
+    toolCalls: toolCalls == _sentinel
+        ? this.toolCalls
+        : toolCalls as List<String>?,
   );
 }
 
