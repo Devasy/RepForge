@@ -1,0 +1,5 @@
+• Workout summary screen with session details
+• Sleep and heart rate readiness scores via Health Connect
+• Conversational Routine Optimizer with AI coaching
+• Bundled Geist fonts — no runtime network requests
+• Production APK signing for open source store distribution
