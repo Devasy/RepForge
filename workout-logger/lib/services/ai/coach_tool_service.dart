@@ -621,7 +621,7 @@ class CoachToolService {
     final xMetric = (args['x_metric'] as String?)?.trim() ?? 'sleep_hours';
     final yMetric = (args['y_metric'] as String?)?.trim() ?? 'workout_volume';
     final exName = (args['exercise_name'] as String?)?.trim();
-    final days = (args['days'] as num?)?.toInt() ?? 60;
+    final days = _limitArg(args, 60, key: 'days', max: 365);
 
     final cutoff = DateTime.now().subtract(Duration(days: days));
     final sessions = _wp.sessions.where((s) => !s.date.isBefore(cutoff)).toList();
@@ -662,7 +662,12 @@ class CoachToolService {
 
     final hh = _hh;
     if (hh != null) {
-      final bars = await hh.sleepBars(DateTime.now(), HealthGranularity.week);
+      // Week granularity only covers the last 7 days (see _getHealthMetrics),
+      // so the default 60-day correlation window needs month granularity or
+      // almost every day falls outside the fetched bars and gets no x value.
+      final granularity =
+          days <= 7 ? HealthGranularity.week : HealthGranularity.month;
+      final bars = await hh.sleepBars(DateTime.now(), granularity);
       for (final b in bars) {
         final key = _d(b.date);
         final m = dayData[key];
@@ -748,7 +753,7 @@ class CoachToolService {
 
   Map<String, Object?> _muscleGroupVolume(Map<String, Object?> args) {
     final rawGroups = (args['muscle_groups'] as List?)?.cast<String>() ?? [];
-    final days = (args['days'] as num?)?.toInt() ?? 60;
+    final days = _limitArg(args, 60, key: 'days', max: 365);
     final cutoff = DateTime.now().subtract(Duration(days: days));
 
     final allExercises = _wp.allExercises;

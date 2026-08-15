@@ -356,14 +356,7 @@ class StorageService implements IStorageService {
 
   @override
   Future<String> exportAllData() async {
-    // Collect settings as a map
-    final settingsMap = <String, String>{};
-    for (final key in _settingsBoxInstance.keys) {
-      final value = _settingsBoxInstance.get(key);
-      if (value != null) {
-        settingsMap[key as String] = value;
-      }
-    }
+    final settingsMap = await getAllSettingsForMigration();
 
     final data = {
       'sessions': _sessionsBox.values

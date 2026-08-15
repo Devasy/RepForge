@@ -38,6 +38,12 @@ class SqlQueryService {
     'SQLITE_MASTER',
     'SQLITE_TEMP_MASTER',
     'SQLITE_SCHEMA',
+    'SQLITE_TEMP_SCHEMA',
+    'SQLITE_DBPAGE',
+    'SQLITE_STAT1',
+    'SQLITE_STAT2',
+    'SQLITE_STAT3',
+    'SQLITE_STAT4',
   ];
 
   String _sanitize(String rawQuery) {

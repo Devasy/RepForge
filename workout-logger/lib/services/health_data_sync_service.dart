@@ -7,6 +7,20 @@ import '../models/models.dart';
 import 'interfaces/health_connect_service_interface.dart';
 import 'sqlite_storage_service.dart';
 
+typedef _SampleReader = Future<List<HealthSample>> Function(DateTime, DateTime);
+
+class _SampleStream {
+  const _SampleStream({
+    required this.watermarkKey,
+    required this.readType,
+    required this.reader,
+  });
+
+  final String watermarkKey;
+  final HealthReadType readType;
+  final _SampleReader reader;
+}
+
 class HealthDataSyncService {
   HealthDataSyncService({
     required IHealthConnectService healthConnectService,
@@ -14,11 +28,34 @@ class HealthDataSyncService {
     DateTime Function()? now,
   })  : _hc = healthConnectService,
         _storage = storage,
-        _now = now ?? DateTime.now;
+        _now = now ?? DateTime.now {
+    _sampleStreams = {
+      'heart_rate': _SampleStream(
+        watermarkKey: 'health_sync.heart_rate',
+        readType: HealthReadType.heartRate,
+        reader: _hc.readHeartRateSamples,
+      ),
+      'resting_heart_rate': _SampleStream(
+        watermarkKey: 'health_sync.resting_heart_rate',
+        readType: HealthReadType.restingHeartRate,
+        reader: _hc.readRestingHeartRate,
+      ),
+      'hrv_rmssd': _SampleStream(
+        watermarkKey: 'health_sync.hrv_rmssd',
+        readType: HealthReadType.hrv,
+        reader: _hc.readHrvRmssd,
+      ),
+    };
+  }
 
   final IHealthConnectService _hc;
   final SqliteStorageService _storage;
   final DateTime Function() _now;
+
+  // Adding a new sample stream only needs one entry here — the watermark key,
+  // the permission it depends on, and the reader all live together instead of
+  // being repeated across separate keyed maps that could drift apart.
+  late final Map<String, _SampleStream> _sampleStreams;
 
   static const Duration _backfillWindow = Duration(days: 90);
   static const Duration _lookback = Duration(days: 3);
@@ -26,16 +63,8 @@ class HealthDataSyncService {
 
   static const String _sleepWatermarkKey = 'health_sync.sleep';
   static const String _lastRunKey = 'health_sync.last_run';
-  static const Map<String, String> _sampleWatermarkKeys = {
-    'heart_rate': 'health_sync.heart_rate',
-    'resting_heart_rate': 'health_sync.resting_heart_rate',
-    'hrv_rmssd': 'health_sync.hrv_rmssd',
-  };
-  static const Map<String, HealthReadType> _sampleReadTypes = {
-    'heart_rate': HealthReadType.heartRate,
-    'resting_heart_rate': HealthReadType.restingHeartRate,
-    'hrv_rmssd': HealthReadType.hrv,
-  };
+
+  Future<void>? _inFlight;
 
   /// Pulls any new sleep/HR data since the last sync into SQLite. Skipped if
   /// the last sync ran under 30 minutes ago, unless [force] is true. Each of
@@ -45,7 +74,14 @@ class HealthDataSyncService {
   /// watermark is left untouched so the first sync after granting permission
   /// still performs the full backfill instead of resuming from a watermark
   /// that was silently advanced while unauthorized.
-  Future<void> sync({bool force = false}) async {
+  ///
+  /// Concurrent calls (e.g. the launch-time sync overlapping a manual
+  /// "sync now" tap) share a single in-flight run instead of racing.
+  Future<void> sync({bool force = false}) {
+    return _inFlight ??= _sync(force: force).whenComplete(() => _inFlight = null);
+  }
+
+  Future<void> _sync({required bool force}) async {
     final now = _now();
     if (!force) {
       final lastRunRaw = await _storage.getSetting(_lastRunKey);
@@ -64,15 +100,10 @@ class HealthDataSyncService {
     if (granted.contains(HealthReadType.sleep)) {
       await _syncSleep(now);
     }
-    for (final entry in _sampleReadTypes.entries) {
-      if (!granted.contains(entry.value)) continue;
-      final reader = switch (entry.key) {
-        'heart_rate' => _hc.readHeartRateSamples,
-        'resting_heart_rate' => _hc.readRestingHeartRate,
-        'hrv_rmssd' => _hc.readHrvRmssd,
-        _ => throw StateError('unknown stream ${entry.key}'),
-      };
-      await _syncSamples(type: entry.key, now: now, reader: reader);
+    for (final entry in _sampleStreams.entries) {
+      final stream = entry.value;
+      if (!granted.contains(stream.readType)) continue;
+      await _syncSamples(type: entry.key, now: now, stream: stream);
     }
 
     await _storage.saveSetting(_lastRunKey, now.toIso8601String());
@@ -99,14 +130,13 @@ class HealthDataSyncService {
   Future<void> _syncSamples({
     required String type,
     required DateTime now,
-    required Future<List<HealthSample>> Function(DateTime, DateTime) reader,
+    required _SampleStream stream,
   }) async {
-    final watermarkKey = _sampleWatermarkKeys[type]!;
     try {
-      final from = await _windowStart(watermarkKey, now);
-      final samples = await reader(from, now);
+      final from = await _windowStart(stream.watermarkKey, now);
+      final samples = await stream.reader(from, now);
       await _storage.upsertHealthSamples(type, samples);
-      await _storage.saveSetting(watermarkKey, now.toIso8601String());
+      await _storage.saveSetting(stream.watermarkKey, now.toIso8601String());
     } catch (_) {
       // Best-effort; leave the watermark untouched so the next sync retries.
     }

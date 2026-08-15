@@ -3,6 +3,8 @@
 // Following Dependency Inversion Principle: we create concrete implementations
 // here at the composition root and inject them into high-level modules.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -282,7 +284,13 @@ class _AppInitializerState extends State<AppInitializer> {
 
       // Fire-and-forget: populates the SQLite tables run_sql_query joins
       // against. No-op under the pre-migration Hive fallback (null there).
-      healthDataSync?.sync();
+      // Errors are swallowed here since main.dart discards the returned
+      // Future — sync() has no caller to propagate a failure to.
+      unawaited(
+        healthDataSync?.sync().catchError(
+          (Object e, StackTrace st) => debugPrint('healthDataSync.sync failed: $e\n$st'),
+        ),
+      );
 
       // Fire-and-forget analytics in background.
       api.sendHeartbeat();

@@ -253,6 +253,9 @@ def main() -> None:
                 sys.exit(0)
             raise e
         candidates = res1.get("candidates", [])
+        if not candidates:
+            print(f"[!] No candidates returned. Raw response:\n{json.dumps(res1)[:500]}")
+            sys.exit(1)
         first_cand = candidates[0]
         model_content = first_cand.get("content", {})
         raw_parts = model_content.get("parts", [])

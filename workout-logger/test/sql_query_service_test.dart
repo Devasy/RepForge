@@ -72,6 +72,24 @@ void main() {
     expect(result['error'], contains('restricted table'));
   });
 
+  test('rejects queries reading sqlite_temp_schema', () async {
+    final service = SqlQueryService(dbPath);
+    final result = await service.runQuery('SELECT * FROM sqlite_temp_schema');
+    expect(result['error'], contains('restricted table'));
+  });
+
+  test('rejects queries reading sqlite_dbpage', () async {
+    final service = SqlQueryService(dbPath);
+    final result = await service.runQuery('SELECT * FROM sqlite_dbpage');
+    expect(result['error'], contains('restricted table'));
+  });
+
+  test('rejects queries reading pragma_table_list', () async {
+    final service = SqlQueryService(dbPath);
+    final result = await service.runQuery('SELECT * FROM pragma_table_list');
+    expect(result['error'], contains('restricted table'));
+  });
+
   test('trailing line comment does not break the LIMIT wrapper', () async {
     final service = SqlQueryService(dbPath);
     final result = await service.runQuery('SELECT * FROM widgets -- get all');

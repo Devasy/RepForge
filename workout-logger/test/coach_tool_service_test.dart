@@ -87,6 +87,7 @@ void main() {
       });
 
       tearDown(() async {
+        await sqliteStorage.close();
         // Best-effort cleanup: the sqflite ffi connection may still hold the
         // file handle open on some platforms (e.g. Windows), which would
         // otherwise turn cleanup noise into a spurious test failure.

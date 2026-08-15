@@ -41,6 +41,15 @@ void main() {
     await hiveStorage.init();
     sqliteStorage = SqliteStorageService(databasePathOverride: inMemoryDatabasePath);
     await sqliteStorage.init();
+    addTearDown(sqliteStorage.close);
+  });
+
+  // hiveStorage reuses the same on-disk box across every test in this file
+  // (only Hive.init() runs once, in setUpAll) — reset the flag it wrote so
+  // each test starts from a clean, order-independent state instead of
+  // relying on test declaration order.
+  tearDown(() async {
+    await Hive.box<String>('settings').delete(storageMigratedFlagKey);
   });
 
   tearDownAll(() async {
@@ -48,9 +57,6 @@ void main() {
     await Hive.deleteFromDisk();
   });
 
-  // Runs before the "migration succeeds" test below, which writes the
-  // migrated flag onto the same on-disk Hive box — this assertion needs the
-  // flag to still be unset.
   test('alreadyMigrated false, migration fails, falls back to hive and writes no flag',
       () async {
     // migrate() only reaches saveWorkoutSession if there's a session to

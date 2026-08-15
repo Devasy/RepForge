@@ -30,7 +30,6 @@ class SqliteStorageService implements IStorageService {
       value REAL NOT NULL
     )''',
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_health_samples_unique ON health_samples(type, timestamp)',
-    'CREATE INDEX IF NOT EXISTS idx_health_samples_type_ts ON health_samples(type, timestamp)',
     '''CREATE TABLE IF NOT EXISTS sleep_sessions (
       id TEXT PRIMARY KEY,
       start_ts TEXT NOT NULL,
@@ -802,7 +801,7 @@ class SqliteStorageService implements IStorageService {
 
     double weeklyVolume = 0;
     int exercisesCompleted = 0;
-    for (var session in weekSessions) {
+    for (final session in weekSessions) {
       weeklyVolume += session.totalVolume;
       exercisesCompleted += session.exercises.length;
     }

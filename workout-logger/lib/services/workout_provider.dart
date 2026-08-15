@@ -692,6 +692,7 @@ class WorkoutProvider extends ChangeNotifier {
     String? handle,
     int limit = 3,
   }) {
+    if (limit <= 0) return const <List<WorkoutSet>>[];
     final sortedSessions = [..._sessions]..sort((a, b) => b.date.compareTo(a.date));
     final useHandle = handle != null && handle.isNotEmpty;
 
@@ -712,8 +713,9 @@ class WorkoutProvider extends ChangeNotifier {
     if (useHandle) {
       final exact = collect((exLog) => exLog.handle == handle);
       if (exact.isNotEmpty) return exact;
+      return collect((exLog) => exLog.handle == null || exLog.handle!.isEmpty);
     }
-    return collect((exLog) => exLog.handle == null || exLog.handle!.isEmpty);
+    return collect((_) => true);
   }
 
   /// Get the most recent exercise log for [exerciseId], or null if never logged.
@@ -736,8 +738,9 @@ class WorkoutProvider extends ChangeNotifier {
     if (useHandle) {
       final exact = find((exLog) => exLog.handle == handle);
       if (exact != null) return exact;
+      return find((exLog) => exLog.handle == null || exLog.handle!.isEmpty);
     }
-    return find((exLog) => exLog.handle == null || exLog.handle!.isEmpty);
+    return find((_) => true);
   }
 
   // ==================== SESSION MANAGEMENT ====================

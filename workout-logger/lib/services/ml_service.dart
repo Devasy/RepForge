@@ -342,6 +342,14 @@ class MLService implements IMLService {
   static const _declineWeeklyPct = -2.0;
   static const _minR2ForTrendSignal = 0.2;
 
+  // Deload detection thresholds: the last session counts as a deload when its
+  // load drops below these fractions of the session before it.
+  static const _deloadWeightThreshold = 0.85;
+  static const _deloadVolumeThreshold = 0.70;
+  // How recent the last session must be for a detected deload to still count
+  // as "active" — see the isRecent comment below.
+  static const _deloadRecencyWindowDays = 21;
+
   /// Double-progression with trend- and recovery-aware modulation.
   ///
   /// Priority order:
@@ -363,7 +371,9 @@ class MLService implements IMLService {
     int maxReps = 12,
     Map<String, MuscleRecoveryStatus>? recoveryScores,
     List<String>? primaryMuscleIds,
+    DateTime? asOf,
   }) {
+    final now = asOf ?? DateTime.now();
     if (lastSession.isEmpty && (pastSessions == null || pastSessions.isEmpty)) {
       return [];
     }
@@ -397,12 +407,13 @@ class MLService implements IMLService {
         // misread as an active deload to recover from.
         final mostRecentTimestamp =
             s0.map((s) => s.timestamp).reduce((a, b) => a.isAfter(b) ? a : b);
-        final isRecent =
-            DateTime.now().difference(mostRecentTimestamp).inDays <= 21;
+        final isRecent = now.difference(mostRecentTimestamp).inDays <=
+            _deloadRecencyWindowDays;
 
-        // If the last session (s0) was a deload (weight < 85% of s1 or volume < 70% of s1)
+        // If the last session (s0) was a deload relative to the one before it
         if (isRecent &&
-            ((w1 > 0 && w0 < w1 * 0.85) || (v1 > 0 && v0 < v1 * 0.70))) {
+            ((w1 > 0 && w0 < w1 * _deloadWeightThreshold) ||
+                (v1 > 0 && v0 < v1 * _deloadVolumeThreshold))) {
           refSets = s1;
           isPostDeloadRecovery = true;
         }

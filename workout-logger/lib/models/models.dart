@@ -64,6 +64,19 @@ class MuscleActivation {
 
 // ==================== Exercise ====================
 
+// Exercise IDs treated as bodyweight-assisted (e.g. an assisted-dip/pull-up
+// machine). Computed once here so every consumer (the load panel, the input
+// row, set persistence) agrees on which exercises count as "assisted".
+const Set<String> _assistedBodyweightExerciseIds = {
+  'pull_ups',
+  'chin_ups',
+  'dips',
+  'push_ups',
+};
+
+bool isAssistedBodyweightExercise(String? exerciseId) =>
+    exerciseId != null && _assistedBodyweightExerciseIds.contains(exerciseId);
+
 class Exercise {
   final String id;
   final String name;
@@ -72,7 +85,7 @@ class Exercise {
   final bool isCustom; // User-created exercise
   final List<String>? availableHandles; // Attachment/handle options e.g. ['Rope', 'Bar']
 
-  Exercise({
+  const Exercise({
     required this.id,
     required this.name,
     required this.muscleActivations,
@@ -250,7 +263,7 @@ class ExerciseLog {
   final String? notes;
   final String? handle;
 
-  ExerciseLog({
+  const ExerciseLog({
     required this.exerciseId,
     required this.sets,
     this.notes,

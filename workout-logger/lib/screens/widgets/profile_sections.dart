@@ -358,7 +358,7 @@ class HealthConnectSection extends StatelessWidget {
               title: 'Sync coach data now',
               subtitle: "Pull recent sleep & heart rate into the coach's database",
               loading: isHealthSyncLoading,
-              onTap: onHealthSyncNow,
+              onTap: isHealthSyncLoading ? null : onHealthSyncNow,
             ),
           ],
         ],

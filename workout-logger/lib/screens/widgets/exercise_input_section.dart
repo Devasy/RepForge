@@ -7,19 +7,6 @@ import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 
-// Exercise IDs treated as bodyweight-assisted (e.g. an assisted-dip/pull-up
-// machine). Computed once here so the load panel and the input row never
-// drift out of sync on which exercises count as "assisted".
-const Set<String> _assistedBodyweightExerciseIds = {
-  'pull_ups',
-  'chin_ups',
-  'dips',
-  'push_ups',
-};
-
-bool isAssistedBodyweightExercise(String? exerciseId) =>
-    exerciseId != null && _assistedBodyweightExerciseIds.contains(exerciseId);
-
 // ── ExerciseInputSection ──────────────────────────────────────────────────────
 // Renders: AI suggestion card, weight/reps inputs, dropset section,
 // LOG SET button, previous sets, last session info, program metadata banner.

@@ -39,6 +39,11 @@ const int _kMaxToolRounds = 5;
 // Retry policy for transient (5xx / 429) errors. Total attempts = 1 + retries.
 const int _kMaxRetries = 3;
 
+// When the server supplies an explicit retryDelay, honor it up to this many
+// attempts even past _kMaxRetries — a server-specified delay is more likely
+// to actually resolve the transient error than our own backoff schedule.
+const int _kMaxRetriesWithServerDelay = 4;
+
 const String _apiBase =
     'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -262,12 +267,15 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         },
       };
 
-  // gemini-2.5-flash predates the Gemini 3.x thinking-level enum and only
-  // understands the older thinkingBudget (integer token budget) shape;
-  // 3.x models take thinkingLevel (minimal/medium/high). Since the daily
-  // quota fallback chain can land on either family mid-conversation, the
-  // config shape must match whichever model is currently selected.
-  Map<String, dynamic> get _thinkingConfig => _model == 'gemini-2.5-flash'
+  // Every gemini-2.x model predates the Gemini 3.x thinking-level enum and
+  // only understands the older thinkingBudget (integer token budget) shape;
+  // 3.x models take thinkingLevel (minimal/medium/high). Matched by family,
+  // not the single 'gemini-2.5-flash' id, so a persisted legacy model id
+  // that isn't in kGeminiModels (e.g. from a since-removed picker entry)
+  // still gets the right shape instead of failing with no fallback. Since
+  // the daily quota fallback chain can land on either family mid-conversation,
+  // the config shape must match whichever model is currently selected.
+  Map<String, dynamic> get _thinkingConfig => _model.startsWith('gemini-2')
       ? {'thinkingBudget': 0}
       : {'thinkingLevel': 'minimal'};
 
@@ -325,7 +333,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
       final customDelay = _extractRetryDelay(err);
       if (_isRetryableStatus(resp.statusCode) &&
-          (attempt < _kMaxRetries || (customDelay != null && attempt < 4))) {
+          (attempt < _kMaxRetries || (customDelay != null && attempt < _kMaxRetriesWithServerDelay))) {
         client.close();
         final delay = customDelay ?? _retryBackoff(attempt);
         await Future.delayed(delay);
@@ -394,7 +402,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
       final customDelay = _extractRetryDelay(response.body);
       if (_isRetryableStatus(response.statusCode) &&
-          (attempt < _kMaxRetries || (customDelay != null && attempt < 4))) {
+          (attempt < _kMaxRetries || (customDelay != null && attempt < _kMaxRetriesWithServerDelay))) {
         final delay = customDelay ?? _retryBackoff(attempt);
         await Future.delayed(delay);
         continue;
