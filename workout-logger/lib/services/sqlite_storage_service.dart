@@ -170,6 +170,7 @@ class SqliteStorageService implements IStorageService {
   String get databasePath => _db.path;
 
   Future<void> close() async {
+    if (!_initialized) return;
     await _db.close();
     _initialized = false;
   }
@@ -305,7 +306,10 @@ class SqliteStorageService implements IStorageService {
         'exercise_logs',
         where: 'session_id = ?',
         whereArgs: [sessionId],
-        orderBy: 'id ASC',
+        // rowid, not id: ids are synthetic strings like "sess1_10", and
+        // string ordering would sort "_10" before "_2" once a session has 10+
+        // exercises. rowid preserves actual insertion order regardless of id.
+        orderBy: 'rowid ASC',
       );
       final exerciseLogs = <ExerciseLog>[];
       for (final logRow in logRows) {
@@ -314,7 +318,9 @@ class SqliteStorageService implements IStorageService {
           'sets',
           where: 'exercise_log_id = ?',
           whereArgs: [logId],
-          orderBy: 'id ASC',
+          // Same reasoning as above — an exercise log with 10+ sets would
+          // otherwise be misordered by lexicographic id comparison.
+          orderBy: 'rowid ASC',
         );
         final sets = setRows
             .map((s) => WorkoutSet(
@@ -602,7 +608,7 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<List<Exercise>> getCustomExercises() async {
-    final rows = await _db.query('exercises');
+    final rows = await _db.query('exercises', where: 'is_custom = 1');
     final result = <Exercise>[];
     for (final row in rows) {
       result.add(await _loadCustomExerciseRow(row));

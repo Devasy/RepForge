@@ -549,6 +549,7 @@ class WorkoutProvider extends ChangeNotifier {
           exerciseId: currentLog.exerciseId,
           sets: newSets,
           notes: currentLog.notes,
+          handle: currentLog.handle,
         );
         notifyListeners();
         unawaited(_persistDraft());
@@ -708,7 +709,7 @@ class WorkoutProvider extends ChangeNotifier {
       final exact = collect((exLog) => exLog.handle == handle);
       if (exact.isNotEmpty) return exact;
     }
-    return collect((_) => true);
+    return collect((exLog) => exLog.handle == null || exLog.handle!.isEmpty);
   }
 
   /// Get the most recent exercise log for [exerciseId], or null if never logged.
@@ -732,7 +733,7 @@ class WorkoutProvider extends ChangeNotifier {
       final exact = find((exLog) => exLog.handle == handle);
       if (exact != null) return exact;
     }
-    return find((_) => true);
+    return find((exLog) => exLog.handle == null || exLog.handle!.isEmpty);
   }
 
   // ==================== SESSION MANAGEMENT ====================

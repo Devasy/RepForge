@@ -311,6 +311,11 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         final fallback = _getFallbackModel(_model);
         if (fallback != null) {
           _model = fallback;
+          // gemini-2.5-flash and the 3.x family use different thinkingConfig
+          // shapes (see _thinkingConfig) — rebuild it for the new model so the
+          // retried request isn't rejected for the previous model's shape.
+          (body['generationConfig'] as Map<String, dynamic>)['thinkingConfig'] =
+              _thinkingConfig;
           notifyListeners();
           client.close();
           client = http.Client();
@@ -363,13 +368,12 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
   // Single-shot (non-streaming) generateContent call, with retry on 5xx/429.
   Future<Map<String, dynamic>> _generate(Map<String, dynamic> body) async {
-    final payload = jsonEncode(body);
     for (var attempt = 0;; attempt++) {
       final uri = Uri.parse('$_apiBase/$_model:generateContent?key=$_apiKey');
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: payload,
+        body: jsonEncode(body),
       );
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -379,6 +383,10 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         final fallback = _getFallbackModel(_model);
         if (fallback != null) {
           _model = fallback;
+          // See the matching comment in _streamSse — the thinkingConfig shape
+          // must match whichever model this attempt is about to hit.
+          (body['generationConfig'] as Map<String, dynamic>)['thinkingConfig'] =
+              _thinkingConfig;
           notifyListeners();
           continue;
         }

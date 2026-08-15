@@ -53,6 +53,12 @@ void main() {
     ));
     await hiveStorage.saveConversation(Conversation(id: 'conv1', title: 'Chat', messages: []));
     await hiveStorage.saveSetting('user_name', 'Alex');
+    await hiveStorage.saveTrainingProgram(TrainingProgram(
+      id: 'prog1', name: 'Push Pull Legs', totalWeeks: 6, phases: const [], weeks: const [],
+    ));
+    // Growth rate starts at the seeded default (0); modify it on the Hive
+    // side so the migrated value can be distinguished from an unmigrated one.
+    await hiveStorage.updateMuscleGroupGrowthRate('chest', 0.42);
 
     await StorageMigrationService(hiveStorage, sqliteStorage).migrate();
 
@@ -63,5 +69,7 @@ void main() {
     expect((await sqliteStorage.getExercise('custom_mig'))?.name, 'Migrated Exercise');
     expect((await sqliteStorage.getConversation('conv1'))?.title, 'Chat');
     expect(await sqliteStorage.getSetting('user_name'), 'Alex');
+    expect((await sqliteStorage.getTrainingProgram('prog1'))?.name, 'Push Pull Legs');
+    expect((await sqliteStorage.getMuscleGroup('chest'))?.growthRate, 0.42);
   });
 }

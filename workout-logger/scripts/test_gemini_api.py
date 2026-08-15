@@ -46,7 +46,7 @@ def extract_retry_delay(body_str: str) -> float | None:
                         delay_str = str(item["retryDelay"]).replace("s", "").strip()
                         val = float(delay_str)
                         if val > 0:
-                            return val + 0.35
+                            return min(max(val + 0.35, 0.5), 45.0)
             # 2. Regex search in error.message (e.g. "Please retry in 23.690750876s.")
             msg = err.get("message", "")
             if isinstance(msg, str):
@@ -54,7 +54,7 @@ def extract_retry_delay(body_str: str) -> float | None:
                 if match:
                     val = float(match.group(1))
                     if val > 0:
-                        return val + 0.35
+                        return min(max(val + 0.35, 0.5), 45.0)
     except Exception:
         pass
     return None

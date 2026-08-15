@@ -2,9 +2,21 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:repforge/models/models.dart';
 import 'package:repforge/services/storage_service.dart';
 import 'package:repforge/services/sqlite_storage_service.dart';
 import 'package:repforge/services/storage_backend_resolver.dart';
+
+/// Forces the migration to fail without adding new production API surface —
+/// [SqliteStorageService.saveWorkoutSession] is the first write
+/// [StorageMigrationService.migrate] performs against a seeded hiveStorage.
+class _FailingSqliteStorage extends SqliteStorageService {
+  _FailingSqliteStorage() : super(databasePathOverride: inMemoryDatabasePath);
+
+  @override
+  Future<void> saveWorkoutSession(WorkoutSession session) async =>
+      throw StateError('forced migration failure');
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +48,30 @@ void main() {
     await Hive.deleteFromDisk();
   });
 
+  // Runs before the "migration succeeds" test below, which writes the
+  // migrated flag onto the same on-disk Hive box — this assertion needs the
+  // flag to still be unset.
+  test('alreadyMigrated false, migration fails, falls back to hive and writes no flag',
+      () async {
+    // migrate() only reaches saveWorkoutSession if there's a session to
+    // migrate — seed one so the forced failure actually triggers.
+    await hiveStorage.saveWorkoutSession(WorkoutSession(
+      id: 'fail1', date: DateTime(2026, 5, 1), duration: 10, exercises: const [],
+    ));
+    final failing = _FailingSqliteStorage();
+    await failing.init();
+    addTearDown(failing.close);
+
+    final result = await resolveStorageBackend(
+      hiveStorage: hiveStorage,
+      sqliteStorage: failing,
+      alreadyMigrated: false,
+    );
+
+    expect(result, same(hiveStorage));
+    expect(await hiveStorage.getSetting(storageMigratedFlagKey), isNull);
+  });
+
   test('alreadyMigrated true returns sqlite without touching migration', () async {
     final result = await resolveStorageBackend(
       hiveStorage: hiveStorage,
@@ -54,14 +90,4 @@ void main() {
     expect(result, same(sqliteStorage));
     expect(await hiveStorage.getSetting(storageMigratedFlagKey), 'true');
   });
-
-  // A third case — alreadyMigrated: false with migration throwing, asserting
-  // fallback to hive and no flag write — is intentionally omitted. There's
-  // no clean way to force StorageMigrationService.migrate() to throw with
-  // SqliteStorageService's current public API (no forceable write failure)
-  // without adding new production API surface purely for testability. The
-  // failure-fallback branch is exercised indirectly by
-  // test/storage_migration_service_test.dart's existing scope. The two
-  // tests above cover the real-world paths every user takes: fresh install
-  // (migration runs) and normal re-launch (already migrated).
 }

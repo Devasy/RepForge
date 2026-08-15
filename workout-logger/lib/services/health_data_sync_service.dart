@@ -8,8 +8,13 @@ import 'interfaces/health_connect_service_interface.dart';
 import 'sqlite_storage_service.dart';
 
 class HealthDataSyncService {
-  HealthDataSyncService(this._hc, this._storage, {DateTime Function()? now})
-      : _now = now ?? DateTime.now;
+  HealthDataSyncService({
+    required IHealthConnectService healthConnectService,
+    required SqliteStorageService storage,
+    DateTime Function()? now,
+  })  : _hc = healthConnectService,
+        _storage = storage,
+        _now = now ?? DateTime.now;
 
   final IHealthConnectService _hc;
   final SqliteStorageService _storage;
@@ -48,7 +53,13 @@ class HealthDataSyncService {
       if (lastRun != null && now.difference(lastRun) < _throttleWindow) return;
     }
 
-    final granted = await _hc.grantedReadTypes();
+    final Set<HealthReadType> granted;
+    try {
+      granted = await _hc.grantedReadTypes();
+    } catch (_) {
+      // Best-effort; leave every watermark untouched so the next sync retries.
+      return;
+    }
 
     if (granted.contains(HealthReadType.sleep)) {
       await _syncSleep(now);
@@ -61,7 +72,7 @@ class HealthDataSyncService {
         'hrv_rmssd' => _hc.readHrvRmssd,
         _ => throw StateError('unknown stream ${entry.key}'),
       };
-      await _syncSamples(entry.key, now, reader);
+      await _syncSamples(type: entry.key, now: now, reader: reader);
     }
 
     await _storage.saveSetting(_lastRunKey, now.toIso8601String());
@@ -85,11 +96,11 @@ class HealthDataSyncService {
     }
   }
 
-  Future<void> _syncSamples(
-    String type,
-    DateTime now,
-    Future<List<HealthSample>> Function(DateTime, DateTime) reader,
-  ) async {
+  Future<void> _syncSamples({
+    required String type,
+    required DateTime now,
+    required Future<List<HealthSample>> Function(DateTime, DateTime) reader,
+  }) async {
     final watermarkKey = _sampleWatermarkKeys[type]!;
     try {
       final from = await _windowStart(watermarkKey, now);

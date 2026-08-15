@@ -146,8 +146,8 @@ class WorkoutLoggerApp extends StatelessWidget {
   static final HealthDataSyncService? _healthDataSyncService =
       _storageService is SqliteStorageService
           ? HealthDataSyncService(
-              _healthConnectService,
-              _storageService as SqliteStorageService,
+              healthConnectService: _healthConnectService,
+              storage: _storageService as SqliteStorageService,
             )
           : null;
   static final GeminiAiService _geminiService =

@@ -369,7 +369,13 @@ class MLService implements IMLService {
     }
 
     // Determine target reference sets and deload status based on past 3 sessions trend
-    List<WorkoutSet> refSets = lastSession;
+    List<WorkoutSet> refSets = lastSession.isNotEmpty
+        ? lastSession
+        : pastSessions?.firstWhere(
+              (session) => session.isNotEmpty,
+              orElse: () => const <WorkoutSet>[],
+            ) ??
+            const <WorkoutSet>[];
     bool isPostDeloadRecovery = false;
 
     if (pastSessions != null && pastSessions.length >= 2) {

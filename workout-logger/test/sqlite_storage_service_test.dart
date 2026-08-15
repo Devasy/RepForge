@@ -183,6 +183,55 @@ void main() {
       expect(fetched.exercises.single.sets[1].drops!.single.weight, 50);
     });
 
+    test('preserves set order with 11+ sets (regression: synthetic ids like '
+        '"_10" sort before "_2" lexicographically, so ordering must use '
+        'rowid, not id)', () async {
+      final weights = [for (var i = 0; i < 11; i++) 40.0 + i];
+      final session = WorkoutSession(
+        id: 's_order',
+        date: DateTime(2026, 7, 15),
+        duration: 60,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'bench_press',
+            sets: [for (final w in weights) WorkoutSet(weight: w, reps: 5)],
+          ),
+        ],
+      );
+
+      await storage.saveWorkoutSession(session);
+      final fetched = await storage.getWorkoutSession('s_order');
+
+      expect(
+        fetched!.exercises.single.sets.map((s) => s.weight).toList(),
+        weights,
+      );
+    });
+
+    test('preserves exercise-log order with 11+ exercises in one session',
+        () async {
+      final session = WorkoutSession(
+        id: 's_order_logs',
+        date: DateTime(2026, 7, 16),
+        duration: 90,
+        exercises: [
+          for (var i = 0; i < 11; i++)
+            ExerciseLog(
+              exerciseId: 'exercise_$i',
+              sets: [WorkoutSet(weight: 10.0 + i, reps: 5)],
+            ),
+        ],
+      );
+
+      await storage.saveWorkoutSession(session);
+      final fetched = await storage.getWorkoutSession('s_order_logs');
+
+      expect(
+        fetched!.exercises.map((e) => e.exerciseId).toList(),
+        [for (var i = 0; i < 11; i++) 'exercise_$i'],
+      );
+    });
+
     test('saveWorkoutSession overwrites previous sets on re-save', () async {
       final session = WorkoutSession(
         id: 's2',

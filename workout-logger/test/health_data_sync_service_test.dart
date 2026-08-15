@@ -90,7 +90,7 @@ void main() {
 
   test('first sync backfills 90 days plus the 3-day lookback', () async {
     final now = DateTime(2026, 8, 11, 9);
-    final service = HealthDataSyncService(hc, storage, now: () => now);
+    final service = HealthDataSyncService(healthConnectService: hc, storage: storage, now: () => now);
 
     await service.sync();
 
@@ -103,7 +103,7 @@ void main() {
     final firstRun = DateTime(2026, 8, 1, 9);
     final secondRun = DateTime(2026, 8, 11, 9);
     var current = firstRun;
-    final service = HealthDataSyncService(hc, storage, now: () => current);
+    final service = HealthDataSyncService(healthConnectService: hc, storage: storage, now: () => current);
 
     await service.sync(force: true);
     hc.calls.clear();
@@ -119,7 +119,7 @@ void main() {
     final firstRun = DateTime(2026, 8, 11, 9, 0);
     final soonAfter = DateTime(2026, 8, 11, 9, 10);
     var current = firstRun;
-    final service = HealthDataSyncService(hc, storage, now: () => current);
+    final service = HealthDataSyncService(healthConnectService: hc, storage: storage, now: () => current);
 
     await service.sync();
     hc.calls.clear();
@@ -133,7 +133,7 @@ void main() {
     final firstRun = DateTime(2026, 8, 11, 9, 0);
     final soonAfter = DateTime(2026, 8, 11, 9, 10);
     var current = firstRun;
-    final service = HealthDataSyncService(hc, storage, now: () => current);
+    final service = HealthDataSyncService(healthConnectService: hc, storage: storage, now: () => current);
 
     await service.sync();
     hc.calls.clear();
@@ -146,7 +146,7 @@ void main() {
   test('re-syncing the same sample does not duplicate rows', () async {
     final now = DateTime(2026, 8, 11, 9);
     hc.heartRateSamples = [HealthSample(time: DateTime(2026, 8, 10, 22), value: 62)];
-    final service = HealthDataSyncService(hc, storage, now: () => now);
+    final service = HealthDataSyncService(healthConnectService: hc, storage: storage, now: () => now);
 
     await service.sync(force: true);
     await service.sync(force: true);
@@ -162,7 +162,7 @@ void main() {
     final now = DateTime(2026, 8, 11, 9);
     hc.throwOnHeartRate = true;
     hc.restingHrSamples = [HealthSample(time: now, value: 55)];
-    final service = HealthDataSyncService(hc, storage, now: () => now);
+    final service = HealthDataSyncService(healthConnectService: hc, storage: storage, now: () => now);
 
     await service.sync(force: true);
 
@@ -185,7 +185,7 @@ void main() {
       HealthReadType.restingHeartRate,
       HealthReadType.hrv,
     };
-    final service = HealthDataSyncService(hc, storage, now: () => now);
+    final service = HealthDataSyncService(healthConnectService: hc, storage: storage, now: () => now);
 
     await service.sync(force: true);
 
