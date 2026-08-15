@@ -234,7 +234,7 @@ void main() {
       hc = FakeHealthConnectService();
       hh = FakeHealthHistoryManager(hc, storage);
       pr = PRManager(storage);
-      coachToolService = CoachToolService(wp, pr, healthHistory: hh);
+      coachToolService = CoachToolService(workoutProvider: wp, prManager: pr, healthHistory: hh);
     });
 
     test('get_sleeping_hr_analytics computes p5, p25, mean, stdev, variance and chart series',
@@ -274,7 +274,7 @@ void main() {
 
     test('get_health_metrics returns an error when no HealthHistoryManager '
         'is wired up (_hh == null), instead of throwing', () async {
-      final coachToolService = CoachToolService(wp, pr); // no healthHistory
+      final coachToolService = CoachToolService(workoutProvider: wp, prManager: pr); // no healthHistory
       final call = FunctionCall('get_health_metrics', {'days': 14});
       final res = await coachToolService.handleCall(call);
 
@@ -305,7 +305,7 @@ void main() {
       ];
       await wp.loadAllData();
 
-      final coachToolService = CoachToolService(wp, pr); // no healthHistory
+      final coachToolService = CoachToolService(workoutProvider: wp, prManager: pr); // no healthHistory
       final call = FunctionCall(
         'analyze_health_workout_correlation',
         {'days': 60},
@@ -349,7 +349,7 @@ void main() {
       ];
       await wp.loadAllData();
 
-      final coachToolService = CoachToolService(wp, pr); // no healthHistory
+      final coachToolService = CoachToolService(workoutProvider: wp, prManager: pr); // no healthHistory
       final call = FunctionCall(
         'get_muscle_group_volume',
         {'muscle_groups': ['Quadriceps'], 'days': 60},

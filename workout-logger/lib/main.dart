@@ -206,8 +206,8 @@ class WorkoutLoggerApp extends StatelessWidget {
         // it needs a live database file to open a read-only connection against.
         Provider<CoachToolService>(
           create: (ctx) => CoachToolService(
-            ctx.read<WorkoutProvider>(),
-            ctx.read<PRManager>(),
+            workoutProvider: ctx.read<WorkoutProvider>(),
+            prManager: ctx.read<PRManager>(),
             healthHistory: ctx.read<HealthHistoryManager>(),
             sqlQuery: _storageService is SqliteStorageService
                 ? SqlQueryService((_storageService as SqliteStorageService).databasePath)

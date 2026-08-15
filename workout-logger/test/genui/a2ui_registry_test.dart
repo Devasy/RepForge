@@ -130,9 +130,9 @@ void main() {
 
   group('A2UiSpec', () {
     testWidgets('render() parses then builds', (tester) async {
-      final node = A2UiNode(
+      const node = A2UiNode(
         name: 'StatCard',
-        props: const A2UiProps({'title': 'Weekly Volume'}),
+        props: A2UiProps({'title': 'Weekly Volume'}),
       );
       await tester.pumpWidget(
         Builder(

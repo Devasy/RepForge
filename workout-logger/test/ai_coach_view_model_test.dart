@@ -103,7 +103,7 @@ void main() {
       conversations = ConversationManager(storage);
       return AiCoachViewModel(
         ai: ai,
-        coachTools: CoachToolService(provider, pr),
+        coachTools: CoachToolService(workoutProvider: provider, prManager: pr),
         conversations: conversations,
         settings: settings,
       );

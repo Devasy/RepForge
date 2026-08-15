@@ -17,7 +17,11 @@ void main() {
       programManager: ProgramManager(storage),
     );
     final prm = PRManager(storage);
-    final tools = CoachToolService(wp, prm, sqlQuery: SqlQueryService('unused.db'));
+    final tools = CoachToolService(
+      workoutProvider: wp,
+      prManager: prm,
+      sqlQuery: SqlQueryService('unused.db'),
+    );
 
     final decl = tools
         .buildTools()

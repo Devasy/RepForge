@@ -64,7 +64,7 @@ void main() {
       pr = PRManager(storage);
       await pr.backfillFromSessions(provider.sessions);
 
-      tools = CoachToolService(provider, pr);
+      tools = CoachToolService(workoutProvider: provider, prManager: pr);
     });
 
     group('run_sql_query', () {
@@ -103,7 +103,11 @@ void main() {
       });
 
       test('is advertised and runs a live SELECT when wired', () async {
-        final withSql = CoachToolService(provider, pr, sqlQuery: SqlQueryService(dbPath));
+        final withSql = CoachToolService(
+          workoutProvider: provider,
+          prManager: pr,
+          sqlQuery: SqlQueryService(dbPath),
+        );
 
         final declared =
             withSql.buildTools().expand((t) => t.functionDeclarations ?? []).map((f) => f.name);

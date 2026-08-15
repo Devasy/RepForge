@@ -670,10 +670,14 @@ class WorkoutProvider extends ChangeNotifier {
       return _mlService.getDefaultRecommendations(3);
     }
 
+    // _growthModels is trained per-exerciseId across every handle variation,
+    // so it must not back a handle-scoped recommendation — that would mix
+    // e.g. "Rope pushdown" trend data into a "Bar pushdown" recommendation.
+    final useHandle = handle != null && handle.isNotEmpty;
     return _mlService.recommendSets(
       lastSession: recent.first,
       pastSessions: recent,
-      growthModel: _growthModels[exerciseId],
+      growthModel: useHandle ? null : _growthModels[exerciseId],
     );
   }
 

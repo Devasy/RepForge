@@ -15,6 +15,11 @@ final RegExp _forbiddenPathPattern = RegExp(
 /// a forbidden directory name.
 final RegExp _directiveLine = RegExp(r'^(import|export)\s');
 
+/// Matches an explicit cast to a common type, used to flag unchecked casts on
+/// model-supplied data in component renderers.
+final RegExp _castPattern =
+    RegExp(r'\bas (String|num|int|double|List|Map|bool|Object|dynamic)\b');
+
 void main() {
   test('lib/genui imports nothing app-specific', () {
     // The whole point of the refactor: this package must be liftable into
@@ -94,8 +99,7 @@ void main() {
       scannedFileCount++;
       final lines = entity.readAsStringSync().split('\n');
       for (var i = 0; i < lines.length; i++) {
-        if (RegExp(r"\bas (String|num|int|double|List|Map|bool|Object|dynamic)\b")
-            .hasMatch(lines[i])) {
+        if (_castPattern.hasMatch(lines[i])) {
           violations.add('${entity.path}:${i + 1}: ${lines[i].trim()}');
         }
       }

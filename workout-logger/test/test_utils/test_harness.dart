@@ -48,7 +48,7 @@ class TestHarness {
     final ai = geminiAiService ?? GeminiAiService();
     final prm = PRManager(mockStorage);
     final conv = ConversationManager(mockStorage);
-    final tools = CoachToolService(wp, prm);
+    final tools = CoachToolService(workoutProvider: wp, prManager: prm);
 
     return MultiProvider(
       providers: [

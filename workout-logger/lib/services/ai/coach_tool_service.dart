@@ -27,12 +27,14 @@ class CoachToolService {
   final HealthHistoryManager? _hh;
   final SqlQueryService? _sql;
 
-  CoachToolService(
-    this._wp,
-    this._pr, {
+  CoachToolService({
+    required WorkoutProvider workoutProvider,
+    required PRManager prManager,
     HealthHistoryManager? healthHistory,
     SqlQueryService? sqlQuery,
-  })  : _hh = healthHistory,
+  })  : _wp = workoutProvider,
+        _pr = prManager,
+        _hh = healthHistory,
         _sql = sqlQuery;
 
   /// Tool declaration for the optimizer screen's `ask_user_questions` flow.
@@ -328,13 +330,13 @@ class CoachToolService {
             'analyze_health_workout_correlation',
             'Run an analytical statistical pipeline calculating Mean (µ), Standard Deviation (σ), '
                 'Pearson Correlation Coefficient (r), and linear regression (y = mx + b) between a health metric '
-                '(sleep_hours, deep_sleep_min, readiness_score) and a workout metric '
+                '(sleep_hours, deep_sleep_min) and a workout metric '
                 '(workout_volume, session_duration, exercise_max_weight). Returns analytical stats '
                 'and paired coordinates ready to visualize.',
             Schema.object(
               properties: {
                 'x_metric': Schema.string(
-                  description: 'Health metric, e.g. "sleep_hours", "deep_sleep_min", "readiness_score".',
+                  description: 'Health metric, e.g. "sleep_hours", "deep_sleep_min".',
                 ),
                 'y_metric': Schema.string(
                   description: 'Workout metric, e.g. "workout_volume", "session_duration", "exercise_max_weight".',
@@ -669,9 +671,6 @@ class CoachToolService {
             m['x'] = _round(b.totalMinutes / 60.0);
           } else if (xMetric == 'deep_sleep_min') {
             m['x'] = b.deepMin.toDouble();
-          } else if (xMetric == 'readiness_score') {
-            final score = 70.0 + (b.totalMinutes / 480.0 * 30.0).clamp(0.0, 30.0);
-            m['x'] = _round(score);
           }
         }
       }

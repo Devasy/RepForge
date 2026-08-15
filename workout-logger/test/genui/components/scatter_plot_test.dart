@@ -106,6 +106,25 @@ void main() {
       expect(p.points, hasLength(1));
       expect(p.points.single.x, 1);
     });
+
+    test('drops points with non-finite "NaN"/"Infinity" string coordinates',
+        () {
+      final p = parse({
+        'points': [
+          {'x': 1, 'y': 2},
+          {'x': 'NaN', 'y': 3},
+          {'x': 4, 'y': 'Infinity'},
+          {'x': '-Infinity', 'y': 5},
+        ],
+      });
+      expect(p.points, hasLength(1));
+      expect(p.points.single.x, 1);
+      final b = p.bounds;
+      expect(b.minX.isFinite, isTrue);
+      expect(b.maxX.isFinite, isTrue);
+      expect(b.minY.isFinite, isTrue);
+      expect(b.maxY.isFinite, isTrue);
+    });
   });
 
   group('ScatterPlotProps bounds', () {

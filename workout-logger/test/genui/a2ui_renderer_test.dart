@@ -150,12 +150,10 @@ void main() {
           ],
         },
       });
-      // GridContainer has no other content, so with `items` correctly
-      // excluded from child resolution it has zero children and is dropped
-      // entirely rather than silently rendered blank — `_declaresChildren`
-      // does not fire for `items`, so this actually returns a real
-      // zero-children node here (GridContainer doesn't declare `items` as
-      // its own data key), which is the expected non-crashing behavior.
+      // `_declaresChildren` does not fire for `items`, so the node is not
+      // rejected: it parses into a real GridContainer with zero children.
+      // That is the expected non-crashing behavior — `items` stays
+      // DataListGroup's own data key and is never read as child components.
       expect(node?.name, 'GridContainer');
       expect(node?.children, isEmpty);
     });
