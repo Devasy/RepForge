@@ -12,6 +12,9 @@ import 'services/storage_service.dart';
 import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
 import 'services/ai/coach_tool_service.dart';
+import 'services/ai/adapters/coach_tool_service_adapter.dart';
+import 'services/ai/tools/tool_registry.dart';
+import 'services/ai/runtime/agent_runtime.dart';
 import 'services/health_connect_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
@@ -136,6 +139,21 @@ class WorkoutLoggerApp extends StatelessWidget {
           create: (ctx) => CoachToolService(
             ctx.read<WorkoutProvider>(),
             ctx.read<PRManager>(),
+          ),
+        ),
+        // ToolRegistry provides typed AgentTools wrapping the CoachToolService.
+        Provider<ToolRegistry>(
+          create: (ctx) => CoachToolServiceAdapter.buildRegistry(
+            ctx.read<CoachToolService>(),
+            includeAskUser: true,
+            includeShowGraph: true,
+          ),
+        ),
+        // AgentRuntime executes agent graphs (coach, optimizer).
+        Provider<DefaultAgentRuntime>(
+          create: (ctx) => DefaultAgentRuntime(
+            model: ctx.read<GeminiAiService>().providerAdapter,
+            tools: ctx.read<ToolRegistry>(),
           ),
         ),
       ],

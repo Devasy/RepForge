@@ -4,6 +4,7 @@
 // intercept, persistence) lives in RoutineOptimizerViewModel. The widget only
 // renders state, forwards user intents, and holds UI-local controllers.
 
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,8 +12,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../models/models.dart';
 import '../viewmodels/routine_optimizer_view_model.dart';
-import '../services/ai/gemini_ai_service.dart';
-import '../services/ai/coach_tool_service.dart';
+import '../services/ai/runtime/agent_runtime.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/interfaces/storage_service_interface.dart';
 import '../services/settings_provider.dart';
@@ -39,8 +39,7 @@ class RoutineOptimizerScreen extends StatelessWidget {
         final conversations =
             ConversationManager(storage, kind: 'optimizer');
         return RoutineOptimizerViewModel(
-          ai: ctx.read<GeminiAiService>(),
-          coachTools: ctx.read<CoachToolService>(),
+          runtime: ctx.read<DefaultAgentRuntime>(),
           conversations: conversations,
           settings: ctx.read<SettingsProvider>(),
         )
@@ -250,7 +249,11 @@ class _OptimizerViewState extends State<_OptimizerView> {
               ),
             );
           }
-          return _StreamingBubble(text: vm.streamingText);
+          return _StreamingBubble(
+            text: vm.streamingText,
+            statusText: vm.statusText,
+            activeTools: vm.activeTools,
+          );
         }
         return _MessageBubble(message: messages[i]);
       },
@@ -348,6 +351,49 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
+    final bubbleContent = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        gradient: isUser
+            ? const LinearGradient(
+                colors: [AppColors.primary, Color(0xFF5B21B6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: isUser ? null : AppColors.glass3,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(AppRadius.lg),
+          topRight: const Radius.circular(AppRadius.lg),
+          bottomLeft: Radius.circular(isUser ? AppRadius.lg : 4),
+          bottomRight: Radius.circular(isUser ? 4 : AppRadius.lg),
+        ),
+        border: isUser ? null : Border.all(color: AppColors.glassBorder),
+        boxShadow: isUser
+            ? [
+                BoxShadow(
+                  color: AppColors.primaryGlow(0.25),
+                  blurRadius: 12,
+                  spreadRadius: -4,
+                ),
+              ]
+            : null,
+      ),
+      child: isUser
+          ? Text(
+              message.text,
+              style: TextStyle(fontFamily: 'Geist', 
+                color: AppColors.textPrimary,
+                fontSize: 14,
+                height: 1.55,
+              ),
+            )
+          : _OptimizerMarkdown(text: message.text),
+    );
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
@@ -356,52 +402,24 @@ class _MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isUser) ...[
-            _OptimizerAvatar(),
+            const _OptimizerAvatar(),
             const SizedBox(width: AppSpacing.sm),
           ],
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                gradient: isUser
-                    ? const LinearGradient(
-                        colors: [AppColors.primary, Color(0xFF5B21B6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isUser ? null : AppColors.glass3,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(AppRadius.lg),
-                  topRight: const Radius.circular(AppRadius.lg),
-                  bottomLeft: Radius.circular(isUser ? AppRadius.lg : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : AppRadius.lg),
-                ),
-                border: isUser ? null : Border.all(color: AppColors.glassBorder),
-                boxShadow: isUser
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primaryGlow(0.25),
-                          blurRadius: 12,
-                          spreadRadius: -4,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: isUser
-                  ? Text(
-                      message.text,
-                      style: TextStyle(fontFamily: 'Geist', 
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        height: 1.55,
-                      ),
-                    )
-                  : _OptimizerMarkdown(text: message.text),
-            ),
+            child: isUser
+                ? bubbleContent
+                : ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(AppRadius.lg),
+                      topRight: Radius.circular(AppRadius.lg),
+                      bottomLeft: Radius.circular(4),
+                      bottomRight: Radius.circular(AppRadius.lg),
+                    ),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: bubbleContent,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -412,37 +430,124 @@ class _MessageBubble extends StatelessWidget {
 // ── Streaming bubble ──────────────────────────────────────────────────────────
 
 class _StreamingBubble extends StatelessWidget {
-  const _StreamingBubble({required this.text});
+  const _StreamingBubble({
+    required this.text,
+    required this.statusText,
+    required this.activeTools,
+  });
   final String text;
+  final String statusText;
+  final List<String> activeTools;
 
   @override
   Widget build(BuildContext context) {
+    final bubbleContent = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.glass3,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(AppRadius.lg),
+          topRight: Radius.circular(AppRadius.lg),
+          bottomLeft: Radius.circular(4),
+          bottomRight: Radius.circular(AppRadius.lg),
+        ),
+        border: Border.all(color: AppColors.glassBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (text.isEmpty && statusText.isEmpty && activeTools.isEmpty)
+            const RFLoadingDots(color: AppColors.secondary)
+          else ...[
+            if (text.isNotEmpty)
+              _OptimizerMarkdown(text: text),
+            if (text.isNotEmpty && (statusText.isNotEmpty || activeTools.isNotEmpty))
+              const SizedBox(height: 8),
+            if (statusText.isNotEmpty)
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 10,
+                    height: 10,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.2,
+                      valueColor: AlwaysStoppedAnimation(AppColors.secondary),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      statusText,
+                      style: const TextStyle(
+                        fontFamily: 'Geist',
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            if (activeTools.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: activeTools.map((tool) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.handyman_rounded, size: 10, color: AppColors.secondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          tool,
+                          style: const TextStyle(
+                            fontFamily: 'Geist',
+                            color: AppColors.secondary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _OptimizerAvatar(),
+          const _OptimizerAvatar(isPulsing: true),
           const SizedBox(width: AppSpacing.sm),
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(AppRadius.lg),
+                topRight: Radius.circular(AppRadius.lg),
+                bottomLeft: Radius.circular(4),
+                bottomRight: Radius.circular(AppRadius.lg),
               ),
-              decoration: BoxDecoration(
-                color: AppColors.glass3,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(AppRadius.lg),
-                  topRight: Radius.circular(AppRadius.lg),
-                  bottomLeft: Radius.circular(4),
-                  bottomRight: Radius.circular(AppRadius.lg),
-                ),
-                border: Border.all(color: AppColors.glassBorder),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: bubbleContent,
               ),
-              child: text.isEmpty
-                  ? const RFLoadingDots(color: AppColors.secondary)
-                  : _OptimizerMarkdown(text: text),
             ),
           ),
         ],
@@ -469,27 +574,77 @@ class _OptimizerMarkdown extends StatelessWidget {
   }
 }
 
-class _OptimizerAvatar extends StatelessWidget {
+class _OptimizerAvatar extends StatefulWidget {
+  const _OptimizerAvatar({this.isPulsing = false});
+  final bool isPulsing;
+
+  @override
+  State<_OptimizerAvatar> createState() => _OptimizerAvatarState();
+}
+
+class _OptimizerAvatarState extends State<_OptimizerAvatar> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    _glowAnimation = Tween<double>(begin: 4.0, end: 14.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    if (widget.isPulsing) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _OptimizerAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPulsing != oldWidget.isPulsing) {
+      if (widget.isPulsing) {
+        _controller.repeat(reverse: true);
+      } else {
+        _controller.stop();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.secondary, Color(0xFF0097A7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.secondaryGlow(0.35),
-            blurRadius: 8,
-            spreadRadius: -2,
+    return AnimatedBuilder(
+      animation: _glowAnimation,
+      builder: (context, child) {
+        return Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.secondary, Color(0xFF0097A7)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.secondaryGlow(widget.isPulsing ? 0.5 : 0.35),
+                blurRadius: widget.isPulsing ? _glowAnimation.value : 8,
+                spreadRadius: widget.isPulsing ? 1 : -2,
+              ),
+            ],
           ),
-        ],
-      ),
+          child: child,
+        );
+      },
       child: const Icon(Icons.auto_fix_high_rounded, color: Colors.white, size: 14),
     );
   }
