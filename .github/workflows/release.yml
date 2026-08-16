@@ -47,7 +47,7 @@ jobs:
       - name: Install dependencies
         working-directory: ./workout-logger
         run: |
-          flutter pub get
+          flutter pub get --enforce-lockfile
           : "${PUB_CACHE:?PUB_CACHE is not set}"
           mapfile -t targets < <(find "$PUB_CACHE" -type f -path '*/jni-*/src/CMakeLists.txt')
           if [ "${#targets[@]}" -eq 0 ]; then
