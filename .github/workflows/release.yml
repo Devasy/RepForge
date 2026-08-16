@@ -47,7 +47,7 @@ jobs:
       - name: Install dependencies
         working-directory: ./workout-logger
         run: |
-          flutter pub get
+          flutter pub get --enforce-lockfile
           : "${PUB_CACHE:?PUB_CACHE is not set}"
           mapfile -t targets < <(find "$PUB_CACHE" -type f -path '*/jni-*/src/CMakeLists.txt')
           if [ "${#targets[@]}" -eq 0 ]; then
@@ -149,7 +149,7 @@ jobs:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/app/outputs/symbols
+        run: flutter build apk --release --split-per-abi
 
       - name: Rename APKs
         run: |
