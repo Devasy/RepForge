@@ -78,7 +78,11 @@ flutter test test/workout_provider_test.dart
 flutter analyze
 
 # Build release APKs (split per ABI)
-flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/debug-info
+# Note: deliberately not obfuscated - the F-Droid submission verifies the
+# GitHub release APK byte-for-byte against F-Droid's own rebuild from source
+# (see fdroiddata MR 40630), and --obfuscate embeds a build-unique ID by
+# design, which breaks that comparison even for identical source.
+flutter build apk --release --split-per-abi
 
 # Generate Mockito mocks (after modifying interfaces)
 dart run build_runner build --delete-conflicting-outputs
