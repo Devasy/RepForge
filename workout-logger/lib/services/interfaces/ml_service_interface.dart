@@ -89,6 +89,7 @@ abstract class IMLService {
     int maxReps = 12,
     Map<String, MuscleRecoveryStatus>? recoveryScores,
     List<String>? primaryMuscleIds,
+    DateTime? asOf,
   });
 
   /// Get default recommendations when no history exists.

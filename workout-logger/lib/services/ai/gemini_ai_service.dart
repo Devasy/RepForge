@@ -33,11 +33,19 @@ const kGeminiModels = [
 // Default to the latest GA model.
 const kDefaultGeminiModel = 'gemini-3.6-flash';
 
-// Upper bound on tool-resolution rounds per user turn, to bound runaway loops.
-const int _kMaxToolRounds = 5;
+// Default/minimum/maximum upper bound on tool-resolution rounds per user
+// turn, to bound runaway loops. User-configurable via Profile → AI Features.
+const int kDefaultMaxToolRounds = 5;
+const int kMinMaxToolRounds = 3;
+const int kMaxMaxToolRounds = 25;
 
 // Retry policy for transient (5xx / 429) errors. Total attempts = 1 + retries.
 const int _kMaxRetries = 3;
+
+// When the server supplies an explicit retryDelay, honor it up to this many
+// attempts even past _kMaxRetries — a server-specified delay is more likely
+// to actually resolve the transient error than our own backoff schedule.
+const int _kMaxRetriesWithServerDelay = 4;
 
 const String _apiBase =
     'https://generativelanguage.googleapis.com/v1beta/models';
@@ -135,6 +143,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
   String _apiKey = '';
   String _model = kDefaultGeminiModel;
+  int _maxToolRounds = kDefaultMaxToolRounds;
 
   // Cumulative token usage across all AI calls (persisted).
   int _promptTokens = 0;
@@ -148,6 +157,9 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   @override
   String get currentModel => _model;
 
+  /// Upper bound on tool-resolution rounds per user turn.
+  int get maxToolRounds => _maxToolRounds;
+
   /// Cumulative input (prompt) tokens billed across all AI calls.
   int get promptTokensUsed => _promptTokens;
 
@@ -160,9 +172,13 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   /// Number of AI requests recorded.
   int get aiRequestCount => _requestCount;
 
-  void init(String apiKey, {String model = kDefaultGeminiModel}) {
+  void init(String apiKey, {
+    String model = kDefaultGeminiModel,
+    int maxToolRounds = kDefaultMaxToolRounds,
+  }) {
     _apiKey = apiKey.trim();
     _model = model;
+    _maxToolRounds = maxToolRounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
   }
 
   /// Load persisted cumulative token usage (call once at startup).
@@ -239,6 +255,11 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     notifyListeners();
   }
 
+  void updateMaxToolRounds(int rounds) {
+    _maxToolRounds = rounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
+    notifyListeners();
+  }
+
   // ── Raw HTTP helpers ────────────────────────────────────────────────────────
 
   Map<String, dynamic> _makeBody({
@@ -262,12 +283,15 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         },
       };
 
-  // gemini-2.5-flash predates the Gemini 3.x thinking-level enum and only
-  // understands the older thinkingBudget (integer token budget) shape;
-  // 3.x models take thinkingLevel (minimal/medium/high). Since the daily
-  // quota fallback chain can land on either family mid-conversation, the
-  // config shape must match whichever model is currently selected.
-  Map<String, dynamic> get _thinkingConfig => _model == 'gemini-2.5-flash'
+  // Every gemini-2.x model predates the Gemini 3.x thinking-level enum and
+  // only understands the older thinkingBudget (integer token budget) shape;
+  // 3.x models take thinkingLevel (minimal/medium/high). Matched by family,
+  // not the single 'gemini-2.5-flash' id, so a persisted legacy model id
+  // that isn't in kGeminiModels (e.g. from a since-removed picker entry)
+  // still gets the right shape instead of failing with no fallback. Since
+  // the daily quota fallback chain can land on either family mid-conversation,
+  // the config shape must match whichever model is currently selected.
+  Map<String, dynamic> get _thinkingConfig => _model.startsWith('gemini-2')
       ? {'thinkingBudget': 0}
       : {'thinkingLevel': 'minimal'};
 
@@ -311,6 +335,11 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         final fallback = _getFallbackModel(_model);
         if (fallback != null) {
           _model = fallback;
+          // gemini-2.5-flash and the 3.x family use different thinkingConfig
+          // shapes (see _thinkingConfig) — rebuild it for the new model so the
+          // retried request isn't rejected for the previous model's shape.
+          (body['generationConfig'] as Map<String, dynamic>)['thinkingConfig'] =
+              _thinkingConfig;
           notifyListeners();
           client.close();
           client = http.Client();
@@ -320,7 +349,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
       final customDelay = _extractRetryDelay(err);
       if (_isRetryableStatus(resp.statusCode) &&
-          (attempt < _kMaxRetries || (customDelay != null && attempt < 4))) {
+          (attempt < _kMaxRetries || (customDelay != null && attempt < _kMaxRetriesWithServerDelay))) {
         client.close();
         final delay = customDelay ?? _retryBackoff(attempt);
         await Future.delayed(delay);
@@ -363,13 +392,12 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
   // Single-shot (non-streaming) generateContent call, with retry on 5xx/429.
   Future<Map<String, dynamic>> _generate(Map<String, dynamic> body) async {
-    final payload = jsonEncode(body);
     for (var attempt = 0;; attempt++) {
       final uri = Uri.parse('$_apiBase/$_model:generateContent?key=$_apiKey');
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: payload,
+        body: jsonEncode(body),
       );
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -379,6 +407,10 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         final fallback = _getFallbackModel(_model);
         if (fallback != null) {
           _model = fallback;
+          // See the matching comment in _streamSse — the thinkingConfig shape
+          // must match whichever model this attempt is about to hit.
+          (body['generationConfig'] as Map<String, dynamic>)['thinkingConfig'] =
+              _thinkingConfig;
           notifyListeners();
           continue;
         }
@@ -386,7 +418,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
       final customDelay = _extractRetryDelay(response.body);
       if (_isRetryableStatus(response.statusCode) &&
-          (attempt < _kMaxRetries || (customDelay != null && attempt < 4))) {
+          (attempt < _kMaxRetries || (customDelay != null && attempt < _kMaxRetriesWithServerDelay))) {
         final delay = customDelay ?? _retryBackoff(attempt);
         await Future.delayed(delay);
         continue;
@@ -437,7 +469,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         Content.text(userMessage).toJson(),
       ];
 
-      for (var round = 0; round < _kMaxToolRounds; round++) {
+      for (var round = 0; round < _maxToolRounds; round++) {
         final body = _makeBody(
           contents: contents,
           system: systemPrompt,
@@ -519,7 +551,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         contents.add({'role': 'user', 'parts': responseParts});
       }
       // Exhausted the tool-round budget without a final text answer.
-      yield '\n\n_(Stopped after $_kMaxToolRounds tool steps — try rephrasing.)_';
+      yield '\n\n_(Stopped after $_maxToolRounds tool steps — try rephrasing.)_';
     } catch (e) {
       yield 'Error: $e';
     }

@@ -16,6 +16,7 @@ import 'package:repforge/services/managers/pr_manager.dart';
 import 'package:repforge/services/managers/readiness_manager.dart';
 import 'package:repforge/services/interfaces/health_connect_service_interface.dart';
 import 'package:repforge/services/interfaces/ml_service_interface.dart';
+import 'package:repforge/services/health_data_sync_service.dart';
 import 'mock_storage_service.dart';
 import 'mock_ml_service.dart';
 import 'stub_health_connect_service.dart';
@@ -60,6 +61,7 @@ class TestHarness {
         ChangeNotifierProvider<ReadinessManager>.value(value: rm),
         Provider<HealthHistoryManager>.value(value: hhm),
         Provider<IHealthConnectService>.value(value: const StubHcService()),
+        Provider<HealthDataSyncService?>.value(value: null),
         Provider<ApiService>.value(value: ApiService()),
         Provider<CoachToolService>.value(value: tools),
         Provider<IMLService>.value(value: MockMLService()),

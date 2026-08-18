@@ -308,6 +308,18 @@ class StorageService implements IStorageService {
     return _settingsBoxInstance.get(key);
   }
 
+  /// Every stored setting key/value. Used only by [StorageMigrationService]
+  /// to migrate the settings box to the SQLite backend — not part of
+  /// [IStorageService] since no other consumer needs to enumerate all keys.
+  Future<Map<String, String>> getAllSettingsForMigration() async {
+    final map = <String, String>{};
+    for (final key in _settingsBoxInstance.keys) {
+      final value = _settingsBoxInstance.get(key);
+      if (value != null) map[key as String] = value;
+    }
+    return map;
+  }
+
   // ==================== EXPORT / IMPORT ====================
 
   dynamic _normalizeExportValue(dynamic value) {
@@ -344,14 +356,7 @@ class StorageService implements IStorageService {
 
   @override
   Future<String> exportAllData() async {
-    // Collect settings as a map
-    final settingsMap = <String, String>{};
-    for (final key in _settingsBoxInstance.keys) {
-      final value = _settingsBoxInstance.get(key);
-      if (value != null) {
-        settingsMap[key as String] = value;
-      }
-    }
+    final settingsMap = await getAllSettingsForMigration();
 
     final data = {
       'sessions': _sessionsBox.values
