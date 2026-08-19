@@ -422,7 +422,7 @@ void main() {
         lastTrained: DateTime.now(),
         stdError: 25.0, // → ±5 days at 5 volume/day
       );
-      final result = MLService.predictTargetWithConfidence(
+      final result = GrowthCurveFitter.predictTargetWithConfidence(
         currentValue: 100.0,
         targetValue: 200.0,
         growthModel: model,

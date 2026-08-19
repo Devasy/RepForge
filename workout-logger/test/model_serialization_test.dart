@@ -173,6 +173,22 @@ void main() {
       final restored = WorkoutSession.fromJson(original.toJson());
       expect(restored.hcSyncedAt, syncTime);
     });
+
+    test('sessionEffort is null by default and round-trips when set', () {
+      final withoutEffort = WorkoutSession(
+        id: 'session-5',
+        date: date,
+        exercises: [],
+        duration: 30,
+      );
+      expect(withoutEffort.sessionEffort, isNull);
+      expect(WorkoutSession.fromJson(withoutEffort.toJson()).sessionEffort, isNull);
+
+      final withEffort = withoutEffort.copyWith(sessionEffort: 2);
+      expect(withEffort.sessionEffort, 2);
+      final restored = WorkoutSession.fromJson(withEffort.toJson());
+      expect(restored.sessionEffort, 2);
+    });
   });
 
   // ── Exercise ──────────────────────────────────────────────────────────────

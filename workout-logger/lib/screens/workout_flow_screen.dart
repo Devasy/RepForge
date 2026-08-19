@@ -10,6 +10,7 @@ import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../services/managers/pr_manager.dart';
+import '../services/managers/readiness_manager.dart';
 import '../theme/app_theme.dart';
 import 'add_custom_exercise_screen.dart';
 import 'exercise_library_screen.dart';
@@ -270,8 +271,17 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final isLast = idx >= totalExercises - 1;
 
     final selectedHandle = log?.handle;
+    // Nullable-typed lookup: resolves to null (no readiness signal) instead
+    // of throwing when no ReadinessManager is above this screen in the
+    // widget tree — keeps this screen usable without the full app's
+    // provider tree (e.g. in isolated widget tests).
+    final readinessBand = context.watch<ReadinessManager?>()?.snapshot?.band;
     final recommendations = exercise != null
-        ? provider.getRecommendations(exercise.id, handle: selectedHandle)
+        ? provider.getRecommendations(
+            exercise.id,
+            handle: selectedHandle,
+            readinessBand: readinessBand,
+          )
         : <SetRecommendation>[];
 
     final lastSession = exercise != null

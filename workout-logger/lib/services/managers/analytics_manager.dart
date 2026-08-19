@@ -130,14 +130,22 @@ class AnalyticsManager extends ChangeNotifier {
   /// Get set recommendations for an exercise.
   ///
   /// Uses the most-recently-dated session containing this exercise as the
-  /// basis for the recommendation. Reads from the pre-built session index
-  /// so no sort is required at call time — O(1).
+  /// basis for the recommendation, plus up to 2 sessions before that for
+  /// deload-recovery detection and (when [exercises]/[exerciseMap] are
+  /// supplied) the primary muscle's recovery status. Reads from the
+  /// pre-built session index so no sort is required at call time — O(1).
+  ///
+  /// [exerciseMap] is a pre-built id → Exercise map for O(1) lookups; falls
+  /// back to building one from [exercises] when omitted (see
+  /// [getWeeklyVolumeByMuscle] for the same convention).
   List<SetRecommendation> getRecommendations(
     String exerciseId,
-    List<WorkoutSession> sessions,
-  ) {
+    List<WorkoutSession> sessions, {
+    List<Exercise> exercises = const [],
+    Map<String, Exercise>? exerciseMap,
+  }) {
     final isFresh = identical(_lastIndexedSessions, sessions);
-    
+
     // Fast path: use pre-built index if available and fresh.
     final logs = isFresh ? _sessionIndex[exerciseId] : null;
     final lastLog = (logs != null && logs.isNotEmpty)
@@ -148,9 +156,24 @@ class AnalyticsManager extends ChangeNotifier {
       return _mlService.getDefaultRecommendations(3);
     }
 
+    final pastSessions = (logs != null && logs.isNotEmpty)
+        ? logs.take(3).map((e) => e.log.sets).toList()
+        : [lastLog.sets];
+
+    final lookup = exerciseMap ?? {for (final e in exercises) e.id: e};
+    final recoveryInputs = recoveryRecommendationInputs(
+      exerciseId: exerciseId,
+      sessions: sessions,
+      exerciseMap: lookup,
+      mlService: _mlService,
+    );
+
     return _mlService.recommendSets(
       lastSession: lastLog.sets,
+      pastSessions: pastSessions,
       growthModel: _growthModels[exerciseId],
+      recoveryScores: recoveryInputs.recoveryScores,
+      primaryMuscleIds: recoveryInputs.primaryMuscleIds,
     );
   }
 

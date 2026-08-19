@@ -247,6 +247,214 @@ void main() {
         expect(recs, isNotEmpty);
         expect(recs.first.weight, greaterThanOrEqualTo(120));
       });
+
+      test('getRecommendations holds load when the primary muscle is still '
+          'under-recovered from a session a couple hours ago', () async {
+        // bench_press's primary muscle is chest (tau=48h); a session this
+        // recent leaves chest well under the 70% recovery threshold.
+        final recentTimestamp = DateTime.now().subtract(const Duration(hours: 2));
+        mockStorage.addMockSession(
+          session('recent', recentTimestamp, [
+            log('bench_press', sets: [WorkoutSet(weight: 80, reps: 8)]),
+          ]),
+        );
+
+        await provider.init();
+
+        final recs = provider.getRecommendations('bench_press');
+
+        expect(recs, isNotEmpty);
+        expect(recs.first.confidence, 'low');
+        expect(recs.first.reasoning, contains('recovered'));
+        expect(recs.first.weight, 80);
+        expect(recs.first.reps, 8);
+      });
+
+      test('getRecommendations holds load when readinessBand is low, even '
+          'when reps are otherwise ready to progress', () async {
+        mockStorage.addMockSession(
+          session('old', DateTime(2025, 1, 1), [
+            log('bench_press', sets: [WorkoutSet(weight: 60, reps: 12)]),
+          ]),
+        );
+        await provider.init();
+
+        final normal = provider.getRecommendations('bench_press');
+        // Baseline: with reps at the ceiling and no readiness signal, this
+        // progresses (weight bump), confirming the low-readiness case below
+        // is actually suppressing something.
+        expect(normal.first.weight, greaterThan(60));
+
+        final lowReadiness = provider.getRecommendations(
+          'bench_press',
+          readinessBand: ReadinessBand.low,
+        );
+        expect(lowReadiness.first.weight, 60);
+        expect(lowReadiness.first.reps, 12);
+        expect(lowReadiness.first.confidence, 'low');
+        expect(lowReadiness.first.reasoning, contains('readiness'));
+      });
+
+      test('getRecommendations ignores a moderate/high readinessBand', () async {
+        mockStorage.addMockSession(
+          session('old', DateTime(2025, 1, 1), [
+            log('bench_press', sets: [WorkoutSet(weight: 60, reps: 12)]),
+          ]),
+        );
+        await provider.init();
+
+        final recs = provider.getRecommendations(
+          'bench_press',
+          readinessBand: ReadinessBand.moderate,
+        );
+        expect(recs.first.weight, greaterThan(60));
+      });
+
+      test('getRecommendations is unaffected by a realistic amount of prior '
+          'same-session training — the fatigue calibration is deliberately '
+          'inert at real-world session sizes (see session_fatigue.dart)',
+          () async {
+        await provider.addCustomExercise(
+          name: 'Ex One',
+          category: 'compound',
+          primaryMuscleGroupId: 'chest',
+        );
+        await provider.addCustomExercise(
+          name: 'Ex Two',
+          category: 'compound',
+          primaryMuscleGroupId: 'chest',
+        );
+        final ex1 = provider.allExercises.firstWhere((e) => e.name == 'Ex One');
+        final ex2 = provider.allExercises.firstWhere((e) => e.name == 'Ex Two');
+
+        // History for ex2 so its recommendation is a real weight-bump
+        // scenario (reps at the ceiling), not the no-history default.
+        mockStorage.addMockSession(
+          session('old', DateTime(2025, 1, 1), [
+            log(ex2.id, sets: [WorkoutSet(weight: 60, reps: 12)]),
+          ]),
+        );
+        await provider.init();
+
+        // Start a live session covering both exercises; log a realistic
+        // number of sets of ex1 first (12 — more than a real working
+        // exercise would have), then ask for ex2's recommendation.
+        provider.startWorkout(exerciseIds: [ex1.id, ex2.id]);
+        for (var i = 0; i < 12; i++) {
+          provider.addSet(WorkoutSet(weight: 100, reps: 8));
+        }
+        provider.nextExercise();
+
+        final withPriorSets = provider.getRecommendations(ex2.id);
+
+        // Compare against a fresh provider with no in-progress session at
+        // all (only ex2's history) to isolate the same-session effect.
+        final freshMock = MockStorageService();
+        freshMock.addMockSession(
+          session('old', DateTime(2025, 1, 1), [
+            log(ex2.id, sets: [WorkoutSet(weight: 60, reps: 12)]),
+          ]),
+        );
+        final freshProvider = WorkoutProvider(
+          freshMock,
+          programManager: ProgramManager(freshMock),
+        );
+        freshMock.addMockCustomExercise(ex1);
+        freshMock.addMockCustomExercise(ex2);
+        await freshProvider.init();
+        final withoutPriorSets = freshProvider.getRecommendations(ex2.id);
+
+        expect(withoutPriorSets.first.weight, greaterThan(60)); // baseline progresses
+        expect(withPriorSets.first.weight, withoutPriorSets.first.weight);
+      });
+
+      test('getRecommendations dampens after an extreme, unrealistic amount '
+          'of same-session prior training — proves the fatigue mechanism is '
+          'wired end-to-end even though realistic sessions never reach it',
+          () async {
+        await provider.addCustomExercise(
+          name: 'Warmup Ex',
+          category: 'isolation',
+          primaryMuscleGroupId: 'chest',
+        );
+        await provider.addCustomExercise(
+          name: 'Target Ex',
+          category: 'compound',
+          primaryMuscleGroupId: 'chest',
+        );
+        final warmupEx =
+            provider.allExercises.firstWhere((e) => e.name == 'Warmup Ex');
+        final targetEx =
+            provider.allExercises.firstWhere((e) => e.name == 'Target Ex');
+
+        mockStorage.addMockSession(
+          session('old', DateTime(2025, 1, 1), [
+            log(targetEx.id, sets: [WorkoutSet(weight: 60, reps: 12)]),
+          ]),
+        );
+        await provider.init();
+
+        provider.startWorkout(exerciseIds: [warmupEx.id, targetEx.id]);
+        // Far beyond any real single-exercise set count — well past the
+        // point (raw total > softCap = 16.0) where the factor engages.
+        for (var i = 0; i < 40; i++) {
+          provider.addSet(WorkoutSet(
+            weight: 100,
+            reps: 8,
+            timestamp: DateTime(2026, 1, 1, 10, i * 3),
+          ));
+        }
+        provider.nextExercise();
+
+        final recs = provider.getRecommendations(targetEx.id);
+        // Baseline (no prior sets) would bump weight above 60 — see the
+        // "unaffected" test above. An extreme prior load instead holds or
+        // reduces the increment.
+        expect(recs.first.weight, lessThan(65)); // baseline bump would be 65
+      });
+
+      group('recordSessionEffort / effortCalibrationOffset', () {
+        test('effortCalibrationOffset defaults to 0.0 when never answered', () {
+          expect(provider.effortCalibrationOffset, 0.0);
+        });
+
+        test(
+            'records sessionEffort on the session and updates the rolling offset',
+            () async {
+          mockStorage.addMockSession(
+            session('s1', DateTime(2025, 1, 1), [log('bench_press')]),
+          );
+          await provider.init();
+          final sessionId =
+              provider.sessions.firstWhere((s) => s.id == 's1').id;
+
+          await provider.recordSessionEffort(sessionId, 3); // Brutal
+
+          final updated = provider.sessions.firstWhere((s) => s.id == sessionId);
+          expect(updated.sessionEffort, 3);
+          expect(provider.effortCalibrationOffset, greaterThan(0.0));
+        });
+
+        test('persists the offset across a reload', () async {
+          mockStorage.addMockSession(
+            session('s1', DateTime(2025, 1, 1), [log('bench_press')]),
+          );
+          await provider.init();
+          await provider.recordSessionEffort('s1', 1); // Easy
+          final offsetAfterRecording = provider.effortCalibrationOffset;
+          expect(offsetAfterRecording, lessThan(0.0));
+
+          await provider.init(); // simulate app restart
+
+          expect(provider.effortCalibrationOffset,
+              closeTo(offsetAfterRecording, 0.0001));
+        });
+
+        test('does nothing for an unknown session id', () async {
+          await provider.recordSessionEffort('does-not-exist', 3);
+          expect(provider.effortCalibrationOffset, 0.0);
+        });
+      });
     });
 
     group('deleteCustomExercise', () {

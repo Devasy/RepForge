@@ -26,6 +26,11 @@ class MockMLService implements IMLService {
   // Last parameters received
   String? lastExtractedExerciseId;
   List<WorkoutSet>? lastRecommendedLastSession;
+  List<List<WorkoutSet>>? lastPastSessions;
+  Map<String, MuscleRecoveryStatus>? lastRecoveryScores;
+  List<String>? lastPrimaryMuscleIds;
+  ReadinessBand? lastReadinessBand;
+  double? lastSessionFatigueFactor;
 
   @override
   GrowthModel trainGrowthModel(List<DataPoint> dataPoints) {
@@ -93,10 +98,17 @@ class MockMLService implements IMLService {
     int maxReps = 12,
     Map<String, MuscleRecoveryStatus>? recoveryScores,
     List<String>? primaryMuscleIds,
+    ReadinessBand? readinessBand,
+    double sessionFatigueFactor = 0.0,
     DateTime? asOf,
   }) {
     recommendSetsCallCount++;
     lastRecommendedLastSession = lastSession;
+    lastPastSessions = pastSessions;
+    lastRecoveryScores = recoveryScores;
+    lastPrimaryMuscleIds = primaryMuscleIds;
+    lastReadinessBand = readinessBand;
+    lastSessionFatigueFactor = sessionFatigueFactor;
 
     return mockRecommendations ??
         [
@@ -150,6 +162,11 @@ class MockMLService implements IMLService {
     predictTargetCompletionCallCount = 0;
     lastExtractedExerciseId = null;
     lastRecommendedLastSession = null;
+    lastPastSessions = null;
+    lastRecoveryScores = null;
+    lastPrimaryMuscleIds = null;
+    lastReadinessBand = null;
+    lastSessionFatigueFactor = null;
     mockGrowthModel = null;
     mockRecommendations = null;
     mockPrediction = null;

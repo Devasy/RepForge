@@ -1,4 +1,5 @@
 import '../../models/models.dart';
+import '../interfaces/ml_service_interface.dart';
 
 /// Returns the [ExerciseLog] for [exerciseId] from the most-recently-dated
 /// [WorkoutSession] in [sessions], or `null` if the exercise has never been
@@ -26,4 +27,31 @@ ExerciseLog? findMostRecentExerciseLog(
     }
   }
   return null;
+}
+
+/// Recovery-related inputs for [IMLService.recommendSets]: per-muscle
+/// recovery scores across [sessions], and [exerciseId]'s primary muscle.
+///
+/// Centralizes what both `WorkoutProvider.getRecommendations` and
+/// `AnalyticsManager.getRecommendations` need to assemble so the two call
+/// sites can't drift out of sync with each other again (they previously did
+/// — see the recommendation-engine-upgrade plan's audit item 6). Returns
+/// nulls when [exerciseMap] doesn't resolve [exerciseId], so callers that
+/// don't have exercise data on hand degrade to the pre-recovery-aware
+/// behavior instead of erroring.
+({Map<String, MuscleRecoveryStatus>? recoveryScores, List<String>? primaryMuscleIds})
+    recoveryRecommendationInputs({
+  required String exerciseId,
+  required List<WorkoutSession> sessions,
+  required Map<String, Exercise> exerciseMap,
+  required IMLService mlService,
+}) {
+  final exercise = exerciseMap[exerciseId];
+  if (exercise == null) {
+    return (recoveryScores: null, primaryMuscleIds: null);
+  }
+  return (
+    recoveryScores: mlService.computeMuscleRecoveryScores(sessions, exerciseMap),
+    primaryMuscleIds: [exercise.primaryMuscle],
+  );
 }

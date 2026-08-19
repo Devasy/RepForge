@@ -81,6 +81,15 @@ abstract class IMLService {
   /// is the session immediately before that. Any further entries are ignored.
   /// [minReps]/[maxReps] define the double-progression rep range.
   /// Pass [recoveryScores] + [primaryMuscleIds] for recovery-aware advice.
+  /// Pass [readinessBand] (from the cached `ReadinessManager.snapshot` — this
+  /// method never fetches it itself, keeping this synchronous/offline) to
+  /// hold load on a low-readiness day.
+  /// Pass [sessionFatigueFactor] (a pre-computed 0.0–1.0 dampening factor —
+  /// see `SessionFatigueAccumulator`) for same-session fatigue awareness.
+  /// Deliberately exercise-agnostic, not muscle-specific: a backtest found no
+  /// statistically significant same-session order effect for this app's
+  /// hand-authored `muscleActivations` groupings, so this only tracks total
+  /// prior same-session training load, not which muscles it hit.
   List<SetRecommendation> recommendSets({
     required List<WorkoutSet> lastSession,
     List<List<WorkoutSet>>? pastSessions,
@@ -89,6 +98,8 @@ abstract class IMLService {
     int maxReps = 12,
     Map<String, MuscleRecoveryStatus>? recoveryScores,
     List<String>? primaryMuscleIds,
+    ReadinessBand? readinessBand,
+    double sessionFatigueFactor = 0.0,
     DateTime? asOf,
   });
 

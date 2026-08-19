@@ -26,6 +26,9 @@ import 'ml_service.dart';
 import 'strategies/target_calculator.dart';
 import 'managers/program_manager.dart';
 import 'managers/history_manager.dart';
+import 'utils/effort_calibration.dart';
+import 'utils/exercise_history.dart';
+import 'utils/session_fatigue.dart';
 
 enum StartWorkoutConflictAction { resume, discardAndStart, cancel }
 
@@ -38,10 +41,16 @@ class WorkoutProvider extends ChangeNotifier {
   final IMLService _mlService;
   final HistoryManager? _historyManager;
   final Uuid _uuid = const Uuid();
+  final EffortCalibration _effortCalibration = const EffortCalibration();
+  final SessionFatigueAccumulator _sessionFatigueAccumulator =
+      const SessionFatigueAccumulator();
+
+  static const String _effortCalibrationOffsetKey = 'effort.calibrationOffset';
 
   // State
   List<WorkoutSession> _sessions = [];
   List<Routine> _routines = [];
+  double _effortCalibrationOffset = 0.0;
   List<Target> _targets = [];
   List<MuscleGroup> _muscleGroups = [];
   List<Exercise> _allExercises = [];
@@ -79,6 +88,11 @@ class WorkoutProvider extends ChangeNotifier {
   List<ExerciseLog> get currentExerciseLogs => _currentExerciseLogs;
   DateTime? get workoutStartTime => _workoutStartTime;
 
+  /// Rolling calibration offset for [EffortEstimator]'s RPE-8 anchor,
+  /// derived only from the once-per-workout effort chip (see
+  /// [recordSessionEffort]) — 0.0 until the user has ever answered it.
+  double get effortCalibrationOffset => _effortCalibrationOffset;
+
   /// Create WorkoutProvider with dependency injection.
   ///
   /// Following Dependency Inversion Principle: accepts abstractions
@@ -108,6 +122,8 @@ class WorkoutProvider extends ChangeNotifier {
     _routines = await _storage.getAllRoutines();
     _targets = await _storage.getAllTargets();
     _muscleGroups = await _storage.getAllMuscleGroups();
+    final storedOffset = await _storage.getSetting(_effortCalibrationOffsetKey);
+    _effortCalibrationOffset = double.tryParse(storedOffset ?? '') ?? 0.0;
     _allExercises = await _storage.getAllExercises();
     await programManager.loadPrograms();
     notifyListeners();
@@ -662,8 +678,18 @@ class WorkoutProvider extends ChangeNotifier {
   /// Get set recommendations for an exercise, optionally scoped by [handle].
   ///
   /// Uses up to 3 past sessions for this exercise (and handle variation) as the
-  /// basis for trend analysis and deload recovery.
-  List<SetRecommendation> getRecommendations(String exerciseId, {String? handle}) {
+  /// basis for trend analysis and deload recovery, plus the exercise's primary
+  /// muscle's recovery status so a still-fatigued muscle holds instead of
+  /// progressing.
+  /// [readinessBand] should come from the already-cached
+  /// `ReadinessManager.snapshot?.band` — this method never fetches it
+  /// itself, keeping recommendation generation synchronous/offline for the
+  /// in-workout hot path.
+  List<SetRecommendation> getRecommendations(
+    String exerciseId, {
+    String? handle,
+    ReadinessBand? readinessBand,
+  }) {
     final recent = getRecentSessionsForExercise(exerciseId, handle: handle, limit: 3);
 
     if (recent.isEmpty) {
@@ -674,10 +700,25 @@ class WorkoutProvider extends ChangeNotifier {
     // so it must not back a handle-scoped recommendation — that would mix
     // e.g. "Rope pushdown" trend data into a "Bar pushdown" recommendation.
     final useHandle = handle != null && handle.isNotEmpty;
+    final exerciseMap = {for (final e in _allExercises) e.id: e};
+    final recoveryInputs = recoveryRecommendationInputs(
+      exerciseId: exerciseId,
+      sessions: _sessions,
+      exerciseMap: exerciseMap,
+      mlService: _mlService,
+    );
+    final sessionFatigueFactor = _sessionFatigueAccumulator.factorFor(
+      exerciseLogs: _currentExerciseLogs,
+      excludeExerciseId: exerciseId,
+    );
     return _mlService.recommendSets(
       lastSession: recent.first,
       pastSessions: recent,
       growthModel: useHandle ? null : _growthModels[exerciseId],
+      recoveryScores: recoveryInputs.recoveryScores,
+      primaryMuscleIds: recoveryInputs.primaryMuscleIds,
+      sessionFatigueFactor: sessionFatigueFactor,
+      readinessBand: readinessBand,
     );
   }
 
@@ -826,6 +867,34 @@ class WorkoutProvider extends ChangeNotifier {
 
     // Recalculate targets for affected exercises
     await _recalculateTargets(allAffectedExerciseIds);
+
+    notifyListeners();
+  }
+
+  /// Records the once-per-workout effort chip (1 = Easy, 2 = Solid,
+  /// 3 = Brutal) for [sessionId] and folds it into the rolling
+  /// [effortCalibrationOffset]. Answering is optional — this is only ever
+  /// called from a user tap on the post-workout summary screen, never
+  /// required to finish a workout.
+  ///
+  /// Lighter than [updateWorkoutSession]: this only annotates metadata, so
+  /// it skips the growth-model/target retraining that method does for
+  /// exercise-data changes.
+  Future<void> recordSessionEffort(String sessionId, int chipValue) async {
+    final index = _sessions.indexWhere((s) => s.id == sessionId);
+    if (index == -1) return;
+
+    final updated = _sessions[index].copyWith(sessionEffort: chipValue);
+    await _storage.saveWorkoutSession(updated);
+    _sessions = List.from(_sessions)..[index] = updated;
+    _historyManager?.patchSession(updated);
+
+    _effortCalibrationOffset =
+        _effortCalibration.updateOffset(_effortCalibrationOffset, chipValue);
+    await _storage.saveSetting(
+      _effortCalibrationOffsetKey,
+      _effortCalibrationOffset.toString(),
+    );
 
     notifyListeners();
   }

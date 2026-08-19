@@ -78,6 +78,8 @@ class WorkoutSummaryScreen extends StatelessWidget {
                     ],
                     const SizedBox(height: AppSpacing.lg),
                     _buildExerciseSummary(session, provider),
+                    const SizedBox(height: AppSpacing.lg),
+                    _EffortChipRow(session: session),
                     const SizedBox(height: AppSpacing.xl),
                     GlowButton(
                       label: 'Done',
@@ -364,6 +366,79 @@ class _ExerciseSummaryRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Optional once-per-workout effort chip — "how did that feel?" — used only
+/// to calibrate [EffortEstimator]'s RPE anchor. Never required: skipping it
+/// leaves the rolling calibration offset unchanged.
+class _EffortChipRow extends StatefulWidget {
+  const _EffortChipRow({required this.session});
+
+  final WorkoutSession session;
+
+  @override
+  State<_EffortChipRow> createState() => _EffortChipRowState();
+}
+
+class _EffortChipRowState extends State<_EffortChipRow> {
+  static const _options = [
+    (value: 1, label: 'Easy', color: AppColors.success),
+    (value: 2, label: 'Solid', color: AppColors.secondary),
+    (value: 3, label: 'Brutal', color: AppColors.accent),
+  ];
+
+  late int? _selected = widget.session.sessionEffort;
+
+  void _select(int value) {
+    setState(() => _selected = value);
+    context.read<WorkoutProvider>().recordSessionEffort(widget.session.id, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const RFSectionHeader('How did that feel?'),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            for (final option in _options) ...[
+              Expanded(child: _buildChip(option)),
+              if (option != _options.last) const SizedBox(width: AppSpacing.sm),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChip(({int value, String label, Color color}) option) {
+    final isSelected = _selected == option.value;
+    return GestureDetector(
+      onTap: () => _select(option.value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: option.color.withValues(alpha: isSelected ? 0.2 : 0.08),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(
+            color: option.color.withValues(alpha: isSelected ? 0.8 : 0.3),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          option.label,
+          style: TextStyle(
+            color: isSelected ? option.color : AppColors.textMuted,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
