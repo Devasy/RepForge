@@ -200,12 +200,16 @@ class _AppInitializerState extends State<AppInitializer> {
       // so the opt-in flag is loaded; never blocks or fails app init.
       readiness.refresh();
 
-      // Fire-and-forget analytics in background.
-      api.sendHeartbeat();
-      api.trackEvent('app_open');
-      provider.getQuickStats().then((stats) => api.reportUsage(stats)).catchError(
-        (Object e) => debugPrint('Failed to report usage: $e'),
-      );
+      // Fire-and-forget analytics in background — never fires for F-Droid
+      // installs, and honors the user's Settings toggle otherwise. Must
+      // run after settings.init() so both are loaded.
+      if (settings.telemetryAllowed) {
+        api.sendHeartbeat();
+        api.trackEvent('app_open');
+        provider.getQuickStats().then((stats) => api.reportUsage(stats)).catchError(
+          (Object e) => debugPrint('Failed to report usage: $e'),
+        );
+      }
 
       if (!mounted) return;
       setState(() {
