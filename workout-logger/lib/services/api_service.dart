@@ -15,6 +15,16 @@ class ApiService {
     defaultValue: 'https://workout-logger-production-1e93.up.railway.app',
   );
 
+  /// Gates the *automatic* telemetry (heartbeat/app-open/usage-report) sent
+  /// on every launch. Off by default in the F-Droid build
+  /// (`--dart-define=ANALYTICS_ENABLED=false`, see fdroiddata build recipe)
+  /// since that build has no Tracking AntiFeature disclosure. Does not gate
+  /// [backupData], which is a user-initiated action, not passive telemetry.
+  static const bool _analyticsEnabled = bool.fromEnvironment(
+    'ANALYTICS_ENABLED',
+    defaultValue: true,
+  );
+
   static final ApiService _instance = ApiService._internal();
 
   factory ApiService() => _instance;
@@ -57,6 +67,7 @@ class ApiService {
   // ───────── ingest helpers ─────────
 
   Future<void> sendHeartbeat() async {
+    if (!_analyticsEnabled) return;
     try {
       final id = await userAppId;
       final body = {
@@ -85,6 +96,7 @@ class ApiService {
     String event, {
     Map<String, dynamic>? metadata,
   }) async {
+    if (!_analyticsEnabled) return;
     try {
       final id = await userAppId;
       final body = {
@@ -112,6 +124,7 @@ class ApiService {
   }
 
   Future<void> reportUsage(Map<String, dynamic> stats) async {
+    if (!_analyticsEnabled) return;
     try {
       final id = await userAppId;
       final payload = {
