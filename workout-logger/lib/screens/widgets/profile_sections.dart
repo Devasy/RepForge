@@ -356,18 +356,14 @@ class DataManagementSection extends StatelessWidget {
     super.key,
     required this.isExporting,
     required this.isImporting,
-    required this.isBackingUp,
     required this.onExport,
     required this.onImport,
-    required this.onCloudBackup,
   });
 
   final bool isExporting;
   final bool isImporting;
-  final bool isBackingUp;
   final VoidCallback? onExport;
   final VoidCallback? onImport;
-  final VoidCallback? onCloudBackup;
 
   @override
   Widget build(BuildContext context) {
@@ -375,7 +371,7 @@ class DataManagementSection extends StatelessWidget {
       icon: Icons.storage_rounded,
       iconColor: AppColors.secondary,
       title: 'Data Management',
-      subtitle: 'Export, import, or backup your workout data',
+      subtitle: 'Export or import your workout data',
       child: Column(
         children: [
           _ActionTile(
@@ -395,77 +391,67 @@ class DataManagementSection extends StatelessWidget {
             loading: isImporting,
             onTap: onImport,
           ),
-          const _SectionDivider(),
-          _ActionTile(
-            icon: Icons.cloud_upload_outlined,
-            iconColor: AppColors.primary,
-            title: 'Cloud Backup',
-            subtitle: 'Sync to RepForge cloud (requires account)',
-            loading: isBackingUp,
-            onTap: onCloudBackup,
-          ),
         ],
       ),
     );
   }
 }
 
-// ── Cloud Sync section (placeholder) ─────────────────────────────────────────
-class CloudSyncSection extends StatelessWidget {
-  const CloudSyncSection({super.key});
+// ── Privacy section ────────────────────────────────────────────────────────────
+class PrivacySection extends StatelessWidget {
+  const PrivacySection({super.key, required this.settings});
+
+  final SettingsProvider settings;
+
+  static const _color = AppColors.textSoft;
 
   @override
   Widget build(BuildContext context) {
+    final isFdroid = settings.isFdroidInstall;
+    final enabled = settings.telemetryAllowed;
     return _ProfileSection(
-      icon: Icons.sync_rounded,
-      iconColor: AppColors.warning,
-      title: 'Cloud Sync',
-      subtitle: 'Sync your data across devices',
-      trailing: const _ComingSoonBadge(),
+      icon: Icons.privacy_tip_outlined,
+      iconColor: _color,
+      title: 'Privacy',
+      subtitle: 'Control anonymous usage data',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionLabel('MONGODB CONNECTION STRING'),
-          const SizedBox(height: AppSpacing.sm),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.glass,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(color: AppColors.glassBorder),
-            ),
-            child: TextField(
-              enabled: false,
-              style: TextStyle(fontFamily: 'GeistMono', 
-                color: AppColors.textFaint,
-                fontSize: 12,
-              ),
-              decoration: InputDecoration(
-                hintText: 'mongodb+srv://user:pass@cluster.mongodb.net/db',
-                hintStyle: TextStyle(fontFamily: 'GeistMono', 
-                  color: AppColors.textFaint,
-                  fontSize: 12,
-                ),
-                prefixIcon: const Icon(
-                  Icons.link_rounded,
-                  color: AppColors.textFaint,
-                  size: 16,
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm + 4,
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Share anonymous usage data',
+                      style: TextStyle(fontFamily: 'Geist',
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isFdroid
+                          ? 'Always off for F-Droid installs'
+                          : 'Install ID, platform, and workout counts — no personal data',
+                      style: TextStyle(fontFamily: 'Geist',
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Cloud sync with custom MongoDB will be available in a future update.',
-            style: TextStyle(fontFamily: 'Geist', 
-              color: AppColors.textFaint,
-              fontSize: 11,
-              fontStyle: FontStyle.italic,
-            ),
+              Switch(
+                value: enabled,
+                onChanged: isFdroid
+                    ? null
+                    : (v) => settings.setAnalyticsEnabled(v),
+                activeThumbColor: _color,
+                activeTrackColor: _color.withValues(alpha: 0.35),
+              ),
+            ],
           ),
         ],
       ),
@@ -1151,31 +1137,6 @@ class _DebugLogSheet extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _ComingSoonBadge extends StatelessWidget {
-  const _ComingSoonBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.warning.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.full),
-        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
-      ),
-      child: Text(
-        'Soon',
-        style: TextStyle(fontFamily: 'Geist', 
-          color: AppColors.warning,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.3,
-        ),
-      ),
     );
   }
 }
