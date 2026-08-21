@@ -20,8 +20,7 @@ class SettingsProvider extends ChangeNotifier {
   String _weeklyInsights = '';
   DateTime? _weeklyInsightsDate;
   bool _showAdvancedMetrics = false;
-  bool _analyticsEnabled = true;
-  bool _isFdroidInstall = false;
+  bool _analyticsEnabled = false;
 
   WeightUnit get weightUnit => _weightUnit;
   double get weightIncrement => _weightIncrement;
@@ -36,21 +35,12 @@ class SettingsProvider extends ChangeNotifier {
   DateTime? get weeklyInsightsDate => _weeklyInsightsDate;
   bool get showAdvancedMetrics => _showAdvancedMetrics;
 
-  /// Whether this install came from the F-Droid client (detected at runtime
-  /// via the Android installer package name — never baked in at compile
-  /// time, since a compile-time difference between the F-Droid build and
-  /// the GitHub release binary would break F-Droid's byte-for-byte
-  /// reproducible-build verification against `Binaries:` in fdroiddata).
-  bool get isFdroidInstall => _isFdroidInstall;
-
-  /// User's analytics preference, as stored. F-Droid installs are always
-  /// telemetry-free regardless of this value — see [telemetryAllowed].
-  bool get analyticsEnabled => _analyticsEnabled;
-
   /// Whether automatic telemetry (heartbeat/app-open/usage-report) may
-  /// fire. False for F-Droid installs unconditionally; otherwise follows
-  /// the user's setting.
-  bool get telemetryAllowed => _analyticsEnabled && !_isFdroidInstall;
+  /// fire. Off by default for every install — installer identity (F-Droid
+  /// vs. sideload vs. Play) isn't a reliable signal, since there are
+  /// multiple F-Droid client apps and installer info can be unreadable.
+  /// Users opt in via the Privacy toggle in Settings.
+  bool get analyticsEnabled => _analyticsEnabled;
 
   SettingsProvider(this._storage);
 
@@ -80,14 +70,7 @@ class SettingsProvider extends ChangeNotifier {
     _showAdvancedMetrics = advMetrics == 'true';
 
     final analytics = await _storage.getSetting('analyticsEnabled');
-    _analyticsEnabled = analytics != 'false';
-
-    try {
-      final info = await PackageInfo.fromPlatform();
-      _isFdroidInstall = info.installerStore == 'org.fdroid.fdroid';
-    } catch (_) {
-      _isFdroidInstall = false;
-    }
+    _analyticsEnabled = analytics == 'true';
   }
 
   Future<void> setUserName(String name) async {

@@ -407,8 +407,6 @@ class PrivacySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isFdroid = settings.isFdroidInstall;
-    final enabled = settings.telemetryAllowed;
     return _ProfileSection(
       icon: Icons.privacy_tip_outlined,
       iconColor: _color,
@@ -432,9 +430,7 @@ class PrivacySection extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      isFdroid
-                          ? 'Always off for F-Droid installs'
-                          : 'Install ID, platform, and workout counts — no personal data',
+                      'Off by default. Install ID, platform, and workout counts — no personal data',
                       style: TextStyle(fontFamily: 'Geist',
                         color: AppColors.textMuted,
                         fontSize: 12,
@@ -444,10 +440,8 @@ class PrivacySection extends StatelessWidget {
                 ),
               ),
               Switch(
-                value: enabled,
-                onChanged: isFdroid
-                    ? null
-                    : (v) => settings.setAnalyticsEnabled(v),
+                value: settings.analyticsEnabled,
+                onChanged: (v) => settings.setAnalyticsEnabled(v),
                 activeThumbColor: _color,
                 activeTrackColor: _color.withValues(alpha: 0.35),
               ),
