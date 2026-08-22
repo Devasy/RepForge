@@ -107,22 +107,23 @@ class ReadinessCard extends StatelessWidget {
   /// One line of evidence from the weakest available component.
   static String _subtitle(ReadinessSnapshot s) {
     final parts = <(int, String)>[
-      if (s.sleepScore != null)
+      if (s.sleepScore != null && s.sleepMinutes != null && s.sleepBaselineMinutes != null)
         (
           s.sleepScore!,
           'Sleep ${_fmtSleep(s.sleepMinutes!)} vs ${_fmtSleep(s.sleepBaselineMinutes!.round())} avg'
         ),
-      if (s.rhrScore != null)
+      if (s.rhrScore != null && s.restingHr != null && s.rhrBaseline != null)
         (
           s.rhrScore!,
           'Resting HR ${s.restingHr!.round()} vs ${s.rhrBaseline!.round()} avg'
         ),
-      if (s.hrvScore != null)
+      if (s.hrvScore != null && s.hrvMs != null && s.hrvBaseline != null)
         (
           s.hrvScore!,
           'HRV ${s.hrvMs!.round()}ms vs ${s.hrvBaseline!.round()}ms avg'
         ),
     ];
+    if (parts.isEmpty) return 'Ready to train';
     parts.sort((a, b) => a.$1.compareTo(b.$1));
     return parts.first.$2;
   }

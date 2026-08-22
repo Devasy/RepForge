@@ -70,6 +70,7 @@ class Exercise {
   final List<MuscleActivation> muscleActivations;
   final String category; // 'compound' or 'isolation'
   final bool isCustom; // User-created exercise
+  final List<String>? availableHandles; // Attachment/handle options e.g. ['Rope', 'Bar']
 
   Exercise({
     required this.id,
@@ -77,6 +78,7 @@ class Exercise {
     required this.muscleActivations,
     required this.category,
     this.isCustom = false,
+    this.availableHandles,
   });
 
   String get primaryMuscle {
@@ -93,6 +95,7 @@ class Exercise {
     'muscleActivations': muscleActivations.map((m) => m.toJson()).toList(),
     'category': category,
     'isCustom': isCustom,
+    'availableHandles': availableHandles,
   };
 
   factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
@@ -103,6 +106,7 @@ class Exercise {
         .toList(),
     category: json['category'],
     isCustom: json['isCustom'] ?? false,
+    availableHandles: (json['availableHandles'] as List?)?.cast<String>(),
   );
 }
 
@@ -115,6 +119,10 @@ class WorkoutSet {
   final List<DropsetEntry>? drops; // For dropsets
   final int? timeTaken; // seconds
   final DateTime timestamp;
+  final double? assistWeight;
+  final double? extraWeight;
+  final String? handle;
+  final double? bodyWeightAtLog;
 
   WorkoutSet({
     required this.weight,
@@ -123,17 +131,46 @@ class WorkoutSet {
     this.drops,
     this.timeTaken,
     DateTime? timestamp,
+    this.assistWeight,
+    this.extraWeight,
+    this.handle,
+    this.bodyWeightAtLog,
   }) : timestamp = timestamp ?? DateTime.now();
 
-  double get volume {
-    double vol = weight * reps;
+  /// Per-rep effective load for the main (non-drop) entry of this set: for
+  /// assisted-bodyweight sets (i.e. [assistWeight] is set) this is
+  /// `bodyweight − assist + extra`, snapshotted against [bodyWeightAtLog]
+  /// (falling back to 70.0) so historical values stay correct even if the
+  /// user's current bodyweight later changes. Conventional (non-assisted)
+  /// sets just use [weight]. Use this (not raw [weight]) wherever a
+  /// "how heavy was this set" comparison needs to be consistent with
+  /// [calculateVolume] for assisted-bodyweight exercises.
+  double get effectiveWeight {
+    final assist = assistWeight;
+    if (assist == null) return weight;
+    final bw = bodyWeightAtLog ?? 70.0;
+    return max(0.0, bw - assist + (extraWeight ?? 0.0));
+  }
+
+  double calculateVolume({double? userBodyWeight, bool? isAssistedBW}) {
+    final assisted = isAssistedBW ?? (assistWeight != null);
+    final bw = bodyWeightAtLog ?? userBodyWeight ?? 70.0;
+    final effW = assisted
+        ? max(0.0, bw - (assistWeight ?? weight) + (extraWeight ?? 0.0))
+        : weight;
+    double vol = effW * reps;
     if (isDropset && drops != null) {
-      for (var drop in drops!) {
-        vol += drop.weight * drop.reps;
+      for (final drop in drops!) {
+        final dropEff = assisted
+            ? max(0.0, bw - drop.weight + (extraWeight ?? 0.0))
+            : drop.weight;
+        vol += dropEff * drop.reps;
       }
     }
     return vol;
   }
+
+  double get volume => calculateVolume();
 
   Map<String, dynamic> toJson() => {
     'weight': weight,
@@ -142,6 +179,10 @@ class WorkoutSet {
     'drops': drops?.map((d) => d.toJson()).toList(),
     'timeTaken': timeTaken,
     'timestamp': timestamp.toIso8601String(),
+    'assistWeight': assistWeight,
+    'extraWeight': extraWeight,
+    'handle': handle,
+    'bodyWeightAtLog': bodyWeightAtLog,
   };
 
   factory WorkoutSet.fromJson(Map<String, dynamic> json) => WorkoutSet(
@@ -153,6 +194,10 @@ class WorkoutSet {
         : null,
     timeTaken: json['timeTaken'],
     timestamp: DateTime.parse(json['timestamp']),
+    assistWeight: (json['assistWeight'] as num?)?.toDouble(),
+    extraWeight: (json['extraWeight'] as num?)?.toDouble(),
+    handle: json['handle'] as String?,
+    bodyWeightAtLog: (json['bodyWeightAtLog'] as num?)?.toDouble(),
   );
 
   WorkoutSet copyWith({
@@ -162,6 +207,10 @@ class WorkoutSet {
     Object? drops = _sentinel,
     Object? timeTaken = _sentinel,
     Object? timestamp = _sentinel,
+    Object? assistWeight = _sentinel,
+    Object? extraWeight = _sentinel,
+    Object? handle = _sentinel,
+    Object? bodyWeightAtLog = _sentinel,
   }) => WorkoutSet(
     weight: weight == _sentinel ? this.weight : weight as double,
     reps: reps == _sentinel ? this.reps : reps as int,
@@ -169,6 +218,10 @@ class WorkoutSet {
     drops: drops == _sentinel ? this.drops : drops as List<DropsetEntry>?,
     timeTaken: timeTaken == _sentinel ? this.timeTaken : timeTaken as int?,
     timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime?,
+    assistWeight: assistWeight == _sentinel ? this.assistWeight : assistWeight as double?,
+    extraWeight: extraWeight == _sentinel ? this.extraWeight : extraWeight as double?,
+    handle: handle == _sentinel ? this.handle : handle as String?,
+    bodyWeightAtLog: bodyWeightAtLog == _sentinel ? this.bodyWeightAtLog : bodyWeightAtLog as double?,
   );
 }
 
@@ -195,8 +248,17 @@ class ExerciseLog {
   final String exerciseId;
   final List<WorkoutSet> sets;
   final String? notes;
+  final String? handle;
 
-  ExerciseLog({required this.exerciseId, required this.sets, this.notes});
+  ExerciseLog({
+    required this.exerciseId,
+    required this.sets,
+    this.notes,
+    this.handle,
+  });
+
+  double calculateTotalVolume({double? userBodyWeight, bool? isAssistedBW}) =>
+      sets.fold(0.0, (sum, set) => sum + set.calculateVolume(userBodyWeight: userBodyWeight, isAssistedBW: isAssistedBW));
 
   double get totalVolume => sets.fold(0.0, (sum, set) => sum + set.volume);
 
@@ -204,24 +266,28 @@ class ExerciseLog {
     'exerciseId': exerciseId,
     'sets': sets.map((s) => s.toJson()).toList(),
     'notes': notes,
+    'handle': handle,
   };
 
   factory ExerciseLog.fromJson(Map<String, dynamic> json) => ExerciseLog(
     exerciseId: json['exerciseId'],
     sets: (json['sets'] as List).map((s) => WorkoutSet.fromJson(s)).toList(),
     notes: json['notes'],
+    handle: json['handle'] as String?,
   );
 
   ExerciseLog copyWith({
     Object? exerciseId = _sentinel,
     Object? sets = _sentinel,
     Object? notes = _sentinel,
+    Object? handle = _sentinel,
   }) => ExerciseLog(
     exerciseId: exerciseId == _sentinel
         ? this.exerciseId
         : exerciseId as String,
     sets: sets == _sentinel ? this.sets : sets as List<WorkoutSet>,
     notes: notes == _sentinel ? this.notes : notes as String?,
+    handle: handle == _sentinel ? this.handle : handle as String?,
   );
 }
 

@@ -16,11 +16,13 @@ class SettingsProvider extends ChangeNotifier {
   String? _userName;
   String? _lastSeenVersion;
   String _geminiApiKey = '';
-  String _geminiModel = 'gemini-2.5-flash';
+  String _geminiModel = 'gemini-3.6-flash';
   String _weeklyInsights = '';
   DateTime? _weeklyInsightsDate;
   bool _showAdvancedMetrics = false;
   bool _analyticsEnabled = false;
+
+  double _userBodyWeight = 70.0;
 
   WeightUnit get weightUnit => _weightUnit;
   double get weightIncrement => _weightIncrement;
@@ -34,6 +36,7 @@ class SettingsProvider extends ChangeNotifier {
   String get weeklyInsights => _weeklyInsights;
   DateTime? get weeklyInsightsDate => _weeklyInsightsDate;
   bool get showAdvancedMetrics => _showAdvancedMetrics;
+  double get userBodyWeight => _userBodyWeight;
 
   /// Whether automatic telemetry (heartbeat/app-open/usage-report) may
   /// fire. Off by default for every install — installer identity (F-Droid
@@ -53,6 +56,10 @@ class SettingsProvider extends ChangeNotifier {
         ? (double.tryParse(increment) ?? _defaultIncrement)
         : _defaultIncrement;
 
+    final bw = await _storage.getSetting('userBodyWeight');
+    final parsedBw = bw != null ? double.tryParse(bw) : null;
+    _userBodyWeight = _isValidBodyWeight(parsedBw) ? parsedBw! : 70.0;
+
     final hcEnabled = await _storage.getSetting('healthConnectEnabled');
     _healthConnectEnabled = hcEnabled == 'true';
 
@@ -62,7 +69,7 @@ class SettingsProvider extends ChangeNotifier {
     _userName = await _storage.getSetting('userName');
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
-    _geminiModel = await _storage.getSetting('geminiModel') ?? 'gemini-2.5-flash';
+    _geminiModel = await _storage.getSetting('geminiModel') ?? 'gemini-3.6-flash';
     _weeklyInsights = await _storage.getSetting('weeklyInsights') ?? '';
     final dateStr = await _storage.getSetting('weeklyInsightsDate');
     _weeklyInsightsDate = dateStr != null ? DateTime.tryParse(dateStr) : null;
@@ -71,6 +78,17 @@ class SettingsProvider extends ChangeNotifier {
 
     final analytics = await _storage.getSetting('analyticsEnabled');
     _analyticsEnabled = analytics == 'true';
+  }
+
+  /// A valid bodyweight must be finite (not NaN/Infinity) and strictly positive.
+  static bool _isValidBodyWeight(double? weight) =>
+      weight != null && weight.isFinite && weight > 0;
+
+  Future<void> setUserBodyWeight(double weight) async {
+    if (!_isValidBodyWeight(weight)) return;
+    _userBodyWeight = weight;
+    await _storage.saveSetting('userBodyWeight', weight.toString());
+    notifyListeners();
   }
 
   Future<void> setUserName(String name) async {

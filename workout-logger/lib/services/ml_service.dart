@@ -357,13 +357,54 @@ class MLService implements IMLService {
   @override
   List<SetRecommendation> recommendSets({
     required List<WorkoutSet> lastSession,
+    List<List<WorkoutSet>>? pastSessions,
     GrowthModel? growthModel,
     int minReps = 6,
     int maxReps = 12,
     Map<String, MuscleRecoveryStatus>? recoveryScores,
     List<String>? primaryMuscleIds,
   }) {
-    if (lastSession.isEmpty) return [];
+    if (lastSession.isEmpty && (pastSessions == null || pastSessions.isEmpty)) {
+      return [];
+    }
+
+    // Determine target reference sets and deload status based on past 3 sessions trend
+    List<WorkoutSet> refSets = lastSession;
+    bool isPostDeloadRecovery = false;
+
+    if (pastSessions != null && pastSessions.length >= 2) {
+      final s0 = pastSessions[0];
+      final s1 = pastSessions[1];
+
+      if (s0.isNotEmpty && s1.isNotEmpty) {
+        // Use effective load (bodyweight − assist + extra for assisted-BW
+        // sets), not raw set.weight, so assist changes on machines like
+        // assisted dips/pull-ups aren't misread as a deload/progression.
+        final w0 = s0.map((s) => s.effectiveWeight).reduce(max);
+        final w1 = s1.map((s) => s.effectiveWeight).reduce(max);
+        final v0 = s0.fold(0.0, (sum, s) => sum + s.volume);
+        final v1 = s1.fold(0.0, (sum, s) => sum + s.volume);
+
+        // Only treat this as "recovering from a deload" if the most recent
+        // session (s0) is actually recent — otherwise an old, unrelated dip
+        // between two stale sessions after a long break would be
+        // misread as an active deload to recover from.
+        final mostRecentTimestamp =
+            s0.map((s) => s.timestamp).reduce((a, b) => a.isAfter(b) ? a : b);
+        final isRecent =
+            DateTime.now().difference(mostRecentTimestamp).inDays <= 21;
+
+        // If the last session (s0) was a deload (weight < 85% of s1 or volume < 70% of s1)
+        if (isRecent &&
+            ((w1 > 0 && w0 < w1 * 0.85) || (v1 > 0 && v0 < v1 * 0.70))) {
+          refSets = s1;
+          isPostDeloadRecovery = true;
+        }
+      }
+    }
+
+    if (refSets.isEmpty) refSets = lastSession;
+    if (refSets.isEmpty) return [];
 
     final trendIsTrustworthy =
         growthModel != null && growthModel.r2 > _minR2ForTrendSignal;
@@ -384,7 +425,7 @@ class MLService implements IMLService {
             .fold(100, (a, b) => a < b ? a : b)
         : null;
 
-    return lastSession
+    return refSets
         .map((set) => _doubleProgression(
               set: set,
               minReps: minReps,
@@ -393,6 +434,7 @@ class MLService implements IMLService {
               isDeclining: isDeclining,
               isUnderRecovered: isUnderRecovered,
               recoveryPercent: worstRecovery,
+              isPostDeloadRecovery: isPostDeloadRecovery,
             ))
         .toList();
   }
@@ -405,6 +447,7 @@ class MLService implements IMLService {
     required bool isDeclining,
     required bool isUnderRecovered,
     int? recoveryPercent,
+    bool isPostDeloadRecovery = false,
   }) {
     if (isUnderRecovered) {
       return SetRecommendation(
@@ -413,6 +456,19 @@ class MLService implements IMLService {
         confidence: 'low',
         reasoning:
             'Muscle only $recoveryPercent% recovered — maintain load, skip progression',
+      );
+    }
+
+    if (isPostDeloadRecovery) {
+      return SetRecommendation(
+        weight: set.weight,
+        reps: set.reps,
+        confidence: 'high',
+        // No raw weight value embedded here — the recommended weight/unit
+        // is already surfaced via SetRecommendation.weight and formatted by
+        // the presentation layer according to the user's unit preference.
+        reasoning:
+            'Resuming training after deload — anchored on pre-deload baseline (${set.reps} reps)',
       );
     }
 

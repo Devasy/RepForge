@@ -2,7 +2,6 @@
 // All widgets consume AppColors/AppSpacing/AppRadius tokens only.
 
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
@@ -135,148 +134,10 @@ class AmbientGlow extends StatelessWidget {
   }
 }
 
-// ── RFNavBar ─────────────────────────────────────────────────────────────────
-// Premium floating glassmorphic bottom navigation bar with perfect rounded blur,
-// deep drop shadow, and clean transparent padding so it sits elegantly above the content.
-class RFNavBar extends StatelessWidget {
-  const RFNavBar({
-    super.key,
-    required this.currentIndex,
-    required this.onTap,
-    required this.items,
-  });
+// ── Nav bar ──────────────────────────────────────────────────────────────────
+// Moved to floating_nav_bar.dart (zero-dependency, drop-in portable widget).
+// Import and use FloatingNavBar / FloatingNavBarScaffold / FloatingNavItem.
 
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-  final List<RFNavItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return Container(
-      color: Colors.transparent, // Completely transparent outer container
-      padding: EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        bottomPadding > 0 ? bottomPadding + 8 : 16,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
-              blurRadius: 28,
-              spreadRadius: -4,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.8), // Sleek transparent surface
-                borderRadius: BorderRadius.circular(AppRadius.xxl),
-                border: Border.all(
-                  color: AppColors.glassBorderStrong,
-                  width: 1.5,
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(items.length, (i) {
-                  final active = i == currentIndex;
-                  return _NavItem(
-                    item: items[i],
-                    active: active,
-                    onTap: () => onTap(i),
-                  );
-                }),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class RFNavItem {
-  const RFNavItem({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.item,
-    required this.active,
-    required this.onTap,
-  });
-
-  final RFNavItem item;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: item.label,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          width: 60,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Accent indicator above icon
-              AnimatedContainer(
-                duration: AppDurations.normal,
-                width: active ? 18 : 0,
-                height: 2,
-                margin: const EdgeInsets.only(bottom: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(2),
-                  color: AppColors.primary,
-                  boxShadow: active
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.6),
-                            blurRadius: 6,
-                          ),
-                        ]
-                      : null,
-                ),
-              ),
-              Icon(
-                item.icon,
-                size: 19,
-                color: active ? AppColors.textPrimary : AppColors.textMuted,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                item.label,
-                style: TextStyle(fontFamily: 'Geist', 
-                  fontSize: 10,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                  color: active ? AppColors.textPrimary : AppColors.textMuted,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ── GlowButton ──────────────────────────────────────────────────────────────
 // Full-width primary action button with glow shadow + haptic feedback.
@@ -1037,3 +898,110 @@ class _SkeletonBoxState extends State<SkeletonBox>
     );
   }
 }
+
+// ── RFTextField ─────────────────────────────────────────────────────────────
+/// Standardized RepForge glassmorphic text input field.
+class RFTextField extends StatefulWidget {
+  const RFTextField({
+    super.key,
+    required this.controller,
+    required this.hint,
+    this.label,
+    this.keyboardType,
+    this.inputFormatters,
+    this.maxLines = 1,
+    this.onChanged,
+    this.prefixIcon,
+    this.suffixIcon,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final String? label;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final int maxLines;
+  final ValueChanged<String>? onChanged;
+  final IconData? prefixIcon;
+  final Widget? suffixIcon;
+
+  @override
+  State<RFTextField> createState() => _RFTextFieldState();
+}
+
+class _RFTextFieldState extends State<RFTextField> {
+  late final FocusNode _focusNode;
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    setState(() => _isFocused = _focusNode.hasFocus);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.label != null) ...[
+          Text(
+            widget.label!,
+            style: const TextStyle(
+              fontFamily: 'GeistMono',
+              color: AppColors.textSoft,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: _isFocused ? AppColors.primary : AppColors.glassBorder,
+              width: _isFocused ? 1.5 : 1.0,
+            ),
+          ),
+          child: TextField(
+            controller: widget.controller,
+            focusNode: _focusNode,
+            keyboardType: widget.keyboardType,
+            inputFormatters: widget.inputFormatters,
+            maxLines: widget.maxLines,
+            onChanged: widget.onChanged,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+              prefixIcon: widget.prefixIcon != null
+                  ? Icon(widget.prefixIcon, color: AppColors.textSoft, size: 20)
+                  : null,
+              suffixIcon: widget.suffixIcon,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+

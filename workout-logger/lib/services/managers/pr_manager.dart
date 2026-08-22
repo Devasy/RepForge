@@ -44,7 +44,10 @@ class PRManager extends ChangeNotifier {
     }
   }
 
-  PersonalRecord? getRecord(String exerciseId) => _cache[exerciseId];
+  PersonalRecord? getRecord(String exerciseId, {String? handle}) {
+    final key = (handle != null && handle.isNotEmpty) ? '$exerciseId:$handle' : exerciseId;
+    return _cache[key] ?? _cache[exerciseId];
+  }
 
   /// Compare each exercise log in [session] against stored PRs.
   ///
@@ -67,7 +70,9 @@ class PRManager extends ChangeNotifier {
   }
 
   Future<Set<String>> _checkExercise(ExerciseLog log, DateTime date) async {
-    final existing = _cache[log.exerciseId];
+    final handle = log.handle ?? log.sets.where((s) => s.handle != null).firstOrNull?.handle;
+    final key = (handle != null && handle.isNotEmpty) ? '${log.exerciseId}:$handle' : log.exerciseId;
+    final existing = _cache[key];
 
     double newBestWeight = existing?.bestWeight ?? 0;
     int newBestReps = existing?.bestReps ?? 0;
@@ -91,13 +96,13 @@ class PRManager extends ChangeNotifier {
     if (broken.isEmpty) return broken;
 
     final updated = PersonalRecord(
-      exerciseId: log.exerciseId,
+      exerciseId: key,
       bestWeight: newBestWeight,
       bestReps: newBestReps,
       bestVolume: newBestVolume,
       achievedAt: date,
     );
-    _cache[log.exerciseId] = updated;
+    _cache[key] = updated;
     await _storage.savePersonalRecord(updated);
 
     return broken;

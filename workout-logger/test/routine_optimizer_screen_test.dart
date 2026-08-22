@@ -59,6 +59,30 @@ class _ImmediateAi implements IAiService {
 
   @override
   Future<String> generateInsight(String system, String context) async => '';
+
+  @override
+  Stream<String> streamChatReply({
+    required String userMessage,
+    required String systemPrompt,
+    required List<Content> history,
+    List<Tool>? tools,
+    Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+  }) =>
+      streamCoachReply(
+        userMessage: userMessage,
+        systemPrompt: systemPrompt,
+        history: history,
+        tools: tools,
+        onToolCall: onToolCall,
+      );
+
+  @override
+  Future<T> generateStructuredJson<T>({
+    required String systemPrompt,
+    required String userPrompt,
+    required T Function(Map<String, dynamic> json) fromJson,
+  }) =>
+      throw UnimplementedError();
 }
 
 /// AI that hangs indefinitely — keeps `isLoading` true for the entire test.
@@ -94,6 +118,30 @@ class _HangingAi implements IAiService {
 
   @override
   Future<String> generateInsight(String system, String context) async => '';
+
+  @override
+  Stream<String> streamChatReply({
+    required String userMessage,
+    required String systemPrompt,
+    required List<Content> history,
+    List<Tool>? tools,
+    Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+  }) =>
+      streamCoachReply(
+        userMessage: userMessage,
+        systemPrompt: systemPrompt,
+        history: history,
+        tools: tools,
+        onToolCall: onToolCall,
+      );
+
+  @override
+  Future<T> generateStructuredJson<T>({
+    required String systemPrompt,
+    required String userPrompt,
+    required T Function(Map<String, dynamic> json) fromJson,
+  }) =>
+      throw UnimplementedError();
 }
 
 /// AI that fires an `ask_user_questions` tool call before yielding a reply.
@@ -138,6 +186,30 @@ class _QuestionAi implements IAiService {
 
   @override
   Future<String> generateInsight(String system, String context) async => '';
+
+  @override
+  Stream<String> streamChatReply({
+    required String userMessage,
+    required String systemPrompt,
+    required List<Content> history,
+    List<Tool>? tools,
+    Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+  }) =>
+      streamCoachReply(
+        userMessage: userMessage,
+        systemPrompt: systemPrompt,
+        history: history,
+        tools: tools,
+        onToolCall: onToolCall,
+      );
+
+  @override
+  Future<T> generateStructuredJson<T>({
+    required String systemPrompt,
+    required String userPrompt,
+    required T Function(Map<String, dynamic> json) fromJson,
+  }) =>
+      throw UnimplementedError();
 }
 
 // ── Test helpers ───────────────────────────────────────────────────────────
@@ -150,7 +222,7 @@ RoutineOptimizerViewModel _buildVm(IAiService ai) {
   final pr = PRManager(storage);
   final conversations = ConversationManager(storage, kind: 'optimizer');
   final settings = SettingsProvider(storage);
-  final coachTools = CoachToolService(wp, pr);
+  final coachTools = CoachToolService(workoutProvider: wp, prManager: pr);
   return RoutineOptimizerViewModel(
     ai: ai,
     coachTools: coachTools,

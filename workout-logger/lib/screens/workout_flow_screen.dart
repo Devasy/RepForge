@@ -168,7 +168,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final exercise = provider.currentExercise;
     if (exercise == null) return;
 
-    final last = provider.getLastSessionForExercise(exercise.id);
+    final currentHandle = provider.currentExerciseLog?.handle;
+    final last = provider.getLastSessionForExercise(
+      exercise.id,
+      handle: currentHandle,
+    );
     if (last != null && last.sets.isNotEmpty) {
       final lastSet = last.sets.last;
       setState(() {
@@ -265,12 +269,13 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final isFirst = idx == 0;
     final isLast = idx >= totalExercises - 1;
 
+    final selectedHandle = log?.handle;
     final recommendations = exercise != null
-        ? provider.getRecommendations(exercise.id)
+        ? provider.getRecommendations(exercise.id, handle: selectedHandle)
         : <SetRecommendation>[];
 
     final lastSession = exercise != null
-        ? provider.getLastSessionForExercise(exercise.id)
+        ? provider.getLastSessionForExercise(exercise.id, handle: selectedHandle)
         : null;
 
     return Column(
@@ -316,6 +321,12 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               lastSession: lastSession,
               settings: settings,
               exerciseId: exercise?.id,
+              availableHandles: exercise?.availableHandles,
+              selectedHandle: selectedHandle,
+              onHandleChanged: (h) {
+                provider.setExerciseHandle(h);
+                _loadLastSessionData();
+              },
               programSlot: _slot(idx, p: provider),
               programWeek: _resolvedWeek(provider),
               onWeightChanged: (v) => setState(() => _currentWeight = v),
@@ -534,15 +545,26 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   void _completeSet() {
     final provider = context.read<WorkoutProvider>();
+    final settings = context.read<SettingsProvider>();
     final idx = provider.currentExerciseIndex;
     final currentSlot = _slot(idx, p: provider);
     final nextSlot = _slot(idx + 1, p: provider);
+
+    // For bodyweight-assisted exercises (assisted dips/pull-ups/etc.) the
+    // weight input represents the assist load, not the lifted load. Snapshot
+    // the assist weight and the bodyweight it was computed against so
+    // historical volume stays correct even if the user's bodyweight later
+    // changes in settings.
+    final isAssistedBW =
+        isAssistedBodyweightExercise(provider.currentExercise?.id);
 
     final set = WorkoutSet(
       weight: _currentWeight,
       reps: _currentReps,
       isDropset: _isDropset,
       drops: _isDropset ? List.from(_drops) : null,
+      assistWeight: isAssistedBW ? _currentWeight : null,
+      bodyWeightAtLog: isAssistedBW ? settings.userBodyWeight : null,
     );
 
     provider.addSet(set);
@@ -684,8 +706,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   await context.read<WorkoutProvider>().finishWorkout();
               final newPRs = await prManager.checkAndUpdatePRs(session);
               if (!mounted) return;
-              nav.pop();
-              nav.push(MaterialPageRoute(
+              nav.pushReplacement(MaterialPageRoute(
                 builder: (_) => WorkoutSummaryScreen(
                   session: session,
                   newPRs: newPRs,

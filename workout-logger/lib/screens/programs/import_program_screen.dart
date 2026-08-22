@@ -269,7 +269,6 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['json'],
-        allowMultiple: false,
       );
       if (result == null || result.files.isEmpty) return;
 

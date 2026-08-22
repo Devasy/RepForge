@@ -88,3 +88,12 @@ repforge_backup_*.json
 
 # Claude Code project memory & session files
 .claude/
+
+# Hive test databases and temporary directories
+*.hive
+tmp_hive_*/
+**/tmp_hive_*/
+
+
+# Subagent-driven-development scratch workspace
+.superpowers/

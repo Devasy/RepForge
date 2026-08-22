@@ -22,6 +22,7 @@ import 'widgets/readiness_card.dart';
 import 'widgets/sleep_hr_card.dart';
 import 'widgets/heart_rate_card.dart';
 import 'widgets/rf_widgets.dart';
+import 'widgets/floating_nav_bar.dart';
 import 'widgets/sparkline_painter.dart';
 import 'widgets/activity_heatmap.dart';
 import 'widgets/body_heatmap.dart';
@@ -39,19 +40,34 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   static const _navItems = [
-    RFNavItem(icon: Icons.home_rounded, label: 'Home'),
-    RFNavItem(icon: Icons.layers_rounded, label: 'Routines'),
-    RFNavItem(icon: Icons.history_rounded, label: 'History'),
-    RFNavItem(icon: Icons.bar_chart_rounded, label: 'Stats'),
+    FloatingNavItem(icon: Icons.home_rounded,      label: 'Home'),
+    FloatingNavItem(icon: Icons.layers_rounded,    label: 'Routines'),
+    FloatingNavItem(icon: Icons.history_rounded,   label: 'History'),
+    FloatingNavItem(icon: Icons.bar_chart_rounded, label: 'Stats'),
   ];
 
   void switchTab(int index) => setState(() => _currentIndex = index);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      backgroundColor: AppColors.background,
+    return FloatingNavBarScaffold(
+      scaffoldBackgroundColor: AppColors.background,
+      // App-specific colour overrides — all other values use the
+      // FloatingNavBarTheme defaults which adapt to ThemeData.colorScheme.
+      theme: FloatingNavBarTheme(
+        backgroundColor: AppColors.surface,
+        borderColor: AppColors.glassBorderStrong,
+        // Chip colours (replaces old pill API)
+        selectedChipColor: AppColors.glass3,
+        selectedChipBorderColor: AppColors.primary.withValues(alpha: 0.25),
+        selectedChipShadowColor: AppColors.primary.withValues(alpha: 0.15),
+        selectedContentColor: AppColors.textPrimary,
+        inactiveIconColor: AppColors.textMuted,
+        outerGlowColor: AppColors.primary.withValues(alpha: 0.08),
+      ),
+      items: _navItems,
+      currentIndex: _currentIndex,
+      onTabChanged: switchTab,
       body: IndexedStack(
         index: _currentIndex,
         children: const [
@@ -60,11 +76,6 @@ class _HomeScreenState extends State<HomeScreen> {
           HistoryScreen(),
           AnalyticsScreen(),
         ],
-      ),
-      bottomNavigationBar: RFNavBar(
-        currentIndex: _currentIndex,
-        onTap: switchTab,
-        items: _navItems,
       ),
     );
   }

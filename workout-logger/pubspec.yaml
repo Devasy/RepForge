@@ -20,7 +20,7 @@ version: 2.0.11+32
 
 environment:
   sdk: ^3.11.4
-  flutter: 3.41.6
+  flutter: 3.44.8
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -48,9 +48,9 @@ dependencies:
   
   # Utilities
   uuid: ^4.5.1
-  intl: ^0.19.0
+  intl: ^0.20.3
   http: ^1.2.1
-  package_info_plus: ^8.3.1
+  package_info_plus: ^10.2.1
 
   # Health Connect integration
   health_connector: ^3.9.1
@@ -59,9 +59,9 @@ dependencies:
   google_generative_ai: ^0.4.3
 
   # Backup export/import
-  file_picker: ^11.0.2
+  file_picker: ^12.0.0-beta.7
   path_provider: ^2.1.5
-  share_plus: ^12.0.1
+  share_plus: ^13.2.1
   gpt_markdown: ^1.1.7
 
 dev_dependencies:
@@ -74,7 +74,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
   
   # Testing
   mockito: ^5.4.4

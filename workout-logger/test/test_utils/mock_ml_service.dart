@@ -87,6 +87,7 @@ class MockMLService implements IMLService {
   @override
   List<SetRecommendation> recommendSets({
     required List<WorkoutSet> lastSession,
+    List<List<WorkoutSet>>? pastSessions,
     GrowthModel? growthModel,
     int minReps = 6,
     int maxReps = 12,
