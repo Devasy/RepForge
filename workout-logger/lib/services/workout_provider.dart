@@ -325,6 +325,7 @@ class WorkoutProvider extends ChangeNotifier {
     required String name,
     required String category,
     required String primaryMuscleGroupId,
+    bool isTimeBased = false,
   }) async {
     // Validate and normalize name (trim and collapse whitespace)
     final normalizedName = name.trim().replaceAll(RegExp(r'\s+'), ' ');
@@ -363,6 +364,7 @@ class WorkoutProvider extends ChangeNotifier {
       muscleActivations: muscleActivations,
       category: normalizedCategory,
       isCustom: true,
+      isTimeBased: isTimeBased,
     );
 
     // Persist to storage

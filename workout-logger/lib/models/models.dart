@@ -84,6 +84,9 @@ class Exercise {
   final String category; // 'compound' or 'isolation'
   final bool isCustom; // User-created exercise
   final List<String>? availableHandles; // Attachment/handle options e.g. ['Rope', 'Bar']
+  // Duration-based hold exercises (e.g. Plank, Wall Sit) are logged as
+  // weight + seconds held instead of weight + reps.
+  final bool isTimeBased;
 
   const Exercise({
     required this.id,
@@ -92,6 +95,7 @@ class Exercise {
     required this.category,
     this.isCustom = false,
     this.availableHandles,
+    this.isTimeBased = false,
   });
 
   String get primaryMuscle {
@@ -109,6 +113,7 @@ class Exercise {
     'category': category,
     'isCustom': isCustom,
     'availableHandles': availableHandles,
+    'isTimeBased': isTimeBased,
   };
 
   factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
@@ -120,6 +125,7 @@ class Exercise {
     category: json['category'],
     isCustom: json['isCustom'] ?? false,
     availableHandles: (json['availableHandles'] as List?)?.cast<String>(),
+    isTimeBased: json['isTimeBased'] ?? false,
   );
 }
 

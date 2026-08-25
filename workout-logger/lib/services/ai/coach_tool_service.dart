@@ -308,6 +308,13 @@ class CoachToolService {
                       'Primary muscle group this exercise targets, e.g. "Chest" '
                       'or "Biceps". Must match an existing muscle group.',
                 ),
+                'is_time_based': Schema.boolean(
+                  description:
+                      'Optional. Set true for a duration-based hold exercise '
+                      '(e.g. "Plank" or "Wall Sit") that is logged as weight + '
+                      'seconds held instead of weight + reps. Defaults to false.',
+                  nullable: true,
+                ),
               },
               requiredProperties: ['name', 'category', 'primary_muscle'],
             ),
@@ -383,9 +390,13 @@ class CoachToolService {
             'sessions(id, date, routine_id, duration_min, notes, hc_synced_at)\n'
             'exercise_logs(id, session_id, exercise_id, notes, handle)\n'
             'sets(id, exercise_log_id, weight, reps, is_dropset, drops_json, '
-            'time_taken, timestamp, assist_weight, extra_weight, handle)\n'
-            'exercises(id, name, category, is_custom, available_handles) — custom '
-            'exercises only; built-ins are not stored here\n'
+            'time_taken, timestamp, assist_weight, extra_weight, handle) — '
+            'time_taken is seconds held, only set for time-based hold exercises '
+            '(e.g. Plank, Wall Sit), which log reps=0\n'
+            'exercises(id, name, category, is_custom, available_handles, '
+            'is_time_based) — custom exercises only; built-ins are not stored '
+            'here. is_time_based=1 means the exercise is logged as weight + '
+            'seconds instead of weight + reps\n'
             'muscle_groups(id, name, growth_rate, last_updated)\n'
             'exercise_muscle_activations(exercise_id, muscle_group_id, activation_percentage)\n'
             'routines(id, name, created_at)\n'
@@ -913,7 +924,11 @@ class CoachToolService {
           ? null
           : [
               for (final s in lastLog.sets)
-                {'weight': _round(s.weight), 'reps': s.reps},
+                {
+                  'weight': _round(s.weight),
+                  'reps': s.reps,
+                  if (s.timeTaken != null) 'seconds': s.timeTaken,
+                },
             ],
       'personal_record': pr == null
           ? null
@@ -1294,11 +1309,14 @@ class CoachToolService {
       };
     }
 
+    final isTimeBased = args['is_time_based'] == true;
+
     try {
       await _wp.addCustomExercise(
         name: name,
         category: category,
         primaryMuscleGroupId: muscle.id,
+        isTimeBased: isTimeBased,
       );
     } catch (e) {
       return {'error': 'Could not create exercise: $e'};
@@ -1309,6 +1327,7 @@ class CoachToolService {
       'exercise_name': name,
       'category': category,
       'primary_muscle': muscle.name,
+      'is_time_based': isTimeBased,
     };
   }
 
@@ -1335,6 +1354,7 @@ class CoachToolService {
                 {
                   'weight': _round(set.weight),
                   'reps': set.reps,
+                  if (set.timeTaken != null) 'seconds': set.timeTaken,
                   if (set.isDropset) 'dropset': true,
                   if (set.isDropset && set.drops != null)
                     'drops': [

@@ -70,6 +70,7 @@ class ExerciseManager extends ChangeNotifier {
     required String name,
     required String category,
     required String primaryMuscleGroupId,
+    bool isTimeBased = false,
   }) async {
     // Validate and normalize name
     final normalizedName = name.trim().replaceAll(RegExp(r'\s+'), ' ');
@@ -107,6 +108,7 @@ class ExerciseManager extends ChangeNotifier {
       muscleActivations: muscleActivations,
       category: normalizedCategory,
       isCustom: true,
+      isTimeBased: isTimeBased,
     );
 
     await _storage.saveCustomExercise(exercise);

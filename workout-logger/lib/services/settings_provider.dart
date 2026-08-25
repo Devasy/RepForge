@@ -3,7 +3,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'ai/gemini_ai_service.dart'
-    show kDefaultMaxToolRounds, kMinMaxToolRounds, kMaxMaxToolRounds;
+    show kDefaultGeminiModel, kDefaultMaxToolRounds, kMinMaxToolRounds, kMaxMaxToolRounds;
 import 'interfaces/storage_service_interface.dart';
 
 enum WeightUnit { kg, lbs }
@@ -18,7 +18,7 @@ class SettingsProvider extends ChangeNotifier {
   String? _userName;
   String? _lastSeenVersion;
   String _geminiApiKey = '';
-  String _geminiModel = 'gemini-3.6-flash';
+  String _geminiModel = kDefaultGeminiModel;
   int _geminiMaxToolRounds = kDefaultMaxToolRounds;
   String _weeklyInsights = '';
   DateTime? _weeklyInsightsDate;
@@ -65,7 +65,7 @@ class SettingsProvider extends ChangeNotifier {
     _userName = await _storage.getSetting('userName');
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
-    _geminiModel = await _storage.getSetting('geminiModel') ?? 'gemini-3.6-flash';
+    _geminiModel = await _storage.getSetting('geminiModel') ?? kDefaultGeminiModel;
     final maxRounds = await _storage.getSetting('geminiMaxToolRounds');
     _geminiMaxToolRounds =
         maxRounds != null ? (int.tryParse(maxRounds) ?? kDefaultMaxToolRounds) : kDefaultMaxToolRounds;

@@ -40,6 +40,9 @@ class ExerciseInputSection extends StatelessWidget {
     this.availableHandles,
     this.selectedHandle,
     this.onHandleChanged,
+    this.isTimeBased = false,
+    this.currentSeconds = 0,
+    this.onSecondsChanged,
   });
 
   final double currentWeight;
@@ -69,6 +72,11 @@ class ExerciseInputSection extends StatelessWidget {
   final List<String>? availableHandles;
   final String? selectedHandle;
   final ValueChanged<String?>? onHandleChanged;
+  // Duration-based hold exercises (e.g. Plank, Wall Sit): logs weight +
+  // seconds held instead of weight + reps, and skips the dropset section.
+  final bool isTimeBased;
+  final int currentSeconds;
+  final ValueChanged<int>? onSecondsChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -111,8 +119,21 @@ class ExerciseInputSection extends StatelessWidget {
 
         const SizedBox(height: AppSpacing.lg),
 
-        // Weight + reps inputs
-        if (!isDropset) ...[
+        // Weight + reps (or weight + seconds, for time-based holds) inputs
+        if (isTimeBased) ...[
+          _InputRow(
+            currentWeight: currentWeight,
+            currentReps: currentReps,
+            settings: settings,
+            isAssistedBW: isAssistedBW,
+            onWeightChanged: onWeightChanged,
+            onRepsChanged: onRepsChanged,
+            isTimeBased: true,
+            currentSeconds: currentSeconds,
+            onSecondsChanged: onSecondsChanged,
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ] else if (!isDropset) ...[
           _InputRow(
             currentWeight: currentWeight,
             currentReps: currentReps,
@@ -145,25 +166,26 @@ class ExerciseInputSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
         ],
 
-        // Dropset section
-        _DropsetSection(
-          isDropset: isDropset,
-          drops: drops,
-          currentWeight: currentWeight,
-          currentReps: currentReps,
-          mainWeightController: mainWeightController,
-          mainRepsController: mainRepsController,
-          dropWeightControllers: dropWeightControllers,
-          dropRepsControllers: dropRepsControllers,
-          settings: settings,
-          onToggled: onDropsetToggled,
-          onDropAdded: onDropAdded,
-          onDropRemoved: onDropRemoved,
-          onDropWeightChanged: onDropWeightChanged,
-          onDropRepsChanged: onDropRepsChanged,
-        ),
-
-        const SizedBox(height: AppSpacing.lg),
+        // Dropset section — not applicable to duration-based holds
+        if (!isTimeBased) ...[
+          _DropsetSection(
+            isDropset: isDropset,
+            drops: drops,
+            currentWeight: currentWeight,
+            currentReps: currentReps,
+            mainWeightController: mainWeightController,
+            mainRepsController: mainRepsController,
+            dropWeightControllers: dropWeightControllers,
+            dropRepsControllers: dropRepsControllers,
+            settings: settings,
+            onToggled: onDropsetToggled,
+            onDropAdded: onDropAdded,
+            onDropRemoved: onDropRemoved,
+            onDropWeightChanged: onDropWeightChanged,
+            onDropRepsChanged: onDropRepsChanged,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
 
         // LOG SET button
         GlowButton(
@@ -175,12 +197,20 @@ class ExerciseInputSection extends StatelessWidget {
         // Previous sets
         if (previousSets.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.lg),
-          _PreviousSetsSection(sets: previousSets, settings: settings),
+          _PreviousSetsSection(
+            sets: previousSets,
+            settings: settings,
+            isTimeBased: isTimeBased,
+          ),
         ],
 
         // Last session
         const SizedBox(height: AppSpacing.lg),
-        _LastSessionSection(lastSession: lastSession, settings: settings),
+        _LastSessionSection(
+          lastSession: lastSession,
+          settings: settings,
+          isTimeBased: isTimeBased,
+        ),
       ],
     );
   }
@@ -377,6 +407,9 @@ class _InputRow extends StatelessWidget {
     required this.onWeightChanged,
     required this.onRepsChanged,
     this.isAssistedBW = false,
+    this.isTimeBased = false,
+    this.currentSeconds = 0,
+    this.onSecondsChanged,
   });
 
   final double currentWeight;
@@ -385,6 +418,9 @@ class _InputRow extends StatelessWidget {
   final ValueChanged<double> onWeightChanged;
   final ValueChanged<int> onRepsChanged;
   final bool isAssistedBW;
+  final bool isTimeBased;
+  final int currentSeconds;
+  final ValueChanged<int>? onSecondsChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -405,13 +441,21 @@ class _InputRow extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
-          child: _NumberInputCard(
-            label: 'Reps',
-            value: currentReps.toDouble(),
-            step: 1,
-            decimals: 0,
-            onChanged: (v) => onRepsChanged(v.toInt()),
-          ),
+          child: isTimeBased
+              ? _NumberInputCard(
+                  label: 'Seconds',
+                  value: currentSeconds.toDouble(),
+                  step: 5,
+                  decimals: 0,
+                  onChanged: (v) => onSecondsChanged?.call(v.toInt()),
+                )
+              : _NumberInputCard(
+                  label: 'Reps',
+                  value: currentReps.toDouble(),
+                  step: 1,
+                  decimals: 0,
+                  onChanged: (v) => onRepsChanged(v.toInt()),
+                ),
         ),
       ],
     );
@@ -789,10 +833,15 @@ class _DropRow extends StatelessWidget {
 
 // ── Previous Sets ─────────────────────────────────────────────────────────────
 class _PreviousSetsSection extends StatelessWidget {
-  const _PreviousSetsSection({required this.sets, required this.settings});
+  const _PreviousSetsSection({
+    required this.sets,
+    required this.settings,
+    this.isTimeBased = false,
+  });
 
   final List<WorkoutSet> sets;
   final SettingsProvider settings;
+  final bool isTimeBased;
 
   @override
   Widget build(BuildContext context) {
@@ -840,7 +889,7 @@ class _PreviousSetsSection extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '$wStr × ${s.reps}',
+                    isTimeBased ? '$wStr × ${s.timeTaken ?? 0}s' : '$wStr × ${s.reps}',
                     style: const TextStyle(
                       color: AppColors.success,
                       fontSize: 12,
@@ -900,10 +949,15 @@ class _PreviousSetsSection extends StatelessWidget {
 
 // ── Last Session ──────────────────────────────────────────────────────────────
 class _LastSessionSection extends StatelessWidget {
-  const _LastSessionSection({required this.lastSession, required this.settings});
+  const _LastSessionSection({
+    required this.lastSession,
+    required this.settings,
+    this.isTimeBased = false,
+  });
 
   final ExerciseLog? lastSession;
   final SettingsProvider settings;
+  final bool isTimeBased;
 
   @override
   Widget build(BuildContext context) {
@@ -952,7 +1006,7 @@ class _LastSessionSection extends StatelessWidget {
                 : dw.toStringAsFixed(1);
             return Chip(
               label: Text(
-                '$wStr × ${s.reps}',
+                isTimeBased ? '$wStr × ${s.timeTaken ?? 0}s' : '$wStr × ${s.reps}',
                 style: const TextStyle(fontSize: 12, color: AppColors.textSoft),
               ),
               backgroundColor: AppColors.surface,

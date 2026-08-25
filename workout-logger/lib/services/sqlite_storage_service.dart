@@ -16,8 +16,13 @@ class SqliteStorageService implements IStorageService {
         _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 3;
   static int _nextInstanceId = 0;
+
+  /// Added in schema v3 (time-based exercises, e.g. Plank / Wall Sit).
+  static const List<String> _timeBasedSchemaStatements = [
+    'ALTER TABLE exercises ADD COLUMN is_time_based INTEGER NOT NULL DEFAULT 0',
+  ];
 
   /// Added in schema v2 (health sync). Kept separate from the rest of
   /// [_schemaStatements] so `onUpgrade` can run exactly these statements
@@ -55,7 +60,8 @@ class SqliteStorageService implements IStorageService {
       name TEXT NOT NULL,
       category TEXT NOT NULL,
       is_custom INTEGER NOT NULL DEFAULT 0,
-      available_handles TEXT
+      available_handles TEXT,
+      is_time_based INTEGER NOT NULL DEFAULT 0
     )''',
     '''CREATE TABLE muscle_groups (
       id TEXT PRIMARY KEY,
@@ -208,6 +214,20 @@ class SqliteStorageService implements IStorageService {
         if (oldVersion < 2) {
           for (final statement in _healthSchemaStatements) {
             await db.execute(statement);
+          }
+        }
+        if (oldVersion < 3) {
+          // Guard against upgrading a database that predates the `exercises`
+          // table itself (e.g. a partially-provisioned or test database) —
+          // ALTER TABLE has no "column IF NOT EXISTS" form in SQLite.
+          final hasExercisesTable = Sqflite.firstIntValue(await db.rawQuery(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'exercises'",
+              )) ==
+              1;
+          if (hasExercisesTable) {
+            for (final statement in _timeBasedSchemaStatements) {
+              await db.execute(statement);
+            }
           }
         }
       },
@@ -569,6 +589,7 @@ class SqliteStorageService implements IStorageService {
           'is_custom': 1,
           'available_handles':
               exercise.availableHandles == null ? null : jsonEncode(exercise.availableHandles),
+          'is_time_based': exercise.isTimeBased ? 1 : 0,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -596,6 +617,7 @@ class SqliteStorageService implements IStorageService {
       availableHandles: row['available_handles'] == null
           ? null
           : (jsonDecode(row['available_handles'] as String) as List).cast<String>(),
+      isTimeBased: (row['is_time_based'] as int? ?? 0) == 1,
       muscleActivations: activations
           .map((a) => MuscleActivation(
                 muscleGroupId: a['muscle_group_id'] as String,

@@ -28,10 +28,11 @@ const kGeminiModels = [
   ('gemini-3.5-flash-lite', 'Gemini 3.5 Flash Lite'),
   ('gemini-3.5-flash',      'Gemini 3.5 Flash'),
   ('gemini-3.6-flash',      'Gemini 3.6 Flash'),
+  ('gemini-3.7-flash',      'Gemini 3.7 Flash'),
 ];
 
 // Default to the latest GA model.
-const kDefaultGeminiModel = 'gemini-3.6-flash';
+const kDefaultGeminiModel = 'gemini-3.7-flash';
 
 // Default/minimum/maximum upper bound on tool-resolution rounds per user
 // turn, to bound runaway loops. User-configurable via Profile → AI Features.
@@ -107,6 +108,8 @@ bool _isDailyQuotaExhausted(String body) {
 
 String? _getFallbackModel(String currentModel) {
   switch (currentModel) {
+    case 'gemini-3.7-flash':
+      return 'gemini-3.6-flash';
     case 'gemini-3.6-flash':
       return 'gemini-3.5-flash';
     case 'gemini-3.5-flash':

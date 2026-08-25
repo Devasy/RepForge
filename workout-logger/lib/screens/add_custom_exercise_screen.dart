@@ -23,6 +23,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
 
   String _category = 'compound';
   String? _muscleId;
+  bool _isTimeBased = false;
   bool _isSubmitting = false;
 
   @override
@@ -49,6 +50,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
             name: _nameController.text.trim(),
             category: _category,
             primaryMuscleGroupId: _muscleId!,
+            isTimeBased: _isTimeBased,
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -216,6 +218,52 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                     onTap: () => setState(() => _category = 'isolation'),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: AppSpacing.lg),
+
+              // Time-based (hold duration) toggle
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.glassBorder),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.timer_outlined,
+                        color: AppColors.textMuted, size: 18),
+                    const SizedBox(width: AppSpacing.sm),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Time-based hold',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            'Logged as weight + seconds, e.g. Plank or Wall Sit',
+                            style: TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _isTimeBased,
+                      onChanged: (v) => setState(() => _isTimeBased = v),
+                      activeThumbColor: AppColors.primary,
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: AppSpacing.lg),

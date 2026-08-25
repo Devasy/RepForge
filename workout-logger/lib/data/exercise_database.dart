@@ -487,6 +487,26 @@ class ExerciseDatabase {
       category: 'isolation',
       availableHandles: ['Rope', 'Bar'],
     ),
+    Exercise(
+      id: 'plank',
+      name: 'Plank',
+      muscleActivations: [
+        MuscleActivation(muscleGroupId: MuscleGroups.core, activationPercentage: 90),
+        MuscleActivation(muscleGroupId: MuscleGroups.shoulders, activationPercentage: 15),
+      ],
+      category: 'isolation',
+      isTimeBased: true,
+    ),
+    Exercise(
+      id: 'wall_sit',
+      name: 'Wall Sit',
+      muscleActivations: [
+        MuscleActivation(muscleGroupId: MuscleGroups.quads, activationPercentage: 90),
+        MuscleActivation(muscleGroupId: MuscleGroups.glutes, activationPercentage: 30),
+      ],
+      category: 'isolation',
+      isTimeBased: true,
+    ),
   ];
 
   static Exercise? getById(String id) {

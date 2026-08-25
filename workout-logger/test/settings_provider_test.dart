@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:repforge/services/ai/gemini_ai_service.dart' show kDefaultGeminiModel;
 import 'package:repforge/services/settings_provider.dart';
 import 'test_utils/mock_storage_service.dart';
 
@@ -20,7 +21,7 @@ void main() {
       expect(provider.readinessEnabled, isFalse);
       expect(provider.userName, isNull);
       expect(provider.geminiApiKey, isEmpty);
-      expect(provider.geminiModel, equals('gemini-3.6-flash'));
+      expect(provider.geminiModel, equals(kDefaultGeminiModel));
       expect(provider.showAdvancedMetrics, isFalse);
     });
 

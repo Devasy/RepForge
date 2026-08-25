@@ -50,6 +50,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   // Set entry state
   double _currentWeight = 20;
   int _currentReps = 10;
+  int _currentSeconds = 30;
   bool _isDropset = false;
   final List<DropsetEntry> _drops = [];
 
@@ -179,6 +180,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       setState(() {
         _currentWeight = lastSet.weight;
         _currentReps = lastSet.reps;
+        if (lastSet.timeTaken != null) _currentSeconds = lastSet.timeTaken!;
         final dw = settings.toDisplay(_currentWeight);
         _mainWeightCtrl.text = dw == dw.truncateToDouble()
             ? dw.toStringAsFixed(0)
@@ -276,7 +278,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     // widget tree — keeps this screen usable without the full app's
     // provider tree (e.g. in isolated widget tests).
     final readinessBand = context.watch<ReadinessManager?>()?.snapshot?.band;
-    final recommendations = exercise != null
+    final isTimeBased = exercise?.isTimeBased ?? false;
+    // AI weight/rep recommendations don't apply to duration-based holds.
+    final recommendations = exercise != null && !isTimeBased
         ? provider.getRecommendations(
             exercise.id,
             handle: selectedHandle,
@@ -339,6 +343,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               },
               programSlot: _slot(idx, p: provider),
               programWeek: _resolvedWeek(provider),
+              isTimeBased: isTimeBased,
+              currentSeconds: _currentSeconds,
+              onSecondsChanged: (v) => setState(() => _currentSeconds = v),
               onWeightChanged: (v) => setState(() => _currentWeight = v),
               onRepsChanged: (v) => setState(() => _currentReps = v),
               onDropsetToggled: _toggleDropset,
@@ -567,10 +574,14 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     // changes in settings.
     final isAssistedBW =
         isAssistedBodyweightExercise(provider.currentExercise?.id);
+    final isTimeBased = provider.currentExercise?.isTimeBased ?? false;
 
     final set = WorkoutSet(
       weight: _currentWeight,
-      reps: _currentReps,
+      // Time-based holds (Plank, Wall Sit) log a duration in seconds instead
+      // of reps — reps stays 0 so reps-based views/analytics ignore it.
+      reps: isTimeBased ? 0 : _currentReps,
+      timeTaken: isTimeBased ? _currentSeconds : null,
       isDropset: _isDropset,
       drops: _isDropset ? List.from(_drops) : null,
       assistWeight: isAssistedBW ? _currentWeight : null,
