@@ -14,7 +14,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
-import '../services/api_service.dart';
 import '../services/interfaces/health_connect_service_interface.dart';
 import '../services/managers/readiness_manager.dart';
 import '../theme/app_theme.dart';
@@ -31,7 +30,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     with WidgetsBindingObserver {
   bool _isExporting = false;
   bool _isImporting = false;
-  bool _isBackingUp = false;
   bool _isRequestingHcPermission = false;
   bool _isRequestingReadinessPermission = false;
   String _appVersion = '';
@@ -295,27 +293,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  Future<void> _performCloudBackup() async {
-    setState(() => _isBackingUp = true);
-    final provider = context.read<WorkoutProvider>();
-    final api = context.read<ApiService>();
-    try {
-      final jsonString = await provider.exportAllData();
-      final data = jsonDecode(jsonString) as Map<String, dynamic>;
-      await api.trackEvent('backup_triggered').catchError((_) => null);
-      final success = await api.backupData(data);
-      if (!mounted) return;
-      _showSnack(
-        success ? 'Cloud backup successful!' : 'Backup failed. Please try again.',
-        success ? AppColors.success : AppColors.error,
-      );
-    } catch (_) {
-      if (mounted) _showSnack('Something went wrong.', AppColors.error);
-    } finally {
-      if (mounted) setState(() => _isBackingUp = false);
-    }
-  }
-
   void _showSnack(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -379,15 +356,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                 DataManagementSection(
                   isExporting: _isExporting,
                   isImporting: _isImporting,
-                  isBackingUp: _isBackingUp,
                   onExport: _isExporting ? null : _exportToFile,
                   onImport: _isImporting ? null : _importFromFile,
-                  onCloudBackup: _isBackingUp ? null : _performCloudBackup,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 const AiSettingsSection(),
-                const SizedBox(height: AppSpacing.md),
-                const CloudSyncSection(),
                 const SizedBox(height: AppSpacing.md),
                 AboutSection(appVersion: _appVersion),
                 const SizedBox(height: AppSpacing.xxl),
