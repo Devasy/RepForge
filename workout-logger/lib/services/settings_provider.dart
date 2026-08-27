@@ -20,7 +20,6 @@ class SettingsProvider extends ChangeNotifier {
   String _weeklyInsights = '';
   DateTime? _weeklyInsightsDate;
   bool _showAdvancedMetrics = false;
-  bool _analyticsEnabled = false;
 
   WeightUnit get weightUnit => _weightUnit;
   double get weightIncrement => _weightIncrement;
@@ -34,13 +33,6 @@ class SettingsProvider extends ChangeNotifier {
   String get weeklyInsights => _weeklyInsights;
   DateTime? get weeklyInsightsDate => _weeklyInsightsDate;
   bool get showAdvancedMetrics => _showAdvancedMetrics;
-
-  /// Whether automatic telemetry (heartbeat/app-open/usage-report) may
-  /// fire. Off by default for every install — installer identity (F-Droid
-  /// vs. sideload vs. Play) isn't a reliable signal, since there are
-  /// multiple F-Droid client apps and installer info can be unreadable.
-  /// Users opt in via the Privacy toggle in Settings.
-  bool get analyticsEnabled => _analyticsEnabled;
 
   SettingsProvider(this._storage);
 
@@ -68,9 +60,6 @@ class SettingsProvider extends ChangeNotifier {
     _weeklyInsightsDate = dateStr != null ? DateTime.tryParse(dateStr) : null;
     final advMetrics = await _storage.getSetting('showAdvancedMetrics');
     _showAdvancedMetrics = advMetrics == 'true';
-
-    final analytics = await _storage.getSetting('analyticsEnabled');
-    _analyticsEnabled = analytics == 'true';
   }
 
   Future<void> setUserName(String name) async {
@@ -138,12 +127,6 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setShowAdvancedMetrics(bool value) async {
     _showAdvancedMetrics = value;
     await _storage.saveSetting('showAdvancedMetrics', value.toString());
-    notifyListeners();
-  }
-
-  Future<void> setAnalyticsEnabled(bool value) async {
-    _analyticsEnabled = value;
-    await _storage.saveSetting('analyticsEnabled', value.toString());
     notifyListeners();
   }
 

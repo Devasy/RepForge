@@ -18,7 +18,6 @@ import 'services/interfaces/ml_service_interface.dart';
 import 'services/interfaces/health_connect_service_interface.dart';
 import 'services/workout_provider.dart';
 import 'services/settings_provider.dart';
-import 'services/api_service.dart';
 import 'services/managers/program_manager.dart';
 import 'services/managers/history_manager.dart';
 import 'services/managers/health_sync_manager.dart';
@@ -101,8 +100,6 @@ class WorkoutLoggerApp extends StatelessWidget {
         Provider<IMLService>.value(value: _mlService),
         // IHealthConnectService stays in tree for ProfileScreen permission flow
         Provider<IHealthConnectService>.value(value: _healthConnectService),
-        // Provide the ApiService singleton via DI
-        Provider<ApiService>.value(value: ApiService()),
         // ProgramManager passed to tree directly
         ChangeNotifierProvider<ProgramManager>.value(value: _programManager),
         // SettingsProvider for user preferences (weight unit, increments)
@@ -173,7 +170,6 @@ class _AppInitializerState extends State<AppInitializer> {
     final settings = context.read<SettingsProvider>();
     final historyManager = context.read<HistoryManager>();
     final prManager = context.read<PRManager>();
-    final api = context.read<ApiService>();
     final gemini = context.read<GeminiAiService>();
     final readiness = context.read<ReadinessManager>();
 
@@ -199,17 +195,6 @@ class _AppInitializerState extends State<AppInitializer> {
       // Fire-and-forget readiness refresh — must run after settings.init()
       // so the opt-in flag is loaded; never blocks or fails app init.
       readiness.refresh();
-
-      // Fire-and-forget analytics in background — off by default, only
-      // fires once the user opts in via the Settings toggle. Must run
-      // after settings.init() so the flag is loaded.
-      if (settings.analyticsEnabled) {
-        api.sendHeartbeat();
-        api.trackEvent('app_open');
-        provider.getQuickStats().then((stats) => api.reportUsage(stats)).catchError(
-          (Object e) => debugPrint('Failed to report usage: $e'),
-        );
-      }
 
       if (!mounted) return;
       setState(() {

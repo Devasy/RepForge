@@ -362,8 +362,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                 const SizedBox(height: AppSpacing.md),
                 const AiSettingsSection(),
                 const SizedBox(height: AppSpacing.md),
-                PrivacySection(settings: settings),
-                const SizedBox(height: AppSpacing.md),
                 AboutSection(appVersion: _appVersion),
                 const SizedBox(height: AppSpacing.xxl),
               ]),
