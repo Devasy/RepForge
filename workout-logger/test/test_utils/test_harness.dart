@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/settings_provider.dart';
-import 'package:repforge/services/api_service.dart';
 import 'package:repforge/services/ai/gemini_ai_service.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'package:repforge/services/managers/conversation_manager.dart';
@@ -62,7 +61,6 @@ class TestHarness {
         Provider<HealthHistoryManager>.value(value: hhm),
         Provider<IHealthConnectService>.value(value: const StubHcService()),
         Provider<HealthDataSyncService?>.value(value: null),
-        Provider<ApiService>.value(value: ApiService()),
         Provider<CoachToolService>.value(value: tools),
         Provider<IMLService>.value(value: MockMLService()),
       ],
