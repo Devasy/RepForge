@@ -397,62 +397,6 @@ class DataManagementSection extends StatelessWidget {
   }
 }
 
-// ── Privacy section ────────────────────────────────────────────────────────────
-class PrivacySection extends StatelessWidget {
-  const PrivacySection({super.key, required this.settings});
-
-  final SettingsProvider settings;
-
-  static const _color = AppColors.textSoft;
-
-  @override
-  Widget build(BuildContext context) {
-    return _ProfileSection(
-      icon: Icons.privacy_tip_outlined,
-      iconColor: _color,
-      title: 'Privacy',
-      subtitle: 'Control anonymous usage data',
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Share anonymous usage data',
-                      style: TextStyle(fontFamily: 'Geist',
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Off by default. Install ID, platform, and workout counts — no personal data',
-                      style: TextStyle(fontFamily: 'Geist',
-                        color: AppColors.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: settings.analyticsEnabled,
-                onChanged: (v) => settings.setAnalyticsEnabled(v),
-                activeThumbColor: _color,
-                activeTrackColor: _color.withValues(alpha: 0.35),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ── About section ─────────────────────────────────────────────────────────────
 class AboutSection extends StatefulWidget {
   const AboutSection({super.key, required this.appVersion});
