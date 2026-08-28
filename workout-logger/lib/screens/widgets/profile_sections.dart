@@ -828,9 +828,18 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   }
 
   Future<void> _commitMaxToolRounds(int rounds) async {
-    final settings = context.read<SettingsProvider>();
-    await settings.setGeminiMaxToolRounds(rounds);
-    setState(() => _draggingMaxToolRounds = null);
+    // onChangeEnd discards this Future, so a storage failure would otherwise
+    // surface as an unhandled error; and the await means the widget can be
+    // disposed before setState runs.
+    try {
+      await context.read<SettingsProvider>().setGeminiMaxToolRounds(rounds);
+    } catch (e, st) {
+      debugPrint('Failed to save max tool rounds: $e\n$st');
+    } finally {
+      if (mounted) {
+        setState(() => _draggingMaxToolRounds = null);
+      }
+    }
   }
 
   @override

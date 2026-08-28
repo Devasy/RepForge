@@ -752,7 +752,7 @@ class _MessageBubble extends StatelessWidget {
                   child: isUser
                       ? Text(
                           message.text,
-                          style: TextStyle(fontFamily: 'Geist',
+                          style: const TextStyle(fontFamily: 'Geist',
                             color: AppColors.textPrimary,
                             fontSize: 14,
                             height: 1.55,
@@ -865,7 +865,7 @@ class _ToolCallChips extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   _label(name),
-                  style: TextStyle(fontFamily: 'GeistMono',
+                  style: const TextStyle(fontFamily: 'GeistMono',
                     color: AppColors.secondary,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,

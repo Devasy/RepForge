@@ -48,6 +48,71 @@ void main() {
   }
 
   group('SqliteStorageService — health data', () {
+    // A DST fall-back maps two distinct UTC instants onto the same local
+    // wall-clock string. Identity therefore lives on utc_ts, not on the local
+    // timestamp column — asserted here without depending on the machine's
+    // timezone actually observing DST.
+    test('two instants sharing a local wall-clock string both survive', () async {
+      final db = await openDatabase(storage.databasePath, singleInstance: false);
+      const localString = '2026-11-01T01:30:00.000';
+      await db.insert('health_samples', {
+        'type': 'heart_rate',
+        'timestamp': localString,
+        'utc_ts': '2026-11-01T05:30:00.000Z',
+        'value': 60.0,
+      });
+      await db.insert('health_samples', {
+        'type': 'heart_rate',
+        'timestamp': localString,
+        'utc_ts': '2026-11-01T06:30:00.000Z',
+        'value': 65.0,
+      });
+      await db.close();
+
+      final rows = await rawQuery(
+        storage,
+        "SELECT value FROM health_samples WHERE type = 'heart_rate' ORDER BY utc_ts",
+      );
+      expect(rows.length, 2);
+      expect(rows.map((r) => r['value']), [60.0, 65.0]);
+    });
+
+    test('upsertHealthSamples records the exact UTC instant in utc_ts', () async {
+      final utcTime = DateTime.utc(2026, 8, 10, 21, 0);
+      await storage.upsertHealthSamples('heart_rate', [HealthSample(time: utcTime, value: 60)]);
+
+      final rows = await rawQuery(
+        storage,
+        "SELECT utc_ts FROM health_samples WHERE type = 'heart_rate'",
+      );
+      final stored = rows.first['utc_ts'] as String;
+      expect(stored.endsWith('Z'), isTrue);
+      expect(DateTime.parse(stored).toUtc(), utcTime);
+    });
+
+    test('sleep session id is the UTC start instant, not the local one', () async {
+      final start = DateTime.utc(2026, 11, 1, 5, 30);
+      await storage.upsertSleepSessions([
+        SleepPeriod(
+          start: start,
+          end: start.add(const Duration(hours: 8)),
+          lightMinutes: 200,
+          deepMinutes: 60,
+          remMinutes: 100,
+          awakeMinutes: 10,
+          stageTimeline: const [],
+        ),
+      ]);
+
+      final rows = await rawQuery(storage, 'SELECT id, start_ts FROM sleep_sessions');
+      expect(rows.length, 1);
+      final id = rows.first['id'] as String;
+      expect(id, start.toIso8601String());
+      expect(DateTime.parse(id).toUtc(), start);
+      // start_ts stays local so it joins cleanly against workout_sessions.date.
+      expect((rows.first['start_ts'] as String).endsWith('Z'), isFalse);
+    });
+
     test('upsertHealthSamples replaces duplicates on (type, timestamp)', () async {
       final t = DateTime(2026, 8, 10, 22, 30);
       await storage.upsertHealthSamples('heart_rate', [HealthSample(time: t, value: 60)]);
@@ -147,6 +212,82 @@ void main() {
       );
       final names = tableRows.map((r) => r['name'] as String).toSet();
       expect(names, containsAll(['health_samples', 'sleep_sessions', 'sleep_stage_intervals']));
+
+      await upgraded.close();
+      await File(path).delete();
+    });
+
+    test('onUpgrade rebuilds v2 health tables on the utc_ts shape', () async {
+      final path =
+          '${Directory.systemTemp.path}/sqlite_v2_upgrade_${DateTime.now().microsecondsSinceEpoch}.db';
+      final v2 = await openDatabase(
+        path,
+        version: 2,
+        onCreate: (db, v) async {
+          await db.execute('''CREATE TABLE muscle_groups (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            growth_rate REAL NOT NULL DEFAULT 0,
+            last_updated TEXT NOT NULL
+          )''');
+          await db.execute('''CREATE TABLE settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+          )''');
+          // The v2 shape: no utc_ts, unique on the ambiguous local string.
+          await db.execute('''CREATE TABLE health_samples (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            value REAL NOT NULL
+          )''');
+          await db.execute(
+              'CREATE UNIQUE INDEX idx_health_samples_unique ON health_samples(type, timestamp)');
+          await db.execute('''CREATE TABLE sleep_sessions (
+            id TEXT PRIMARY KEY,
+            start_ts TEXT NOT NULL,
+            end_ts TEXT NOT NULL,
+            light_min INTEGER,
+            deep_min INTEGER,
+            rem_min INTEGER,
+            awake_min INTEGER
+          )''');
+          await db.execute('''CREATE TABLE sleep_stage_intervals (
+            sleep_session_id TEXT NOT NULL,
+            start_ts TEXT NOT NULL,
+            end_ts TEXT NOT NULL,
+            stage TEXT NOT NULL
+          )''');
+          await db.insert('health_samples', {
+            'type': 'heart_rate',
+            'timestamp': '2026-08-10T22:30:00.000',
+            'value': 60.0,
+          });
+          await db.insert('settings',
+              {'key': 'health_sync.heart_rate', 'value': '2026-08-10T22:30:00.000Z'});
+          await db.insert('settings', {'key': 'userName', 'value': 'Devasy'});
+        },
+      );
+      await v2.close();
+
+      final upgraded = SqliteStorageService(databasePathOverride: path);
+      await upgraded.init();
+
+      // The cache is rebuilt on the new shape...
+      final cols = await rawQuery(upgraded, 'PRAGMA table_info(health_samples)');
+      expect(cols.map((c) => c['name']), contains('utc_ts'));
+      final samples = await rawQuery(upgraded, 'SELECT COUNT(*) AS n FROM health_samples');
+      expect(samples.first['n'], 0);
+
+      // ...the watermarks are cleared so the next sync re-pulls the window...
+      final watermarks = await rawQuery(
+        upgraded,
+        "SELECT COUNT(*) AS n FROM settings WHERE key LIKE 'health_sync.%'",
+      );
+      expect(watermarks.first['n'], 0);
+
+      // ...and unrelated settings are left alone.
+      expect(await upgraded.getSetting('userName'), 'Devasy');
 
       await upgraded.close();
       await File(path).delete();
