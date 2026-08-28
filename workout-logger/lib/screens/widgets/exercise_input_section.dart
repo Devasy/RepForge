@@ -5,14 +5,14 @@ import 'package:flutter/services.dart';
 import '../../models/models.dart';
 import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
-import 'rf_widgets.dart';
+import 'rf_shell.dart';
 
 // ── ExerciseInputSection ──────────────────────────────────────────────────────
-// Renders: AI suggestion card, weight/reps inputs, dropset section,
-// LOG SET button, previous sets, last session info, program metadata banner.
+// Suggestion card, weight/reps inputs, dropset, session history, program meta.
 class ExerciseInputSection extends StatelessWidget {
   const ExerciseInputSection({
     super.key,
+    required this.contentWidth,
     required this.currentWeight,
     required this.currentReps,
     required this.isDropset,
@@ -32,7 +32,6 @@ class ExerciseInputSection extends StatelessWidget {
     required this.onDropRemoved,
     required this.onDropWeightChanged,
     required this.onDropRepsChanged,
-    required this.onLogSet,
     required this.onApplyRecommendation,
     this.programSlot,
     this.programWeek,
@@ -41,6 +40,9 @@ class ExerciseInputSection extends StatelessWidget {
     this.selectedHandle,
     this.onHandleChanged,
   });
+
+  /// Layout width minus padding. Passed in, not measured: the host screen's [IntrinsicHeight] (which [Spacer] needs) forbids a [LayoutBuilder] under it.
+  final double contentWidth;
 
   final double currentWeight;
   final int currentReps;
@@ -61,7 +63,6 @@ class ExerciseInputSection extends StatelessWidget {
   final ValueChanged<int> onDropRemoved;
   final void Function(int index, double weight) onDropWeightChanged;
   final void Function(int index, int reps) onDropRepsChanged;
-  final VoidCallback onLogSet;
   final VoidCallback onApplyRecommendation;
   final ProgramExerciseSlot? programSlot;
   final ProgramWeek? programWeek;
@@ -114,6 +115,7 @@ class ExerciseInputSection extends StatelessWidget {
         // Weight + reps inputs
         if (!isDropset) ...[
           _InputRow(
+            contentWidth: contentWidth,
             currentWeight: currentWeight,
             currentReps: currentReps,
             settings: settings,
@@ -134,9 +136,12 @@ class ExerciseInputSection extends StatelessWidget {
                 children: [
                   const Icon(Icons.fitness_center_rounded, size: 14, color: AppColors.primary),
                   const SizedBox(width: 6),
-                  Text(
-                    'Effective Volume Load: ${effectiveWeightDisplay.toStringAsFixed(1)} ${settings.unitLabel} (${bodyWeightDisplay.toStringAsFixed(1)} BW − ${currentWeightDisplay.toStringAsFixed(1)} Assist) × $currentReps reps',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSoft, fontWeight: FontWeight.w500),
+                  // Long enough to wrap on a narrow phone, more so at a large text scale.
+                  Expanded(
+                    child: Text(
+                      'Effective Volume Load: ${effectiveWeightDisplay.toStringAsFixed(1)} ${settings.unitLabel} (${bodyWeightDisplay.toStringAsFixed(1)} BW − ${currentWeightDisplay.toStringAsFixed(1)} Assist) × $currentReps reps',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSoft, fontWeight: FontWeight.w500),
+                    ),
                   ),
                 ],
               ),
@@ -165,21 +170,13 @@ class ExerciseInputSection extends StatelessWidget {
 
         const SizedBox(height: AppSpacing.lg),
 
-        // LOG SET button
-        GlowButton(
-          label: 'LOG SET',
-          icon: Icons.check_rounded,
-          onPressed: onLogSet,
-        ),
+        // Absorbs leftover height so the history below reads as a footer.
+        const Spacer(),
 
-        // Previous sets
         if (previousSets.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.lg),
           _PreviousSetsSection(sets: previousSets, settings: settings),
+          const SizedBox(height: AppSpacing.lg),
         ],
-
-        // Last session
-        const SizedBox(height: AppSpacing.lg),
         _LastSessionSection(lastSession: lastSession, settings: settings),
       ],
     );
@@ -208,44 +205,20 @@ class _HandleSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'ATTACHMENT / HANDLE VARIATION',
-          style: TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
-        ),
-        const SizedBox(height: 6),
+        const RFLabel('Attachment'),
+        const SizedBox(height: AppSpacing.sm),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: availableHandles.map((handle) {
-              final isSelected = selectedHandle == handle;
               return Padding(
                 padding: const EdgeInsets.only(right: 6),
-                child: FilterChip(
-                  label: Text(handle),
-                  selected: isSelected,
-                  onSelected: locked
+                child: RFOptionChip(
+                  label: handle,
+                  selected: selectedHandle == handle,
+                  onTap: locked || onChanged == null
                       ? null
-                      : (selected) {
-                          if (selected && onChanged != null) {
-                            onChanged!(handle);
-                          }
-                        },
-                  selectedColor: AppColors.primary.withValues(alpha: 0.25),
-                  backgroundColor: AppColors.surface,
-                  checkmarkColor: AppColors.primary,
-                  labelStyle: TextStyle(
-                    color: isSelected ? AppColors.primary : AppColors.textSoft,
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  side: BorderSide(
-                    color: isSelected ? AppColors.primary : AppColors.glassBorder,
-                  ),
+                      : () => onChanged!(handle),
                 ),
               );
             }).toList(),
@@ -315,13 +288,17 @@ class _RecommendationCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Text(
-                      'AI Suggestion',
-                      style: TextStyle(
-                        color: AppColors.textSoft,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
+                    const Flexible(
+                      child: Text(
+                        'AI Suggestion',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textSoft,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -371,6 +348,7 @@ class _RecommendationCard extends StatelessWidget {
 // ── Input Row ────────────────────────────────────────────────────────────────
 class _InputRow extends StatelessWidget {
   const _InputRow({
+    required this.contentWidth,
     required this.currentWeight,
     required this.currentReps,
     required this.settings,
@@ -379,6 +357,7 @@ class _InputRow extends StatelessWidget {
     this.isAssistedBW = false,
   });
 
+  final double contentWidth;
   final double currentWeight;
   final int currentReps;
   final SettingsProvider settings;
@@ -392,27 +371,42 @@ class _InputRow extends StatelessWidget {
         isAssistedBW ? 'Assist (${settings.unitLabel})' : settings.unitLabel;
     final displayWeight = settings.toDisplay(currentWeight);
 
+    // Once a large system font squeezes the value past legibility, stack rather than shrink the digits further.
+    final pairedWidth = (contentWidth - AppSpacing.md) / 2;
+    final stacked = !_NumberInputCard.valueFits(context, pairedWidth);
+    final cardWidth = stacked ? contentWidth : pairedWidth;
+
+    final weightCard = _NumberInputCard(
+      cardWidth: cardWidth,
+      label: weightLabel,
+      value: displayWeight,
+      step: settings.weightIncrement,
+      decimals: 1,
+      onChanged: (v) => onWeightChanged(settings.toStorage(v)),
+    );
+    final repsCard = _NumberInputCard(
+      cardWidth: cardWidth,
+      label: 'Reps',
+      value: currentReps.toDouble(),
+      step: 1,
+      decimals: 0,
+      onChanged: (v) => onRepsChanged(v.toInt()),
+    );
+
+    if (stacked) {
+      return Column(
+        children: [
+          weightCard,
+          const SizedBox(height: AppSpacing.md),
+          repsCard,
+        ],
+      );
+    }
     return Row(
       children: [
-        Expanded(
-          child: _NumberInputCard(
-            label: weightLabel,
-            value: displayWeight,
-            step: settings.weightIncrement,
-            decimals: 1,
-            onChanged: (v) => onWeightChanged(settings.toStorage(v)),
-          ),
-        ),
+        Expanded(child: weightCard),
         const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _NumberInputCard(
-            label: 'Reps',
-            value: currentReps.toDouble(),
-            step: 1,
-            decimals: 0,
-            onChanged: (v) => onRepsChanged(v.toInt()),
-          ),
-        ),
+        Expanded(child: repsCard),
       ],
     );
   }
@@ -421,6 +415,7 @@ class _InputRow extends StatelessWidget {
 // ── Number Input Card ─────────────────────────────────────────────────────────
 class _NumberInputCard extends StatefulWidget {
   const _NumberInputCard({
+    required this.cardWidth,
     required this.label,
     required this.value,
     required this.step,
@@ -428,11 +423,48 @@ class _NumberInputCard extends StatefulWidget {
     required this.onChanged,
   });
 
+  /// Laid-out width; passed for the reason [ExerciseInputSection.contentWidth] gives.
+  final double cardWidth;
+
   final String label;
   final double value;
   final double step;
   final int decimals;
   final ValueChanged<double> onChanged;
+
+  /// Tighter than the usual `md`, to leave the value more of the row.
+  static const double hPadding = AppSpacing.sm + 2;
+
+  static const double maxValueFontSize = 36;
+  static const double minValueFontSize = 18;
+
+  /// Room left for the value between the two steppers in a card [cardWidth] wide.
+  static double valueSlotWidth(BuildContext context, double cardWidth) =>
+      cardWidth - hPadding * 2 - _StepBtn.sizeOf(context) * 2;
+
+  /// Whether a card [cardWidth] wide still shows `100.0` legibly — [_InputRow] stacks when it does not.
+  static bool valueFits(BuildContext context, double cardWidth) =>
+      valueSlotWidth(context, cardWidth) >=
+      measureValue(context, '100.0', minValueFontSize);
+
+  static TextStyle valueStyle(double fontSize) => TextStyle(
+        fontFamily: 'GeistMono',
+        color: AppColors.textPrimary,
+        fontSize: fontSize,
+        fontWeight: FontWeight.w700,
+      );
+
+  /// Width [text] paints at, honouring the reader's text scale.
+  static double measureValue(
+      BuildContext context, String text, double fontSize) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: valueStyle(fontSize)),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    return painter.width;
+  }
 
   @override
   State<_NumberInputCard> createState() => _NumberInputCardState();
@@ -469,10 +501,27 @@ class _NumberInputCardState extends State<_NumberInputCard> {
       ? widget.value.toStringAsFixed(widget.decimals)
       : widget.value.toInt().toString();
 
+  /// Largest size that paints [text] inside the value slot, floored at [_NumberInputCard.minValueFontSize].
+  double _fitFontSize(BuildContext context, String text) {
+    const maxSize = _NumberInputCard.maxValueFontSize;
+    final slot = _NumberInputCard.valueSlotWidth(context, widget.cardWidth);
+    if (!slot.isFinite) return maxSize;
+    // A few pixels for the caret, which sits past the last glyph.
+    final available = slot - 4;
+    if (available <= 0) return _NumberInputCard.minValueFontSize;
+    final natural = _NumberInputCard.measureValue(context, text, maxSize);
+    if (natural <= available || natural <= 0) return maxSize;
+    return (maxSize * available / natural)
+        .clamp(_NumberInputCard.minValueFontSize, maxSize);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: _NumberInputCard.hPadding,
+        vertical: AppSpacing.md,
+      ),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -480,14 +529,10 @@ class _NumberInputCardState extends State<_NumberInputCard> {
       ),
       child: Column(
         children: [
-          Text(
-            widget.label,
-            style: TextStyle(fontFamily: 'Geist', 
-              color: AppColors.textMuted,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
+          // Kept to one line so the two cards in a row stay the same height.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: RFLabel(widget.label),
           ),
           const SizedBox(height: AppSpacing.sm),
           Row(
@@ -500,41 +545,49 @@ class _NumberInputCardState extends State<_NumberInputCard> {
                 ),
               ),
               Expanded(
-                child: TextField(
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  style: TextStyle(fontFamily: 'GeistMono', 
-                    color: AppColors.textPrimary,
-                    fontSize: 36,
-                    fontWeight: FontWeight.w700,
+                // Re-fitted per keystroke: a 3-digit weight or a large system font would otherwise be clipped.
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _controller,
+                  builder: (context, value, _) => TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    style: _NumberInputCard.valueStyle(
+                      _fitFontSize(
+                        context,
+                        value.text.isEmpty ? _format() : value.text,
+                      ),
+                    ),
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.numberWithOptions(
+                      decimal: widget.decimals > 0,
+                    ),
+                    inputFormatters: widget.decimals > 0
+                        ? [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d*$'),
+                            ),
+                          ]
+                        : [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                      isDense: true,
+                    ),
+                    onChanged: (text) {
+                      final parsed = double.tryParse(text);
+                      if (parsed != null) {
+                        widget.onChanged(parsed.clamp(0, 999).toDouble());
+                      }
+                    },
+                    onEditingComplete: () {
+                      final formatted = _format();
+                      if (_controller.text != formatted) {
+                        _controller.text = formatted;
+                      }
+                      _focusNode.unfocus();
+                    },
                   ),
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.numberWithOptions(
-                    decimal: widget.decimals > 0,
-                  ),
-                  inputFormatters: widget.decimals > 0
-                      ? [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d*\.?\d*$'),
-                          ),
-                        ]
-                      : [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    isDense: true,
-                  ),
-                  onChanged: (text) {
-                    final parsed = double.tryParse(text);
-                    if (parsed != null) {
-                      widget.onChanged(parsed.clamp(0, 999).toDouble());
-                    }
-                  },
-                  onEditingComplete: () {
-                    final formatted = _format();
-                    if (_controller.text != formatted) _controller.text = formatted;
-                    _focusNode.unfocus();
-                  },
                 ),
               ),
               _StepBtn(
@@ -556,9 +609,13 @@ class _StepBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
+  /// Fixed: a stepper stays a thumb target, so the value beside it is what gives.
+  static double sizeOf(BuildContext context) =>
+      MediaQuery.sizeOf(context).width < AppBreakpoints.narrow ? 36.0 : 40.0;
+
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context).width < AppBreakpoints.narrow ? 36.0 : 40.0;
+    final size = sizeOf(context);
     return GestureDetector(
       onTap: () {
         onTap();
@@ -632,15 +689,16 @@ class _DropsetSection extends StatelessWidget {
                 size: 18,
               ),
               const SizedBox(width: 8),
-              const Text(
-                'Dropset',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+              const Expanded(
+                child: Text(
+                  'Dropset',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              const Spacer(),
               Switch(
                 value: isDropset,
                 onChanged: onToggled,
@@ -799,15 +857,7 @@ class _PreviousSetsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'THIS SESSION',
-          style: TextStyle(fontFamily: 'Geist', 
-            color: AppColors.textFaint,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.2,
-          ),
-        ),
+        const RFLabel('This session', dim: true),
         const SizedBox(height: AppSpacing.sm),
         Wrap(
           spacing: 6,
@@ -920,9 +970,11 @@ class _LastSessionSection extends StatelessWidget {
             Icon(Icons.star_outline_rounded,
                 color: AppColors.textMuted, size: 16),
             SizedBox(width: 8),
-            Text(
-              'First time doing this exercise!',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            Expanded(
+              child: Text(
+                'First time doing this exercise!',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              ),
             ),
           ],
         ),
@@ -932,15 +984,7 @@ class _LastSessionSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'LAST SESSION',
-          style: TextStyle(fontFamily: 'Geist', 
-            color: AppColors.textFaint,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.2,
-          ),
-        ),
+        const RFLabel('Last session', dim: true),
         const SizedBox(height: AppSpacing.sm),
         Wrap(
           spacing: 6,
@@ -1005,12 +1049,14 @@ class _ProgramMetaBanner extends StatelessWidget {
                   child: Icon(Icons.battery_charging_full_rounded,
                       size: 14, color: Colors.amber),
                 ),
-              Text(
-                'Target: $displaySets × $repRange',
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  'Target: $displaySets × $repRange',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],

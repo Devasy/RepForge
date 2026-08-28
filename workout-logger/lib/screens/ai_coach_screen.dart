@@ -18,7 +18,11 @@ import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
+import 'widgets/rf_shell.dart';
 import 'profile_screen.dart';
+
+/// Bubbles stop short of the far edge; full-bleed ones read as banners.
+const double _kBubbleMaxWidthFactor = 0.82;
 
 /// Public entry point. Owns the screen-scoped [AiCoachViewModel].
 class AiCoachScreen extends StatelessWidget {
@@ -103,7 +107,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
       if (_scrollCtrl.hasClients) {
         _scrollCtrl.animateTo(
           _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
+          duration: AppDurations.moderate,
           curve: Curves.easeOut,
         );
       }
@@ -119,18 +123,17 @@ class _AiCoachViewState extends State<_AiCoachView> {
       body: Stack(
         children: [
           const AmbientGlow(),
-          SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(context, vm),
-                Expanded(
-                  child: vm.isConfigured
-                      ? _buildChatArea(vm)
-                      : _buildNoKeyState(context),
-                ),
-                if (vm.isConfigured) _buildInputBar(vm),
-              ],
-            ),
+          // No wrapping SafeArea: header takes the top inset, input bar the bottom.
+          Column(
+            children: [
+              _buildHeader(context, vm),
+              Expanded(
+                child: vm.isConfigured
+                    ? _buildChatArea(vm)
+                    : _buildNoKeyState(context),
+              ),
+              if (vm.isConfigured) _buildInputBar(vm),
+            ],
           ),
         ],
       ),
@@ -138,91 +141,25 @@ class _AiCoachViewState extends State<_AiCoachView> {
   }
 
   Widget _buildHeader(BuildContext context, AiCoachViewModel vm) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        0,
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.glass3,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                border: Border.all(color: AppColors.glassBorder),
-              ),
-              child: const Icon(
-                Icons.arrow_back_rounded,
-                color: AppColors.textSoft,
-                size: 18,
-              ),
-            ),
+    return RFScreenHeader(
+      title: 'AI Coach',
+      subtitle: 'Powered by Gemini',
+      badgeIcon: Icons.auto_awesome_rounded,
+      onBack: () => Navigator.pop(context),
+      actions: [
+        if (vm.isConfigured) ...[
+          RFIconButton(
+            icon: Icons.history_rounded,
+            tooltip: 'Past conversations',
+            onTap: () => _openHistory(context, vm),
           ),
-          const SizedBox(width: AppSpacing.md),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.primary, Color(0xFF5B21B6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primaryGlow(0.4),
-                  blurRadius: 12,
-                  spreadRadius: -4,
-                ),
-              ],
-            ),
-            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
+          RFIconButton(
+            icon: Icons.add_rounded,
+            tooltip: 'New chat',
+            onTap: vm.newConversation,
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'AI Coach',
-                  style: TextStyle(fontFamily: 'Geist', 
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                Text(
-                  'Powered by Gemini',
-                  style: TextStyle(fontFamily: 'Geist', 
-                    color: AppColors.textMuted,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (vm.isConfigured) ...[
-            _HeaderIconButton(
-              icon: Icons.history_rounded,
-              onTap: () => _openHistory(context, vm),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            _HeaderIconButton(
-              icon: Icons.add_rounded,
-              onTap: () {
-                HapticFeedback.lightImpact();
-                vm.newConversation();
-              },
-            ),
-          ],
         ],
-      ),
+      ],
     );
   }
 
@@ -246,11 +183,13 @@ class _AiCoachViewState extends State<_AiCoachView> {
 
     return ListView.builder(
       controller: _scrollCtrl,
+      physics: const BouncingScrollPhysics(),
+      // Extra bottom room so the last turn settles clear of the input bar.
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.md,
         AppSpacing.md,
-        AppSpacing.sm,
+        AppSpacing.lg,
       ),
       itemCount: messages.length + (vm.isLoading ? 1 : 0),
       itemBuilder: (_, i) {
@@ -273,29 +212,11 @@ class _AiCoachViewState extends State<_AiCoachView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, Color(0xFF5B21B6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryGlow(0.45),
-                    blurRadius: 28,
-                    spreadRadius: -4,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.auto_awesome_rounded,
-                color: Colors.white,
-                size: 32,
-              ),
+            const RFGradientBadge(
+              icon: Icons.auto_awesome_rounded,
+              size: 72,
+              radius: AppRadius.xl,
+              glow: 0.45,
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
@@ -329,7 +250,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
                   'Am I progressing on bench?',
                   'Suggest a deload week',
                 ])
-                  _SuggestionChip(
+                  RFOptionChip(
                     label: s,
                     onTap: () {
                       _controller.text = s;
@@ -373,44 +294,46 @@ class _AiCoachViewState extends State<_AiCoachView> {
   }
 
   Widget _buildInputBar(AiCoachViewModel vm) {
-    final loading = vm.isLoading;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.md + MediaQuery.of(context).padding.bottom,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.9),
-        border: const Border(top: BorderSide(color: AppColors.glassBorder)),
-      ),
+    return RFBottomBar(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              alignment: Alignment.centerLeft,
               decoration: BoxDecoration(
-                color: AppColors.glass3,
+                color: AppColors.glass2,
                 borderRadius: BorderRadius.circular(AppRadius.xl),
                 border: Border.all(color: AppColors.glassBorderStrong),
               ),
               child: TextField(
                 controller: _controller,
-                style: TextStyle(fontFamily: 'Geist', 
+                style: const TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textPrimary,
                   fontSize: 14,
+                  height: 1.4,
                 ),
-                maxLines: 4,
+                maxLines: 5,
                 minLines: 1,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  hintText: 'Ask your coach...',
-                  hintStyle: TextStyle(fontFamily: 'Geist', 
+                cursorColor: AppColors.primary,
+                decoration: const InputDecoration(
+                  hintText: 'Ask your coach…',
+                  hintStyle: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textFaint,
                     fontSize: 14,
                   ),
+                  // The container draws the only frame; the theme otherwise nests
+                  // a filled 12-radius box and focus ring inside this 18-radius pill.
+                  filled: false,
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
                     horizontal: AppSpacing.md,
                     vertical: AppSpacing.sm + 4,
                   ),
@@ -420,48 +343,13 @@ class _AiCoachViewState extends State<_AiCoachView> {
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
-          GestureDetector(
-            onTap: loading ? null : _send,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: loading
-                    ? null
-                    : const LinearGradient(
-                        colors: [AppColors.primary, Color(0xFF5B21B6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                color: loading ? AppColors.glass3 : null,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                boxShadow: loading
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: AppColors.primaryGlow(0.4),
-                          blurRadius: 12,
-                          spreadRadius: -4,
-                        ),
-                      ],
-              ),
-              child: loading
-                  ? const Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                        ),
-                      ),
-                    )
-                  : const Icon(
-                      Icons.arrow_upward_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+          // Keystrokes rebuild only this button, not the whole transcript.
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _controller,
+            builder: (_, value, _) => _SendButton(
+              loading: vm.isLoading,
+              enabled: value.text.trim().isNotEmpty,
+              onTap: _send,
             ),
           ),
         ],
@@ -470,25 +358,68 @@ class _AiCoachViewState extends State<_AiCoachView> {
   }
 }
 
-// ── Header icon button ──────────────────────────────────────────────────────
+// ── Send button ──────────────────────────────────────────────────────────────
 
-class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({required this.icon, required this.onTap});
-  final IconData icon;
+/// Three distinguishable states: sending, ready, and nothing-to-send.
+class _SendButton extends StatelessWidget {
+  const _SendButton({
+    required this.loading,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final bool loading;
+  final bool enabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.glass,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: AppColors.glassBorder),
+    final active = enabled && !loading;
+    return Semantics(
+      button: true,
+      enabled: active,
+      label: loading ? 'Sending' : 'Send message',
+      child: GestureDetector(
+        onTap: active ? onTap : null,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          curve: Curves.easeOut,
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            gradient: active ? AppColors.primaryGradient : null,
+            color: active ? null : AppColors.glass2,
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            border: active
+                ? null
+                : Border.all(color: AppColors.glassBorder),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: AppColors.primaryGlow(0.4),
+                      blurRadius: 12,
+                      spreadRadius: -4,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                    ),
+                  )
+                : Icon(
+                    Icons.arrow_upward_rounded,
+                    color: active ? Colors.white : AppColors.textFaint,
+                    size: 20,
+                  ),
+          ),
         ),
-        child: Icon(icon, color: AppColors.textSoft, size: 18),
       ),
     );
   }
@@ -655,37 +586,6 @@ class _ConversationTile extends StatelessWidget {
   }
 }
 
-// ── Suggestion chip ───────────────────────────────────────────────────────────
-
-class _SuggestionChip extends StatelessWidget {
-  const _SuggestionChip({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(AppRadius.full),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.30)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(fontFamily: 'Geist', 
-            color: AppColors.primary,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ── Message bubble ────────────────────────────────────────────────────────────
 
 class _MessageBubble extends StatelessWidget {
@@ -695,76 +595,20 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (!isUser) ...[
-            _AiAvatar(),
-            const SizedBox(width: AppSpacing.sm),
-          ],
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!isUser && (message.toolCalls?.isNotEmpty ?? false))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: _ToolCallChips(toolNames: message.toolCalls!),
-                  ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm + 2,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: isUser
-                        ? const LinearGradient(
-                            colors: [AppColors.primary, Color(0xFF5B21B6)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : null,
-                    color: isUser ? null : AppColors.glass3,
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(AppRadius.lg),
-                      topRight: const Radius.circular(AppRadius.lg),
-                      bottomLeft: Radius.circular(isUser ? AppRadius.lg : 4),
-                      bottomRight: Radius.circular(isUser ? 4 : AppRadius.lg),
-                    ),
-                    border: isUser
-                        ? null
-                        : Border.all(color: AppColors.glassBorder),
-                    boxShadow: isUser
-                        ? [
-                            BoxShadow(
-                              color: AppColors.primaryGlow(0.25),
-                              blurRadius: 12,
-                              spreadRadius: -4,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: isUser
-                      ? Text(
-                          message.text,
-                          style: TextStyle(fontFamily: 'Geist',
-                            color: AppColors.textPrimary,
-                            fontSize: 14,
-                            height: 1.55,
-                          ),
-                        )
-                      : CoachMessageContent(text: message.text),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return _Turn(
+      isUser: isUser,
+      toolCalls: isUser ? const [] : (message.toolCalls ?? const []),
+      child: isUser
+          ? Text(
+              message.text,
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                color: Colors.white,
+                fontSize: 14,
+                height: 1.55,
+              ),
+            )
+          : CoachMessageContent(text: message.text),
     );
   }
 }
@@ -776,45 +620,121 @@ class _StreamingBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _Turn(
+      isUser: false,
+      toolCalls: toolCalls,
+      toolCallsActive: true,
+      // An empty stream is still a bubble — the dots need somewhere to sit.
+      forceBubble: text.isEmpty,
+      child: text.isEmpty
+          ? const RFLoadingDots()
+          : CoachMessageContent(text: text, streaming: true),
+    );
+  }
+}
+
+// ── Turn layout ──────────────────────────────────────────────────────────────
+
+/// One turn: avatar, tool-call chips, and content — bubbled for prose, bare
+/// for a dashboard, whose own cards would otherwise sit in a second frame.
+class _Turn extends StatelessWidget {
+  const _Turn({
+    required this.isUser,
+    required this.child,
+    this.toolCalls = const [],
+    this.toolCallsActive = false,
+    this.forceBubble = false,
+  });
+
+  final bool isUser;
+  final Widget child;
+  final List<String> toolCalls;
+  final bool toolCallsActive;
+  final bool forceBubble;
+
+  @override
+  Widget build(BuildContext context) {
+    // A dashboard takes the full column; prose takes a bubble.
+    final isDashboard = !forceBubble &&
+        !isUser &&
+        child is CoachMessageContent &&
+        CoachMessageContent.rendersAsDashboard(
+          (child as CoachMessageContent).text,
+        );
+
+    final content = isDashboard
+        ? child
+        : Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm + 2,
+            ),
+            decoration: BoxDecoration(
+              gradient: isUser ? AppColors.primaryGradient : null,
+              color: isUser ? null : AppColors.glass2,
+              // The square corner marks the speaker's side.
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(AppRadius.lg),
+                topRight: const Radius.circular(AppRadius.lg),
+                bottomLeft: Radius.circular(isUser ? AppRadius.lg : 4),
+                bottomRight: Radius.circular(isUser ? 4 : AppRadius.lg),
+              ),
+              border:
+                  isUser ? null : Border.all(color: AppColors.glassBorder),
+              boxShadow: isUser
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primaryGlow(0.25),
+                        blurRadius: 12,
+                        spreadRadius: -4,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: child,
+          );
+
+    final column = Column(
+      crossAxisAlignment:
+          isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (toolCalls.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: _ToolCallChips(
+              toolNames: toolCalls,
+              active: toolCallsActive,
+            ),
+          ),
+        content,
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        // Top, so a tall turn's avatar sits beside its first line, not its last.
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _AiAvatar(),
-          const SizedBox(width: AppSpacing.sm),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (toolCalls.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: _ToolCallChips(toolNames: toolCalls, active: true),
-                  ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm + 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.glass3,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(AppRadius.lg),
-                      topRight: Radius.circular(AppRadius.lg),
-                      bottomLeft: Radius.circular(4),
-                      bottomRight: Radius.circular(AppRadius.lg),
-                    ),
-                    border: Border.all(color: AppColors.glassBorder),
-                  ),
-                  child: text.isEmpty
-                      ? const RFLoadingDots()
-                      : CoachMessageContent(text: text, streaming: true),
+          if (!isUser) ...[
+            const _AiAvatar(),
+            const SizedBox(width: AppSpacing.sm),
+          ],
+          if (isDashboard)
+            Expanded(child: column)
+          else
+            Flexible(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width *
+                      _kBubbleMaxWidthFactor,
                 ),
-              ],
+                child: column,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -892,6 +812,27 @@ class CoachMessageContent extends StatefulWidget {
     this.streaming = false,
   });
 
+  static final _parser = A2UiParser(defaultA2UiRegistry);
+
+  /// Parsed nodes by source text. Shared because the turn layout needs the
+  /// result before this widget builds; bounded so transcripts don't accumulate.
+  static final Map<String, A2UiNode?> _nodeCache = <String, A2UiNode?>{};
+  static const _nodeCacheLimit = 32;
+
+  static A2UiNode? nodeFor(String text) {
+    if (_nodeCache.containsKey(text)) return _nodeCache[text];
+    if (_nodeCache.length >= _nodeCacheLimit) {
+      _nodeCache.remove(_nodeCache.keys.first);
+    }
+    return _nodeCache[text] = _parser.parse(text);
+  }
+
+  /// True when [text] is a complete A2UI payload, so renders full-width.
+  static bool rendersAsDashboard(String text) => nodeFor(text) != null;
+
+  /// True when [text] is a partial A2UI payload still arriving.
+  static bool looksLikeUi(String text) => _parser.looksLikeUi(text);
+
   final String text;
 
   /// True while tokens are still arriving, so a half-written JSON payload
@@ -903,33 +844,14 @@ class CoachMessageContent extends StatefulWidget {
 }
 
 class _CoachMessageContentState extends State<CoachMessageContent> {
-  static final _parser = A2UiParser(defaultA2UiRegistry);
-
-  A2UiNode? _node;
-  String? _parsedFrom;
-
-  @override
-  void didUpdateWidget(CoachMessageContent oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text) _parsedFrom = null;
-  }
-
-  A2UiNode? get _resolved {
-    if (_parsedFrom != widget.text) {
-      _parsedFrom = widget.text;
-      _node = _parser.parse(widget.text);
-    }
-    return _node;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final node = _resolved;
+    final node = CoachMessageContent.nodeFor(widget.text);
     if (node != null) return A2UiRenderer(node: node);
 
     // Mid-stream JSON: hide the braces behind a progress row rather than
     // letting the Markdown renderer spill raw payload into the bubble.
-    if (widget.streaming && _parser.looksLikeUi(widget.text)) {
+    if (widget.streaming && CoachMessageContent.looksLikeUi(widget.text)) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -973,27 +895,14 @@ class _CoachMarkdown extends StatelessWidget {
 }
 
 class _AiAvatar extends StatelessWidget {
+  const _AiAvatar();
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, Color(0xFF5B21B6)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryGlow(0.35),
-            blurRadius: 8,
-            spreadRadius: -2,
-          ),
-        ],
-      ),
-      child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 14),
+    return const RFGradientBadge(
+      icon: Icons.auto_awesome_rounded,
+      size: 28,
+      radius: AppRadius.sm,
     );
   }
 }

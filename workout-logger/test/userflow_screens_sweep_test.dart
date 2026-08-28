@@ -178,12 +178,12 @@ void main() {
       robot.expectVisible(WorkoutFlowScreen);
 
       // Interact with set logging and rest timer
-      final logSetBtn = find.text('LOG SET');
+      final logSetBtn = find.text('Log set');
       if (logSetBtn.evaluate().isNotEmpty) {
         await tester.tap(logSetBtn);
         await tester.pumpAndSettle();
 
-        final restTargets = ['+30s', 'SKIP REST'];
+        final restTargets = ['+30s', 'Skip rest'];
         await TestSweep.tapAll(tester, restTargets);
       }
 

@@ -11,6 +11,7 @@ import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/rf_cards.dart';
+import 'widgets/rf_shell.dart';
 
 class WorkoutSummaryScreen extends StatelessWidget {
   const WorkoutSummaryScreen({
@@ -48,52 +49,70 @@ class WorkoutSummaryScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: AppSpacing.lg),
-                    _buildTrophyHeader(context),
-                    const SizedBox(height: AppSpacing.xl),
-                    _buildStatGrid(
-                      session.duration,
-                      volStr,
-                      totalSets,
-                      session.exercises.length,
-                      settings.unitLabel,
-                    ),
-                    if (newPRs.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.lg),
-                      _buildPRSection(newPRs, provider),
+      body: Stack(
+        children: [
+          const AmbientGlow(),
+          Column(
+            children: [
+              Expanded(
+                child: SafeArea(
+                  bottom: false,
+                  child: CustomScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const SizedBox(height: AppSpacing.lg),
+                              _buildTrophyHeader(context),
+                              const SizedBox(height: AppSpacing.xl),
+                              _buildStatGrid(
+                                session.duration,
+                                volStr,
+                                totalSets,
+                                session.exercises.length,
+                                settings.unitLabel,
+                              ),
+                              // The only ask on this screen, above the read-only sections.
+                              const SizedBox(height: AppSpacing.lg),
+                              _EffortChipRow(session: session),
+                              if (newPRs.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                _buildPRSection(newPRs, provider),
+                              ],
+                              if (muscles.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                _buildMusclesSection(muscles, provider),
+                              ],
+                              const SizedBox(height: AppSpacing.lg),
+                              _buildExerciseSummary(
+                                session,
+                                provider,
+                                settings,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
-                    if (muscles.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.lg),
-                      _buildMusclesSection(muscles, provider),
-                    ],
-                    const SizedBox(height: AppSpacing.lg),
-                    _buildExerciseSummary(session, provider),
-                    const SizedBox(height: AppSpacing.lg),
-                    _EffortChipRow(session: session),
-                    const SizedBox(height: AppSpacing.xl),
-                    GlowButton(
-                      label: 'Done',
-                      icon: Icons.check_rounded,
-                      onPressed: () => Navigator.of(context)
-                          .popUntil((r) => r.isFirst),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
+              RFBottomBar(
+                child: GlowButton(
+                  label: 'Done',
+                  icon: Icons.check_rounded,
+                  onPressed: () =>
+                      Navigator.of(context).popUntil((r) => r.isFirst),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -210,7 +229,7 @@ class WorkoutSummaryScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const RFSectionHeader('New Personal Records'),
+        const RFSectionHeader('New personal records'),
         const SizedBox(height: AppSpacing.sm),
         ...prs.map((pr) {
           final name = provider.getExerciseName(pr.exerciseId);
@@ -273,7 +292,7 @@ class WorkoutSummaryScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const RFSectionHeader('Muscles Trained'),
+        const RFSectionHeader('Muscles trained'),
         const SizedBox(height: AppSpacing.sm),
         Wrap(
           spacing: 6,
@@ -293,14 +312,19 @@ class WorkoutSummaryScreen extends StatelessWidget {
   Widget _buildExerciseSummary(
     WorkoutSession session,
     WorkoutProvider provider,
+    SettingsProvider settings,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const RFSectionHeader('Exercise Breakdown'),
+        const RFSectionHeader('Exercise breakdown'),
         const SizedBox(height: AppSpacing.sm),
         ...session.exercises.map(
-          (log) => _ExerciseSummaryRow(log: log, provider: provider),
+          (log) => _ExerciseSummaryRow(
+            log: log,
+            provider: provider,
+            settings: settings,
+          ),
         ),
       ],
     );
@@ -311,15 +335,18 @@ class _ExerciseSummaryRow extends StatelessWidget {
   const _ExerciseSummaryRow({
     required this.log,
     required this.provider,
+    required this.settings,
   });
 
   final ExerciseLog log;
   final WorkoutProvider provider;
+  final SettingsProvider settings;
 
   @override
   Widget build(BuildContext context) {
     final name = provider.getExerciseName(log.exerciseId);
-    final volume = log.totalVolume;
+    // Converted like every other figure here; this row used to print raw kg.
+    final volume = settings.toDisplay(log.totalVolume);
     final volStr = volume >= 1000
         ? '${(volume / 1000).toStringAsFixed(1)}k'
         : volume.toStringAsFixed(0);
@@ -358,7 +385,7 @@ class _ExerciseSummaryRow extends StatelessWidget {
             ),
           ),
           Text(
-            '$volStr kg',
+            '$volStr ${settings.unitLabel}',
             style: const TextStyle(
               color: AppColors.success,
               fontSize: 13,
@@ -417,29 +444,11 @@ class _EffortChipRowState extends State<_EffortChipRow> {
   }
 
   Widget _buildChip(({int value, String label, Color color}) option) {
-    final isSelected = _selected == option.value;
-    return GestureDetector(
+    return RFOptionChip(
+      label: option.label,
+      color: option.color,
+      selected: _selected == option.value,
       onTap: () => _select(option.value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: option.color.withValues(alpha: isSelected ? 0.2 : 0.08),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: option.color.withValues(alpha: isSelected ? 0.8 : 0.3),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Text(
-          option.label,
-          style: TextStyle(
-            color: isSelected ? option.color : AppColors.textMuted,
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-          ),
-        ),
-      ),
     );
   }
 }

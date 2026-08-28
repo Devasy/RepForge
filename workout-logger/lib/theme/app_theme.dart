@@ -20,10 +20,35 @@ class AppColors {
   static const glassBorderStrong = Color(0x21FFFFFF); // --border-strong 13%
   static const divider = Color(0x0FFFFFFF);         // 6% white
 
+  // GlassCard material. The fill grades top-to-bottom and the edge grades with
+  // it, so a panel reads as a surface catching light from above rather than as
+  // an outline. The old fill (3.5% -> 1.6%) resolved to +9/255 and +4/255 over
+  // the canvas, which left the border twice as bright as the face it wrapped.
+  static const glassFillTop = Color(0x12FFFFFF);    // 7%  -> +17.5/255
+  static const glassFillBottom = Color(0x05FFFFFF); // 2%  ->  +4.9/255
+  static const glassEdgeTop = Color(0x24FFFFFF);    // 14% -> +34.9/255
+  static const glassEdgeBottom = Color(0x0AFFFFFF); // 4%  ->  +9.7/255
+
+  // Ambient wash floor. A radial pool's reach is finite and a scrolling column
+  // is not, so this full-height grade is the only layer that can guarantee a
+  // non-zero floor everywhere. Without it the canvas below the key pool is
+  // literally flat and glass has nothing to sit on.
+  static const washFloorTop = Color(0x065B21B6);    // 2.4% violet
+  static const washFloorMid = Color(0x045B21B6);    // 1.6%
+  static const washFloorBottom = Color(0x055B21B6); // 2.0%
+
   // Brand — electric violet primary, cyan data
   static const primary = Color(0xFF7C3AED);         // --accent oklch(0.68 0.18 285)
+  static const primaryDeep = Color(0xFF5B21B6);     // gradient end / ambient wash
   static const secondary = Color(0xFF00C2D4);       // --data  oklch(0.78 0.14 200)
   static const accent = Color(0xFF7C3AED);          // alias for primary
+
+  /// The one brand gradient, so every violet surface catches the same light.
+  static const primaryGradient = LinearGradient(
+    colors: [primary, primaryDeep],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   // Semantic
   static const success = Color(0xFF00C89B);         // --success oklch(0.78 0.16 155)
