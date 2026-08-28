@@ -169,6 +169,44 @@ void main() {
       expect(recs.first.reps, 10);
       expect(recs.first.reasoning, contains('Resuming training after deload'));
     });
+
+    // The recency window is 21 days. Duration.inDays truncates, so comparing
+    // it would keep a deload 21 days and 23 hours old inside the window.
+    group('deload recency window boundary', () {
+      final asOf = DateTime(2026, 8, 1, 12);
+
+      List<SetRecommendation> recsAged(Duration age) {
+        final deloadAt = asOf.subtract(age);
+        final s1 = [
+          WorkoutSet(
+            weight: 60.0,
+            reps: 10,
+            timestamp: deloadAt.subtract(const Duration(days: 3)),
+          )
+        ];
+        final s0 = [WorkoutSet(weight: 40.0, reps: 8, timestamp: deloadAt)];
+        return mlService.recommendSets(
+          lastSession: s0,
+          pastSessions: [s0, s1],
+          maxReps: 12,
+          asOf: asOf,
+        );
+      }
+
+      test('exactly 21 days old still counts as recent', () {
+        expect(
+          recsAged(const Duration(days: 21)).first.reasoning,
+          contains('Resuming training after deload'),
+        );
+      });
+
+      test('21 days and 23 hours old is outside the window', () {
+        expect(
+          recsAged(const Duration(days: 21, hours: 23)).first.reasoning,
+          isNot(contains('Resuming training after deload')),
+        );
+      });
+    });
   });
 
   group('PRManager - Handle Variations Scoping', () {

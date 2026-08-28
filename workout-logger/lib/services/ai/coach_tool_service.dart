@@ -393,10 +393,14 @@ class CoachToolService {
             'targets(id, exercise_id, target_type, target_value, current_value, '
             'estimated_completion_date, created_at, is_completed)\n'
             'personal_records(exercise_id, best_weight, best_reps, best_volume, achieved_at)\n'
-            'health_samples(id, type, timestamp, value) — type is heart_rate | '
-            'resting_heart_rate | hrv_rmssd; one row per Health Connect sample\n'
+            'health_samples(id, type, timestamp, utc_ts, value) — type is '
+            'heart_rate | resting_heart_rate | hrv_rmssd; one row per Health '
+            'Connect sample. Join on timestamp (local wall-clock, same clock as '
+            'workout_sessions.date); utc_ts is the UTC instant, for ordering '
+            'and de-duplication only\n'
             'sleep_sessions(id, start_ts, end_ts, light_min, deep_min, rem_min, '
-            'awake_min) — one row per night, id is the session start_ts\n'
+            'awake_min) — one row per night; start_ts/end_ts are local '
+            'wall-clock, id is the UTC start instant\n'
             'sleep_stage_intervals(sleep_session_id, start_ts, end_ts, stage) — '
             'stage is deep | rem | light | awake\n'
             'When joining tables, select explicit columns with aliases (e.g. s.id AS '
@@ -623,7 +627,8 @@ class CoachToolService {
     final exName = (args['exercise_name'] as String?)?.trim();
     final days = _limitArg(args, 60, key: 'days', max: 365);
 
-    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final now = DateTime.now();
+    final cutoff = now.subtract(Duration(days: days));
     final sessions = _wp.sessions.where((s) => !s.date.isBefore(cutoff)).toList();
 
     if (sessions.isEmpty) {
@@ -662,12 +667,18 @@ class CoachToolService {
 
     final hh = _hh;
     if (hh != null) {
-      // Week granularity only covers the last 7 days (see _getHealthMetrics),
-      // so the default 60-day correlation window needs month granularity or
-      // almost every day falls outside the fetched bars and gets no x value.
-      final granularity =
-          days <= 7 ? HealthGranularity.week : HealthGranularity.month;
-      final bars = await hh.sleepBars(DateTime.now(), granularity);
+      // sleepBars(anchor, month) covers only the anchor's calendar month, so a
+      // single call would drop every workout day before the 1st of this month
+      // — the default window is 60 days. Walk each month the window touches
+      // and merge the daily bars. Year granularity is not an option here: it
+      // returns 12 monthly averages, not one bar per night.
+      final lastMonth = DateTime(now.year, now.month, 1);
+      final bars = <SleepDayBar>[];
+      for (var m = DateTime(cutoff.year, cutoff.month, 1);
+          !m.isAfter(lastMonth);
+          m = DateTime(m.year, m.month + 1, 1)) {
+        bars.addAll(await hh.sleepBars(m, HealthGranularity.month));
+      }
       for (final b in bars) {
         final key = _d(b.date);
         final m = dayData[key];

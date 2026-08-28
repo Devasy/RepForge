@@ -70,8 +70,12 @@ class SettingsProvider extends ChangeNotifier {
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
     _geminiModel = await _storage.getSetting('geminiModel') ?? 'gemini-3.6-flash';
     final maxRounds = await _storage.getSetting('geminiMaxToolRounds');
-    _geminiMaxToolRounds =
-        maxRounds != null ? (int.tryParse(maxRounds) ?? kDefaultMaxToolRounds) : kDefaultMaxToolRounds;
+    // Clamp on read as well as on write: a stored value from an older build or
+    // a hand-edited settings row would otherwise bypass the bounds that
+    // setGeminiMaxToolRounds enforces.
+    final parsedMaxRounds = maxRounds != null ? int.tryParse(maxRounds) : null;
+    _geminiMaxToolRounds = (parsedMaxRounds ?? kDefaultMaxToolRounds)
+        .clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
     final thinkingLevel = await _storage.getSetting('geminiThinkingLevel');
     _geminiThinkingLevel =
         clampThinkingLevel(_geminiModel, thinkingLevel ?? kDefaultThinkingLevel);

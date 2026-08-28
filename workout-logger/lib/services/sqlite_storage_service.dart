@@ -16,20 +16,40 @@ class SqliteStorageService implements IStorageService {
         _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 3;
+
+  /// Dropped and rebuilt by the v2 → v3 upgrade. The health tables are a cache
+  /// of Health Connect, so rebuilding them costs one re-sync rather than user
+  /// data — and their old rows have no recoverable UTC instant to backfill
+  /// `utc_ts` from.
+  static const List<String> _healthTables = [
+    'sleep_stage_intervals',
+    'sleep_sessions',
+    'health_samples',
+  ];
   static int _nextInstanceId = 0;
 
-  /// Added in schema v2 (health sync). Kept separate from the rest of
-  /// [_schemaStatements] so `onUpgrade` can run exactly these statements
-  /// against pre-v2 databases without re-running the full v1 DDL.
+  /// Added in schema v2 (health sync), reshaped in v3. Kept separate from the
+  /// rest of [_schemaStatements] so `onUpgrade` can run exactly these
+  /// statements against older databases without re-running the full v1 DDL.
+  ///
+  /// Two clocks on purpose. `timestamp` / `start_ts` / `end_ts` are **local
+  /// wall-clock** with no offset, matching how every other table stores dates
+  /// (see `workout_sessions.date`), so the coach can join health data to
+  /// workouts on `date(...)` without timezone skew. `utc_ts` and
+  /// `sleep_sessions.id` are the **UTC instant**, and carry identity: a local
+  /// string is ambiguous across a DST fall-back, where the repeated hour maps
+  /// two distinct instants onto one string and the upserts below would discard
+  /// one of them.
   static const List<String> _healthSchemaStatements = [
     '''CREATE TABLE IF NOT EXISTS health_samples (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
       timestamp TEXT NOT NULL,
+      utc_ts TEXT NOT NULL,
       value REAL NOT NULL
     )''',
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_health_samples_unique ON health_samples(type, timestamp)',
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_health_samples_unique ON health_samples(type, utc_ts)',
     '''CREATE TABLE IF NOT EXISTS sleep_sessions (
       id TEXT PRIMARY KEY,
       start_ts TEXT NOT NULL,
@@ -209,6 +229,22 @@ class SqliteStorageService implements IStorageService {
           for (final statement in _healthSchemaStatements) {
             await db.execute(statement);
           }
+        } else if (oldVersion < 3) {
+          // v2 keyed health rows by a local-time string, which collides across
+          // a DST fall-back. Rebuild the tables on the v3 shape and clear the
+          // sync watermarks so the next run re-pulls the window from Health
+          // Connect; nothing here is user-authored data.
+          for (final table in _healthTables) {
+            await db.execute('DROP TABLE IF EXISTS $table');
+          }
+          for (final statement in _healthSchemaStatements) {
+            await db.execute(statement);
+          }
+          await db.delete(
+            'settings',
+            where: 'key LIKE ?',
+            whereArgs: ['health_sync.%'],
+          );
         }
       },
     );
@@ -827,7 +863,10 @@ class SqliteStorageService implements IStorageService {
         'health_samples',
         {
           'type': type,
+          // Local for date joins, UTC for identity — see
+          // [_healthSchemaStatements].
           'timestamp': s.time.toLocal().toIso8601String(),
+          'utc_ts': s.time.toUtc().toIso8601String(),
           'value': s.value,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
@@ -840,7 +879,9 @@ class SqliteStorageService implements IStorageService {
     if (periods.isEmpty) return;
     await _db.transaction((txn) async {
       for (final p in periods) {
-        final id = p.start.toLocal().toIso8601String();
+        // UTC instant, not local: two sessions starting in the repeated hour of
+        // a DST fall-back share a local string and would collide on this key.
+        final id = p.start.toUtc().toIso8601String();
         await txn.delete(
           'sleep_stage_intervals',
           where: 'sleep_session_id = ?',

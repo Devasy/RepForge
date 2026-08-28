@@ -753,17 +753,34 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   }
 
   Future<void> _commitMaxToolRounds(int rounds) async {
-    final settings = context.read<SettingsProvider>();
-    await settings.setGeminiMaxToolRounds(rounds);
-    setState(() => _draggingMaxToolRounds = null);
+    // onChangeEnd discards this Future, so a storage failure would otherwise
+    // surface as an unhandled error; and the await means the widget can be
+    // disposed before setState runs.
+    try {
+      await context.read<SettingsProvider>().setGeminiMaxToolRounds(rounds);
+    } catch (e, st) {
+      debugPrint('Failed to save max tool rounds: $e\n$st');
+    } finally {
+      if (mounted) {
+        setState(() => _draggingMaxToolRounds = null);
+      }
+    }
   }
 
   Future<void> _commitThinkingLevel(String level) async {
-    final settings = context.read<SettingsProvider>();
+    // Same contract as _commitMaxToolRounds above: onChangeEnd drops the
+    // Future, and the widget may be gone by the time the await returns.
     final gemini = context.read<GeminiAiService>();
-    await settings.setGeminiThinkingLevel(level);
-    gemini.updateThinkingLevel(level);
-    setState(() => _draggingThinkingLevelIndex = null);
+    try {
+      await context.read<SettingsProvider>().setGeminiThinkingLevel(level);
+      gemini.updateThinkingLevel(level);
+    } catch (e, st) {
+      debugPrint('Failed to save thinking level: $e\n$st');
+    } finally {
+      if (mounted) {
+        setState(() => _draggingThinkingLevelIndex = null);
+      }
+    }
   }
 
   @override
