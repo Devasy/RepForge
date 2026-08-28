@@ -21,6 +21,7 @@ void main() {
       expect(provider.userName, isNull);
       expect(provider.geminiApiKey, isEmpty);
       expect(provider.geminiModel, equals('gemini-3.6-flash'));
+      expect(provider.geminiThinkingLevel, equals('minimal'));
       expect(provider.showAdvancedMetrics, isFalse);
     });
 
@@ -32,6 +33,7 @@ void main() {
       await mockStorage.saveSetting('userName', 'Devasy');
       await mockStorage.saveSetting('geminiApiKey', 'secret_key');
       await mockStorage.saveSetting('geminiModel', 'gemini-1.5-pro');
+      await mockStorage.saveSetting('geminiThinkingLevel', 'high');
       await mockStorage.saveSetting('showAdvancedMetrics', 'true');
 
       await provider.init();
@@ -44,7 +46,17 @@ void main() {
       expect(provider.userName, equals('Devasy'));
       expect(provider.geminiApiKey, equals('secret_key'));
       expect(provider.geminiModel, equals('gemini-1.5-pro'));
+      expect(provider.geminiThinkingLevel, equals('high'));
       expect(provider.showAdvancedMetrics, isTrue);
+    });
+
+    test('init clamps a stored thinking level that the stored model no longer supports', () async {
+      await mockStorage.saveSetting('geminiModel', 'gemini-3.7-flash');
+      await mockStorage.saveSetting('geminiThinkingLevel', 'minimal');
+
+      await provider.init();
+
+      expect(provider.geminiThinkingLevel, equals('low'));
     });
 
     test('setUserName updates state and notifies listeners', () async {
@@ -104,8 +116,20 @@ void main() {
       await provider.setGeminiModel('custom-model');
       expect(provider.geminiModel, equals('custom-model'));
 
+      await provider.setGeminiThinkingLevel('high');
+      expect(provider.geminiThinkingLevel, equals('high'));
+      expect(mockStorage.settings['geminiThinkingLevel'], equals('high'));
+
       await provider.setShowAdvancedMetrics(true);
       expect(provider.showAdvancedMetrics, isTrue);
+    });
+
+    test('setGeminiModel clamps an already-set thinking level the new model does not support', () async {
+      await provider.setGeminiThinkingLevel('minimal');
+      await provider.setGeminiModel('gemini-3.7-flash');
+
+      expect(provider.geminiThinkingLevel, equals('low'));
+      expect(mockStorage.settings['geminiThinkingLevel'], equals('low'));
     });
 
     test('saveWeeklyInsights updates insights string and date', () async {

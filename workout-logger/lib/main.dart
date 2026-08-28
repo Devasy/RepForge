@@ -261,6 +261,7 @@ class _AppInitializerState extends State<AppInitializer> {
         settings.geminiApiKey,
         model: settings.geminiModel,
         maxToolRounds: settings.geminiMaxToolRounds,
+        thinkingLevel: settings.geminiThinkingLevel,
       );
       try {
         await gemini.loadUsage();

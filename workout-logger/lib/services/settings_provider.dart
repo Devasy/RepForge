@@ -3,7 +3,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'ai/gemini_ai_service.dart'
-    show kDefaultMaxToolRounds, kMinMaxToolRounds, kMaxMaxToolRounds;
+    show kDefaultMaxToolRounds, kMinMaxToolRounds, kMaxMaxToolRounds,
+        kDefaultThinkingLevel, clampThinkingLevel;
 import 'interfaces/storage_service_interface.dart';
 
 enum WeightUnit { kg, lbs }
@@ -20,6 +21,7 @@ class SettingsProvider extends ChangeNotifier {
   String _geminiApiKey = '';
   String _geminiModel = 'gemini-3.6-flash';
   int _geminiMaxToolRounds = kDefaultMaxToolRounds;
+  String _geminiThinkingLevel = kDefaultThinkingLevel;
   String _weeklyInsights = '';
   DateTime? _weeklyInsightsDate;
   bool _showAdvancedMetrics = false;
@@ -36,6 +38,7 @@ class SettingsProvider extends ChangeNotifier {
   String get geminiApiKey => _geminiApiKey;
   String get geminiModel => _geminiModel;
   int get geminiMaxToolRounds => _geminiMaxToolRounds;
+  String get geminiThinkingLevel => _geminiThinkingLevel;
   String get weeklyInsights => _weeklyInsights;
   DateTime? get weeklyInsightsDate => _weeklyInsightsDate;
   bool get showAdvancedMetrics => _showAdvancedMetrics;
@@ -69,6 +72,9 @@ class SettingsProvider extends ChangeNotifier {
     final maxRounds = await _storage.getSetting('geminiMaxToolRounds');
     _geminiMaxToolRounds =
         maxRounds != null ? (int.tryParse(maxRounds) ?? kDefaultMaxToolRounds) : kDefaultMaxToolRounds;
+    final thinkingLevel = await _storage.getSetting('geminiThinkingLevel');
+    _geminiThinkingLevel =
+        clampThinkingLevel(_geminiModel, thinkingLevel ?? kDefaultThinkingLevel);
     _weeklyInsights = await _storage.getSetting('weeklyInsights') ?? '';
     final dateStr = await _storage.getSetting('weeklyInsightsDate');
     _weeklyInsightsDate = dateStr != null ? DateTime.tryParse(dateStr) : null;
@@ -140,12 +146,23 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setGeminiModel(String model) async {
     _geminiModel = model;
     await _storage.saveSetting('geminiModel', model);
+    final clamped = clampThinkingLevel(_geminiModel, _geminiThinkingLevel);
+    if (clamped != _geminiThinkingLevel) {
+      _geminiThinkingLevel = clamped;
+      await _storage.saveSetting('geminiThinkingLevel', clamped);
+    }
     notifyListeners();
   }
 
   Future<void> setGeminiMaxToolRounds(int rounds) async {
     _geminiMaxToolRounds = rounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
     await _storage.saveSetting('geminiMaxToolRounds', _geminiMaxToolRounds.toString());
+    notifyListeners();
+  }
+
+  Future<void> setGeminiThinkingLevel(String level) async {
+    _geminiThinkingLevel = clampThinkingLevel(_geminiModel, level);
+    await _storage.saveSetting('geminiThinkingLevel', _geminiThinkingLevel);
     notifyListeners();
   }
 

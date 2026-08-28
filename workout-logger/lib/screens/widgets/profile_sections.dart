@@ -716,6 +716,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   // Live value shown while dragging the slider; null when not dragging (in
   // which case the persisted settings value is shown instead).
   double? _draggingMaxToolRounds;
+  double? _draggingThinkingLevelIndex;
 
   @override
   void initState() {
@@ -755,6 +756,14 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     final settings = context.read<SettingsProvider>();
     await settings.setGeminiMaxToolRounds(rounds);
     setState(() => _draggingMaxToolRounds = null);
+  }
+
+  Future<void> _commitThinkingLevel(String level) async {
+    final settings = context.read<SettingsProvider>();
+    final gemini = context.read<GeminiAiService>();
+    await settings.setGeminiThinkingLevel(level);
+    gemini.updateThinkingLevel(level);
+    setState(() => _draggingThinkingLevelIndex = null);
   }
 
   @override
@@ -848,41 +857,111 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
           const SizedBox(height: AppSpacing.md),
           const _SectionLabel('GEMINI MODEL'),
           const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: kGeminiModels.map(((String, String) entry) {
-              final (id, label) = entry;
-              final selected = settings.geminiModel == id;
-              return GestureDetector(
-                onTap: () => _selectModel(id),
-                child: AnimatedContainer(
-                  duration: AppDurations.fast,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? AppColors.primary.withValues(alpha: 0.15)
-                        : AppColors.glass,
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    border: Border.all(
-                      color: selected
-                          ? AppColors.primary.withValues(alpha: 0.5)
-                          : AppColors.glassBorder,
-                      width: selected ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Text(
-                    label,
-                    style: TextStyle(fontFamily: 'GeistMono', 
-                      color: selected ? AppColors.primary : AppColors.textSoft,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                      fontSize: 11,
-                    ),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.glass,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(color: AppColors.glassBorderStrong),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButtonFormField<String>(
+                key: ValueKey(settings.geminiModel),
+                initialValue: settings.geminiModel,
+                isExpanded: true,
+                isDense: false,
+                dropdownColor: AppColors.card,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textFaint),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
                   ),
                 ),
-              );
-            }).toList(),
+                style: TextStyle(fontFamily: 'GeistMono',
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                ),
+                items: kGeminiModels.map(((String, String) entry) {
+                  final (id, label) = entry;
+                  return DropdownMenuItem(value: id, child: Text(label));
+                }).toList(),
+                onChanged: (id) {
+                  if (id != null) _selectModel(id);
+                },
+              ),
+            ),
           ),
+          if (supportedThinkingLevels(settings.geminiModel).isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            const _SectionLabel('THINKING LEVEL'),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'How much the model reasons before replying. Lower is faster and cheaper; higher is more capable on hard problems.',
+              style: TextStyle(fontFamily: 'Geist',
+                color: AppColors.textFaint,
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Builder(builder: (context) {
+              final levels = supportedThinkingLevels(settings.geminiModel);
+              final currentIndex = levels.indexOf(settings.geminiThinkingLevel);
+              final liveIndex = _draggingThinkingLevelIndex ??
+                  (currentIndex >= 0 ? currentIndex.toDouble() : 0.0);
+              final liveLevel = levels[liveIndex.round().clamp(0, levels.length - 1)];
+              final liveLevelLabel = liveLevel[0].toUpperCase() + liveLevel.substring(1);
+              return Row(
+                children: [
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: AppColors.primary,
+                        inactiveTrackColor: AppColors.glassBorderStrong,
+                        thumbColor: AppColors.primary,
+                        overlayColor: AppColors.primary.withValues(alpha: 0.15),
+                        valueIndicatorColor: AppColors.primary,
+                        trackHeight: 3,
+                      ),
+                      child: Slider(
+                        value: liveIndex,
+                        min: 0,
+                        max: (levels.length - 1).toDouble(),
+                        divisions: levels.length > 1 ? levels.length - 1 : null,
+                        label: liveLevelLabel,
+                        onChanged: (v) {
+                          setState(() => _draggingThinkingLevelIndex = v);
+                          context.read<GeminiAiService>().updateThinkingLevel(
+                            levels[v.round().clamp(0, levels.length - 1)],
+                          );
+                        },
+                        onChangeEnd: (v) => _commitThinkingLevel(
+                          levels[v.round().clamp(0, levels.length - 1)],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                    ),
+                    child: Text(
+                      liveLevelLabel,
+                      style: TextStyle(fontFamily: 'GeistMono',
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ],
           const SizedBox(height: AppSpacing.md),
           const _SectionLabel('MAX TOOL-CALL STEPS'),
           const SizedBox(height: AppSpacing.sm),
