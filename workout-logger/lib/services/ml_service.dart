@@ -188,8 +188,11 @@ class MLService implements IMLService {
         // misread as an active deload to recover from.
         final mostRecentTimestamp =
             s0.map((s) => s.timestamp).reduce((a, b) => a.isAfter(b) ? a : b);
-        final isRecent = now.difference(mostRecentTimestamp).inDays <=
-            _deloadRecencyWindowDays;
+        // Compare the full duration, not Duration.inDays: inDays truncates, so
+        // a session 21 days and 23 hours old would still read as 21 and stay
+        // inside the window.
+        final isRecent = !now.isAfter(mostRecentTimestamp
+            .add(const Duration(days: _deloadRecencyWindowDays)));
 
         // If the last session (s0) was a deload relative to the one before it
         if (isRecent &&

@@ -785,7 +785,7 @@ class _ToolCallChips extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   _label(name),
-                  style: TextStyle(fontFamily: 'GeistMono',
+                  style: const TextStyle(fontFamily: 'GeistMono',
                     color: AppColors.secondary,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,

@@ -90,6 +90,21 @@ void main() {
     expect(result['error'], contains('restricted table'));
   });
 
+  // The query planner's stat tables are on the denylist but were not otherwise
+  // exercised, so a typo there could silently reopen SQLite metadata access.
+  for (final table in const [
+    'sqlite_stat1',
+    'sqlite_stat2',
+    'sqlite_stat3',
+    'sqlite_stat4',
+  ]) {
+    test('rejects queries reading $table', () async {
+      final service = SqlQueryService(dbPath);
+      final result = await service.runQuery('SELECT * FROM $table');
+      expect(result['error'], contains('restricted table'));
+    });
+  }
+
   test('trailing line comment does not break the LIMIT wrapper', () async {
     final service = SqlQueryService(dbPath);
     final result = await service.runQuery('SELECT * FROM widgets -- get all');
