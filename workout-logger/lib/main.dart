@@ -292,7 +292,8 @@ class _AppInitializerState extends State<AppInitializer> {
       // Future — sync() has no caller to propagate a failure to.
       unawaited(
         healthDataSync?.sync().catchError(
-          (Object e, StackTrace st) => debugPrint('healthDataSync.sync failed: $e\n$st'),
+          (Object e, StackTrace st) =>
+              debugPrint('healthDataSync.sync failed: $e\n$st'),
         ),
       );
 
