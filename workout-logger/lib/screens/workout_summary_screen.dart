@@ -419,9 +419,18 @@ class _EffortChipRowState extends State<_EffortChipRow> {
 
   late int? _selected = widget.session.sessionEffort;
 
-  void _select(int value) {
+  Future<void> _select(int value) async {
+    final previous = _selected;
     setState(() => _selected = value);
-    context.read<WorkoutProvider>().recordSessionEffort(widget.session.id, value);
+    try {
+      await context
+          .read<WorkoutProvider>()
+          .recordSessionEffort(widget.session.id, value);
+    } catch (e, st) {
+      // Don't leave the chip showing a value that was never persisted.
+      debugPrint('Failed to record session effort: $e\n$st');
+      if (mounted) setState(() => _selected = previous);
+    }
   }
 
   @override
@@ -448,6 +457,7 @@ class _EffortChipRowState extends State<_EffortChipRow> {
       label: option.label,
       color: option.color,
       selected: _selected == option.value,
+      inMutuallyExclusiveGroup: true,
       onTap: () => _select(option.value),
     );
   }

@@ -62,6 +62,8 @@ abstract class ProgressionRule {
 
 /// Priority 1: a still-fatigued primary muscle holds instead of progressing.
 class UnderRecoveredRule implements ProgressionRule {
+  const UnderRecoveredRule();
+
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (!c.isUnderRecovered) return null;
@@ -78,6 +80,8 @@ class UnderRecoveredRule implements ProgressionRule {
 /// Priority 2: the session right after a detected deload re-anchors on the
 /// pre-deload baseline rather than progressing off the deload itself.
 class PostDeloadRecoveryRule implements ProgressionRule {
+  const PostDeloadRecoveryRule();
+
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (!c.isPostDeloadRecovery) return null;
@@ -98,6 +102,8 @@ class PostDeloadRecoveryRule implements ProgressionRule {
 /// progressing — a day-level physiological signal, so it outranks the
 /// session-local fatigue check below.
 class ReadinessRule implements ProgressionRule {
+  const ReadinessRule();
+
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (!c.isLowReadiness) return null;
@@ -116,6 +122,8 @@ class ReadinessRule implements ProgressionRule {
 /// and 1 don't stop here — they defer to [DoubleProgressionRule], which
 /// scales its weight increment down instead of blocking it outright.
 class SessionFatigueRule implements ProgressionRule {
+  const SessionFatigueRule();
+
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (c.sessionFatigueFactor < 1.0) return null;
@@ -131,6 +139,8 @@ class SessionFatigueRule implements ProgressionRule {
 
 /// Priority 5: a trustworthy declining trend triggers a ~10% deload.
 class DeclineDeloadRule implements ProgressionRule {
+  const DeclineDeloadRule();
+
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (!c.isDeclining) return null;
@@ -148,6 +158,8 @@ class DeclineDeloadRule implements ProgressionRule {
 
 /// Priority 6: a trustworthy flat trend holds load and reps.
 class PlateauRule implements ProgressionRule {
+  const PlateauRule();
+
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (!c.isPlateau) return null;
@@ -170,6 +182,8 @@ class PlateauRule implements ProgressionRule {
 /// outright, snapped to the nearest 2.5kg plate. At f = 0 (the default) this
 /// reduces to exactly the original unscaled behavior.
 class DoubleProgressionRule implements ProgressionRule {
+  const DoubleProgressionRule();
+
   @override
   SetRecommendation apply(ProgressionContext c) {
     if (c.set.reps >= c.maxReps) {
@@ -196,10 +210,17 @@ class DoubleProgressionRule implements ProgressionRule {
         weight: c.set.weight + increment,
         reps: c.minReps,
         confidence: increment < baseIncrement ? 'medium' : 'high',
+        // No raw weight or unit embedded, for the same reason as
+        // PostDeloadRecoveryRule above: the recommended load rides on
+        // SetRecommendation.weight and the presentation layer formats it in
+        // the user's chosen unit. Hardcoding "kg" here read as "add 5.0kg"
+        // to someone with pounds selected.
         reasoning: increment < baseIncrement
-            ? 'Rep target hit — add ${increment}kg (reduced — already '
-                'fatigued this muscle today) and reset to ${c.minReps} reps'
-            : 'Rep target hit — add ${increment}kg and reset to ${c.minReps} reps',
+            ? 'Rep target hit — step the weight up a little (reduced — '
+                'already fatigued this muscle today) and reset to '
+                '${c.minReps} reps'
+            : 'Rep target hit — step the weight up and reset to '
+                '${c.minReps} reps',
       );
     }
 
@@ -217,7 +238,7 @@ class DoubleProgressionRule implements ProgressionRule {
 class ProgressionRuleFactory {
   static List<ProgressionRule> _rules = _defaults();
 
-  static List<ProgressionRule> _defaults() => [
+  static List<ProgressionRule> _defaults() => const [
         UnderRecoveredRule(),
         PostDeloadRecoveryRule(),
         ReadinessRule(),

@@ -407,10 +407,13 @@ void main() {
         provider.nextExercise();
 
         final recs = provider.getRecommendations(targetEx.id);
-        // Baseline (no prior sets) would bump weight above 60 — see the
-        // "unaffected" test above. An extreme prior load instead holds or
-        // reduces the increment.
-        expect(recs.first.weight, lessThan(65)); // baseline bump would be 65
+        // 40 hard sets push the raw accumulation to ~26.7, past _hardCap, so
+        // the factor clamps to 1.0 and SessionFatigueRule hard-holds. Naming
+        // the exact weight and reasoning distinguishes that from
+        // DoubleProgressionRule's partial-increment scaling — `lessThan(65)`
+        // alone was true of both outcomes.
+        expect(recs.first.weight, 60.0);
+        expect(recs.first.reasoning, contains('earlier in today'));
       });
 
       group('recordSessionEffort / effortCalibrationOffset', () {
@@ -444,9 +447,17 @@ void main() {
           final offsetAfterRecording = provider.effortCalibrationOffset;
           expect(offsetAfterRecording, lessThan(0.0));
 
-          await provider.init(); // simulate app restart
+          // A second init() on the same instance would pass even if the
+          // offset were only ever held in memory. Build a fresh provider over
+          // the same storage, as the draft-restore test does, so this can
+          // only pass if the value actually round-tripped through storage.
+          final reloaded = WorkoutProvider(
+            mockStorage,
+            programManager: ProgramManager(mockStorage),
+          );
+          await reloaded.init();
 
-          expect(provider.effortCalibrationOffset,
+          expect(reloaded.effortCalibrationOffset,
               closeTo(offsetAfterRecording, 0.0001));
         });
 

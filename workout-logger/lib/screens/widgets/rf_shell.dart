@@ -303,6 +303,7 @@ class RFOptionChip extends StatelessWidget {
     this.selected = false,
     this.color,
     this.icon,
+    this.inMutuallyExclusiveGroup = false,
   });
 
   final String label;
@@ -314,6 +315,12 @@ class RFOptionChip extends StatelessWidget {
   /// Accent for the selected state. Defaults to the brand violet.
   final Color? color;
   final IconData? icon;
+
+  /// Set when this chip is one of a single-choice group (handle picker,
+  /// effort rating) so a screen reader announces it as a radio-style choice
+  /// rather than a standalone button. Left false for chips that are just
+  /// actions, e.g. the coach's suggested prompts.
+  final bool inMutuallyExclusiveGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -327,16 +334,21 @@ class RFOptionChip extends StatelessWidget {
 
     return Semantics(
       button: enabled,
+      enabled: enabled,
+      inMutuallyExclusiveGroup: inMutuallyExclusiveGroup,
       selected: selected,
       label: label,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      // InkWell, not a bare GestureDetector: these need to be reachable by
+      // keyboard/switch access and to show a focus + press response, not just
+      // fire a haptic.
+      child: InkWell(
         onTap: enabled
             ? () {
                 HapticFeedback.selectionClick();
                 onTap!();
               }
             : null,
+        borderRadius: BorderRadius.circular(AppRadius.full),
         child: AnimatedContainer(
           duration: AppDurations.fast,
           curve: Curves.easeOut,

@@ -216,6 +216,7 @@ class _HandleSelector extends StatelessWidget {
                 child: RFOptionChip(
                   label: handle,
                   selected: selectedHandle == handle,
+                  inMutuallyExclusiveGroup: true,
                   onTap: locked || onChanged == null
                       ? null
                       : () => onChanged!(handle),

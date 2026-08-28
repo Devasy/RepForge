@@ -47,8 +47,23 @@ class RecoveryCalculator {
     List<WorkoutSession> sessions,
     Map<String, Exercise> exerciseMap, {
     DateTime? asOf,
-  }) {
-    final now = asOf ?? DateTime.now();
+  }) =>
+      recoveryScoresFrom(
+        lastTrainedPerMuscle(sessions, exerciseMap),
+        asOf: asOf,
+      );
+
+  /// When each muscle group was last trained across [sessions].
+  ///
+  /// Split out from [computeMuscleRecoveryScores] because this half is the
+  /// expensive one — it copies and sorts the whole session list and walks
+  /// every session's exercises — and it depends only on the history, not on
+  /// the clock. Callers on a hot path (see `WorkoutProvider`) cache this and
+  /// re-run only the cheap [recoveryScoresFrom] decay per call.
+  Map<String, DateTime> lastTrainedPerMuscle(
+    List<WorkoutSession> sessions,
+    Map<String, Exercise> exerciseMap,
+  ) {
     final sorted = List<WorkoutSession>.from(sessions)
       ..sort((a, b) => a.date.compareTo(b.date));
 
@@ -59,7 +74,18 @@ class RecoveryCalculator {
         lastTrained[muscleId] = session.date;
       }
     }
+    return lastTrained;
+  }
 
+  /// Applies the recovery decay to a [lastTrainedPerMuscle] result.
+  ///
+  /// O(muscle groups) and clock-dependent — cheap enough to re-run on every
+  /// call even when the [lastTrained] map behind it is cached.
+  Map<String, MuscleRecoveryStatus> recoveryScoresFrom(
+    Map<String, DateTime> lastTrained, {
+    DateTime? asOf,
+  }) {
+    final now = asOf ?? DateTime.now();
     final result = <String, MuscleRecoveryStatus>{};
     for (final entry in lastTrained.entries) {
       final muscleId = entry.key;

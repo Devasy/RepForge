@@ -99,6 +99,20 @@ class MLService implements IMLService {
         asOf: asOf,
       );
 
+  @override
+  Map<String, DateTime> lastTrainedPerMuscle(
+    List<WorkoutSession> sessions,
+    Map<String, Exercise> exerciseMap,
+  ) =>
+      _recoveryCalculator.lastTrainedPerMuscle(sessions, exerciseMap);
+
+  @override
+  Map<String, MuscleRecoveryStatus> recoveryScoresFrom(
+    Map<String, DateTime> lastTrained, {
+    DateTime? asOf,
+  }) =>
+      _recoveryCalculator.recoveryScoresFrom(lastTrained, asOf: asOf);
+
   // ==================== RECOMMENDATIONS ====================
 
   // Weekly relative growth thresholds (% of current volume per week).
@@ -265,12 +279,10 @@ class MLService implements IMLService {
     required double currentValue,
     required double targetValue,
     required GrowthModel growthModel,
-    double sessionsPerWeek = 3.0,
   }) =>
       _curveFitter.predictTargetCompletion(
         currentValue: currentValue,
         targetValue: targetValue,
         growthModel: growthModel,
-        sessionsPerWeek: sessionsPerWeek,
       );
 }

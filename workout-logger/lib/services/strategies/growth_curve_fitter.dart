@@ -35,7 +35,6 @@ abstract class IGrowthCurveFitter {
     required double currentValue,
     required double targetValue,
     required GrowthModel growthModel,
-    double sessionsPerWeek,
   });
 }
 
@@ -219,7 +218,6 @@ class GrowthCurveFitter implements IGrowthCurveFitter {
     required double currentValue,
     required double targetValue,
     required GrowthModel growthModel,
-    double sessionsPerWeek = 3.0,
   }) {
     if (currentValue >= targetValue) return DateTime.now();
     if (growthModel.slope <= 0) return null;
@@ -255,13 +253,11 @@ class GrowthCurveFitter implements IGrowthCurveFitter {
     required double currentValue,
     required double targetValue,
     required GrowthModel growthModel,
-    double sessionsPerWeek = 3.0,
   }) {
     final expected = GrowthCurveFitter().predictTargetCompletion(
       currentValue: currentValue,
       targetValue: targetValue,
       growthModel: growthModel,
-      sessionsPerWeek: sessionsPerWeek,
     );
     if (expected == null) return null;
 

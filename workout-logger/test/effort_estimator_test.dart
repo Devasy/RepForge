@@ -16,7 +16,7 @@ WorkoutSet _set({
     );
 
 void main() {
-  final estimator = EffortEstimator();
+  const estimator = EffortEstimator();
 
   group('EffortEstimator - no signals available', () {
     test('returns the RPE-8 anchor with base confidence', () {
@@ -253,21 +253,26 @@ void main() {
       expect(result.confidence, lessThanOrEqualTo(EffortEstimator.maxEstimatedConfidence));
     });
 
-    test('rpe is always clamped to [minRpe, maxRpe]', () {
-      final model = GrowthModel(
-        slope: 5.0,
-        intercept: 10000.0,
-        r2: 0.9,
-        lastTrained: DateTime.now(),
-        stdError: 1.0, // tiny stdError → huge z-score → extreme term
-      );
+    // The trend term alone cannot reach the outer clamp: z is already
+    // clamped to ±2, so it contributes at most ±1.6 around the 8.0 anchor.
+    // Driving calibrationOffset past the bound is what actually exercises
+    // rpe.clamp — without it these assertions pass with the clamp removed.
+    test('rpe is clamped to minRpe when the calibration offset drives it under',
+        () {
       final result = estimator.estimate(
         set: _set(weight: 1, reps: 1),
-        growthModel: model,
-        growthModelX: 0,
+        calibrationOffset: -50.0,
       );
-      expect(result.rpe, greaterThanOrEqualTo(EffortEstimator.minRpe));
-      expect(result.rpe, lessThanOrEqualTo(EffortEstimator.maxRpe));
+      expect(result.rpe, EffortEstimator.minRpe);
+    });
+
+    test('rpe is clamped to maxRpe when the calibration offset drives it over',
+        () {
+      final result = estimator.estimate(
+        set: _set(weight: 1, reps: 1),
+        calibrationOffset: 50.0,
+      );
+      expect(result.rpe, EffortEstimator.maxRpe);
     });
   });
 }

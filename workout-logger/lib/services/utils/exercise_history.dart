@@ -39,19 +39,26 @@ ExerciseLog? findMostRecentExerciseLog(
 /// nulls when [exerciseMap] doesn't resolve [exerciseId], so callers that
 /// don't have exercise data on hand degrade to the pre-recovery-aware
 /// behavior instead of erroring.
+/// Pass [lastTrained] (from [IMLService.lastTrainedPerMuscle]) when the
+/// caller already holds a cached one — callers on a per-frame path do, and
+/// it skips re-sorting and re-walking every session here. Omitting it
+/// computes the same thing from [sessions].
 ({Map<String, MuscleRecoveryStatus>? recoveryScores, List<String>? primaryMuscleIds})
     recoveryRecommendationInputs({
   required String exerciseId,
   required List<WorkoutSession> sessions,
   required Map<String, Exercise> exerciseMap,
   required IMLService mlService,
+  Map<String, DateTime>? lastTrained,
 }) {
   final exercise = exerciseMap[exerciseId];
   if (exercise == null) {
     return (recoveryScores: null, primaryMuscleIds: null);
   }
   return (
-    recoveryScores: mlService.computeMuscleRecoveryScores(sessions, exerciseMap),
+    recoveryScores: lastTrained != null
+        ? mlService.recoveryScoresFrom(lastTrained)
+        : mlService.computeMuscleRecoveryScores(sessions, exerciseMap),
     primaryMuscleIds: [exercise.primaryMuscle],
   );
 }

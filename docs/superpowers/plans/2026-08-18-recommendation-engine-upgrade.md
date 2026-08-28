@@ -110,13 +110,13 @@ Anchor at RPE 8 (double progression already assumes near-failure working sets), 
 
 **Decision: per-muscle *hard-set-equivalent* accumulation with a continuous dampening factor**, using the Phase 3 effort estimate — not raw tonnage (a leg-press set and a lateral-raise set aren't comparable in kg), not relative-to-typical-volume (would need a history query on the synchronous hot path).
 
-```
+```text
 hardSets[muscleId] = Σ over sets already logged today, excluding the current exercise
       (activation% / 100) × clamp((estimatedRpe − 6) / 3, 0, 1)
 ```
 Activation weighting reuses the Phase 2 `RecoveryCalculator.muscleVolumes` helper rather than a second copy of that loop.
 
-```
+```text
 f = clamp((hardSets − softCap) / (hardCap − softCap), 0, 1)   // softCap = 6, hardCap = 12
 ```
 - `f = 0` → untouched.
