@@ -90,6 +90,22 @@ class MockMLService implements IMLService {
   }
 
   @override
+  Map<String, DateTime> lastTrainedPerMuscle(
+    List<WorkoutSession> sessions,
+    Map<String, Exercise> exerciseMap,
+  ) {
+    return {};
+  }
+
+  @override
+  Map<String, MuscleRecoveryStatus> recoveryScoresFrom(
+    Map<String, DateTime> lastTrained, {
+    DateTime? asOf,
+  }) {
+    return {};
+  }
+
+  @override
   List<SetRecommendation> recommendSets({
     required List<WorkoutSet> lastSession,
     List<List<WorkoutSet>>? pastSessions,

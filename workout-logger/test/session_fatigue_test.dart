@@ -14,7 +14,7 @@ WorkoutSet _hardSet({
     );
 
 void main() {
-  final accumulator = SessionFatigueAccumulator();
+  const accumulator = SessionFatigueAccumulator();
 
   test('empty session logs produce zero factor', () {
     expect(accumulator.factorFor(exerciseLogs: []), 0.0);
@@ -28,12 +28,20 @@ void main() {
   });
 
   test('excludeExerciseId skips that exercise but keeps others', () {
+    // Each hard set contributes (8.0 − 6.0) / 3.0 ≈ 0.667, and the factor is
+    // 0.0 until the raw total passes _softCap (16.0). With one set per
+    // exercise both branches sit at 0.0 and the comparison holds even if the
+    // exclusion were ignored — so load each exercise past the cap, where
+    // dropping one is actually observable.
+    const setsPerExercise = 30; // ≈20.0 raw, comfortably past _softCap
+    List<WorkoutSet> hardSets() => [
+          for (var i = 0; i < setsPerExercise; i++)
+            _hardSet(timestamp: DateTime(2026, 1, 1, 10, i)),
+        ];
+
     final logs = [
-      ExerciseLog(exerciseId: 'squat', sets: [_hardSet()]),
-      ExerciseLog(
-        exerciseId: 'leg_press',
-        sets: [_hardSet(timestamp: DateTime(2026, 1, 1, 10, 20))],
-      ),
+      ExerciseLog(exerciseId: 'squat', sets: hardSets()),
+      ExerciseLog(exerciseId: 'leg_press', sets: hardSets()),
     ];
 
     final withSquatExcluded = accumulator.factorFor(
@@ -43,6 +51,15 @@ void main() {
     final legPressOnly = accumulator.factorFor(exerciseLogs: [logs[1]]);
 
     expect(withSquatExcluded, closeTo(legPressOnly, 0.0001));
+    // Strictly inside (0, 1): at 0.0 or 1.0 the assertion above would pass
+    // whether or not the exclusion happened.
+    expect(withSquatExcluded, greaterThan(0.0));
+    expect(withSquatExcluded, lessThan(1.0));
+    // And keeping both exercises must land somewhere different.
+    expect(
+      accumulator.factorFor(exerciseLogs: logs),
+      greaterThan(withSquatExcluded),
+    );
   });
 
   test('a realistic session (a handful of sets across a few exercises) '

@@ -2,12 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/services/utils/effort_calibration.dart';
 
 void main() {
-  final calibration = EffortCalibration();
+  const calibration = EffortCalibration();
 
-  test('never-answered path: offset starts at 0.0', () {
-    // Nothing to assert on the class itself — this documents that callers
-    // should default the offset to 0.0 until updateOffset is ever called.
-    expect(EffortCalibration.chipRpe.isNotEmpty, isTrue);
+  test('chipRpe maps every effort chip to an RPE anchor', () {
+    // The chip values are what WorkoutSummaryScreen sends to
+    // recordSessionEffort; a gap here would make a chip silently inert.
+    expect(EffortCalibration.chipRpe.keys, containsAll(<int>[1, 2, 3]));
+    for (final entry in EffortCalibration.chipRpe.entries) {
+      expect(entry.value, inInclusiveRange(1.0, 10.0), reason: '${entry.key}');
+    }
   });
 
   test('an Easy answer nudges the offset negative', () {

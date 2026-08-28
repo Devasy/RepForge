@@ -392,9 +392,18 @@ class _EffortChipRowState extends State<_EffortChipRow> {
 
   late int? _selected = widget.session.sessionEffort;
 
-  void _select(int value) {
+  Future<void> _select(int value) async {
+    final previous = _selected;
     setState(() => _selected = value);
-    context.read<WorkoutProvider>().recordSessionEffort(widget.session.id, value);
+    try {
+      await context
+          .read<WorkoutProvider>()
+          .recordSessionEffort(widget.session.id, value);
+    } catch (e, st) {
+      // Don't leave the chip showing a value that was never persisted.
+      debugPrint('Failed to record session effort: $e\n$st');
+      if (mounted) setState(() => _selected = previous);
+    }
   }
 
   @override
@@ -418,25 +427,41 @@ class _EffortChipRowState extends State<_EffortChipRow> {
 
   Widget _buildChip(({int value, String label, Color color}) option) {
     final isSelected = _selected == option.value;
-    return GestureDetector(
-      onTap: () => _select(option.value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: option.color.withValues(alpha: isSelected ? 0.2 : 0.08),
+    // Semantics + InkWell rather than a bare GestureDetector: these are the
+    // only way to answer "how did that feel?", so they need to be focusable
+    // and to announce which one is selected.
+    return Semantics(
+      button: true,
+      inMutuallyExclusiveGroup: true,
+      selected: isSelected,
+      label: option.label,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: InkWell(
+          onTap: () => _select(option.value),
           borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: option.color.withValues(alpha: isSelected ? 0.8 : 0.3),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Text(
-          option.label,
-          style: TextStyle(
-            color: isSelected ? option.color : AppColors.textMuted,
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+          child: Ink(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: option.color.withValues(alpha: isSelected ? 0.2 : 0.08),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(
+                color: option.color.withValues(alpha: isSelected ? 0.8 : 0.3),
+                width: isSelected ? 1.5 : 1,
+              ),
+            ),
+            child: Align(
+              alignment: Alignment.center,
+              child: Text(
+                option.label,
+                style: TextStyle(
+                  color: isSelected ? option.color : AppColors.textMuted,
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                ),
+              ),
+            ),
           ),
         ),
       ),

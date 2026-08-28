@@ -33,6 +33,14 @@ class AnalyticsManager extends ChangeNotifier {
   // Rebuilt via [buildSessionIndex] whenever the session list changes.
   Map<String, List<({ExerciseLog log, DateTime date})>> _sessionIndex = {};
 
+  // When each muscle was last trained, cached alongside _sessionIndex: the
+  // walk behind it sorts and scans all sessions, and it depends only on the
+  // history, not on the clock. Dropped by buildSessionIndex; _lastTrainedFor
+  // guards the case where a caller passes a different exerciseMap than the
+  // one this was built from.
+  Map<String, DateTime>? _lastTrained;
+  Map<String, Exercise>? _lastTrainedFor;
+
   // Callback to update targets with new growth models
   final void Function(String exerciseId, GrowthModel model)?
   onGrowthModelUpdated;
@@ -66,6 +74,10 @@ class AnalyticsManager extends ChangeNotifier {
     }
 
     _sessionIndex = index;
+    // The recovery walk is keyed off the same "sessions changed" signal, so
+    // it's dropped here and rebuilt lazily on the next getRecommendations.
+    _lastTrained = null;
+    _lastTrainedFor = null;
   }
 
   /// Get growth model for a specific exercise
@@ -132,8 +144,13 @@ class AnalyticsManager extends ChangeNotifier {
   /// Uses the most-recently-dated session containing this exercise as the
   /// basis for the recommendation, plus up to 2 sessions before that for
   /// deload-recovery detection and (when [exercises]/[exerciseMap] are
-  /// supplied) the primary muscle's recovery status. Reads from the
-  /// pre-built session index so no sort is required at call time — O(1).
+  /// supplied) the primary muscle's recovery status.
+  ///
+  /// Reads from the pre-built session index, so the log lookup is O(1) and
+  /// needs no sort at call time. The recovery walk behind the recovery
+  /// status is O(N sessions), but it is cached on the same
+  /// [buildSessionIndex] invalidation, so it costs that only on the first
+  /// call after a session change; subsequent calls pay O(muscle groups).
   ///
   /// [exerciseMap] is a pre-built id → Exercise map for O(1) lookups; falls
   /// back to building one from [exercises] when omitted (see
@@ -161,11 +178,18 @@ class AnalyticsManager extends ChangeNotifier {
         : [lastLog.sets];
 
     final lookup = exerciseMap ?? {for (final e in exercises) e.id: e};
+    // Reuse the last-trained walk across calls — it's invalidated by
+    // buildSessionIndex, the same signal that invalidates _sessionIndex.
+    if (!isFresh || !identical(_lastTrainedFor, lookup)) {
+      _lastTrained = _mlService.lastTrainedPerMuscle(sessions, lookup);
+      _lastTrainedFor = lookup;
+    }
     final recoveryInputs = recoveryRecommendationInputs(
       exerciseId: exerciseId,
       sessions: sessions,
       exerciseMap: lookup,
       mlService: _mlService,
+      lastTrained: _lastTrained,
     );
 
     return _mlService.recommendSets(

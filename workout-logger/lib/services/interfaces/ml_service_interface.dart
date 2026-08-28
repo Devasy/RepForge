@@ -75,6 +75,22 @@ abstract class IMLService {
     DateTime? asOf,
   });
 
+  /// The history-dependent half of [computeMuscleRecoveryScores]: when each
+  /// muscle group was last trained. Sorts and walks all of [sessions], so
+  /// callers on a hot path cache this and pair it with
+  /// [recoveryScoresFrom] rather than recomputing per call.
+  Map<String, DateTime> lastTrainedPerMuscle(
+    List<WorkoutSession> sessions,
+    Map<String, Exercise> exerciseMap,
+  );
+
+  /// The clock-dependent half: applies the recovery decay to a
+  /// [lastTrainedPerMuscle] result. O(muscle groups).
+  Map<String, MuscleRecoveryStatus> recoveryScoresFrom(
+    Map<String, DateTime> lastTrained, {
+    DateTime? asOf,
+  });
+
   /// Get recommended sets based on last session, recent-session trend, and growth model.
   /// [pastSessions], if provided, only has its first two entries read for
   /// deload/recovery detection: index 0 is the latest prior session, index 1
