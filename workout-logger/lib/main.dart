@@ -25,7 +25,6 @@ import 'services/interfaces/ml_service_interface.dart';
 import 'services/interfaces/health_connect_service_interface.dart';
 import 'services/workout_provider.dart';
 import 'services/settings_provider.dart';
-import 'services/api_service.dart';
 import 'services/managers/program_manager.dart';
 import 'services/managers/history_manager.dart';
 import 'services/managers/health_sync_manager.dart';
@@ -47,9 +46,9 @@ IStorageService? _resolvedStorageService;
 /// One-time, flag-gated, reversible Hive -> SQLite cutover. See
 /// docs/superpowers/specs/2026-08-08-sqlite-migration-and-coach-sql-tool-design.md §6.
 Future<void> _resolveStorageBackend() async {
-  // Hive stays initialized here even post-cutover: ApiService reads/writes
-  // an installation id directly against this settings box, independent of
-  // IStorageService. Do not remove this unconditional init.
+  // Hive stays initialized unconditionally: the cutover flag itself lives in
+  // this settings box, so it has to be readable before we know which backend
+  // to build — and the pre-migration path still runs on Hive outright.
   await Hive.initFlutter();
   final settingsBox = await Hive.openBox<String>('settings');
   final alreadyMigrated = settingsBox.get(storageMigratedFlagKey) == 'true';
@@ -172,8 +171,6 @@ class WorkoutLoggerApp extends StatelessWidget {
         Provider<IMLService>.value(value: _mlService),
         // IHealthConnectService stays in tree for ProfileScreen permission flow
         Provider<IHealthConnectService>.value(value: _healthConnectService),
-        // Provide the ApiService singleton via DI
-        Provider<ApiService>.value(value: ApiService()),
         // ProgramManager passed to tree directly
         ChangeNotifierProvider<ProgramManager>.value(value: _programManager),
         // SettingsProvider for user preferences (weight unit, increments)
@@ -254,7 +251,6 @@ class _AppInitializerState extends State<AppInitializer> {
     final settings = context.read<SettingsProvider>();
     final historyManager = context.read<HistoryManager>();
     final prManager = context.read<PRManager>();
-    final api = context.read<ApiService>();
     final gemini = context.read<GeminiAiService>();
     final readiness = context.read<ReadinessManager>();
     final healthDataSync = context.read<HealthDataSyncService?>();
@@ -292,15 +288,9 @@ class _AppInitializerState extends State<AppInitializer> {
       // Future — sync() has no caller to propagate a failure to.
       unawaited(
         healthDataSync?.sync().catchError(
-          (Object e, StackTrace st) => debugPrint('healthDataSync.sync failed: $e\n$st'),
+          (Object e, StackTrace st) =>
+              debugPrint('healthDataSync.sync failed: $e\n$st'),
         ),
-      );
-
-      // Fire-and-forget analytics in background.
-      api.sendHeartbeat();
-      api.trackEvent('app_open');
-      provider.getQuickStats().then((stats) => api.reportUsage(stats)).catchError(
-        (Object e) => debugPrint('Failed to report usage: $e'),
       );
 
       if (!mounted) return;
