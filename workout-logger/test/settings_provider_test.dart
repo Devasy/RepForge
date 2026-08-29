@@ -32,7 +32,7 @@ void main() {
       await mockStorage.saveSetting('readinessEnabled', 'true');
       await mockStorage.saveSetting('userName', 'Devasy');
       await mockStorage.saveSetting('geminiApiKey', 'secret_key');
-      await mockStorage.saveSetting('geminiModel', 'gemini-1.5-pro');
+      await mockStorage.saveSetting('geminiModel', 'gemini-3.5-flash');
       await mockStorage.saveSetting('geminiThinkingLevel', 'high');
       await mockStorage.saveSetting('showAdvancedMetrics', 'true');
 
@@ -45,9 +45,20 @@ void main() {
       expect(provider.readinessEnabled, isTrue);
       expect(provider.userName, equals('Devasy'));
       expect(provider.geminiApiKey, equals('secret_key'));
-      expect(provider.geminiModel, equals('gemini-1.5-pro'));
+      expect(provider.geminiModel, equals('gemini-3.5-flash'));
       expect(provider.geminiThinkingLevel, equals('high'));
       expect(provider.showAdvancedMetrics, isTrue);
+    });
+
+    test('init falls back to the default model when the stored one is no '
+        'longer offered', () async {
+      // A model id left behind by an older build. The picker only has items
+      // for kGeminiModels, so surfacing this one would assert.
+      await mockStorage.saveSetting('geminiModel', 'gemini-1.5-pro');
+
+      await provider.init();
+
+      expect(provider.geminiModel, equals('gemini-3.6-flash'));
     });
 
     test('init clamps a stored thinking level that the stored model no longer supports', () async {
