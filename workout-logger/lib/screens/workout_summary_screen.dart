@@ -89,9 +89,9 @@ class WorkoutSummaryScreen extends StatelessWidget {
                               ],
                               const SizedBox(height: AppSpacing.lg),
                               _buildExerciseSummary(
-                                session,
-                                provider,
-                                settings,
+                                session: session,
+                                provider: provider,
+                                settings: settings,
                               ),
                               const SizedBox(height: AppSpacing.md),
                             ],
@@ -160,10 +160,7 @@ class WorkoutSummaryScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           dateStr,
-          style: const TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 13,
-          ),
+          style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
         ),
       ],
     );
@@ -299,21 +296,18 @@ class WorkoutSummaryScreen extends StatelessWidget {
           runSpacing: 6,
           children: muscles.map((m) {
             final name = provider.getMuscleGroupName(m);
-            return RFChip(
-              label: name,
-              color: AppColors.muscle(m),
-            );
+            return RFChip(label: name, color: AppColors.muscle(m));
           }).toList(),
         ),
       ],
     );
   }
 
-  Widget _buildExerciseSummary(
-    WorkoutSession session,
-    WorkoutProvider provider,
-    SettingsProvider settings,
-  ) {
+  Widget _buildExerciseSummary({
+    required WorkoutSession session,
+    required WorkoutProvider provider,
+    required SettingsProvider settings,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -423,9 +417,10 @@ class _EffortChipRowState extends State<_EffortChipRow> {
     final previous = _selected;
     setState(() => _selected = value);
     try {
-      await context
-          .read<WorkoutProvider>()
-          .recordSessionEffort(widget.session.id, value);
+      await context.read<WorkoutProvider>().recordSessionEffort(
+        widget.session.id,
+        value,
+      );
     } catch (e, st) {
       // Don't leave the chip showing a value that was never persisted.
       debugPrint('Failed to record session effort: $e\n$st');

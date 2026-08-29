@@ -107,11 +107,15 @@ Future<T?> showRFActionSheet<T>(
     context: context,
     backgroundColor: AppColors.surface,
     barrierColor: Colors.black.withValues(alpha: 0.6),
+    // Without this the sheet is capped at 9/16 of the viewport. Three actions
+    // with descriptions already fill most of that, so at a large text scale
+    // the bottom action would be clipped with no way to scroll to it.
+    isScrollControlled: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
     ),
     builder: (ctx) => SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.md,
           AppSpacing.sm,
@@ -166,8 +170,7 @@ Future<T?> showRFActionSheet<T>(
                 )
               else
                 _SheetChoice<T>(action: action, ctx: ctx),
-              if (action != actions.last)
-                const SizedBox(height: AppSpacing.sm),
+              if (action != actions.last) const SizedBox(height: AppSpacing.sm),
             ],
           ],
         ),

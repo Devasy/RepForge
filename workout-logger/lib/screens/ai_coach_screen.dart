@@ -220,8 +220,11 @@ class _AiCoachViewState extends State<_AiCoachView> {
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              name != null && name.isNotEmpty ? 'Hey $name 👋' : 'Your AI Coach',
-              style: TextStyle(fontFamily: 'Geist', 
+              name != null && name.isNotEmpty
+                  ? 'Hey $name 👋'
+                  : 'Your AI Coach',
+              style: TextStyle(
+                fontFamily: 'Geist',
                 color: AppColors.textPrimary,
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
@@ -232,7 +235,8 @@ class _AiCoachViewState extends State<_AiCoachView> {
             Text(
               'Ask me anything — what to train today, how to break a plateau, reading your progress, anything.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Geist', 
+              style: TextStyle(
+                fontFamily: 'Geist',
                 color: AppColors.textMuted,
                 fontSize: 14,
                 height: 1.5,
@@ -275,7 +279,8 @@ class _AiCoachViewState extends State<_AiCoachView> {
             const RFEmptyState(
               icon: Icons.key_rounded,
               title: 'API Key Required',
-              subtitle: 'Add your Gemini API key in\nProfile → AI Features to start chatting',
+              subtitle:
+                  'Add your Gemini API key in\nProfile → AI Features to start chatting',
             ),
             const SizedBox(height: AppSpacing.lg),
             GlowButton(
@@ -379,45 +384,52 @@ class _SendButton extends StatelessWidget {
       button: true,
       enabled: active,
       label: loading ? 'Sending' : 'Send message',
-      child: GestureDetector(
-        onTap: active ? onTap : null,
-        child: AnimatedContainer(
-          duration: AppDurations.fast,
-          curve: Curves.easeOut,
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            gradient: active ? AppColors.primaryGradient : null,
-            color: active ? null : AppColors.glass2,
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            border: active
-                ? null
-                : Border.all(color: AppColors.glassBorder),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: AppColors.primaryGlow(0.4),
-                      blurRadius: 12,
-                      spreadRadius: -4,
+      // InkWell, not a bare GestureDetector: the button needs to sit in the
+      // focus traversal order and activate from the keyboard. Enter already
+      // sends from the text field, so this is about reaching the control
+      // itself, not about the action being unavailable.
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: active ? onTap : null,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          focusColor: AppColors.primaryGlow(0.35),
+          child: AnimatedContainer(
+            duration: AppDurations.fast,
+            curve: Curves.easeOut,
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: active ? AppColors.primaryGradient : null,
+              color: active ? null : AppColors.glass2,
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              border: active ? null : Border.all(color: AppColors.glassBorder),
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primaryGlow(0.4),
+                        blurRadius: 12,
+                        spreadRadius: -4,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Center(
+              child: loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                      ),
+                    )
+                  : Icon(
+                      Icons.arrow_upward_rounded,
+                      color: active ? Colors.white : AppColors.textFaint,
+                      size: 20,
                     ),
-                  ]
-                : null,
-          ),
-          child: Center(
-            child: loading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                    ),
-                  )
-                : Icon(
-                    Icons.arrow_upward_rounded,
-                    color: active ? Colors.white : AppColors.textFaint,
-                    size: 20,
-                  ),
+            ),
           ),
         ),
       ),
@@ -449,7 +461,8 @@ class _ConversationsSheet extends StatelessWidget {
                   children: [
                     Text(
                       'Conversations',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textPrimary,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -463,12 +476,16 @@ class _ConversationsSheet extends StatelessWidget {
                       },
                       child: Row(
                         children: [
-                          const Icon(Icons.add_rounded,
-                              color: AppColors.primary, size: 18),
+                          const Icon(
+                            Icons.add_rounded,
+                            color: AppColors.primary,
+                            size: 18,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'New chat',
-                            style: TextStyle(fontFamily: 'Geist', 
+                            style: TextStyle(
+                              fontFamily: 'Geist',
                               color: AppColors.primary,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -482,10 +499,13 @@ class _ConversationsSheet extends StatelessWidget {
                 const SizedBox(height: AppSpacing.md),
                 if (conversations.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.lg,
+                    ),
                     child: Text(
                       'No saved conversations yet.',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textMuted,
                         fontSize: 13,
                       ),
@@ -548,23 +568,31 @@ class _ConversationTile extends StatelessWidget {
           vertical: AppSpacing.sm + 2,
         ),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primary.withValues(alpha: 0.12) : AppColors.glass3,
+          color: isActive
+              ? AppColors.primary.withValues(alpha: 0.12)
+              : AppColors.glass3,
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: isActive ? AppColors.primary.withValues(alpha: 0.4) : AppColors.glassBorder,
+            color: isActive
+                ? AppColors.primary.withValues(alpha: 0.4)
+                : AppColors.glassBorder,
           ),
         ),
         child: Row(
           children: [
-            const Icon(Icons.chat_bubble_outline_rounded,
-                color: AppColors.textMuted, size: 16),
+            const Icon(
+              Icons.chat_bubble_outline_rounded,
+              color: AppColors.textMuted,
+              size: 16,
+            ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 conversation.title.isEmpty ? 'New chat' : conversation.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textPrimary,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -575,8 +603,11 @@ class _ConversationTile extends StatelessWidget {
               onTap: onDelete,
               child: const Padding(
                 padding: EdgeInsets.only(left: AppSpacing.sm),
-                child: Icon(Icons.delete_outline_rounded,
-                    color: AppColors.textFaint, size: 18),
+                child: Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppColors.textFaint,
+                  size: 18,
+                ),
               ),
             ),
           ],
@@ -655,7 +686,8 @@ class _Turn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // A dashboard takes the full column; prose takes a bubble.
-    final isDashboard = !forceBubble &&
+    final isDashboard =
+        !forceBubble &&
         !isUser &&
         child is CoachMessageContent &&
         CoachMessageContent.rendersAsDashboard(
@@ -679,8 +711,7 @@ class _Turn extends StatelessWidget {
                 bottomLeft: Radius.circular(isUser ? AppRadius.lg : 4),
                 bottomRight: Radius.circular(isUser ? 4 : AppRadius.lg),
               ),
-              border:
-                  isUser ? null : Border.all(color: AppColors.glassBorder),
+              border: isUser ? null : Border.all(color: AppColors.glassBorder),
               boxShadow: isUser
                   ? [
                       BoxShadow(
@@ -695,8 +726,9 @@ class _Turn extends StatelessWidget {
           );
 
     final column = Column(
-      crossAxisAlignment:
-          isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: isUser
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (toolCalls.isNotEmpty)
@@ -714,8 +746,9 @@ class _Turn extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         // Top, so a tall turn's avatar sits beside its first line, not its last.
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -729,8 +762,8 @@ class _Turn extends StatelessWidget {
             Flexible(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width *
-                      _kBubbleMaxWidthFactor,
+                  maxWidth:
+                      MediaQuery.sizeOf(context).width * _kBubbleMaxWidthFactor,
                 ),
                 child: column,
               ),
@@ -772,7 +805,9 @@ class _ToolCallChips extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.secondary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(AppRadius.full),
-              border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: AppColors.secondary.withValues(alpha: 0.3),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -785,7 +820,8 @@ class _ToolCallChips extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   _label(name),
-                  style: const TextStyle(fontFamily: 'GeistMono',
+                  style: const TextStyle(
+                    fontFamily: 'GeistMono',
                     color: AppColors.secondary,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -885,7 +921,8 @@ class _CoachMarkdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return GptMarkdown(
       text,
-      style: TextStyle(fontFamily: 'Geist', 
+      style: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 14,
         height: 1.55,

@@ -13,8 +13,22 @@ class RFIconButton extends StatelessWidget {
     required this.onTap,
     this.tooltip,
     this.color,
-    this.size = 38,
+    this.size = standardSize,
   });
+
+  /// The painted box size for every header button. [RFScreenHeader]'s
+  /// centred-title counterweight assumes each action is this wide.
+  static const double standardSize = 38;
+
+  /// Material's minimum touch target. The painted box stays [size]; the
+  /// gesture area is expanded to this when [size] is smaller.
+  static const double minTapTarget = 48;
+
+  /// The width a default-size button actually occupies once the tap target is
+  /// applied — what a caller laying out around it needs, not [standardSize].
+  static const double standardExtent = standardSize > minTapTarget
+      ? standardSize
+      : minTapTarget;
 
   final IconData icon;
   final VoidCallback? onTap;
@@ -29,40 +43,55 @@ class RFIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
+    final target = size < minTapTarget ? minTapTarget : size;
+    // InkWell, not a bare GestureDetector: this is the back/close control in
+    // every header, so it has to be reachable by keyboard and switch access —
+    // the same requirement RFOptionChip states below. The Material is there
+    // for headers that sit outside a Scaffold, where InkWell has no ancestor
+    // to paint its splash into.
     final button = Semantics(
       button: true,
       enabled: enabled,
       label: tooltip,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled
-            ? () {
-                HapticFeedback.lightImpact();
-                onTap!();
-              }
-            : null,
-        child: Container(
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.glass2,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.glassBorder),
-          ),
-          child: Icon(
-            icon,
-            size: 18,
-            color: enabled
-                ? (color ?? AppColors.textSoft)
-                : AppColors.textFaint,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          onTap: enabled
+              ? () {
+                  HapticFeedback.lightImpact();
+                  onTap!();
+                }
+              : null,
+          // The gesture area is the full 48pt target; only the decorated box
+          // inside it is painted at `size`.
+          child: SizedBox(
+            width: target,
+            height: target,
+            child: Center(
+              child: Container(
+                width: size,
+                height: size,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.glass2,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.glassBorder),
+                ),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: enabled
+                      ? (color ?? AppColors.textSoft)
+                      : AppColors.textFaint,
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
-    return tooltip == null
-        ? button
-        : Tooltip(message: tooltip!, child: button);
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }
 
@@ -138,14 +167,21 @@ class RFScreenHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // One action = one 38pt button + one 8pt gap, matching RFIconButton.
-    const cellWidth = 38.0 + AppSpacing.sm;
+    // One action = one default-size button plus its 8pt gap.
+    //
+    // This counterweight is only correct while every action is an
+    // RFIconButton at the default size: the header cannot measure its actions
+    // before layout, so a caller passing differently-sized actions (as
+    // workout_header.dart does) with centreTitle: true will see the title sit
+    // off centre. Measure the trailing cluster if that case ever needs to work.
+    const cellWidth = RFIconButton.standardExtent + AppSpacing.sm;
     final leadingWidth = onBack != null ? cellWidth : 0.0;
     final trailingWidth = actions.length * cellWidth;
 
     final titleBlock = Column(
-      crossAxisAlignment:
-          centreTitle ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: centreTitle
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
@@ -329,8 +365,8 @@ class RFOptionChip extends StatelessWidget {
     final fg = selected
         ? c
         : enabled
-            ? AppColors.textSoft
-            : AppColors.textFaint;
+        ? AppColors.textSoft
+        : AppColors.textFaint;
 
     return Semantics(
       button: enabled,
@@ -357,9 +393,7 @@ class RFOptionChip extends StatelessWidget {
             vertical: AppSpacing.sm + 1,
           ),
           decoration: BoxDecoration(
-            color: selected
-                ? c.withValues(alpha: 0.16)
-                : AppColors.glass2,
+            color: selected ? c.withValues(alpha: 0.16) : AppColors.glass2,
             borderRadius: BorderRadius.circular(AppRadius.full),
             border: Border.all(
               color: selected

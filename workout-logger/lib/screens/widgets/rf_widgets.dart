@@ -45,6 +45,7 @@ class GlassCard extends StatelessWidget {
   final BorderRadius? borderRadius;
   final Color? glowColor;
   final Color? borderColor;
+
   /// When true, uses accent colour border (e.g. Analytics exercise selector).
   final bool accentBorder;
   final VoidCallback? onTap;
@@ -57,8 +58,7 @@ class GlassCard extends StatelessWidget {
     // An explicit border is a state signal (selected, accented), so it stays a
     // flat ring at full strength. The graded ring is the default *material*,
     // and grading it would mute the signal.
-    final overrideColor =
-        accentBorder ? AppColors.primary : borderColor;
+    final overrideColor = accentBorder ? AppColors.primary : borderColor;
 
     final decoration = BoxDecoration(
       gradient: const LinearGradient(
@@ -101,10 +101,7 @@ class GlassCard extends StatelessWidget {
     return Semantics(
       button: true,
       label: semanticsLabel,
-      child: GestureDetector(
-        onTap: onTap,
-        child: content,
-      ),
+      child: GestureDetector(onTap: onTap, child: content),
     );
   }
 }
@@ -154,8 +151,8 @@ class AmbientMotion extends InheritedNotifier<ValueNotifier<double>> {
 
   /// Reads the current offset without subscribing.
   static double read(BuildContext context) {
-    final element =
-        context.getElementForInheritedWidgetOfExactType<AmbientMotion>();
+    final element = context
+        .getElementForInheritedWidgetOfExactType<AmbientMotion>();
     final widget = element?.widget as AmbientMotion?;
     return widget?.notifier?.value ?? 0;
   }
@@ -279,13 +276,14 @@ class _AmbientGlowState extends State<AmbientGlow>
   }
 
   /// Sine at [harmonic] cycles per loop; coprime harmonics never resync.
-  double _wave(double t, int harmonic) =>
-      math.sin(2 * math.pi * harmonic * t);
+  double _wave(double t, int harmonic) => math.sin(2 * math.pi * harmonic * t);
 
   /// Eased toward the live scroll position so route changes glide, not jump.
   double _sampleParallax(BuildContext context) {
-    final target =
-        (AmbientMotion.read(context) / _parallaxRange).clamp(0.0, 1.0);
+    final target = (AmbientMotion.read(context) / _parallaxRange).clamp(
+      0.0,
+      1.0,
+    );
     _parallax += (target - _parallax) * 0.08;
     return _parallax;
   }
@@ -301,16 +299,21 @@ class _AmbientGlowState extends State<AmbientGlow>
     Offset drift = Offset.zero,
     double fade = 1,
   }) {
-    final wash = _Wash(size: box, opacity: opacity);
+    // The fade is folded into the gradient's own alpha rather than wrapped in
+    // an Opacity: these boxes are a large fraction of the viewport and the
+    // drift loop never stops, so an Opacity here would mean three
+    // near-fullscreen saveLayers on every frame, forever. Equivalent output —
+    // the gradient's far stop is fully transparent, so scaling the near stop
+    // scales the whole ramp.
     return Positioned(
       left: left,
       top: top,
       child: animate
           ? Transform.translate(
               offset: drift,
-              child: Opacity(opacity: fade, child: wash),
+              child: _Wash(size: box, opacity: opacity * fade),
             )
-          : wash,
+          : _Wash(size: box, opacity: opacity),
     );
   }
 
@@ -447,7 +450,6 @@ class _Wash extends StatelessWidget {
 // Moved to floating_nav_bar.dart (zero-dependency, drop-in portable widget).
 // Import and use FloatingNavBar / FloatingNavBarScaffold / FloatingNavItem.
 
-
 // ── GlowButton ──────────────────────────────────────────────────────────────
 // Full-width primary action button with glow shadow + haptic feedback.
 class GlowButton extends StatefulWidget {
@@ -521,10 +523,8 @@ class _GlowButtonState extends State<GlowButton>
 
     return AnimatedBuilder(
       animation: _scale,
-      builder: (context, child) => Transform.scale(
-        scale: _scale.value,
-        child: child,
-      ),
+      builder: (context, child) =>
+          Transform.scale(scale: _scale.value, child: child),
       child: Semantics(
         button: true,
         label: widget.label,
@@ -558,8 +558,9 @@ class _GlowButtonState extends State<GlowButton>
                     ],
             ),
             child: Row(
-              mainAxisSize:
-                  widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
+              mainAxisSize: widget.fullWidth
+                  ? MainAxisSize.max
+                  : MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (widget.icon != null) ...[
@@ -704,10 +705,7 @@ class RFSectionHeader extends StatelessWidget {
       padding: EdgeInsets.only(bottom: bottomPad ? AppSpacing.sm : 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          RFLabel(title),
-          ?trailing,
-        ],
+        children: [RFLabel(title), ?trailing],
       ),
     );
   }
@@ -803,7 +801,8 @@ class AnimatedCounter extends StatelessWidget {
             : v.toInt().toString();
         return Text(
           '$display$suffix',
-          style: style ??
+          style:
+              style ??
               const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 22,
@@ -1037,10 +1036,17 @@ class RFProgressBar extends StatelessWidget {
                 curve: Curves.easeOutCubic,
                 width: constraints.maxWidth * clamped,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [c, Color.lerp(c, Colors.white, 0.2)!]),
+                  gradient: LinearGradient(
+                    colors: [c, Color.lerp(c, Colors.white, 0.2)!],
+                  ),
                   borderRadius: BorderRadius.circular(AppRadius.full),
                   boxShadow: showGlow
-                      ? [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 8)]
+                      ? [
+                          BoxShadow(
+                            color: c.withValues(alpha: 0.5),
+                            blurRadius: 8,
+                          ),
+                        ]
                       : null,
                 ),
               ),
@@ -1071,8 +1077,9 @@ class RestTimerRing extends StatelessWidget {
     final progress = total > 0 ? (remaining / total).clamp(0.0, 1.0) : 0.0;
     final mins = remaining ~/ 60;
     final secs = remaining % 60;
-    final label =
-        mins > 0 ? '$mins:${secs.toString().padLeft(2, '0')}' : '$secs';
+    final label = mins > 0
+        ? '$mins:${secs.toString().padLeft(2, '0')}'
+        : '$secs';
 
     return SizedBox(
       width: size,
@@ -1292,7 +1299,10 @@ class _RFTextFieldState extends State<RFTextField> {
             style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
             decoration: InputDecoration(
               hintText: widget.hint,
-              hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+              hintStyle: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 14,
+              ),
               prefixIcon: widget.prefixIcon != null
                   ? Icon(widget.prefixIcon, color: AppColors.textSoft, size: 20)
                   : null,
@@ -1309,4 +1319,3 @@ class _RFTextFieldState extends State<RFTextField> {
     );
   }
 }
-
