@@ -8,6 +8,7 @@ import '../../services/debug_log_buffer.dart';
 import '../../services/settings_provider.dart';
 import '../../services/ai/gemini_ai_service.dart';
 import '../../theme/app_theme.dart';
+import 'rf_dialogs.dart';
 import 'rf_widgets.dart';
 
 const String _createdBy = 'Devasy Patel';
@@ -732,6 +733,22 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     super.dispose();
   }
 
+  /// Reports the outcome of a settings write. Success is only worth a toast
+  /// for the deliberate actions (Save, picking a model) — the thinking
+  /// slider commits on every drag-release, so it stays quiet unless it fails.
+  void _reportSaved(String message) {
+    if (!mounted) return;
+    context.showRFSnackBar(message, type: RFSnackBarType.success);
+  }
+
+  void _reportSaveFailed(String what) {
+    if (!mounted) return;
+    context.showRFSnackBar(
+      "Couldn't save $what — the change wasn't applied.",
+      type: RFSnackBarType.error,
+    );
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     final key = _ctrl.text.trim();
@@ -740,6 +757,10 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     try {
       await settings.setGeminiApiKey(key);
       gemini.updateApiKey(key);
+      _reportSaved(key.isEmpty ? 'API key cleared' : 'API key saved');
+    } catch (e, st) {
+      debugPrint('Failed to save Gemini API key: $e\n$st');
+      _reportSaveFailed('your API key');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -755,8 +776,10 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     try {
       await settings.setGeminiModel(modelId);
       gemini.updateModel(modelId);
+      _reportSaved('Model saved');
     } catch (e, st) {
       debugPrint('Failed to save Gemini model: $e\n$st');
+      _reportSaveFailed('the model');
     }
   }
 
@@ -768,6 +791,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
       await context.read<SettingsProvider>().setGeminiMaxToolRounds(rounds);
     } catch (e, st) {
       debugPrint('Failed to save max tool rounds: $e\n$st');
+      _reportSaveFailed('the tool-round limit');
     } finally {
       if (mounted) {
         setState(() => _draggingMaxToolRounds = null);
@@ -784,6 +808,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
       gemini.updateThinkingLevel(level);
     } catch (e, st) {
       debugPrint('Failed to save thinking level: $e\n$st');
+      _reportSaveFailed('the thinking level');
     } finally {
       if (mounted) {
         setState(() => _draggingThinkingLevelIndex = null);
