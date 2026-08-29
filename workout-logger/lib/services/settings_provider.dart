@@ -4,7 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'ai/gemini_ai_service.dart'
     show kDefaultMaxToolRounds, kMinMaxToolRounds, kMaxMaxToolRounds,
-        kDefaultThinkingLevel, clampThinkingLevel;
+        kDefaultThinkingLevel, kDefaultGeminiModel, kGeminiModels,
+        clampThinkingLevel;
 import 'interfaces/storage_service_interface.dart';
 
 enum WeightUnit { kg, lbs }
@@ -19,7 +20,7 @@ class SettingsProvider extends ChangeNotifier {
   String? _userName;
   String? _lastSeenVersion;
   String _geminiApiKey = '';
-  String _geminiModel = 'gemini-3.6-flash';
+  String _geminiModel = kDefaultGeminiModel;
   int _geminiMaxToolRounds = kDefaultMaxToolRounds;
   String _geminiThinkingLevel = kDefaultThinkingLevel;
   String _weeklyInsights = '';
@@ -68,7 +69,14 @@ class SettingsProvider extends ChangeNotifier {
     _userName = await _storage.getSetting('userName');
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
-    _geminiModel = await _storage.getSetting('geminiModel') ?? 'gemini-3.6-flash';
+    // Normalize on read: the picker only offers kGeminiModels, and a value
+    // left behind by an older build (the list has churned across releases)
+    // would match none of its items and trip DropdownButtonFormField's
+    // "exactly one item per value" assertion.
+    final storedModel = await _storage.getSetting('geminiModel');
+    _geminiModel = _isKnownGeminiModel(storedModel)
+        ? storedModel!
+        : kDefaultGeminiModel;
     final maxRounds = await _storage.getSetting('geminiMaxToolRounds');
     // Clamp on read as well as on write: a stored value from an older build or
     // a hand-edited settings row would otherwise bypass the bounds that
@@ -85,6 +93,10 @@ class SettingsProvider extends ChangeNotifier {
     final advMetrics = await _storage.getSetting('showAdvancedMetrics');
     _showAdvancedMetrics = advMetrics == 'true';
   }
+
+  /// Whether [model] is one the model picker actually offers.
+  static bool _isKnownGeminiModel(String? model) =>
+      model != null && kGeminiModels.any((entry) => entry.$1 == model);
 
   /// A valid bodyweight must be finite (not NaN/Infinity) and strictly positive.
   static bool _isValidBodyWeight(double? weight) =>
@@ -147,14 +159,18 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Persists before committing in memory, for the same reason as
+  /// [setGeminiThinkingLevel]: the picker's onChanged drops this Future, so a
+  /// failed write must leave the previously saved model active rather than a
+  /// value that only exists in memory.
   Future<void> setGeminiModel(String model) async {
-    _geminiModel = model;
     await _storage.saveSetting('geminiModel', model);
-    final clamped = clampThinkingLevel(_geminiModel, _geminiThinkingLevel);
+    final clamped = clampThinkingLevel(model, _geminiThinkingLevel);
     if (clamped != _geminiThinkingLevel) {
-      _geminiThinkingLevel = clamped;
       await _storage.saveSetting('geminiThinkingLevel', clamped);
     }
+    _geminiModel = model;
+    _geminiThinkingLevel = clamped;
     notifyListeners();
   }
 
@@ -164,9 +180,13 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Persists before committing in memory: the slider's onChangeEnd swallows
+  /// a throw from here, so assigning first would leave the provider showing a
+  /// level that was never written and never notified.
   Future<void> setGeminiThinkingLevel(String level) async {
-    _geminiThinkingLevel = clampThinkingLevel(_geminiModel, level);
-    await _storage.saveSetting('geminiThinkingLevel', _geminiThinkingLevel);
+    final clamped = clampThinkingLevel(_geminiModel, level);
+    await _storage.saveSetting('geminiThinkingLevel', clamped);
+    _geminiThinkingLevel = clamped;
     notifyListeners();
   }
 

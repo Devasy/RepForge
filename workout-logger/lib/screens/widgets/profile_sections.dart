@@ -746,10 +746,18 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   }
 
   Future<void> _selectModel(String modelId) async {
+    // Same contract as _commitThinkingLevel below: the dropdown's onChanged
+    // drops this Future, so a storage failure would otherwise surface as an
+    // unhandled error. On failure the provider keeps the previous model and
+    // the dropdown rebuilds back onto it, so there's nothing to undo here.
     final settings = context.read<SettingsProvider>();
     final gemini = context.read<GeminiAiService>();
-    await settings.setGeminiModel(modelId);
-    gemini.updateModel(modelId);
+    try {
+      await settings.setGeminiModel(modelId);
+      gemini.updateModel(modelId);
+    } catch (e, st) {
+      debugPrint('Failed to save Gemini model: $e\n$st');
+    }
   }
 
   Future<void> _commitMaxToolRounds(int rounds) async {
@@ -925,8 +933,13 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             Builder(builder: (context) {
               final levels = supportedThinkingLevels(settings.geminiModel);
               final currentIndex = levels.indexOf(settings.geminiThinkingLevel);
-              final liveIndex = _draggingThinkingLevelIndex ??
-                  (currentIndex >= 0 ? currentIndex.toDouble() : 0.0);
+              // Clamped because a drag in progress can outlive the level list
+              // it was started against: picking a model with fewer levels
+              // leaves _draggingThinkingLevelIndex past the new max, which
+              // Slider asserts on.
+              final liveIndex = (_draggingThinkingLevelIndex ??
+                      (currentIndex >= 0 ? currentIndex.toDouble() : 0.0))
+                  .clamp(0.0, (levels.length - 1).toDouble());
               final liveLevel = levels[liveIndex.round().clamp(0, levels.length - 1)];
               final liveLevelLabel = liveLevel[0].toUpperCase() + liveLevel.substring(1);
               return Row(

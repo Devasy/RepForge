@@ -41,6 +41,13 @@ class AnalyticsManager extends ChangeNotifier {
   Map<String, DateTime>? _lastTrained;
   Map<String, Exercise>? _lastTrainedFor;
 
+  // The map built from a caller's `exercises` list when it passes no
+  // exerciseMap. Held so repeated calls with the same list reuse one map
+  // instance — without this, the literal below is a fresh object every call
+  // and _lastTrainedFor's identity check never hits.
+  List<Exercise>? _fallbackLookupFor;
+  Map<String, Exercise>? _fallbackLookup;
+
   // Callback to update targets with new growth models
   final void Function(String exerciseId, GrowthModel model)?
   onGrowthModelUpdated;
@@ -78,6 +85,8 @@ class AnalyticsManager extends ChangeNotifier {
     // it's dropped here and rebuilt lazily on the next getRecommendations.
     _lastTrained = null;
     _lastTrainedFor = null;
+    _fallbackLookupFor = null;
+    _fallbackLookup = null;
   }
 
   /// Get growth model for a specific exercise
@@ -154,12 +163,21 @@ class AnalyticsManager extends ChangeNotifier {
   ///
   /// [exerciseMap] is a pre-built id → Exercise map for O(1) lookups; falls
   /// back to building one from [exercises] when omitted (see
-  /// [getWeeklyVolumeByMuscle] for the same convention).
+  /// [getWeeklyVolumeByMuscle] for the same convention). That fallback is
+  /// memoized on the [exercises] instance, because the last-trained cache
+  /// below keys off the map's identity.
+  ///
+  /// [readinessBand] and [sessionFatigueFactor] are forwarded straight to
+  /// [IMLService.recommendSets], matching what
+  /// `WorkoutProvider.getRecommendations` passes — the two entry points
+  /// have drifted apart before (see [recoveryRecommendationInputs]).
   List<SetRecommendation> getRecommendations(
     String exerciseId,
     List<WorkoutSession> sessions, {
     List<Exercise> exercises = const [],
     Map<String, Exercise>? exerciseMap,
+    ReadinessBand? readinessBand,
+    double sessionFatigueFactor = 0.0,
   }) {
     final isFresh = identical(_lastIndexedSessions, sessions);
 
@@ -177,7 +195,7 @@ class AnalyticsManager extends ChangeNotifier {
         ? logs.take(3).map((e) => e.log.sets).toList()
         : [lastLog.sets];
 
-    final lookup = exerciseMap ?? {for (final e in exercises) e.id: e};
+    final lookup = exerciseMap ?? _fallbackLookupFrom(exercises);
     // Reuse the last-trained walk across calls — it's invalidated by
     // buildSessionIndex, the same signal that invalidates _sessionIndex.
     if (!isFresh || !identical(_lastTrainedFor, lookup)) {
@@ -198,7 +216,21 @@ class AnalyticsManager extends ChangeNotifier {
       growthModel: _growthModels[exerciseId],
       recoveryScores: recoveryInputs.recoveryScores,
       primaryMuscleIds: recoveryInputs.primaryMuscleIds,
+      readinessBand: readinessBand,
+      sessionFatigueFactor: sessionFatigueFactor,
     );
+  }
+
+  /// id → Exercise map for [exercises], reusing the previously built one
+  /// while the caller keeps passing the same list instance. The identity
+  /// check in [getRecommendations] compares map instances, so rebuilding
+  /// this on every call would invalidate [_lastTrained] every time.
+  Map<String, Exercise> _fallbackLookupFrom(List<Exercise> exercises) {
+    if (!identical(_fallbackLookupFor, exercises) || _fallbackLookup == null) {
+      _fallbackLookup = {for (final e in exercises) e.id: e};
+      _fallbackLookupFor = exercises;
+    }
+    return _fallbackLookup!;
   }
 
   /// Get volume progression for an exercise.

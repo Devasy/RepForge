@@ -465,6 +465,30 @@ void main() {
           await provider.recordSessionEffort('does-not-exist', 3);
           expect(provider.effortCalibrationOffset, 0.0);
         });
+
+        test('re-answering the chip replaces the previous answer rather than '
+            'folding both in', () async {
+          mockStorage.addMockSession(
+            session('s1', DateTime(2025, 1, 1), [log('bench_press')]),
+          );
+          await provider.init();
+
+          // The summary screen leaves the chip tappable, so changing your
+          // mind must land on the same offset as answering Easy once.
+          await provider.recordSessionEffort('s1', 3); // Brutal
+          await provider.recordSessionEffort('s1', 1); // ...actually, Easy
+          final afterChange = provider.effortCalibrationOffset;
+
+          final fresh = WorkoutProvider(
+            mockStorage,
+            programManager: ProgramManager(mockStorage),
+          );
+          mockStorage.settings.remove('effort.calibrationOffset');
+          await fresh.init();
+          await fresh.recordSessionEffort('s1', 1); // Easy, first time
+
+          expect(afterChange, closeTo(fresh.effortCalibrationOffset, 0.0001));
+        });
       });
     });
 

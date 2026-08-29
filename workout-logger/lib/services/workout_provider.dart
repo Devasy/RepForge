@@ -920,24 +920,71 @@ class WorkoutProvider extends ChangeNotifier {
   /// Lighter than [updateWorkoutSession]: this only annotates metadata, so
   /// it skips the growth-model/target retraining that method does for
   /// exercise-data changes.
+  ///
+  /// The chip is re-answerable — the summary screen leaves it tappable — so
+  /// the offset is recomputed from every stored answer in date order rather
+  /// than folded in incrementally. Folding would count a changed answer
+  /// twice (tapping Brutal then Easy would apply both).
   Future<void> recordSessionEffort(String sessionId, int chipValue) async {
     final index = _sessions.indexWhere((s) => s.id == sessionId);
     if (index == -1) return;
 
-    final updated = _sessions[index].copyWith(sessionEffort: chipValue);
+    final previousSession = _sessions[index];
+    final previousOffset = _effortCalibrationOffset;
+    final updated = previousSession.copyWith(sessionEffort: chipValue);
+
+    final nextSessions = List<WorkoutSession>.from(_sessions)..[index] = updated;
+    final nextOffset = _recomputeEffortCalibrationOffset(nextSessions);
+
+    // No transaction across boxes here, so on a partial failure put both the
+    // session and the offset back the way they were and rethrow — the caller
+    // (the summary screen's chip) restores its selection on the throw.
     await _storage.saveWorkoutSession(updated);
-    _sessions = List.from(_sessions)..[index] = updated;
+    try {
+      await _storage.saveSetting(
+        _effortCalibrationOffsetKey,
+        nextOffset.toString(),
+      );
+    } catch (_) {
+      await _restoreSessionEffort(previousSession, previousOffset);
+      rethrow;
+    }
+
+    _sessions = nextSessions;
+    _effortCalibrationOffset = nextOffset;
     _invalidateHistoryCache();
     _historyManager?.patchSession(updated);
 
-    _effortCalibrationOffset =
-        _effortCalibration.updateOffset(_effortCalibrationOffset, chipValue);
-    await _storage.saveSetting(
-      _effortCalibrationOffsetKey,
-      _effortCalibrationOffset.toString(),
-    );
-
     notifyListeners();
+  }
+
+  /// Rebuilds the rolling offset from scratch over every answered session,
+  /// oldest first, so the result depends only on the stored answers and not
+  /// on how many times the user tapped to get there.
+  double _recomputeEffortCalibrationOffset(List<WorkoutSession> sessions) {
+    final answered = sessions.where((s) => s.sessionEffort != null).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    var offset = 0.0;
+    for (final session in answered) {
+      offset = _effortCalibration.updateOffset(offset, session.sessionEffort!);
+    }
+    return offset;
+  }
+
+  /// Best-effort undo of a half-applied [recordSessionEffort]. A failure here
+  /// leaves the session row ahead of the stored offset, which the next
+  /// answered chip recomputes away; swallowing it keeps the original error
+  /// as the one the caller sees.
+  Future<void> _restoreSessionEffort(
+    WorkoutSession previousSession,
+    double previousOffset,
+  ) async {
+    try {
+      await _storage.saveWorkoutSession(previousSession);
+    } catch (e, st) {
+      debugPrint('Failed to roll back session effort: $e\n$st');
+    }
+    _effortCalibrationOffset = previousOffset;
   }
 
   // ==================== ROUTINES ====================
