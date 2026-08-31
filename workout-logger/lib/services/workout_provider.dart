@@ -26,6 +26,9 @@ import 'ml_service.dart';
 import 'strategies/target_calculator.dart';
 import 'managers/program_manager.dart';
 import 'managers/history_manager.dart';
+import 'utils/effort_calibration.dart';
+import 'utils/exercise_history.dart';
+import 'utils/session_fatigue.dart';
 
 enum StartWorkoutConflictAction { resume, discardAndStart, cancel }
 
@@ -38,15 +41,49 @@ class WorkoutProvider extends ChangeNotifier {
   final IMLService _mlService;
   final HistoryManager? _historyManager;
   final Uuid _uuid = const Uuid();
+  final EffortCalibration _effortCalibration = const EffortCalibration();
+  final SessionFatigueAccumulator _sessionFatigueAccumulator =
+      const SessionFatigueAccumulator();
+
+  static const String _effortCalibrationOffsetKey = 'effort.calibrationOffset';
 
   // State
   List<WorkoutSession> _sessions = [];
   List<Routine> _routines = [];
+  double _effortCalibrationOffset = 0.0;
   List<Target> _targets = [];
   List<MuscleGroup> _muscleGroups = [];
   List<Exercise> _allExercises = [];
   final Map<String, GrowthModel> _growthModels =
       {}; // exerciseId -> GrowthModel
+
+  // getRecommendations runs from WorkoutFlowScreen's build, so it must not
+  // rebuild the exercise map and re-walk all of _sessions on every frame.
+  // Both derived values below depend only on history, so they're cached and
+  // invalidated by an explicit revision rather than by list identity —
+  // _sessions is mutated in place in places (insert/sort), so identity would
+  // go stale silently.
+  int _historyRevision = 0;
+  int? _recoveryCacheRevision;
+  Map<String, Exercise>? _cachedExerciseMap;
+  Map<String, DateTime>? _cachedLastTrained;
+
+  /// Call after any change to [_sessions] or [_allExercises].
+  void _invalidateHistoryCache() => _historyRevision++;
+
+  ({Map<String, Exercise> exerciseMap, Map<String, DateTime> lastTrained})
+      _historyDerived() {
+    if (_recoveryCacheRevision != _historyRevision) {
+      final map = {for (final e in _allExercises) e.id: e};
+      _cachedExerciseMap = map;
+      _cachedLastTrained = _mlService.lastTrainedPerMuscle(_sessions, map);
+      _recoveryCacheRevision = _historyRevision;
+    }
+    return (
+      exerciseMap: _cachedExerciseMap!,
+      lastTrained: _cachedLastTrained!,
+    );
+  }
 
   final ProgramManager programManager;
 
@@ -79,6 +116,11 @@ class WorkoutProvider extends ChangeNotifier {
   List<ExerciseLog> get currentExerciseLogs => _currentExerciseLogs;
   DateTime? get workoutStartTime => _workoutStartTime;
 
+  /// Rolling calibration offset for [EffortEstimator]'s RPE-8 anchor,
+  /// derived only from the once-per-workout effort chip (see
+  /// [recordSessionEffort]) — 0.0 until the user has ever answered it.
+  double get effortCalibrationOffset => _effortCalibrationOffset;
+
   /// Create WorkoutProvider with dependency injection.
   ///
   /// Following Dependency Inversion Principle: accepts abstractions
@@ -105,10 +147,14 @@ class WorkoutProvider extends ChangeNotifier {
 
   Future<void> loadAllData() async {
     _sessions = await _storage.getAllWorkoutSessions();
+    _invalidateHistoryCache();
     _routines = await _storage.getAllRoutines();
     _targets = await _storage.getAllTargets();
     _muscleGroups = await _storage.getAllMuscleGroups();
+    final storedOffset = await _storage.getSetting(_effortCalibrationOffsetKey);
+    _effortCalibrationOffset = double.tryParse(storedOffset ?? '') ?? 0.0;
     _allExercises = await _storage.getAllExercises();
+    _invalidateHistoryCache();
     await programManager.loadPrograms();
     notifyListeners();
   }
@@ -354,6 +400,7 @@ class WorkoutProvider extends ChangeNotifier {
 
     // Add to local list (use List.from for immutability)
     _allExercises = List.from(_allExercises)..add(exercise);
+    _invalidateHistoryCache();
 
     notifyListeners();
   }
@@ -414,6 +461,7 @@ class WorkoutProvider extends ChangeNotifier {
     // Remove from local list
     _allExercises = List.from(_allExercises)
       ..removeWhere((e) => e.id == exerciseId);
+    _invalidateHistoryCache();
 
     // Also remove any growth model
     _growthModels.remove(exerciseId);
@@ -622,6 +670,7 @@ class WorkoutProvider extends ChangeNotifier {
     }
     await _clearDraft();
     _sessions.insert(0, session);
+    _invalidateHistoryCache();
 
     // Update growth models for performed exercises
     for (var log in completedExercises) {
@@ -662,8 +711,18 @@ class WorkoutProvider extends ChangeNotifier {
   /// Get set recommendations for an exercise, optionally scoped by [handle].
   ///
   /// Uses up to 3 past sessions for this exercise (and handle variation) as the
-  /// basis for trend analysis and deload recovery.
-  List<SetRecommendation> getRecommendations(String exerciseId, {String? handle}) {
+  /// basis for trend analysis and deload recovery, plus the exercise's primary
+  /// muscle's recovery status so a still-fatigued muscle holds instead of
+  /// progressing.
+  /// [readinessBand] should come from the already-cached
+  /// `ReadinessManager.snapshot?.band` — this method never fetches it
+  /// itself, keeping recommendation generation synchronous/offline for the
+  /// in-workout hot path.
+  List<SetRecommendation> getRecommendations(
+    String exerciseId, {
+    String? handle,
+    ReadinessBand? readinessBand,
+  }) {
     final recent = getRecentSessionsForExercise(exerciseId, handle: handle, limit: 3);
 
     if (recent.isEmpty) {
@@ -674,10 +733,29 @@ class WorkoutProvider extends ChangeNotifier {
     // so it must not back a handle-scoped recommendation — that would mix
     // e.g. "Rope pushdown" trend data into a "Bar pushdown" recommendation.
     final useHandle = handle != null && handle.isNotEmpty;
+    // Cached: this runs from WorkoutFlowScreen's build, so the exercise map
+    // and the walk over every session are reused until history changes. Only
+    // the decay is recomputed per call, and that's O(muscle groups).
+    final derived = _historyDerived();
+    final recoveryInputs = recoveryRecommendationInputs(
+      exerciseId: exerciseId,
+      sessions: _sessions,
+      exerciseMap: derived.exerciseMap,
+      mlService: _mlService,
+      lastTrained: derived.lastTrained,
+    );
+    final sessionFatigueFactor = _sessionFatigueAccumulator.factorFor(
+      exerciseLogs: _currentExerciseLogs,
+      excludeExerciseId: exerciseId,
+    );
     return _mlService.recommendSets(
       lastSession: recent.first,
       pastSessions: recent,
       growthModel: useHandle ? null : _growthModels[exerciseId],
+      recoveryScores: recoveryInputs.recoveryScores,
+      primaryMuscleIds: recoveryInputs.primaryMuscleIds,
+      sessionFatigueFactor: sessionFatigueFactor,
+      readinessBand: readinessBand,
     );
   }
 
@@ -767,6 +845,7 @@ class WorkoutProvider extends ChangeNotifier {
 
     // Remove from local list
     _sessions = List.from(_sessions)..removeWhere((s) => s.id == sessionId);
+    _invalidateHistoryCache();
 
     // Keep HistoryManager's cache in sync so HistoryScreen rebuilds.
     _historyManager?.evictSession(sessionId);
@@ -810,10 +889,12 @@ class WorkoutProvider extends ChangeNotifier {
     final index = _sessions.indexWhere((s) => s.id == updatedSession.id);
     if (index != -1) {
       _sessions = List.from(_sessions)..[index] = updatedSession;
+      _invalidateHistoryCache();
     }
 
     // Sort sessions by date (most recent first)
     _sessions.sort((a, b) => b.date.compareTo(a.date));
+    _invalidateHistoryCache();
 
     // Keep HistoryManager's cache in sync so HistoryScreen rebuilds.
     _historyManager?.patchSession(updatedSession);
@@ -828,6 +909,103 @@ class WorkoutProvider extends ChangeNotifier {
     await _recalculateTargets(allAffectedExerciseIds);
 
     notifyListeners();
+  }
+
+  /// Tail of the in-flight effort writes, so overlapping chip taps run one
+  /// after another. See [recordSessionEffort].
+  Future<void> _effortWriteQueue = Future<void>.value();
+
+  /// Records the once-per-workout effort chip (1 = Easy, 2 = Solid,
+  /// 3 = Brutal) for [sessionId] and folds it into the rolling
+  /// [effortCalibrationOffset]. Answering is optional — this is only ever
+  /// called from a user tap on the post-workout summary screen, never
+  /// required to finish a workout.
+  ///
+  /// Lighter than [updateWorkoutSession]: this only annotates metadata, so
+  /// it skips the growth-model/target retraining that method does for
+  /// exercise-data changes.
+  ///
+  /// The chip is re-answerable — the summary screen leaves it tappable — so
+  /// the offset is recomputed from every stored answer in date order rather
+  /// than folded in incrementally. Folding would count a changed answer
+  /// twice (tapping Brutal then Easy would apply both).
+  ///
+  /// Calls are serialised. Because the chips stay tappable while a write is
+  /// in flight and [_recordSessionEffort] captures the pre-call session and
+  /// offset for its rollback, two overlapping taps would otherwise let a
+  /// failing first call restore that stale snapshot over a second call that
+  /// had already committed — leaving storage behind provider state. Queuing
+  /// is enough: each call re-reads `_sessions` when its turn comes.
+  Future<void> recordSessionEffort(String sessionId, int chipValue) {
+    final result = _effortWriteQueue.then(
+      (_) => _recordSessionEffort(sessionId, chipValue),
+    );
+    // The queue must survive a failed write, or every later tap would inherit
+    // that error. The caller still sees it through [result].
+    _effortWriteQueue = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  Future<void> _recordSessionEffort(String sessionId, int chipValue) async {
+    final index = _sessions.indexWhere((s) => s.id == sessionId);
+    if (index == -1) return;
+
+    final previousSession = _sessions[index];
+    final previousOffset = _effortCalibrationOffset;
+    final updated = previousSession.copyWith(sessionEffort: chipValue);
+
+    final nextSessions = List<WorkoutSession>.from(_sessions)..[index] = updated;
+    final nextOffset = _recomputeEffortCalibrationOffset(nextSessions);
+
+    // No transaction across boxes here, so on a partial failure put both the
+    // session and the offset back the way they were and rethrow — the caller
+    // (the summary screen's chip) restores its selection on the throw.
+    await _storage.saveWorkoutSession(updated);
+    try {
+      await _storage.saveSetting(
+        _effortCalibrationOffsetKey,
+        nextOffset.toString(),
+      );
+    } catch (_) {
+      await _restoreSessionEffort(previousSession, previousOffset);
+      rethrow;
+    }
+
+    _sessions = nextSessions;
+    _effortCalibrationOffset = nextOffset;
+    _invalidateHistoryCache();
+    _historyManager?.patchSession(updated);
+
+    notifyListeners();
+  }
+
+  /// Rebuilds the rolling offset from scratch over every answered session,
+  /// oldest first, so the result depends only on the stored answers and not
+  /// on how many times the user tapped to get there.
+  double _recomputeEffortCalibrationOffset(List<WorkoutSession> sessions) {
+    final answered = sessions.where((s) => s.sessionEffort != null).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    var offset = 0.0;
+    for (final session in answered) {
+      offset = _effortCalibration.updateOffset(offset, session.sessionEffort!);
+    }
+    return offset;
+  }
+
+  /// Best-effort undo of a half-applied [recordSessionEffort]. A failure here
+  /// leaves the session row ahead of the stored offset, which the next
+  /// answered chip recomputes away; swallowing it keeps the original error
+  /// as the one the caller sees.
+  Future<void> _restoreSessionEffort(
+    WorkoutSession previousSession,
+    double previousOffset,
+  ) async {
+    try {
+      await _storage.saveWorkoutSession(previousSession);
+    } catch (e, st) {
+      debugPrint('Failed to roll back session effort: $e\n$st');
+    }
+    _effortCalibrationOffset = previousOffset;
   }
 
   // ==================== ROUTINES ====================

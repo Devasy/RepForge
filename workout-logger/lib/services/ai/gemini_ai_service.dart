@@ -28,7 +28,35 @@ const kGeminiModels = [
   ('gemini-3.5-flash-lite', 'Gemini 3.5 Flash Lite'),
   ('gemini-3.5-flash',      'Gemini 3.5 Flash'),
   ('gemini-3.6-flash',      'Gemini 3.6 Flash'),
+  ('gemini-3.7-flash',      'Gemini 3.7 Flash'),
 ];
+
+// Ordered fastest/cheapest → most thorough. Matches the Gemini API's own
+// thinkingLevel scale (gemini-2.x models don't use this — see
+// supportedThinkingLevels).
+const kThinkingLevels = ['minimal', 'low', 'medium', 'high'];
+
+// Fastest level available on the default model.
+const kDefaultThinkingLevel = 'minimal';
+
+/// Thinking levels [model] accepts, in kThinkingLevels order. Empty for
+/// gemini-2.x models, which use the older thinkingBudget shape and don't
+/// support thinkingLevel at all. gemini-3.7-flash is the first 3.x model
+/// that doesn't support 'minimal' — sending it returns an API error.
+List<String> supportedThinkingLevels(String model) {
+  if (model.startsWith('gemini-2')) return const [];
+  if (model == 'gemini-3.7-flash') return const ['low', 'medium', 'high'];
+  return kThinkingLevels;
+}
+
+/// Snaps [level] to a value [model] actually supports, falling back to the
+/// model's fastest supported level if [level] isn't valid for it. Returns
+/// [level] unchanged for models with no thinkingLevel support at all.
+String clampThinkingLevel(String model, String level) {
+  final supported = supportedThinkingLevels(model);
+  if (supported.isEmpty || supported.contains(level)) return level;
+  return supported.first;
+}
 
 // Default to the latest GA model.
 const kDefaultGeminiModel = 'gemini-3.6-flash';
@@ -105,8 +133,10 @@ bool _isDailyQuotaExhausted(String body) {
       body.contains('free_tier_requests');
 }
 
-String? _getFallbackModel(String currentModel) {
+String? getFallbackModel(String currentModel) {
   switch (currentModel) {
+    case 'gemini-3.7-flash':
+      return 'gemini-3.6-flash';
     case 'gemini-3.6-flash':
       return 'gemini-3.5-flash';
     case 'gemini-3.5-flash':
@@ -144,6 +174,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   String _apiKey = '';
   String _model = kDefaultGeminiModel;
   int _maxToolRounds = kDefaultMaxToolRounds;
+  String _thinkingLevel = kDefaultThinkingLevel;
 
   // Cumulative token usage across all AI calls (persisted).
   int _promptTokens = 0;
@@ -160,6 +191,10 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   /// Upper bound on tool-resolution rounds per user turn.
   int get maxToolRounds => _maxToolRounds;
 
+  /// Current thinkingLevel sent with 3.x requests. Always valid for
+  /// [currentModel] — see [clampThinkingLevel].
+  String get thinkingLevel => _thinkingLevel;
+
   /// Cumulative input (prompt) tokens billed across all AI calls.
   int get promptTokensUsed => _promptTokens;
 
@@ -175,10 +210,12 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   void init(String apiKey, {
     String model = kDefaultGeminiModel,
     int maxToolRounds = kDefaultMaxToolRounds,
+    String thinkingLevel = kDefaultThinkingLevel,
   }) {
     _apiKey = apiKey.trim();
     _model = model;
     _maxToolRounds = maxToolRounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
+    _thinkingLevel = clampThinkingLevel(_model, thinkingLevel);
   }
 
   /// Load persisted cumulative token usage (call once at startup).
@@ -252,6 +289,12 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
   void updateModel(String model) {
     _model = model;
+    _thinkingLevel = clampThinkingLevel(_model, _thinkingLevel);
+    notifyListeners();
+  }
+
+  void updateThinkingLevel(String level) {
+    _thinkingLevel = clampThinkingLevel(_model, level);
     notifyListeners();
   }
 
@@ -285,15 +328,17 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
   // Every gemini-2.x model predates the Gemini 3.x thinking-level enum and
   // only understands the older thinkingBudget (integer token budget) shape;
-  // 3.x models take thinkingLevel (minimal/medium/high). Matched by family,
+  // 3.x models take thinkingLevel (see kThinkingLevels). Matched by family,
   // not the single 'gemini-2.5-flash' id, so a persisted legacy model id
   // that isn't in kGeminiModels (e.g. from a since-removed picker entry)
   // still gets the right shape instead of failing with no fallback. Since
   // the daily quota fallback chain can land on either family mid-conversation,
   // the config shape must match whichever model is currently selected.
+  // _thinkingLevel is kept clamped to _model everywhere it's set, so it's
+  // always a value _model actually accepts by the time this is read.
   Map<String, dynamic> get _thinkingConfig => _model.startsWith('gemini-2')
       ? {'thinkingBudget': 0}
-      : {'thinkingLevel': 'minimal'};
+      : {'thinkingLevel': _thinkingLevel};
 
   // Extracts non-thought text strings from a candidate object.
   Iterable<String> _textFromCandidate(Map<String, dynamic> candidate) sync* {
@@ -332,9 +377,10 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
       // Automatically fallback to next model when daily free quota limit is reached.
       if (_isDailyQuotaExhausted(err)) {
-        final fallback = _getFallbackModel(_model);
+        final fallback = getFallbackModel(_model);
         if (fallback != null) {
           _model = fallback;
+          _thinkingLevel = clampThinkingLevel(_model, _thinkingLevel);
           // gemini-2.5-flash and the 3.x family use different thinkingConfig
           // shapes (see _thinkingConfig) — rebuild it for the new model so the
           // retried request isn't rejected for the previous model's shape.
@@ -404,9 +450,10 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
       }
 
       if (_isDailyQuotaExhausted(response.body)) {
-        final fallback = _getFallbackModel(_model);
+        final fallback = getFallbackModel(_model);
         if (fallback != null) {
           _model = fallback;
+          _thinkingLevel = clampThinkingLevel(_model, _thinkingLevel);
           // See the matching comment in _streamSse — the thinkingConfig shape
           // must match whichever model this attempt is about to hit.
           (body['generationConfig'] as Map<String, dynamic>)['thinkingConfig'] =

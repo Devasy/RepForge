@@ -315,6 +315,10 @@ class WorkoutSession {
   final String? notes;
   /// Non-null when this session was successfully synced to Health Connect.
   final DateTime? hcSyncedAt;
+  /// Optional once-per-workout subjective effort (1 = Easy, 2 = Solid,
+  /// 3 = Brutal), captured on the post-workout summary screen. Used only to
+  /// calibrate [EffortEstimator]'s per-set RPE anchor — never required.
+  final int? sessionEffort;
 
   WorkoutSession({
     required this.id,
@@ -324,6 +328,7 @@ class WorkoutSession {
     required this.duration,
     this.notes,
     this.hcSyncedAt,
+    this.sessionEffort,
   });
 
   double get totalVolume =>
@@ -337,6 +342,7 @@ class WorkoutSession {
     'duration': duration,
     'notes': notes,
     'hcSyncedAt': hcSyncedAt?.toIso8601String(),
+    'sessionEffort': sessionEffort,
   };
 
   factory WorkoutSession.fromJson(Map<String, dynamic> json) => WorkoutSession(
@@ -351,6 +357,7 @@ class WorkoutSession {
     hcSyncedAt: json['hcSyncedAt'] != null
         ? DateTime.parse(json['hcSyncedAt'] as String)
         : null,
+    sessionEffort: json['sessionEffort'] as int?,
   );
 
   WorkoutSession copyWith({
@@ -361,6 +368,7 @@ class WorkoutSession {
     Object? duration = _sentinel,
     Object? notes = _sentinel,
     Object? hcSyncedAt = _sentinel,
+    Object? sessionEffort = _sentinel,
   }) => WorkoutSession(
     id: id == _sentinel ? this.id : id as String,
     date: date == _sentinel ? this.date : date as DateTime,
@@ -373,6 +381,9 @@ class WorkoutSession {
     hcSyncedAt: hcSyncedAt == _sentinel
         ? this.hcSyncedAt
         : hcSyncedAt as DateTime?,
+    sessionEffort: sessionEffort == _sentinel
+        ? this.sessionEffort
+        : sessionEffort as int?,
   );
 }
 
@@ -477,6 +488,34 @@ class SetRecommendation {
     required this.reps,
     required this.confidence,
     required this.reasoning,
+  });
+}
+
+// ==================== Effort Estimate ====================
+
+/// Where an [EffortEstimate]'s RPE value came from.
+///
+/// No per-set RPE picker exists in this app — [userReported] is reserved
+/// for if one is ever added, so estimated values can never be confused with
+/// a real logged one.
+enum EffortSource { userReported, estimatedWithHr, estimatedHrless }
+
+/// A 0–10 RPE (rate of perceived exertion) estimate for one set, inferred
+/// from data already logged rather than asked of the user. See
+/// [EffortEstimator] for how it's computed.
+class EffortEstimate {
+  final double rpe;
+  final EffortSource source;
+
+  /// 0–1. Capped below 1.0 (see [EffortEstimator.maxEstimatedConfidence]) —
+  /// an estimate can never claim the certainty a real user-reported value
+  /// would have.
+  final double confidence;
+
+  const EffortEstimate({
+    required this.rpe,
+    required this.source,
+    required this.confidence,
   });
 }
 

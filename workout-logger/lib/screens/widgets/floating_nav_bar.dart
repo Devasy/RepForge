@@ -95,6 +95,8 @@ class FloatingNavBarTheme {
     this.inactiveIconColor,
     this.outerShadowColor,
     this.outerGlowColor,
+    /// Colour of the unread-indicator dot on a badged item.
+    this.badgeColor = const Color(0xFFE05040),
     // ── Sizes ────────────────────────────────────────────────────────────────
     this.navHeight = 60.0,
     this.chipHeight = 46.0,
@@ -130,8 +132,10 @@ class FloatingNavBarTheme {
     // ── Scroll behaviour ─────────────────────────────────────────────────────
     /// Set to false to keep the nav bar permanently visible.
     this.hideOnScroll = true,
-    this.scrollDownThreshold = 2.0,
-    this.scrollUpThreshold = 2.0,
+    /// Cumulative downward travel, in pixels, before the bar hides.
+    this.scrollDownThreshold = 48.0,
+    /// Cumulative upward travel before it returns; smaller, so it comes back fast.
+    this.scrollUpThreshold = 16.0,
     // ── Misc ─────────────────────────────────────────────────────────────────
     this.bottomMargin = 16.0,
     this.hapticFeedback = true,
@@ -167,6 +171,7 @@ class FloatingNavBarTheme {
   final Color? inactiveIconColor;
   final Color? outerShadowColor;
   final Color? outerGlowColor;
+  final Color badgeColor;
 
   // ── Sizes ────────────────────────────────────────────────────────────────────
   final double navHeight;
@@ -260,7 +265,10 @@ class FloatingNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bottomPad = MediaQuery.of(context).padding.bottom;
+    final bottomPad = MediaQuery.paddingOf(context).bottom;
+    // Never below bottomMargin, and always a visible gap above any inset.
+    final bottomInset =
+        bottomPad + 8 > theme.bottomMargin ? bottomPad + 8 : theme.bottomMargin;
 
     // ── Resolve colours ──────────────────────────────────────────────────────
     final bg = theme.backgroundColor ??
@@ -280,9 +288,8 @@ class FloatingNavBar extends StatelessWidget {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
-        padding: EdgeInsets.only(
-          bottom: bottomPad > 0 ? bottomPad : theme.bottomMargin,
-        ),
+        // Clears the system inset and keeps a margin off the gesture handle.
+        padding: EdgeInsets.only(bottom: bottomInset),
         child: _ShadowWrapper(
           outerShadow: outerShadow,
           outerGlow: outerGlow,
@@ -567,7 +574,7 @@ class _NavCellState extends State<_NavCell>
                                   width: 8,
                                   height: 8,
                                   decoration: BoxDecoration(
-                                    color: Colors.red,
+                                    color: t.badgeColor,
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       // border matches the chip bg for a
@@ -688,26 +695,49 @@ class _FloatingNavBarScaffoldState extends State<FloatingNavBarScaffold> {
   // ── Tab change — always restore visibility ────────────────────────────────
 
   void _handleTabChange(int index) {
+    _travel = 0;
     if (!_visible) setState(() => _visible = true);
     widget.onTabChanged(index);
   }
 
   // ── Scroll detection ──────────────────────────────────────────────────────
 
+  /// Travel since the last direction change; positive is down, reset on reversal.
+  double _travel = 0;
+
   bool _handleScrollNotification(ScrollNotification n) {
     if (!widget.theme.hideOnScroll) return false;
 
-    if (n is ScrollUpdateNotification) {
-      final delta = n.scrollDelta ?? 0;
+    // A settled scroll starts a fresh gesture — don't carry momentum across.
+    if (n is ScrollEndNotification) {
+      _travel = 0;
+      return false;
+    }
 
-      if (delta > widget.theme.scrollDownThreshold && _visible) {
+    if (n is ScrollUpdateNotification) {
+      // Ignore overscroll bounce: rubber-banding reads as a drag it isn't.
+      final m = n.metrics;
+      if (m.pixels < m.minScrollExtent || m.pixels > m.maxScrollExtent) {
+        return false;
+      }
+
+      final delta = n.scrollDelta ?? 0;
+      // Direction reversal restarts the count.
+      if (delta.sign != _travel.sign) _travel = 0;
+      _travel += delta;
+
+      if (_travel > widget.theme.scrollDownThreshold && _visible) {
+        _travel = 0;
         setState(() => _visible = false);
-      } else if (delta < -widget.theme.scrollUpThreshold && !_visible) {
+      } else if (-_travel > widget.theme.scrollUpThreshold && !_visible) {
+        _travel = 0;
         setState(() => _visible = true);
       }
 
-      // At the very top → always show.
-      if (n.metrics.pixels <= 0 && !_visible) {
+      // Near the very top → always show. A small band rather than an exact
+      // zero, so the bar is already back by the time the bounce settles.
+      if (m.pixels <= m.minScrollExtent + 8 && !_visible) {
+        _travel = 0;
         setState(() => _visible = true);
       }
     }

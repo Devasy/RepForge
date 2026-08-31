@@ -10,10 +10,14 @@ import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
 import '../services/managers/pr_manager.dart';
+import '../services/managers/readiness_manager.dart';
 import '../theme/app_theme.dart';
 import 'add_custom_exercise_screen.dart';
 import 'exercise_library_screen.dart';
 import 'workout_summary_screen.dart';
+import 'widgets/rf_widgets.dart';
+import 'widgets/rf_shell.dart';
+import 'widgets/rf_dialogs.dart';
 import 'widgets/workout_header.dart';
 import 'widgets/exercise_input_section.dart';
 import 'widgets/rest_timer_view.dart';
@@ -270,8 +274,17 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final isLast = idx >= totalExercises - 1;
 
     final selectedHandle = log?.handle;
+    // Nullable-typed lookup: resolves to null (no readiness signal) instead
+    // of throwing when no ReadinessManager is above this screen in the
+    // widget tree — keeps this screen usable without the full app's
+    // provider tree (e.g. in isolated widget tests).
+    final readinessBand = context.watch<ReadinessManager?>()?.snapshot?.band;
     final recommendations = exercise != null
-        ? provider.getRecommendations(exercise.id, handle: selectedHandle)
+        ? provider.getRecommendations(
+            exercise.id,
+            handle: selectedHandle,
+            readinessBand: readinessBand,
+          )
         : <SetRecommendation>[];
 
     final lastSession = exercise != null
@@ -287,27 +300,26 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           setNumber: (log?.sets.length ?? 0) + 1,
           workoutStartTime: provider.workoutStartTime,
           progress: totalExercises > 0 ? (idx + 1) / totalExercises : 0,
-          isFirst: isFirst,
-          isLast: isLast,
           onClose: _showCancelDialog,
-          onPrevious: () {
-            provider.previousExercise();
-            _loadLastSessionData();
-          },
-          onNext: () {
-            provider.nextExercise();
-            _loadLastSessionData();
-          },
           onFinish: _finishWorkout,
           onRemoveLastSet: provider.removeLastSet,
           onSetRestTime: (s) => setState(() => _restSeconds = s),
           restSeconds: _restSeconds,
         ),
         Expanded(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: ExerciseInputSection(
+          // minHeight + IntrinsicHeight let the section's Spacer do its work.
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - AppSpacing.md * 2,
+                ),
+                child: IntrinsicHeight(
+                  child: ExerciseInputSection(
+              // The section cannot measure itself under IntrinsicHeight.
+              contentWidth: constraints.maxWidth - AppSpacing.md * 2,
               currentWeight: _currentWeight,
               currentReps: _currentReps,
               isDropset: _isDropset,
@@ -348,7 +360,6 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   _drops[i] = DropsetEntry(weight: _drops[i].weight, reps: r);
                 }
               },
-              onLogSet: _completeSet,
               onApplyRecommendation: () {
                 if (recommendations.isEmpty) return;
                 final setIdx = (log?.sets.length ?? 0)
@@ -365,6 +376,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                   _mainRepsCtrl.text = rec.reps.toString();
                 });
               },
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -389,97 +403,43 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     );
   }
 
+  /// Log set is tapped twenty-odd times a session and exercise nav a handful,
+  /// so the log action owns the width and the thumb zone. It used to be inverted.
   Widget _buildBottomNav(WorkoutProvider provider, bool isFirst, bool isLast) {
-    final bottomPad = MediaQuery.of(context).padding.bottom;
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomPad),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.95),
-        border: Border(top: BorderSide(color: AppColors.glassBorder)),
-      ),
+    return RFBottomBar(
       child: Row(
         children: [
-          if (!isFirst)
-            Flexible(
-              child: GestureDetector(
-                onTap: () {
-                  provider.previousExercise();
-                  _loadLastSessionData();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.glass2,
-                    borderRadius: BorderRadius.circular(AppRadius.button),
-                    border: Border.all(color: AppColors.glassBorderStrong),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.textMuted),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Prev',
-                        style: TextStyle(fontFamily: 'Geist', 
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            )
-          else
-            const SizedBox.shrink(),
-          const Spacer(),
-          Flexible(
-            child: GestureDetector(
-              onTap: isLast
-                  ? _finishWorkout
-                  : () {
-                      provider.nextExercise();
-                      _loadLastSessionData();
-                    },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                decoration: BoxDecoration(
-                  color: isLast ? AppColors.success : AppColors.primary,
-                  borderRadius: BorderRadius.circular(AppRadius.button),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (isLast ? AppColors.success : AppColors.primary)
-                          .withValues(alpha: 0.35),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        isLast ? 'Finish' : 'Next exercise',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontFamily: 'Geist', 
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Icon(
-                      isLast ? Icons.check_rounded : Icons.arrow_forward_rounded,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                  ],
-                ),
-              ),
+          RFIconButton(
+            icon: Icons.arrow_back_rounded,
+            tooltip: 'Previous exercise',
+            onTap: isFirst
+                ? null
+                : () {
+                    provider.previousExercise();
+                    _loadLastSessionData();
+                  },
+            size: 46,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: GlowButton(
+              label: 'Log set',
+              icon: Icons.check_rounded,
+              onPressed: _completeSet,
             ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          RFIconButton(
+            icon: isLast ? Icons.flag_rounded : Icons.arrow_forward_rounded,
+            tooltip: isLast ? 'Finish workout' : 'Next exercise',
+            color: isLast ? AppColors.success : AppColors.textSoft,
+            onTap: isLast
+                ? _finishWorkout
+                : () {
+                    provider.nextExercise();
+                    _loadLastSessionData();
+                  },
+            size: 46,
           ),
         ],
       ),
@@ -656,98 +616,69 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   // ── Dialogs ─────────────────────────────────────────────────────────────────
 
-  void _showCancelDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardHigh,
-        title: const Text('Cancel Workout?'),
-        content: const Text('Your progress will not be saved.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Continue'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final nav = Navigator.of(context);
-              final ctxNav = Navigator.of(ctx);
-              await context.read<WorkoutProvider>().cancelWorkout();
-              if (!mounted) return;
-              ctxNav.pop();
-              nav.pop();
-            },
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
+  Future<void> _showCancelDialog() async {
+    final discard = await showRFConfirmDialog(
+      context,
+      title: 'Discard this workout?',
+      content: 'Nothing from this session will be saved.',
+      cancelText: 'Keep going',
+      confirmText: 'Discard',
+      isDanger: true,
     );
+    if (discard != true || !mounted) return;
+    final nav = Navigator.of(context);
+    await context.read<WorkoutProvider>().cancelWorkout();
+    if (!mounted) return;
+    nav.pop();
   }
 
-  void _finishWorkout() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardHigh,
-        title: const Text('Finish Workout?'),
-        content: const Text('Ready to save this session?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Continue'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final nav = Navigator.of(context);
-              final prManager = context.read<PRManager>();
-              Navigator.of(ctx).pop();
-              final session =
-                  await context.read<WorkoutProvider>().finishWorkout();
-              final newPRs = await prManager.checkAndUpdatePRs(session);
-              if (!mounted) return;
-              nav.pushReplacement(MaterialPageRoute(
-                builder: (_) => WorkoutSummaryScreen(
-                  session: session,
-                  newPRs: newPRs,
-                ),
-              ));
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.success,
-            ),
-            child: const Text('Save & Finish'),
-          ),
-        ],
-      ),
+  Future<void> _finishWorkout() async {
+    final confirmed = await showRFConfirmDialog(
+      context,
+      title: 'Finish workout?',
+      content: 'This session will be saved to your history.',
+      cancelText: 'Keep going',
+      confirmText: 'Save & finish',
     );
+    if (confirmed != true || !mounted) return;
+
+    final nav = Navigator.of(context);
+    final prManager = context.read<PRManager>();
+    final session = await context.read<WorkoutProvider>().finishWorkout();
+    final newPRs = await prManager.checkAndUpdatePRs(session);
+    if (!mounted) return;
+    nav.pushReplacement(MaterialPageRoute(
+      builder: (_) => WorkoutSummaryScreen(session: session, newPRs: newPRs),
+    ));
   }
 
   Future<void> _handleBack() async {
-    final action = await showDialog<_LeaveAction>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardHigh,
-        title: const Text('Leave workout?'),
-        content: const Text(
-          'Progress is saved. You can resume next time.',
+    // A sheet, not a dialog: three dialog actions wrap into a ragged column.
+    final action = await showRFActionSheet<_LeaveAction>(
+      context,
+      title: 'Leave this workout?',
+      message: 'Your sets so far are already saved.',
+      actions: const [
+        RFAction(
+          label: 'Keep & exit',
+          value: _LeaveAction.keep,
+          description: 'Resume where you left off next time',
+          icon: Icons.bookmark_outline_rounded,
+          isPrimary: true,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, _LeaveAction.discard),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Discard'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, _LeaveAction.keep),
-            child: const Text('Keep & exit'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, _LeaveAction.cancel),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+        RFAction(
+          label: 'Stay here',
+          value: _LeaveAction.cancel,
+          icon: Icons.arrow_back_rounded,
+        ),
+        RFAction(
+          label: 'Discard workout',
+          value: _LeaveAction.discard,
+          description: 'Delete this session for good',
+          icon: Icons.delete_outline_rounded,
+          isDanger: true,
+        ),
+      ],
     );
 
     if (!mounted) return;

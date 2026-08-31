@@ -37,6 +37,7 @@ import 'genui/a2ui.dart';
 import 'theme/a2ui_app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/widgets/rf_widgets.dart';
 
 /// Resolved once in main() before runApp(). Read lazily by
 /// WorkoutLoggerApp._storageService's static initializer, which only runs
@@ -46,9 +47,8 @@ IStorageService? _resolvedStorageService;
 /// One-time, flag-gated, reversible Hive -> SQLite cutover. See
 /// docs/superpowers/specs/2026-08-08-sqlite-migration-and-coach-sql-tool-design.md §6.
 Future<void> _resolveStorageBackend() async {
-  // Hive stays initialized unconditionally: the cutover flag itself lives in
-  // this settings box, so it has to be readable before we know which backend
-  // to build — and the pre-migration path still runs on Hive outright.
+  // Hive must be initialized before the cutover check itself, since the
+  // migration flag below is read directly from the Hive 'settings' box.
   await Hive.initFlutter();
   final settingsBox = await Hive.openBox<String>('settings');
   final alreadyMigrated = settingsBox.get(storageMigratedFlagKey) == 'true';
@@ -220,6 +220,9 @@ class WorkoutLoggerApp extends StatelessWidget {
           title: 'Workout Logger',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.darkTheme,
+          // Above the Navigator, so every route feeds the ambient glow.
+          builder: (context, child) =>
+              AmbientMotionScope(child: child ?? const SizedBox.shrink()),
           home: const AppInitializer(),
         ),
       ),
@@ -262,6 +265,7 @@ class _AppInitializerState extends State<AppInitializer> {
         settings.geminiApiKey,
         model: settings.geminiModel,
         maxToolRounds: settings.geminiMaxToolRounds,
+        thinkingLevel: settings.geminiThinkingLevel,
       );
       try {
         await gemini.loadUsage();

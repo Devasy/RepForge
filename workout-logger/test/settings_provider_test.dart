@@ -21,6 +21,7 @@ void main() {
       expect(provider.userName, isNull);
       expect(provider.geminiApiKey, isEmpty);
       expect(provider.geminiModel, equals('gemini-3.6-flash'));
+      expect(provider.geminiThinkingLevel, equals('minimal'));
       expect(provider.showAdvancedMetrics, isFalse);
     });
 
@@ -31,7 +32,8 @@ void main() {
       await mockStorage.saveSetting('readinessEnabled', 'true');
       await mockStorage.saveSetting('userName', 'Devasy');
       await mockStorage.saveSetting('geminiApiKey', 'secret_key');
-      await mockStorage.saveSetting('geminiModel', 'gemini-1.5-pro');
+      await mockStorage.saveSetting('geminiModel', 'gemini-3.5-flash');
+      await mockStorage.saveSetting('geminiThinkingLevel', 'high');
       await mockStorage.saveSetting('showAdvancedMetrics', 'true');
 
       await provider.init();
@@ -43,8 +45,29 @@ void main() {
       expect(provider.readinessEnabled, isTrue);
       expect(provider.userName, equals('Devasy'));
       expect(provider.geminiApiKey, equals('secret_key'));
-      expect(provider.geminiModel, equals('gemini-1.5-pro'));
+      expect(provider.geminiModel, equals('gemini-3.5-flash'));
+      expect(provider.geminiThinkingLevel, equals('high'));
       expect(provider.showAdvancedMetrics, isTrue);
+    });
+
+    test('init falls back to the default model when the stored one is no '
+        'longer offered', () async {
+      // A model id left behind by an older build. The picker only has items
+      // for kGeminiModels, so surfacing this one would assert.
+      await mockStorage.saveSetting('geminiModel', 'gemini-1.5-pro');
+
+      await provider.init();
+
+      expect(provider.geminiModel, equals('gemini-3.6-flash'));
+    });
+
+    test('init clamps a stored thinking level that the stored model no longer supports', () async {
+      await mockStorage.saveSetting('geminiModel', 'gemini-3.7-flash');
+      await mockStorage.saveSetting('geminiThinkingLevel', 'minimal');
+
+      await provider.init();
+
+      expect(provider.geminiThinkingLevel, equals('low'));
     });
 
     test('setUserName updates state and notifies listeners', () async {
@@ -104,8 +127,20 @@ void main() {
       await provider.setGeminiModel('custom-model');
       expect(provider.geminiModel, equals('custom-model'));
 
+      await provider.setGeminiThinkingLevel('high');
+      expect(provider.geminiThinkingLevel, equals('high'));
+      expect(mockStorage.settings['geminiThinkingLevel'], equals('high'));
+
       await provider.setShowAdvancedMetrics(true);
       expect(provider.showAdvancedMetrics, isTrue);
+    });
+
+    test('setGeminiModel clamps an already-set thinking level the new model does not support', () async {
+      await provider.setGeminiThinkingLevel('minimal');
+      await provider.setGeminiModel('gemini-3.7-flash');
+
+      expect(provider.geminiThinkingLevel, equals('low'));
+      expect(mockStorage.settings['geminiThinkingLevel'], equals('low'));
     });
 
     test('saveWeeklyInsights updates insights string and date', () async {
@@ -115,6 +150,52 @@ void main() {
       expect(provider.weeklyInsightsDate, isNotNull);
       expect(mockStorage.settings['weeklyInsights'], equals('Great progress this week!'));
     });
+
+    test(
+      'setGeminiModel rolls the model write back when the thinking-level write fails',
+      () async {
+        // The two writes are not a transaction. Without the rollback, storage
+        // keeps the new model while the provider keeps the old one, so a
+        // selection the UI reported as failed becomes active on next launch.
+        await provider.setGeminiThinkingLevel('minimal');
+        expect(provider.geminiModel, equals('gemini-3.6-flash'));
+
+        // gemini-3.7-flash doesn't support 'minimal', so the clamp forces the
+        // second write — which is the one we make fail.
+        mockStorage.saveSettingErrorResolver = (key, value) =>
+            key == 'geminiThinkingLevel' ? Exception('disk full') : null;
+
+        await expectLater(
+          provider.setGeminiModel('gemini-3.7-flash'),
+          throwsA(isA<Exception>()),
+        );
+        mockStorage.saveSettingErrorResolver = null;
+
+        expect(provider.geminiModel, equals('gemini-3.6-flash'));
+        expect(
+          mockStorage.settings['geminiModel'],
+          equals('gemini-3.6-flash'),
+          reason: 'the model write must not survive the failed clamp write',
+        );
+        expect(provider.geminiThinkingLevel, equals('minimal'));
+      },
+    );
+
+    test(
+      'setGeminiMaxToolRounds does not commit in memory when the write fails',
+      () async {
+        final before = provider.geminiMaxToolRounds;
+        mockStorage.saveSettingErrorResolver = (key, value) =>
+            key == 'geminiMaxToolRounds' ? Exception('disk full') : null;
+
+        await expectLater(
+          provider.setGeminiMaxToolRounds(before + 3),
+          throwsA(isA<Exception>()),
+        );
+
+        expect(provider.geminiMaxToolRounds, equals(before));
+      },
+    );
 
     test('availableIncrements returns correct values for unit', () async {
       expect(provider.availableIncrements, equals([1.25, 2.5, 5.0, 10.0]));

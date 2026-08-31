@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
+import 'rf_shell.dart';
 
 class RestTimerView extends StatelessWidget {
   const RestTimerView({
@@ -31,15 +32,7 @@ class RestTimerView extends StatelessWidget {
             // Top hint
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.lg),
-              child: Text(
-                'REST',
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
-                ),
-              ),
+              child: const RFLabel('Rest'),
             ),
             // Ring + time fills most of the screen
             Expanded(
@@ -66,15 +59,8 @@ class RestTimerView extends StatelessWidget {
                       ),
                       if (nextExerciseName != null) ...[
                         const SizedBox(height: AppSpacing.lg),
-                        Text(
-                          'Next up',
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 11,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
+                        const RFLabel('Next up', dim: true),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(
                           nextExerciseName!,
                           style: const TextStyle(
@@ -98,7 +84,7 @@ class RestTimerView extends StatelessWidget {
                 AppSpacing.xl,
               ),
               child: OutlineGlowButton(
-                label: 'SKIP REST',
+                label: 'Skip rest',
                 onPressed: onSkip,
                 color: AppColors.textSoft,
                 fullWidth: true,

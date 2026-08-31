@@ -33,6 +33,21 @@ class AnalyticsManager extends ChangeNotifier {
   // Rebuilt via [buildSessionIndex] whenever the session list changes.
   Map<String, List<({ExerciseLog log, DateTime date})>> _sessionIndex = {};
 
+  // When each muscle was last trained, cached alongside _sessionIndex: the
+  // walk behind it sorts and scans all sessions, and it depends only on the
+  // history, not on the clock. Dropped by buildSessionIndex; _lastTrainedFor
+  // guards the case where a caller passes a different exerciseMap than the
+  // one this was built from.
+  Map<String, DateTime>? _lastTrained;
+  Map<String, Exercise>? _lastTrainedFor;
+
+  // The map built from a caller's `exercises` list when it passes no
+  // exerciseMap. Held so repeated calls with the same list reuse one map
+  // instance — without this, the literal below is a fresh object every call
+  // and _lastTrainedFor's identity check never hits.
+  List<Exercise>? _fallbackLookupFor;
+  Map<String, Exercise>? _fallbackLookup;
+
   // Callback to update targets with new growth models
   final void Function(String exerciseId, GrowthModel model)?
   onGrowthModelUpdated;
@@ -66,6 +81,12 @@ class AnalyticsManager extends ChangeNotifier {
     }
 
     _sessionIndex = index;
+    // The recovery walk is keyed off the same "sessions changed" signal, so
+    // it's dropped here and rebuilt lazily on the next getRecommendations.
+    _lastTrained = null;
+    _lastTrainedFor = null;
+    _fallbackLookupFor = null;
+    _fallbackLookup = null;
   }
 
   /// Get growth model for a specific exercise
@@ -130,14 +151,36 @@ class AnalyticsManager extends ChangeNotifier {
   /// Get set recommendations for an exercise.
   ///
   /// Uses the most-recently-dated session containing this exercise as the
-  /// basis for the recommendation. Reads from the pre-built session index
-  /// so no sort is required at call time — O(1).
+  /// basis for the recommendation, plus up to 2 sessions before that for
+  /// deload-recovery detection and (when [exercises]/[exerciseMap] are
+  /// supplied) the primary muscle's recovery status.
+  ///
+  /// Reads from the pre-built session index, so the log lookup is O(1) and
+  /// needs no sort at call time. The recovery walk behind the recovery
+  /// status is O(N sessions), but it is cached on the same
+  /// [buildSessionIndex] invalidation, so it costs that only on the first
+  /// call after a session change; subsequent calls pay O(muscle groups).
+  ///
+  /// [exerciseMap] is a pre-built id → Exercise map for O(1) lookups; falls
+  /// back to building one from [exercises] when omitted (see
+  /// [getWeeklyVolumeByMuscle] for the same convention). That fallback is
+  /// memoized on the [exercises] instance, because the last-trained cache
+  /// below keys off the map's identity.
+  ///
+  /// [readinessBand] and [sessionFatigueFactor] are forwarded straight to
+  /// [IMLService.recommendSets], matching what
+  /// `WorkoutProvider.getRecommendations` passes — the two entry points
+  /// have drifted apart before (see [recoveryRecommendationInputs]).
   List<SetRecommendation> getRecommendations(
     String exerciseId,
-    List<WorkoutSession> sessions,
-  ) {
+    List<WorkoutSession> sessions, {
+    List<Exercise> exercises = const [],
+    Map<String, Exercise>? exerciseMap,
+    ReadinessBand? readinessBand,
+    double sessionFatigueFactor = 0.0,
+  }) {
     final isFresh = identical(_lastIndexedSessions, sessions);
-    
+
     // Fast path: use pre-built index if available and fresh.
     final logs = isFresh ? _sessionIndex[exerciseId] : null;
     final lastLog = (logs != null && logs.isNotEmpty)
@@ -148,10 +191,46 @@ class AnalyticsManager extends ChangeNotifier {
       return _mlService.getDefaultRecommendations(3);
     }
 
+    final pastSessions = (logs != null && logs.isNotEmpty)
+        ? logs.take(3).map((e) => e.log.sets).toList()
+        : [lastLog.sets];
+
+    final lookup = exerciseMap ?? _fallbackLookupFrom(exercises);
+    // Reuse the last-trained walk across calls — it's invalidated by
+    // buildSessionIndex, the same signal that invalidates _sessionIndex.
+    if (!isFresh || !identical(_lastTrainedFor, lookup)) {
+      _lastTrained = _mlService.lastTrainedPerMuscle(sessions, lookup);
+      _lastTrainedFor = lookup;
+    }
+    final recoveryInputs = recoveryRecommendationInputs(
+      exerciseId: exerciseId,
+      sessions: sessions,
+      exerciseMap: lookup,
+      mlService: _mlService,
+      lastTrained: _lastTrained,
+    );
+
     return _mlService.recommendSets(
       lastSession: lastLog.sets,
+      pastSessions: pastSessions,
       growthModel: _growthModels[exerciseId],
+      recoveryScores: recoveryInputs.recoveryScores,
+      primaryMuscleIds: recoveryInputs.primaryMuscleIds,
+      readinessBand: readinessBand,
+      sessionFatigueFactor: sessionFatigueFactor,
     );
+  }
+
+  /// id → Exercise map for [exercises], reusing the previously built one
+  /// while the caller keeps passing the same list instance. The identity
+  /// check in [getRecommendations] compares map instances, so rebuilding
+  /// this on every call would invalidate [_lastTrained] every time.
+  Map<String, Exercise> _fallbackLookupFrom(List<Exercise> exercises) {
+    if (!identical(_fallbackLookupFor, exercises) || _fallbackLookup == null) {
+      _fallbackLookup = {for (final e in exercises) e.id: e};
+      _fallbackLookupFor = exercises;
+    }
+    return _fallbackLookup!;
   }
 
   /// Get volume progression for an exercise.

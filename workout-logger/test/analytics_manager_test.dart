@@ -219,6 +219,40 @@ void main() {
 
       expect(recs, isNotEmpty);
     });
+
+    test('passes pastSessions, recoveryScores, and primaryMuscleIds when '
+        'exercise data is supplied', () {
+      final exercise = _exercise(id: 'ex1', muscleGroupId: 'chest');
+      final sessions = [
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+        _session(id: 's2', exerciseId: 'ex1', weight: 90, date: DateTime(2024, 1, 8)),
+      ];
+      manager.buildSessionIndex(sessions);
+
+      manager.getRecommendations(
+        'ex1',
+        sessions,
+        exerciseMap: {'ex1': exercise},
+      );
+
+      expect(mockML.lastPastSessions, isNotNull);
+      expect(mockML.lastPastSessions!.length, 2);
+      expect(mockML.lastRecoveryScores, isNotNull);
+      expect(mockML.lastPrimaryMuscleIds, ['chest']);
+    });
+
+    test('omits recoveryScores/primaryMuscleIds when no exercise data is '
+        'supplied (backward-compatible call)', () {
+      final sessions = [
+        _session(id: 's1', exerciseId: 'ex1', weight: 80, date: DateTime(2024, 1, 1)),
+      ];
+      manager.buildSessionIndex(sessions);
+
+      manager.getRecommendations('ex1', sessions);
+
+      expect(mockML.lastRecoveryScores, isNull);
+      expect(mockML.lastPrimaryMuscleIds, isNull);
+    });
   });
 
   group('AnalyticsManager - getVolumeProgression', () {
