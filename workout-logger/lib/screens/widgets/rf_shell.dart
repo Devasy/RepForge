@@ -101,10 +101,14 @@ class RFGradientBadge extends StatelessWidget {
   const RFGradientBadge({
     super.key,
     required this.icon,
-    this.size = 34,
+    this.size = standardSize,
     this.radius = AppRadius.md,
     this.glow = 0.35,
   });
+
+  /// Painted extent of a default-size badge. Exposed so callers laying out
+  /// around one — the centred-title counterweight — need not construct it.
+  static const double standardSize = 34;
 
   final IconData icon;
   final double size;
@@ -175,7 +179,12 @@ class RFScreenHeader extends StatelessWidget {
     // workout_header.dart does) with centreTitle: true will see the title sit
     // off centre. Measure the trailing cluster if that case ever needs to work.
     const cellWidth = RFIconButton.standardExtent + AppSpacing.sm;
-    final leadingWidth = onBack != null ? cellWidth : 0.0;
+    // The badge shares the leading run with the back button, so it carries
+    // its own weight on that side too.
+    const badgeWidth = RFGradientBadge.standardSize + AppSpacing.sm;
+    final leadingWidth =
+        (onBack != null ? cellWidth : 0.0) +
+        (badgeIcon != null ? badgeWidth : 0.0);
     final trailingWidth = actions.length * cellWidth;
 
     final titleBlock = Column(
