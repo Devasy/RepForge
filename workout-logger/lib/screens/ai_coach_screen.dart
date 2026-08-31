@@ -4,6 +4,7 @@
 // system-prompt building) lives in AiCoachViewModel. The widget only renders
 // state, forwards user intents, and holds UI-local controllers.
 
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,8 +12,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../models/models.dart';
 import '../viewmodels/ai_coach_view_model.dart';
-import '../services/ai/gemini_ai_service.dart';
-import '../services/ai/coach_tool_service.dart';
+import '../services/ai/runtime/agent_runtime.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
@@ -30,8 +30,7 @@ class AiCoachScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<AiCoachViewModel>(
       create: (ctx) => AiCoachViewModel(
-        ai: ctx.read<GeminiAiService>(),
-        coachTools: ctx.read<CoachToolService>(),
+        runtime: ctx.read<DefaultAgentRuntime>(),
         conversations: ctx.read<ConversationManager>(),
         settings: ctx.read<SettingsProvider>(),
       )..loadConversations(),
@@ -51,11 +50,20 @@ class _AiCoachView extends StatefulWidget {
 class _AiCoachViewState extends State<_AiCoachView> {
   final _controller = TextEditingController();
   final _scrollCtrl = ScrollController();
+  final _focusNode = FocusNode();
+  bool _isFocused = false;
   AiCoachViewModel? _vm;
 
   @override
   void initState() {
     super.initState();
+    _focusNode.addListener(() {
+      if (mounted) {
+        setState(() {
+          _isFocused = _focusNode.hasFocus;
+        });
+      }
+    });
     final seed = widget.seedPrompt?.trim();
     if (seed != null && seed.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -86,6 +94,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
     _vm?.removeListener(_onVmChanged);
     _controller.dispose();
     _scrollCtrl.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -254,7 +263,11 @@ class _AiCoachViewState extends State<_AiCoachView> {
       itemCount: messages.length + (vm.isLoading ? 1 : 0),
       itemBuilder: (_, i) {
         if (i == messages.length) {
-          return _StreamingBubble(text: vm.streamingText);
+          return _StreamingBubble(
+            text: vm.streamingText,
+            statusText: vm.statusText,
+            activeTools: vm.activeTools,
+          );
         }
         return _MessageBubble(message: messages[i]);
       },
@@ -320,15 +333,16 @@ class _AiCoachViewState extends State<_AiCoachView> {
               alignment: WrapAlignment.center,
               children: [
                 for (final s in const [
-                  'What should I train today?',
-                  'How\'s my recovery?',
-                  'Am I progressing on bench?',
-                  'Suggest a deload week',
+                  ('What should I train today?', Icons.fitness_center_rounded),
+                  ('How\'s my recovery?', Icons.favorite_rounded),
+                  ('Am I progressing on bench?', Icons.trending_up_rounded),
+                  ('Suggest a deload week', Icons.date_range_rounded),
                 ])
                   _SuggestionChip(
-                    label: s,
+                    label: s.$1,
+                    icon: s.$2,
                     onTap: () {
-                      _controller.text = s;
+                      _controller.text = s.$1;
                       _send();
                     },
                   ),
@@ -370,97 +384,122 @@ class _AiCoachViewState extends State<_AiCoachView> {
 
   Widget _buildInputBar(AiCoachViewModel vm) {
     final loading = vm.isLoading;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.md + MediaQuery.of(context).padding.bottom,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.9),
-        border: const Border(top: BorderSide(color: AppColors.glassBorder)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.glass3,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                border: Border.all(color: AppColors.glassBorderStrong),
-              ),
-              child: TextField(
-                controller: _controller,
-                style: TextStyle(fontFamily: 'Geist', 
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: AppColors.surface.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.glassBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.glass3,
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                  border: Border.all(
+                    color: _isFocused
+                        ? AppColors.primary.withValues(alpha: 0.6)
+                        : AppColors.glassBorderStrong,
+                    width: 1.5,
+                  ),
+                  boxShadow: _isFocused
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primaryGlow(0.15),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null,
                 ),
-                maxLines: 4,
-                minLines: 1,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  hintText: 'Ask your coach...',
-                  hintStyle: TextStyle(fontFamily: 'Geist', 
-                    color: AppColors.textFaint,
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  style: TextStyle(fontFamily: 'Geist', 
+                    color: AppColors.textPrimary,
                     fontSize: 14,
                   ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm + 4,
-                  ),
-                ),
-                onSubmitted: (_) => _send(),
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          GestureDetector(
-            onTap: loading ? null : _send,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: loading
-                    ? null
-                    : const LinearGradient(
-                        colors: [AppColors.primary, Color(0xFF5B21B6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                color: loading ? AppColors.glass3 : null,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                boxShadow: loading
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: AppColors.primaryGlow(0.4),
-                          blurRadius: 12,
-                          spreadRadius: -4,
-                        ),
-                      ],
-              ),
-              child: loading
-                  ? const Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                        ),
-                      ),
-                    )
-                  : const Icon(
-                      Icons.arrow_upward_rounded,
-                      color: Colors.white,
-                      size: 20,
+                  maxLines: 4,
+                  minLines: 1,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    hintText: 'Ask your coach...',
+                    hintStyle: TextStyle(fontFamily: 'Geist', 
+                      color: AppColors.textFaint,
+                      fontSize: 14,
                     ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm + 4,
+                    ),
+                  ),
+                  onSubmitted: (_) => _send(),
+                ),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: AppSpacing.sm),
+            GestureDetector(
+              onTap: loading ? null : _send,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: loading
+                      ? null
+                      : const LinearGradient(
+                          colors: [AppColors.primary, Color(0xFF5B21B6)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                  color: loading ? AppColors.glass3 : null,
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                  boxShadow: loading
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: AppColors.primaryGlow(0.4),
+                            blurRadius: 12,
+                            spreadRadius: -4,
+                          ),
+                        ],
+                ),
+                child: loading
+                    ? const Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.arrow_upward_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -654,8 +693,13 @@ class _ConversationTile extends StatelessWidget {
 // ── Suggestion chip ───────────────────────────────────────────────────────────
 
 class _SuggestionChip extends StatelessWidget {
-  const _SuggestionChip({required this.label, required this.onTap});
+  const _SuggestionChip({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
   final String label;
+  final IconData icon;
   final VoidCallback onTap;
 
   @override
@@ -665,17 +709,25 @@ class _SuggestionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.10),
+          color: AppColors.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(AppRadius.full),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.30)),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
         ),
-        child: Text(
-          label,
-          style: TextStyle(fontFamily: 'Geist', 
-            color: AppColors.primary,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: AppColors.primary, size: 14),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'Geist',
+                color: AppColors.primary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -691,6 +743,49 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
+    final bubbleContent = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm + 2,
+      ),
+      decoration: BoxDecoration(
+        gradient: isUser
+            ? const LinearGradient(
+                colors: [AppColors.primary, Color(0xFF5B21B6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: isUser ? null : AppColors.glass3,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(AppRadius.lg),
+          topRight: const Radius.circular(AppRadius.lg),
+          bottomLeft: Radius.circular(isUser ? AppRadius.lg : 4),
+          bottomRight: Radius.circular(isUser ? 4 : AppRadius.lg),
+        ),
+        border: isUser ? null : Border.all(color: AppColors.glassBorder),
+        boxShadow: isUser
+            ? [
+                BoxShadow(
+                  color: AppColors.primaryGlow(0.25),
+                  blurRadius: 12,
+                  spreadRadius: -4,
+                ),
+              ]
+            : null,
+      ),
+      child: isUser
+          ? Text(
+              message.text,
+              style: TextStyle(fontFamily: 'Geist', 
+                color: AppColors.textPrimary,
+                fontSize: 14,
+                height: 1.55,
+              ),
+            )
+          : _CoachMarkdown(text: message.text),
+    );
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
@@ -699,54 +794,24 @@ class _MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isUser) ...[
-            _AiAvatar(),
+            const _AiAvatar(),
             const SizedBox(width: AppSpacing.sm),
           ],
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm + 2,
-              ),
-              decoration: BoxDecoration(
-                gradient: isUser
-                    ? const LinearGradient(
-                        colors: [AppColors.primary, Color(0xFF5B21B6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isUser ? null : AppColors.glass3,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(AppRadius.lg),
-                  topRight: const Radius.circular(AppRadius.lg),
-                  bottomLeft: Radius.circular(isUser ? AppRadius.lg : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : AppRadius.lg),
-                ),
-                border: isUser
-                    ? null
-                    : Border.all(color: AppColors.glassBorder),
-                boxShadow: isUser
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primaryGlow(0.25),
-                          blurRadius: 12,
-                          spreadRadius: -4,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: isUser
-                  ? Text(
-                      message.text,
-                      style: TextStyle(fontFamily: 'Geist', 
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        height: 1.55,
-                      ),
-                    )
-                  : _CoachMarkdown(text: message.text),
-            ),
+            child: isUser
+                ? bubbleContent
+                : ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(AppRadius.lg),
+                      topRight: Radius.circular(AppRadius.lg),
+                      bottomLeft: Radius.circular(4),
+                      bottomRight: Radius.circular(AppRadius.lg),
+                    ),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: bubbleContent,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -755,37 +820,124 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _StreamingBubble extends StatelessWidget {
-  const _StreamingBubble({required this.text});
+  const _StreamingBubble({
+    required this.text,
+    required this.statusText,
+    required this.activeTools,
+  });
   final String text;
+  final String statusText;
+  final List<String> activeTools;
 
   @override
   Widget build(BuildContext context) {
+    final bubbleContent = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm + 2,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.glass3,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(AppRadius.lg),
+          topRight: Radius.circular(AppRadius.lg),
+          bottomLeft: Radius.circular(4),
+          bottomRight: Radius.circular(AppRadius.lg),
+        ),
+        border: Border.all(color: AppColors.glassBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (text.isEmpty && statusText.isEmpty && activeTools.isEmpty)
+            const RFLoadingDots()
+          else ...[
+            if (text.isNotEmpty)
+              _CoachMarkdown(text: text),
+            if (text.isNotEmpty && (statusText.isNotEmpty || activeTools.isNotEmpty))
+              const SizedBox(height: 8),
+            if (statusText.isNotEmpty)
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 10,
+                    height: 10,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.2,
+                      valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      statusText,
+                      style: const TextStyle(
+                        fontFamily: 'Geist',
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            if (activeTools.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: activeTools.map((tool) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.handyman_rounded, size: 10, color: AppColors.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          tool,
+                          style: const TextStyle(
+                            fontFamily: 'Geist',
+                            color: AppColors.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _AiAvatar(),
+          const _AiAvatar(isPulsing: true),
           const SizedBox(width: AppSpacing.sm),
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm + 2,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(AppRadius.lg),
+                topRight: Radius.circular(AppRadius.lg),
+                bottomLeft: Radius.circular(4),
+                bottomRight: Radius.circular(AppRadius.lg),
               ),
-              decoration: BoxDecoration(
-                color: AppColors.glass3,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(AppRadius.lg),
-                  topRight: Radius.circular(AppRadius.lg),
-                  bottomLeft: Radius.circular(4),
-                  bottomRight: Radius.circular(AppRadius.lg),
-                ),
-                border: Border.all(color: AppColors.glassBorder),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: bubbleContent,
               ),
-              child: text.isEmpty
-                  ? const RFLoadingDots()
-                  : _CoachMarkdown(text: text),
             ),
           ),
         ],
@@ -812,27 +964,77 @@ class _CoachMarkdown extends StatelessWidget {
   }
 }
 
-class _AiAvatar extends StatelessWidget {
+class _AiAvatar extends StatefulWidget {
+  const _AiAvatar({this.isPulsing = false});
+  final bool isPulsing;
+
+  @override
+  State<_AiAvatar> createState() => _AiAvatarState();
+}
+
+class _AiAvatarState extends State<_AiAvatar> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    _glowAnimation = Tween<double>(begin: 4.0, end: 14.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    if (widget.isPulsing) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _AiAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPulsing != oldWidget.isPulsing) {
+      if (widget.isPulsing) {
+        _controller.repeat(reverse: true);
+      } else {
+        _controller.stop();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, Color(0xFF5B21B6)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryGlow(0.35),
-            blurRadius: 8,
-            spreadRadius: -2,
+    return AnimatedBuilder(
+      animation: _glowAnimation,
+      builder: (context, child) {
+        return Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.primary, Color(0xFF5B21B6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primaryGlow(widget.isPulsing ? 0.5 : 0.35),
+                blurRadius: widget.isPulsing ? _glowAnimation.value : 8,
+                spreadRadius: widget.isPulsing ? 1 : -2,
+              ),
+            ],
           ),
-        ],
-      ),
+          child: child,
+        );
+      },
       child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 14),
     );
   }

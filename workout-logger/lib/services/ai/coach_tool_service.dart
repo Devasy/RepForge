@@ -281,25 +281,25 @@ class CoachToolService {
   Future<Map<String, Object?>> handleCall(FunctionCall call) async {
     switch (call.name) {
       case 'get_exercise_performance':
-        return _exercisePerformance(call.args);
+        return exercisePerformance(call.args);
       case 'get_workouts_in_range':
-        return _workoutsInRange(call.args);
+        return workoutsInRange(call.args);
       case 'get_routine_performance':
-        return _routinePerformance(call.args);
+        return routinePerformance(call.args);
       case 'get_personal_records':
-        return _personalRecords(call.args);
+        return personalRecords(call.args);
       case 'get_goal_progress':
-        return _goalProgress(call.args);
+        return goalProgress(call.args);
       case 'get_muscle_recovery':
-        return _muscleRecovery();
+        return muscleRecovery();
       case 'get_all_routines':
-        return _getAllRoutines();
+        return getAllRoutines();
       case 'create_routine':
-        return _createRoutine(call.args);
+        return createRoutine(call.args);
       case 'update_routine':
-        return await _updateRoutine(call.args);
+        return await updateRoutine(call.args);
       case 'add_custom_exercise':
-        return await _addCustomExercise(call.args);
+        return await addCustomExercise(call.args);
       default:
         return {'error': 'Unknown tool: ${call.name}'};
     }
@@ -307,7 +307,7 @@ class CoachToolService {
 
   // ── Tool implementations ───────────────────────────────────────────────────
 
-  Map<String, Object?> _exercisePerformance(Map<String, Object?> args) {
+  Map<String, Object?> exercisePerformance(Map<String, Object?> args) {
     final name = (args['exercise_name'] as String?)?.trim() ?? '';
     final Exercise exercise;
     try {
@@ -389,7 +389,7 @@ class CoachToolService {
     };
   }
 
-  Map<String, Object?> _workoutsInRange(Map<String, Object?> args) {
+  Map<String, Object?> workoutsInRange(Map<String, Object?> args) {
     final now = DateTime.now();
     final days = (args['days'] as num?)?.toInt();
     final startArg = DateTime.tryParse((args['start_date'] as String?) ?? '');
@@ -436,7 +436,7 @@ class CoachToolService {
     };
   }
 
-  Map<String, Object?> _routinePerformance(Map<String, Object?> args) {
+  Map<String, Object?> routinePerformance(Map<String, Object?> args) {
     final name = (args['routine_name'] as String?)?.trim() ?? '';
     final Routine routine;
     try {
@@ -483,7 +483,7 @@ class CoachToolService {
     };
   }
 
-  Map<String, Object?> _personalRecords(Map<String, Object?> args) {
+  Map<String, Object?> personalRecords(Map<String, Object?> args) {
     final name = (args['exercise_name'] as String?)?.trim();
     if (name != null && name.isNotEmpty) {
       final Exercise exercise;
@@ -527,7 +527,7 @@ class CoachToolService {
     };
   }
 
-  Map<String, Object?> _goalProgress(Map<String, Object?> args) {
+  Map<String, Object?> goalProgress(Map<String, Object?> args) {
     final name = (args['exercise_name'] as String?)?.trim();
     Iterable<Target> targets = _wp.targets;
     if (name != null && name.isNotEmpty) {
@@ -565,7 +565,7 @@ class CoachToolService {
     };
   }
 
-  Map<String, Object?> _muscleRecovery() {
+  Map<String, Object?> muscleRecovery() {
     final scores = _wp.getMuscleRecoveryScores();
     final entries = scores.entries.toList()
       ..sort((a, b) => a.value.recoveryPercent.compareTo(b.value.recoveryPercent));
@@ -587,7 +587,7 @@ class CoachToolService {
 
   // ── Routine CRUD tools ────────────────────────────────────────────────────
 
-  Map<String, Object?> _getAllRoutines() {
+  Map<String, Object?> getAllRoutines() {
     return {
       'routines': [
         for (final r in _wp.routines)
@@ -601,7 +601,7 @@ class CoachToolService {
     };
   }
 
-  Future<Map<String, Object?>> _createRoutine(Map<String, Object?> args) async {
+  Future<Map<String, Object?>> createRoutine(Map<String, Object?> args) async {
     final name = ((args['name'] as String?)?.trim()) ?? '';
     if (name.isEmpty) return {'error': 'Routine name cannot be empty.'};
 
@@ -641,7 +641,7 @@ class CoachToolService {
     };
   }
 
-  Future<Map<String, Object?>> _updateRoutine(Map<String, Object?> args) async {
+  Future<Map<String, Object?>> updateRoutine(Map<String, Object?> args) async {
     final routineName = (args['routine_name'] as String?)?.trim() ?? '';
     final Routine routine;
     try {
@@ -716,7 +716,7 @@ class CoachToolService {
     };
   }
 
-  Future<Map<String, Object?>> _addCustomExercise(
+  Future<Map<String, Object?>> addCustomExercise(
       Map<String, Object?> args) async {
     final name = (args['name'] as String?)?.trim() ?? '';
     if (name.isEmpty) return {'error': 'Exercise name cannot be empty.'};

@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.devasy.repforge"
-    compileSdk = 36
+    compileSdk = 37
     compileSdkExtension = 19
     ndkVersion = flutter.ndkVersion
 
@@ -53,7 +53,7 @@ android {
         // supported. If downgrading, remove the health_connector dependency and
         // all HealthConnectService usages, then restore minSdk to flutter.minSdkVersion.
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // App display name; overridden per build type below so debug installs
