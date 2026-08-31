@@ -5,7 +5,8 @@
 // persists each turn through ConversationManager. Exposes immutable state.
 
 import 'package:flutter/foundation.dart';
-import 'package:google_generative_ai/google_generative_ai.dart' show Content, TextPart;
+import 'package:google_generative_ai/google_generative_ai.dart'
+    show Content, TextPart, FunctionCall;
 
 import '../models/models.dart';
 import '../services/interfaces/ai_service_interface.dart';
@@ -22,6 +23,7 @@ class AiCoachViewModel extends ChangeNotifier {
 
   bool _loading = false;
   String _streamingText = '';
+  final List<String> _streamingToolCalls = [];
 
   AiCoachViewModel({
     required IAiService ai,
@@ -47,6 +49,8 @@ class AiCoachViewModel extends ChangeNotifier {
   bool get isConfigured => _ai.isConfigured;
   bool get isLoading => _loading;
   String get streamingText => _streamingText;
+  // Tool names invoked so far for the in-flight reply, in call order.
+  List<String> get streamingToolCalls => List.unmodifiable(_streamingToolCalls);
   List<ChatMessage> get messages => _conversations.activeMessages;
   List<Conversation> get conversations => _conversations.conversations;
   String? get activeConversationId => _conversations.active?.id;
@@ -80,6 +84,7 @@ class AiCoachViewModel extends ChangeNotifier {
 
     _loading = true;
     _streamingText = '';
+    _streamingToolCalls.clear();
     notifyListeners();
 
     // Persist the user message first; history is derived from the store.
@@ -97,7 +102,7 @@ class AiCoachViewModel extends ChangeNotifier {
         systemPrompt: systemPrompt,
         history: history,
         tools: _coachTools.buildTools(),
-        onToolCall: _coachTools.handleCall,
+        onToolCall: _recordAndDispatch,
       )) {
         buffer.write(chunk);
         _streamingText = buffer.toString();
@@ -106,7 +111,13 @@ class AiCoachViewModel extends ChangeNotifier {
       final reply = buffer.toString().trim();
       if (reply.isNotEmpty) {
         await _conversations.appendMessage(
-          ChatMessage(role: 'model', text: reply),
+          ChatMessage(
+            role: 'model',
+            text: reply,
+            toolCalls: _streamingToolCalls.isEmpty
+                ? null
+                : List.of(_streamingToolCalls),
+          ),
         );
       }
     } catch (e) {
@@ -119,9 +130,17 @@ class AiCoachViewModel extends ChangeNotifier {
       }
     } finally {
       _streamingText = '';
+      _streamingToolCalls.clear();
       _loading = false;
       notifyListeners();
     }
+  }
+
+  // Records the tool name for UI display, then delegates to the real handler.
+  Future<Map<String, Object?>> _recordAndDispatch(FunctionCall call) async {
+    _streamingToolCalls.add(call.name);
+    notifyListeners();
+    return _coachTools.handleCall(call);
   }
 
   // ── Internals ──────────────────────────────────────────────────────────────

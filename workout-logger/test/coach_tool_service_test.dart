@@ -1,13 +1,18 @@
 // Unit tests for CoachToolService — each tool returns expected JSON shapes,
 // backed by a seeded WorkoutProvider + PRManager.
 
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_generative_ai/google_generative_ai.dart' show FunctionCall;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/managers/program_manager.dart';
 import 'package:repforge/services/managers/pr_manager.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
+import 'package:repforge/services/sqlite_storage_service.dart';
+import 'package:repforge/services/ai/sql_query_service.dart';
 import 'test_utils/mock_storage_service.dart';
 
 void main() {
@@ -60,6 +65,61 @@ void main() {
       await pr.backfillFromSessions(provider.sessions);
 
       tools = CoachToolService(workoutProvider: provider, prManager: pr);
+    });
+
+    group('run_sql_query', () {
+      late String dbPath;
+      late SqliteStorageService sqliteStorage;
+
+      setUpAll(() {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      });
+
+      setUp(() async {
+        dbPath = '${Directory.systemTemp.path}/coach_sql_test_${DateTime.now().microsecondsSinceEpoch}.db';
+        sqliteStorage = SqliteStorageService(databasePathOverride: dbPath);
+        await sqliteStorage.init();
+        await sqliteStorage.saveWorkoutSession(WorkoutSession(
+          id: 'sess1', date: DateTime(2026, 5, 1), duration: 40,
+          exercises: [ExerciseLog(exerciseId: 'bench_press', sets: [WorkoutSet(weight: 70, reps: 8)])],
+        ));
+      });
+
+      tearDown(() async {
+        await sqliteStorage.close();
+        // Best-effort cleanup: the sqflite ffi connection may still hold the
+        // file handle open on some platforms (e.g. Windows), which would
+        // otherwise turn cleanup noise into a spurious test failure.
+        try {
+          final f = File(dbPath);
+          if (await f.exists()) await f.delete();
+        } catch (_) {}
+      });
+
+      test('is not advertised when no SqlQueryService is provided', () {
+        final declared =
+            tools.buildTools().expand((t) => t.functionDeclarations ?? []).map((f) => f.name);
+        expect(declared, isNot(contains('run_sql_query')));
+      });
+
+      test('is advertised and runs a live SELECT when wired', () async {
+        final withSql = CoachToolService(
+          workoutProvider: provider,
+          prManager: pr,
+          sqlQuery: SqlQueryService(dbPath),
+        );
+
+        final declared =
+            withSql.buildTools().expand((t) => t.functionDeclarations ?? []).map((f) => f.name);
+        expect(declared, contains('run_sql_query'));
+
+        final result = await withSql.handleCall(
+          FunctionCall('run_sql_query', {'query': 'SELECT id, duration_min FROM sessions'}),
+        );
+        expect(result['row_count'], 1);
+        expect((result['rows'] as List).first, {'id': 'sess1', 'duration_min': 40});
+      });
     });
 
     test('exposes the expected tool declarations', () {

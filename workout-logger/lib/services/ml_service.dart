@@ -342,6 +342,14 @@ class MLService implements IMLService {
   static const _declineWeeklyPct = -2.0;
   static const _minR2ForTrendSignal = 0.2;
 
+  // Deload detection thresholds: the last session counts as a deload when its
+  // load drops below these fractions of the session before it.
+  static const _deloadWeightThreshold = 0.85;
+  static const _deloadVolumeThreshold = 0.70;
+  // How recent the last session must be for a detected deload to still count
+  // as "active" — see the isRecent comment below.
+  static const _deloadRecencyWindowDays = 21;
+
   /// Double-progression with trend- and recovery-aware modulation.
   ///
   /// Priority order:
@@ -363,13 +371,21 @@ class MLService implements IMLService {
     int maxReps = 12,
     Map<String, MuscleRecoveryStatus>? recoveryScores,
     List<String>? primaryMuscleIds,
+    DateTime? asOf,
   }) {
+    final now = asOf ?? DateTime.now();
     if (lastSession.isEmpty && (pastSessions == null || pastSessions.isEmpty)) {
       return [];
     }
 
     // Determine target reference sets and deload status based on past 3 sessions trend
-    List<WorkoutSet> refSets = lastSession;
+    List<WorkoutSet> refSets = lastSession.isNotEmpty
+        ? lastSession
+        : pastSessions?.firstWhere(
+              (session) => session.isNotEmpty,
+              orElse: () => const <WorkoutSet>[],
+            ) ??
+            const <WorkoutSet>[];
     bool isPostDeloadRecovery = false;
 
     if (pastSessions != null && pastSessions.length >= 2) {
@@ -391,12 +407,16 @@ class MLService implements IMLService {
         // misread as an active deload to recover from.
         final mostRecentTimestamp =
             s0.map((s) => s.timestamp).reduce((a, b) => a.isAfter(b) ? a : b);
-        final isRecent =
-            DateTime.now().difference(mostRecentTimestamp).inDays <= 21;
+        // Compare the full duration, not Duration.inDays: inDays truncates, so
+        // a session 21 days and 23 hours old would still read as 21 and stay
+        // inside the window.
+        final isRecent = !now.isAfter(mostRecentTimestamp
+            .add(const Duration(days: _deloadRecencyWindowDays)));
 
-        // If the last session (s0) was a deload (weight < 85% of s1 or volume < 70% of s1)
+        // If the last session (s0) was a deload relative to the one before it
         if (isRecent &&
-            ((w1 > 0 && w0 < w1 * 0.85) || (v1 > 0 && v0 < v1 * 0.70))) {
+            ((w1 > 0 && w0 < w1 * _deloadWeightThreshold) ||
+                (v1 > 0 && v0 < v1 * _deloadVolumeThreshold))) {
           refSets = s1;
           isPostDeloadRecovery = true;
         }

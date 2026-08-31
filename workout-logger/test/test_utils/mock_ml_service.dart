@@ -93,6 +93,7 @@ class MockMLService implements IMLService {
     int maxReps = 12,
     Map<String, MuscleRecoveryStatus>? recoveryScores,
     List<String>? primaryMuscleIds,
+    DateTime? asOf,
   }) {
     recommendSetsCallCount++;
     lastRecommendedLastSession = lastSession;

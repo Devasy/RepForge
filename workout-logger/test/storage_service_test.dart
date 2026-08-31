@@ -177,5 +177,15 @@ void main() {
       final val = await storage.getSetting('test_setting_key');
       expect(val, equals('test_val'));
     });
+
+    test('getAllSettingsForMigration returns every saved key/value', () async {
+      await storage.saveSetting('mig_key_1', 'value_1');
+      await storage.saveSetting('mig_key_2', 'value_2');
+
+      final all = await storage.getAllSettingsForMigration();
+
+      expect(all['mig_key_1'], 'value_1');
+      expect(all['mig_key_2'], 'value_2');
+    });
   });
 }

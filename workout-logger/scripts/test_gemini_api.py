@@ -14,8 +14,12 @@ import os
 import re
 import sys
 import time
+import socket
 import urllib.error
 import urllib.request
+
+# Without this urlopen can block indefinitely on a hung socket.
+_REQUEST_TIMEOUT_SEC = 60
 
 
 def load_env_file(filepath: str) -> None:
@@ -46,7 +50,7 @@ def extract_retry_delay(body_str: str) -> float | None:
                         delay_str = str(item["retryDelay"]).replace("s", "").strip()
                         val = float(delay_str)
                         if val > 0:
-                            return val + 0.35
+                            return min(max(val + 0.35, 0.5), 45.0)
             # 2. Regex search in error.message (e.g. "Please retry in 23.690750876s.")
             msg = err.get("message", "")
             if isinstance(msg, str):
@@ -54,7 +58,7 @@ def extract_retry_delay(body_str: str) -> float | None:
                 if match:
                     val = float(match.group(1))
                     if val > 0:
-                        return val + 0.35
+                        return min(max(val + 0.35, 0.5), 45.0)
     except Exception:
         pass
     return None
@@ -78,9 +82,11 @@ def get_fallback_model(current_model: str) -> str | None:
 
 
 def thinking_config_for(model: str) -> dict:
-    """Mirrors Dart _thinkingConfig: gemini-2.5-flash predates the Gemini 3.x
-    thinkingLevel enum and only understands the older thinkingBudget shape."""
-    if model == "gemini-2.5-flash":
+    """Mirrors Dart _thinkingConfig: every gemini-2.x model predates the Gemini
+    3.x thinkingLevel enum and only understands the older thinkingBudget shape.
+    Matched by family, like the Dart side, so a 2.x id the quota fallback lands
+    on still gets the right shape."""
+    if model.startswith("gemini-2"):
         return {"thinkingBudget": 0}
     return {"thinkingLevel": "minimal"}
 
@@ -108,10 +114,23 @@ def post_generate_content_with_retry(model: str, api_key: str, payload: dict, ma
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req) as resp:
+            with urllib.request.urlopen(req, timeout=_REQUEST_TIMEOUT_SEC) as resp:
                 return json.loads(resp.read().decode("utf-8"))
+        except (TimeoutError, socket.timeout) as e:
+            # A hung socket is transient in the same way a 503 is; apply the
+            # same backoff rather than blocking the script forever.
+            if attempt < max_attempts - 1:
+                wait = 0.5 * (2**attempt)
+                print(f"  [TIMEOUT] No response in {_REQUEST_TIMEOUT_SEC}s. Retrying in {wait:.2f}s (Attempt {attempt+1}/{max_attempts})...")
+                time.sleep(wait)
+                attempt += 1
+                continue
+            raise e
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8")
+            # The stream is consumed now, so cache it for callers that need to
+            # classify the failure after this re-raises.
+            e.error_body = body
             if is_daily_quota_exhausted(body):
                 fallback = get_fallback_model(current_model)
                 if fallback:
@@ -129,6 +148,12 @@ def post_generate_content_with_retry(model: str, api_key: str, payload: dict, ma
                     continue
             print(f"\n[!] HTTP {e.code} Error Body:\n{body}")
             raise e
+
+
+def is_invalid_api_key(body: str) -> bool:
+    """True only for a 400 that names the key itself, not a malformed request."""
+    lowered = body.lower()
+    return "api_key_invalid" in lowered or "api key not valid" in lowered
 
 
 def parse_genui_component(text: str) -> dict | None:
@@ -178,7 +203,14 @@ def main() -> None:
                             "muscle_groups": {
                                 "type": "ARRAY",
                                 "items": {"type": "STRING"},
-                            }
+                            },
+                            # Optional, mirroring the production declaration in
+                            # CoachToolService.
+                            "days": {
+                                "type": "INTEGER",
+                                "description": "Optional. Number of days to look back (defaults to 60).",
+                                "nullable": True,
+                            },
                         },
                         "required": ["muscle_groups"],
                     },
@@ -247,18 +279,43 @@ def main() -> None:
         try:
             res1 = post_generate_content_with_retry(model, api_key, payload1)
         except urllib.error.HTTPError as e:
-            if e.code == 400:
-                print(f"[NOTE] Live call skipped: API key in .env is invalid or unconfigured.")
-                print("[SUCCESS] All local timeout parsing & component normalization tests verified!")
+            # Only an invalid key is a legitimate skip. Any other 400 is a real
+            # failure — a malformed request is exactly what this script exists
+            # to catch, so it must not exit 0. The body was already read (and
+            # printed) by the retry helper, which caches it here.
+            err_body = getattr(e, "error_body", "")
+            if e.code == 400 and is_invalid_api_key(err_body):
+                print("[NOTE] Live call skipped: API key in .env is invalid or unconfigured.")
+                print("[SUCCESS] Local retryDelay & component normalization tests verified.")
                 sys.exit(0)
             raise e
         candidates = res1.get("candidates", [])
+        if not candidates:
+            print(f"[!] No candidates returned. Raw response:\n{json.dumps(res1)[:500]}")
+            sys.exit(1)
         first_cand = candidates[0]
         model_content = first_cand.get("content", {})
         raw_parts = model_content.get("parts", [])
 
         function_calls = [p["functionCall"] for p in raw_parts if "functionCall" in p]
         print(f"  Turn 1 Model Response: {len(function_calls)} function call(s) received.")
+
+        # A run that produced no tool call proved nothing, so it is a failure
+        # rather than a quietly skipped turn 2.
+        volume_calls = [
+            fc for fc in function_calls if fc.get("name") == "get_muscle_group_volume"
+        ]
+        if not volume_calls:
+            print(f"[!] Expected a get_muscle_group_volume call, got {[fc.get('name') for fc in function_calls]}.")
+            print(json.dumps(raw_parts)[:500])
+            sys.exit(1)
+        if not any(
+            isinstance(fc.get("args"), dict) and fc["args"].get("muscle_groups")
+            for fc in volume_calls
+        ):
+            print("[!] get_muscle_group_volume called without a muscle_groups argument.")
+            print(json.dumps(volume_calls)[:500])
+            sys.exit(1)
 
         if function_calls:
             contents.append(model_content)
@@ -294,11 +351,12 @@ def main() -> None:
 
             print(f"  Turn 2 Final Model Output (Length: {len(final_text)} chars):")
             parsed_comp = parse_genui_component(final_text)
-            if parsed_comp:
-                print("  [SUCCESS] Successfully parsed GenUI Component structure!")
-                print(f"  Root Component: {parsed_comp['component']}")
-            else:
+            if parsed_comp is None:
+                print("[!] Final output did not parse as a GenUI component.")
                 print("  Output Text:\n", final_text[:300])
+                sys.exit(1)
+            print("  [SUCCESS] Successfully parsed GenUI Component structure!")
+            print(f"  Root Component: {parsed_comp['component']}")
 
         print(f"\n[SUCCESS] Run {run} completed successfully.\n")
 

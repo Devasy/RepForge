@@ -79,7 +79,10 @@ class PRManager extends ChangeNotifier {
     double newBestVolume = existing?.bestVolume ?? 0;
 
     for (final set in log.sets) {
-      if (set.weight > newBestWeight) newBestWeight = set.weight;
+      // effectiveWeight, not raw weight: for assisted-bodyweight sets, weight
+      // stores the assist load, so a raw comparison would flag more assist
+      // (an easier set) as a new weight PR.
+      if (set.effectiveWeight > newBestWeight) newBestWeight = set.effectiveWeight;
       if (set.reps > newBestReps) newBestReps = set.reps;
       if (set.volume > newBestVolume) newBestVolume = set.volume;
     }
