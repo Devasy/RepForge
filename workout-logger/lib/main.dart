@@ -37,6 +37,7 @@ import 'genui/a2ui.dart';
 import 'theme/a2ui_app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/widgets/rf_widgets.dart';
 
 /// Resolved once in main() before runApp(). Read lazily by
 /// WorkoutLoggerApp._storageService's static initializer, which only runs
@@ -219,6 +220,9 @@ class WorkoutLoggerApp extends StatelessWidget {
           title: 'Workout Logger',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.darkTheme,
+          // Above the Navigator, so every route feeds the ambient glow.
+          builder: (context, child) =>
+              AmbientMotionScope(child: child ?? const SizedBox.shrink()),
           home: const AppInitializer(),
         ),
       ),

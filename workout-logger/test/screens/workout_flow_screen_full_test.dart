@@ -44,7 +44,7 @@ void main() {
       robot.expectVisible(WorkoutFlowScreen);
 
       // Tap Log Set button if present
-      final logBtn = find.text('LOG SET');
+      final logBtn = find.text('Log set');
       if (logBtn.evaluate().isNotEmpty) {
         await tester.tap(logBtn);
         await tester.pumpAndSettle();
@@ -73,7 +73,7 @@ void main() {
       robot.expectVisible(WorkoutFlowScreen);
 
       // Log set
-      final logBtn = find.text('LOG SET');
+      final logBtn = find.text('Log set');
       if (logBtn.evaluate().isNotEmpty) {
         await tester.tap(logBtn);
         await tester.pumpAndSettle();

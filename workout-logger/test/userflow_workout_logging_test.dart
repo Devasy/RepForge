@@ -78,15 +78,15 @@ void main() {
       // Verify WorkoutFlowScreen renders exercise name
       expect(find.text('Barbell Bench Press'), findsWidgets);
 
-      // 2. Drive production flow: Tap 'LOG SET' to trigger RestTimerView overlay in WorkoutFlowScreen
-      final logSetBtn = find.text('LOG SET');
+      // 2. Drive production flow: Tap 'Log set' to trigger RestTimerView overlay in WorkoutFlowScreen
+      final logSetBtn = find.text('Log set');
       expect(logSetBtn, findsOneWidget);
       await tester.tap(logSetBtn);
       await tester.pumpAndSettle();
 
       // Verify RestTimerView overlay appears via WorkoutFlowScreen production state
       expect(find.text('REST'), findsWidgets);
-      expect(find.text('SKIP REST'), findsOneWidget);
+      expect(find.text('Skip rest'), findsOneWidget);
 
       // Tap '+30s' button during rest
       final addTimeBtn = find.text('+30s');
@@ -94,8 +94,8 @@ void main() {
       await tester.tap(addTimeBtn);
       await tester.pump();
 
-      // Tap 'SKIP REST' to return to active workout view
-      final skipBtn = find.text('SKIP REST');
+      // Tap 'Skip rest' to return to active workout view
+      final skipBtn = find.text('Skip rest');
       await tester.tap(skipBtn);
       await tester.pumpAndSettle();
 
