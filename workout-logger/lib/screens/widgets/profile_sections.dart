@@ -787,10 +787,16 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     // onChangeEnd discards this Future, so a storage failure would otherwise
     // surface as an unhandled error; and the await means the widget can be
     // disposed before setState runs.
+    final settings = context.read<SettingsProvider>();
+    final gemini = context.read<GeminiAiService>();
     try {
-      await context.read<SettingsProvider>().setGeminiMaxToolRounds(rounds);
+      await settings.setGeminiMaxToolRounds(rounds);
     } catch (e, st) {
       debugPrint('Failed to save max tool rounds: $e\n$st');
+      // The drag already pushed each intermediate value into the live
+      // service, so put it back to what was actually stored — otherwise
+      // requests keep using a limit the user was just told wasn't saved.
+      gemini.updateMaxToolRounds(settings.geminiMaxToolRounds);
       _reportSaveFailed('the tool-round limit');
     } finally {
       if (mounted) {
@@ -802,12 +808,17 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   Future<void> _commitThinkingLevel(String level) async {
     // Same contract as _commitMaxToolRounds above: onChangeEnd drops the
     // Future, and the widget may be gone by the time the await returns.
+    final settings = context.read<SettingsProvider>();
     final gemini = context.read<GeminiAiService>();
     try {
-      await context.read<SettingsProvider>().setGeminiThinkingLevel(level);
+      await settings.setGeminiThinkingLevel(level);
       gemini.updateThinkingLevel(level);
     } catch (e, st) {
       debugPrint('Failed to save thinking level: $e\n$st');
+      // Same reason as _commitMaxToolRounds: the drag updated the live
+      // service on every tick, so restore the stored level rather than
+      // leaving the service on one that was never written.
+      gemini.updateThinkingLevel(settings.geminiThinkingLevel);
       _reportSaveFailed('the thinking level');
     } finally {
       if (mounted) {

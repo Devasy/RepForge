@@ -489,6 +489,47 @@ void main() {
 
           expect(afterChange, closeTo(fresh.effortCalibrationOffset, 0.0001));
         });
+
+        test('overlapping taps do not let a failed write clobber a later one',
+            () async {
+          mockStorage.addMockSession(
+            session('s1', DateTime(2025, 1, 1), [log('bench_press')]),
+          );
+          await provider.init();
+
+          // The chips stay tappable while a write is in flight. Delay the
+          // offset write so a second tap can be issued mid-flight, and fail
+          // the first one so it takes its rollback path.
+          mockStorage.saveSettingDelayResolver = (key, value) =>
+              key == 'effort.calibrationOffset'
+                  ? const Duration(milliseconds: 20)
+                  : Duration.zero;
+          var offsetWrites = 0;
+          mockStorage.saveSettingErrorResolver = (key, value) {
+            if (key != 'effort.calibrationOffset') return null;
+            offsetWrites++;
+            return offsetWrites == 1 ? Exception('disk full') : null;
+          };
+
+          final first = provider.recordSessionEffort('s1', 3); // Brutal
+          final second = provider.recordSessionEffort('s1', 1); // Easy
+
+          await expectLater(first, throwsA(isA<Exception>()));
+          await second;
+
+          mockStorage.saveSettingErrorResolver = null;
+          mockStorage.saveSettingDelayResolver = null;
+
+          // Serialised, the second call runs after the first has rolled back
+          // and re-reads state, so provider and storage agree on Easy.
+          expect(provider.sessions.firstWhere((s) => s.id == 's1').sessionEffort,
+              1);
+          expect(
+            mockStorage.sessions.firstWhere((s) => s.id == 's1').sessionEffort,
+            1,
+            reason: 'the failed first write must not roll back over the second',
+          );
+        });
       });
     });
 

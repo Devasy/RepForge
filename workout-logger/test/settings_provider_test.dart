@@ -151,6 +151,52 @@ void main() {
       expect(mockStorage.settings['weeklyInsights'], equals('Great progress this week!'));
     });
 
+    test(
+      'setGeminiModel rolls the model write back when the thinking-level write fails',
+      () async {
+        // The two writes are not a transaction. Without the rollback, storage
+        // keeps the new model while the provider keeps the old one, so a
+        // selection the UI reported as failed becomes active on next launch.
+        await provider.setGeminiThinkingLevel('minimal');
+        expect(provider.geminiModel, equals('gemini-3.6-flash'));
+
+        // gemini-3.7-flash doesn't support 'minimal', so the clamp forces the
+        // second write — which is the one we make fail.
+        mockStorage.saveSettingErrorResolver = (key, value) =>
+            key == 'geminiThinkingLevel' ? Exception('disk full') : null;
+
+        await expectLater(
+          provider.setGeminiModel('gemini-3.7-flash'),
+          throwsA(isA<Exception>()),
+        );
+        mockStorage.saveSettingErrorResolver = null;
+
+        expect(provider.geminiModel, equals('gemini-3.6-flash'));
+        expect(
+          mockStorage.settings['geminiModel'],
+          equals('gemini-3.6-flash'),
+          reason: 'the model write must not survive the failed clamp write',
+        );
+        expect(provider.geminiThinkingLevel, equals('minimal'));
+      },
+    );
+
+    test(
+      'setGeminiMaxToolRounds does not commit in memory when the write fails',
+      () async {
+        final before = provider.geminiMaxToolRounds;
+        mockStorage.saveSettingErrorResolver = (key, value) =>
+            key == 'geminiMaxToolRounds' ? Exception('disk full') : null;
+
+        await expectLater(
+          provider.setGeminiMaxToolRounds(before + 3),
+          throwsA(isA<Exception>()),
+        );
+
+        expect(provider.geminiMaxToolRounds, equals(before));
+      },
+    );
+
     test('availableIncrements returns correct values for unit', () async {
       expect(provider.availableIncrements, equals([1.25, 2.5, 5.0, 10.0]));
 
