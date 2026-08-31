@@ -911,6 +911,10 @@ class WorkoutProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Tail of the in-flight effort writes, so overlapping chip taps run one
+  /// after another. See [recordSessionEffort].
+  Future<void> _effortWriteQueue = Future<void>.value();
+
   /// Records the once-per-workout effort chip (1 = Easy, 2 = Solid,
   /// 3 = Brutal) for [sessionId] and folds it into the rolling
   /// [effortCalibrationOffset]. Answering is optional — this is only ever
@@ -925,7 +929,24 @@ class WorkoutProvider extends ChangeNotifier {
   /// the offset is recomputed from every stored answer in date order rather
   /// than folded in incrementally. Folding would count a changed answer
   /// twice (tapping Brutal then Easy would apply both).
-  Future<void> recordSessionEffort(String sessionId, int chipValue) async {
+  ///
+  /// Calls are serialised. Because the chips stay tappable while a write is
+  /// in flight and [_recordSessionEffort] captures the pre-call session and
+  /// offset for its rollback, two overlapping taps would otherwise let a
+  /// failing first call restore that stale snapshot over a second call that
+  /// had already committed — leaving storage behind provider state. Queuing
+  /// is enough: each call re-reads `_sessions` when its turn comes.
+  Future<void> recordSessionEffort(String sessionId, int chipValue) {
+    final result = _effortWriteQueue.then(
+      (_) => _recordSessionEffort(sessionId, chipValue),
+    );
+    // The queue must survive a failed write, or every later tap would inherit
+    // that error. The caller still sees it through [result].
+    _effortWriteQueue = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  Future<void> _recordSessionEffort(String sessionId, int chipValue) async {
     final index = _sessions.indexWhere((s) => s.id == sessionId);
     if (index == -1) return;
 

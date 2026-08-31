@@ -164,19 +164,37 @@ class SettingsProvider extends ChangeNotifier {
   /// failed write must leave the previously saved model active rather than a
   /// value that only exists in memory.
   Future<void> setGeminiModel(String model) async {
+    final previousModel = _geminiModel;
     await _storage.saveSetting('geminiModel', model);
     final clamped = clampThinkingLevel(model, _geminiThinkingLevel);
     if (clamped != _geminiThinkingLevel) {
-      await _storage.saveSetting('geminiThinkingLevel', clamped);
+      try {
+        await _storage.saveSetting('geminiThinkingLevel', clamped);
+      } catch (_) {
+        // The two writes are not a transaction. Without this the model write
+        // above survives, so a selection the UI reported as failed would come
+        // back as the active model on the next launch.
+        try {
+          await _storage.saveSetting('geminiModel', previousModel);
+        } catch (e, st) {
+          debugPrint('Failed to roll back Gemini model: $e\n$st');
+        }
+        rethrow;
+      }
     }
     _geminiModel = model;
     _geminiThinkingLevel = clamped;
     notifyListeners();
   }
 
+  /// Persists before committing in memory, for the same reason as
+  /// [setGeminiModel] and [setGeminiThinkingLevel]: the slider's onChangeEnd
+  /// drops this Future, so a failed write must not leave the provider holding
+  /// a limit that was never stored.
   Future<void> setGeminiMaxToolRounds(int rounds) async {
-    _geminiMaxToolRounds = rounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
-    await _storage.saveSetting('geminiMaxToolRounds', _geminiMaxToolRounds.toString());
+    final clamped = rounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
+    await _storage.saveSetting('geminiMaxToolRounds', clamped.toString());
+    _geminiMaxToolRounds = clamped;
     notifyListeners();
   }
 

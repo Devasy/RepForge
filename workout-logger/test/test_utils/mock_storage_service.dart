@@ -29,6 +29,13 @@ class MockStorageService implements IStorageService {
   Duration saveSettingDelay = Duration.zero;
   Duration Function(String key, String value)? saveSettingDelayResolver;
 
+  /// Return non-null to make [saveSetting] throw for that key/value instead
+  /// of storing it, for exercising partial-write rollback paths.
+  Object? Function(String key, String value)? saveSettingErrorResolver;
+
+  /// Return non-null to make [saveWorkoutSession] throw for that session.
+  Object? Function(WorkoutSession session)? saveWorkoutSessionErrorResolver;
+
   // Public getters for test assertions
   List<Exercise> get customExercises => _customExercises;
   List<WorkoutSession> get sessions => _sessions;
@@ -85,6 +92,8 @@ class MockStorageService implements IStorageService {
 
   @override
   Future<void> saveWorkoutSession(WorkoutSession session) async {
+    final error = saveWorkoutSessionErrorResolver?.call(session);
+    if (error != null) throw error;
     final index = _sessions.indexWhere((s) => s.id == session.id);
     if (index >= 0) {
       _sessions[index] = session;
@@ -232,6 +241,8 @@ class MockStorageService implements IStorageService {
     if (delay > Duration.zero) {
       await Future<void>.delayed(delay);
     }
+    final error = saveSettingErrorResolver?.call(key, value);
+    if (error != null) throw error;
     saveSettingCallCount++;
     _settings[key] = value;
   }
