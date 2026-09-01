@@ -21,7 +21,8 @@ extension RFSnackBarContext on BuildContext {
     switch (type) {
       case RFSnackBarType.success:
         bgColor = AppColors.success;
-        fgColor = AppColors.textPrimary; // #F4F4F8 on #00C89B: ~4.6:1 ✓
+        // Light text on this bright teal is only ~2.0:1; dark text matches how `warning` solves the same problem.
+        fgColor = const Color(0xFF001A14); // near-black on #00C89B: ~8.8:1 ✓
         icon = Icons.check_circle_outline_rounded;
         break;
       case RFSnackBarType.warning:
@@ -30,8 +31,9 @@ extension RFSnackBarContext on BuildContext {
         icon = Icons.warning_amber_rounded;
         break;
       case RFSnackBarType.error:
-        bgColor = AppColors.error;
-        fgColor = AppColors.textPrimary; // #F4F4F8 on #E05040: ~4.7:1 ✓
+        // AppColors.error (#E05040) is only ~3.6:1 against light text; darkened locally so the brand red is unchanged elsewhere.
+        bgColor = const Color(0xFFB3251A);
+        fgColor = AppColors.textPrimary; // #F4F4F8 on #B3251A: ~6.0:1 ✓
         icon = Icons.error_outline_rounded;
         break;
       case RFSnackBarType.info:

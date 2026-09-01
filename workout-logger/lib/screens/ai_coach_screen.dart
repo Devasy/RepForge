@@ -897,7 +897,7 @@ class _CoachMessageContentState extends State<CoachMessageContent> {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
           const SizedBox(width: AppSpacing.sm),
-          Text(
+          const Text(
             'Building dashboard…',
             style: TextStyle(
               fontFamily: 'Geist',

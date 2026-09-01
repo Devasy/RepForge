@@ -474,16 +474,20 @@ class _NavCellState extends State<_NavCell>
   Widget build(BuildContext context) {
     final t = widget.theme;
 
+    void handleTap() {
+      if (t.hapticFeedback) HapticFeedback.lightImpact();
+      widget.onTap();
+    }
+
     return Semantics(
       button: true,
       label: widget.item.label,
       selected: widget.active,
+      // A semantics action, not just a button role: GestureDetector alone leaves assistive tech unable to activate the tab.
+      onTap: handleTap,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () {
-          if (t.hapticFeedback) HapticFeedback.lightImpact();
-          widget.onTap();
-        },
+        onTap: handleTap,
         child: AnimatedBuilder(
           animation: _ctrl,
           builder: (context, _) {
@@ -708,6 +712,9 @@ class _FloatingNavBarScaffoldState extends State<FloatingNavBarScaffold> {
   bool _handleScrollNotification(ScrollNotification n) {
     if (!widget.theme.hideOnScroll) return false;
 
+    // Only the outermost vertical scrollable drives the bar: nested lists (depth > 0) and sideways carousel swipes must not hide it.
+    if (n.depth != 0 || n.metrics.axis != Axis.vertical) return false;
+
     // A settled scroll starts a fresh gesture — don't carry momentum across.
     if (n is ScrollEndNotification) {
       _travel = 0;
@@ -760,33 +767,38 @@ class _FloatingNavBarScaffoldState extends State<FloatingNavBarScaffold> {
             child: widget.body,
           ),
 
-          // Floating nav bar with slide + fade animation.
-          AnimatedSlide(
-            offset: _visible ? Offset.zero : widget.theme.slideHideOffset,
-            duration: _visible
-                ? widget.theme.showDuration
-                : widget.theme.hideDuration,
-            curve:
-                _visible ? widget.theme.showCurve : widget.theme.hideCurve,
-            child: AnimatedOpacity(
-              opacity: _visible ? 1.0 : 0.0,
+          // Positioned leaves height unbounded so Align shrink-wraps to the pill: AnimatedSlide offsets by a fraction of CHILD size, so an unpositioned child would slide ~1.5 screen heights.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: AnimatedSlide(
+              offset: _visible ? Offset.zero : widget.theme.slideHideOffset,
               duration: _visible
                   ? widget.theme.showDuration
-                  : Duration(
-                      milliseconds: (widget.theme.hideDuration.inMilliseconds *
-                              widget.theme.fadeOutDurationFactor)
-                          .round(),
-                    ),
+                  : widget.theme.hideDuration,
               curve:
                   _visible ? widget.theme.showCurve : widget.theme.hideCurve,
-              // Disable hit-testing when fully hidden.
-              child: IgnorePointer(
-                ignoring: !_visible,
-                child: FloatingNavBar(
-                  currentIndex: widget.currentIndex,
-                  onTap: _handleTabChange,
-                  items: widget.items,
-                  theme: widget.theme,
+              child: AnimatedOpacity(
+                opacity: _visible ? 1.0 : 0.0,
+                duration: _visible
+                    ? widget.theme.showDuration
+                    : Duration(
+                        milliseconds: (widget.theme.hideDuration.inMilliseconds *
+                                widget.theme.fadeOutDurationFactor)
+                            .round(),
+                      ),
+                curve:
+                    _visible ? widget.theme.showCurve : widget.theme.hideCurve,
+                // Disable hit-testing when fully hidden.
+                child: IgnorePointer(
+                  ignoring: !_visible,
+                  child: FloatingNavBar(
+                    currentIndex: widget.currentIndex,
+                    onTap: _handleTabChange,
+                    items: widget.items,
+                    theme: widget.theme,
+                  ),
                 ),
               ),
             ),
