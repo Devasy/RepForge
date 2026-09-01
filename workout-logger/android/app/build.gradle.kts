@@ -1,25 +1,28 @@
 import com.android.build.gradle.internal.api.ApkVariantOutputImpl
+import java.io.FileInputStream
+import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // kotlin-android is injected automatically by Flutter's built-in Kotlin support.
+    // (android.builtInKotlin=true in gradle.properties)
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.devasy.repforge"
-    compileSdk = 36
-    compileSdkExtension = 19
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+    kotlin {
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        }
     }
 
     // Strip AGP's "Dependency metadata" signing block from the APK. It embeds a
@@ -33,11 +36,16 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystorePath = System.getenv("KEYSTORE_PATH")
-            val storePass    = System.getenv("KEY_STORE_PASSWORD")
-            val alias        = System.getenv("KEY_ALIAS")
-            val keyPass      = System.getenv("KEY_PASSWORD")
-            if (keystorePath != null && storePass != null && alias != null && keyPass != null) {
+            val keyProperties = Properties()
+            val keyPropertiesFile = rootProject.file("key.properties")
+            if (keyPropertiesFile.exists()) {
+                keyProperties.load(FileInputStream(keyPropertiesFile))
+            }
+            val keystorePath = System.getenv("KEYSTORE_PATH") ?: keyProperties.getProperty("storeFile")
+            val storePass    = System.getenv("KEY_STORE_PASSWORD") ?: keyProperties.getProperty("storePassword")
+            val alias        = System.getenv("KEY_ALIAS") ?: keyProperties.getProperty("keyAlias")
+            val keyPass      = System.getenv("KEY_PASSWORD") ?: keyProperties.getProperty("keyPassword")
+            if (!keystorePath.isNullOrEmpty() && !storePass.isNullOrEmpty() && !alias.isNullOrEmpty() && !keyPass.isNullOrEmpty()) {
                 storeFile     = file(keystorePath)
                 storePassword = storePass
                 keyAlias      = alias
@@ -53,7 +61,7 @@ android {
         // supported. If downgrading, remove the health_connector dependency and
         // all HealthConnectService usages, then restore minSdk to flutter.minSdkVersion.
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // App display name; overridden per build type below so debug installs
@@ -71,6 +79,12 @@ android {
             manifestPlaceholders["appLabel"] = "RepForge (Debug)"
         }
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             // Uses the production EC P-256 keystore when KEYSTORE_PATH env var is set
             // (CI injects it via GitHub Secrets). Falls back to the debug key for a
             // local `flutter run --release` without env vars configured.

@@ -3,16 +3,23 @@
 // Following Dependency Inversion Principle: we create concrete implementations
 // here at the composition root and inject them into high-level modules.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'package:hive_flutter/hive_flutter.dart';
 import 'services/debug_log_buffer.dart';
 import 'services/storage_service.dart';
+import 'services/sqlite_storage_service.dart';
+import 'services/storage_backend_resolver.dart';
+import 'services/ai/sql_query_service.dart';
 import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
 import 'services/ai/coach_tool_service.dart';
 import 'services/health_connect_service.dart';
+import 'services/health_data_sync_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
 import 'services/interfaces/ml_service_interface.dart';
 import 'services/interfaces/health_connect_service_interface.dart';
@@ -26,8 +33,59 @@ import 'services/managers/readiness_manager.dart';
 import 'services/managers/health_history_manager.dart';
 import 'services/managers/conversation_manager.dart';
 import 'theme/app_theme.dart';
+import 'genui/a2ui.dart';
+import 'theme/a2ui_app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/widgets/rf_widgets.dart';
+
+/// Resolved once in main() before runApp(). Read lazily by
+/// WorkoutLoggerApp._storageService's static initializer, which only runs
+/// on first access (during build()) — by then this is already set.
+IStorageService? _resolvedStorageService;
+
+/// One-time, flag-gated, reversible Hive -> SQLite cutover. See
+/// docs/superpowers/specs/2026-08-08-sqlite-migration-and-coach-sql-tool-design.md §6.
+Future<void> _resolveStorageBackend() async {
+  // Hive must be initialized before the cutover check itself, since the
+  // migration flag below is read directly from the Hive 'settings' box.
+  await Hive.initFlutter();
+  final settingsBox = await Hive.openBox<String>('settings');
+  final alreadyMigrated = settingsBox.get(storageMigratedFlagKey) == 'true';
+
+  if (alreadyMigrated) {
+    final sqlite = SqliteStorageService();
+    try {
+      await sqlite.init();
+    } catch (e, st) {
+      debugPrint('SQLite init failed, staying on Hive: $e\n$st');
+      final hiveStorage = StorageService();
+      await hiveStorage.init();
+      _resolvedStorageService = hiveStorage;
+      return;
+    }
+    _resolvedStorageService = sqlite;
+    return;
+  }
+
+  final hiveStorage = StorageService();
+  await hiveStorage.init();
+  final sqliteStorage = SqliteStorageService();
+
+  try {
+    await sqliteStorage.init();
+  } catch (e, st) {
+    debugPrint('SQLite init failed, staying on Hive: $e\n$st');
+    _resolvedStorageService = hiveStorage;
+    return;
+  }
+
+  _resolvedStorageService = await resolveStorageBackend(
+    hiveStorage: hiveStorage,
+    sqliteStorage: sqliteStorage,
+    alreadyMigrated: false,
+  );
+}
 
 void main() async {
   DebugLogBuffer.attach();
@@ -55,13 +113,15 @@ void main() async {
     ),
   );
 
+  await _resolveStorageBackend();
+
   runApp(const WorkoutLoggerApp());
 }
 
 class WorkoutLoggerApp extends StatelessWidget {
   // Singleton instances created once at app startup
   // This ensures the same instances are used throughout the app lifecycle
-  static final IStorageService _storageService = StorageService();
+  static final IStorageService _storageService = _resolvedStorageService ?? StorageService();
   static final IMLService _mlService = MLService();
   static final IHealthConnectService _healthConnectService = HealthConnectService();
   static final ProgramManager _programManager = ProgramManager(_storageService);
@@ -80,6 +140,17 @@ class WorkoutLoggerApp extends StatelessWidget {
   // Serves arbitrary-range sleep/HR data to the detail screens.
   static final HealthHistoryManager _healthHistoryManager =
       HealthHistoryManager(_healthConnectService, _storageService);
+  // Populates the SQLite health tables the coach's run_sql_query tool joins
+  // against workout data. Null under the pre-migration Hive fallback path —
+  // there's no live SQLite database file to sync into. Mirrors the
+  // sqlQuery ? ... : null guard used for CoachToolService below.
+  static final HealthDataSyncService? _healthDataSyncService =
+      _storageService is SqliteStorageService
+          ? HealthDataSyncService(
+              healthConnectService: _healthConnectService,
+              storage: _storageService as SqliteStorageService,
+            )
+          : null;
   static final GeminiAiService _geminiService =
       GeminiAiService(storage: _storageService);
   static final ConversationManager _conversationManager =
@@ -110,6 +181,7 @@ class WorkoutLoggerApp extends StatelessWidget {
         ChangeNotifierProvider<PRManager>.value(value: _prManager),
         ChangeNotifierProvider<ReadinessManager>.value(value: _readinessManager),
         Provider<HealthHistoryManager>.value(value: _healthHistoryManager),
+        Provider<HealthDataSyncService?>.value(value: _healthDataSyncService),
         // GeminiAiService is the single AI backend instance. It's a ChangeNotifier
         // (settings UI watches isConfigured/model), so it's provided as such.
         // Consumers that should depend on the abstraction (the coach ViewModel,
@@ -129,18 +201,30 @@ class WorkoutLoggerApp extends StatelessWidget {
           ),
         ),
         // CoachToolService backs AI tool calls; reads from WorkoutProvider + PRManager.
+        // run_sql_query is only offered once the app has cut over to SQLite —
+        // it needs a live database file to open a read-only connection against.
         Provider<CoachToolService>(
           create: (ctx) => CoachToolService(
-            ctx.read<WorkoutProvider>(),
-            ctx.read<PRManager>(),
+            workoutProvider: ctx.read<WorkoutProvider>(),
+            prManager: ctx.read<PRManager>(),
+            healthHistory: ctx.read<HealthHistoryManager>(),
+            sqlQuery: _storageService is SqliteStorageService
+                ? SqlQueryService((_storageService as SqliteStorageService).databasePath)
+                : null,
           ),
         ),
       ],
-      child: MaterialApp(
-        title: 'Workout Logger',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
-        home: const AppInitializer(),
+      child: A2UiThemeProvider(
+        theme: repforgeA2UiTheme,
+        child: MaterialApp(
+          title: 'Workout Logger',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.darkTheme,
+          // Above the Navigator, so every route feeds the ambient glow.
+          builder: (context, child) =>
+              AmbientMotionScope(child: child ?? const SizedBox.shrink()),
+          home: const AppInitializer(),
+        ),
       ),
     );
   }
@@ -172,11 +256,17 @@ class _AppInitializerState extends State<AppInitializer> {
     final prManager = context.read<PRManager>();
     final gemini = context.read<GeminiAiService>();
     final readiness = context.read<ReadinessManager>();
+    final healthDataSync = context.read<HealthDataSyncService?>();
 
     try {
       await provider.init();
       await settings.init();
-      gemini.init(settings.geminiApiKey, model: settings.geminiModel);
+      gemini.init(
+        settings.geminiApiKey,
+        model: settings.geminiModel,
+        maxToolRounds: settings.geminiMaxToolRounds,
+        thinkingLevel: settings.geminiThinkingLevel,
+      );
       try {
         await gemini.loadUsage();
       } catch (e, st) {
@@ -195,6 +285,17 @@ class _AppInitializerState extends State<AppInitializer> {
       // Fire-and-forget readiness refresh — must run after settings.init()
       // so the opt-in flag is loaded; never blocks or fails app init.
       readiness.refresh();
+
+      // Fire-and-forget: populates the SQLite tables run_sql_query joins
+      // against. No-op under the pre-migration Hive fallback (null there).
+      // Errors are swallowed here since main.dart discards the returned
+      // Future — sync() has no caller to propagate a failure to.
+      unawaited(
+        healthDataSync?.sync().catchError(
+          (Object e, StackTrace st) =>
+              debugPrint('healthDataSync.sync failed: $e\n$st'),
+        ),
+      );
 
       if (!mounted) return;
       setState(() {

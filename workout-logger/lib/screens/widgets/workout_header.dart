@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
+import 'rf_shell.dart';
 
 // ── WorkoutHeader ─────────────────────────────────────────────────────────────
 // Shows exercise name, set/exercise progress, elapsed timer, and nav actions.
@@ -16,11 +17,7 @@ class WorkoutHeader extends StatefulWidget {
     required this.setNumber,
     required this.workoutStartTime,
     required this.progress,
-    required this.isFirst,
-    required this.isLast,
     required this.onClose,
-    required this.onPrevious,
-    required this.onNext,
     required this.onFinish,
     required this.onRemoveLastSet,
     required this.onSetRestTime,
@@ -33,11 +30,7 @@ class WorkoutHeader extends StatefulWidget {
   final int setNumber;
   final DateTime? workoutStartTime;
   final double progress;
-  final bool isFirst;
-  final bool isLast;
   final VoidCallback onClose;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
   final VoidCallback onFinish;
   final VoidCallback onRemoveLastSet;
   final void Function(int seconds) onSetRestTime;
@@ -80,113 +73,70 @@ class _WorkoutHeaderState extends State<WorkoutHeader> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0C0C12), Color(0x000C0C12)],
+    // Left-aligned title, matching every other screen header in the app. The
+    // title used to be centred while the leading and trailing clusters had
+    // very different widths, which pushed it visibly off the optical centre.
+    return RFScreenHeader(
+      title: widget.exerciseName,
+      subtitle:
+          'Exercise ${widget.currentExerciseIndex + 1} of ${widget.totalExercises} · Set ${widget.setNumber}',
+      onBack: widget.onClose,
+      leadingIcon: Icons.close_rounded,
+      leadingTooltip: 'Cancel workout',
+      actions: [
+        _ElapsedChip(label: _elapsedLabel),
+        _OptionsMenu(
+          restSeconds: widget.restSeconds,
+          onRemoveLastSet: widget.onRemoveLastSet,
+          onSetRestTime: widget.onSetRestTime,
+          onFinish: widget.onFinish,
         ),
-        border: Border(bottom: BorderSide(color: AppColors.glassBorder)),
+      ],
+      bottom: RFProgressBar(
+        value: widget.progress,
+        height: 3,
+        showGlow: false,
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
+    );
+  }
+}
+
+// ── Elapsed chip ──────────────────────────────────────────────────────────────
+class _ElapsedChip extends StatelessWidget {
+  const _ElapsedChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Elapsed time',
+      value: label,
+      child: Container(
+        // A floor, not a fixed height: a large text scale needs more than 38pt.
+        constraints: const BoxConstraints(minHeight: 38),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm + 2,
+          vertical: 4,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.glass2,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.glassBorder),
+        ),
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-              child: Row(
-                children: [
-                  // Close button
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 22),
-                    color: AppColors.textSoft,
-                    onPressed: widget.onClose,
-                  ),
-                  // Exercise info
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          widget.exerciseName,
-                          style: TextStyle(fontFamily: 'Geist', 
-                            color: AppColors.textPrimary,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -0.3,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Exercise ${widget.currentExerciseIndex + 1} of ${widget.totalExercises} · Set ${widget.setNumber}',
-                              style: TextStyle(fontFamily: 'Geist', 
-                                color: AppColors.textMuted,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Timer chip + menu
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.card,
-                          borderRadius: BorderRadius.circular(AppRadius.full),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.timer_outlined, size: 12, color: AppColors.textMuted),
-                            const SizedBox(width: 4),
-                            Text(
-                              _elapsedLabel,
-                              style: TextStyle(fontFamily: 'GeistMono', 
-                                color: AppColors.textSoft,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      _OptionsMenu(
-                        restSeconds: widget.restSeconds,
-                        onRemoveLastSet: widget.onRemoveLastSet,
-                        onSetRestTime: widget.onSetRestTime,
-                        onFinish: widget.onFinish,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // Progress bar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.sm,
-                AppSpacing.md,
-                AppSpacing.sm,
-              ),
-              child: RFProgressBar(
-                value: widget.progress,
-                height: 4,
-                showGlow: false,
+            const Icon(Icons.timer_outlined, size: 13, color: AppColors.textMuted),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'GeistMono',
+                color: AppColors.textSoft,
+                fontSize: 12,
+                fontFeatures: [FontFeature.tabularFigures()],
               ),
             ),
           ],

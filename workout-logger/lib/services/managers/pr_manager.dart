@@ -44,7 +44,10 @@ class PRManager extends ChangeNotifier {
     }
   }
 
-  PersonalRecord? getRecord(String exerciseId) => _cache[exerciseId];
+  PersonalRecord? getRecord(String exerciseId, {String? handle}) {
+    final key = (handle != null && handle.isNotEmpty) ? '$exerciseId:$handle' : exerciseId;
+    return _cache[key] ?? _cache[exerciseId];
+  }
 
   /// Compare each exercise log in [session] against stored PRs.
   ///
@@ -67,14 +70,19 @@ class PRManager extends ChangeNotifier {
   }
 
   Future<Set<String>> _checkExercise(ExerciseLog log, DateTime date) async {
-    final existing = _cache[log.exerciseId];
+    final handle = log.handle ?? log.sets.where((s) => s.handle != null).firstOrNull?.handle;
+    final key = (handle != null && handle.isNotEmpty) ? '${log.exerciseId}:$handle' : log.exerciseId;
+    final existing = _cache[key];
 
     double newBestWeight = existing?.bestWeight ?? 0;
     int newBestReps = existing?.bestReps ?? 0;
     double newBestVolume = existing?.bestVolume ?? 0;
 
     for (final set in log.sets) {
-      if (set.weight > newBestWeight) newBestWeight = set.weight;
+      // effectiveWeight, not raw weight: for assisted-bodyweight sets, weight
+      // stores the assist load, so a raw comparison would flag more assist
+      // (an easier set) as a new weight PR.
+      if (set.effectiveWeight > newBestWeight) newBestWeight = set.effectiveWeight;
       if (set.reps > newBestReps) newBestReps = set.reps;
       if (set.volume > newBestVolume) newBestVolume = set.volume;
     }
@@ -91,13 +99,13 @@ class PRManager extends ChangeNotifier {
     if (broken.isEmpty) return broken;
 
     final updated = PersonalRecord(
-      exerciseId: log.exerciseId,
+      exerciseId: key,
       bestWeight: newBestWeight,
       bestReps: newBestReps,
       bestVolume: newBestVolume,
       achievedAt: date,
     );
-    _cache[log.exerciseId] = updated;
+    _cache[key] = updated;
     await _storage.savePersonalRecord(updated);
 
     return broken;

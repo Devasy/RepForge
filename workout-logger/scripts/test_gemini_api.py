@@ -1,0 +1,366 @@
+#!/usr/bin/env python3
+"""
+test_gemini_api.py - Standalone Python script testing Gemini 3.6 Flash tool calling & GenUI dashboard response.
+
+Executes a live 2-turn conversation flow:
+ 1. Sends initial user prompt ("Generate a volume graph for my triceps vs biceps").
+ 2. Parses the model's returned function call & thinking/thought_signature.
+ 3. Echoes back the model's turn verbatim, followed by the tool response under `role: "user"`.
+ 4. Prints the final model output (e.g. A2UI dashboard JSON).
+"""
+
+import json
+import os
+import re
+import sys
+import time
+import socket
+import urllib.error
+import urllib.request
+
+# Without this urlopen can block indefinitely on a hung socket.
+_REQUEST_TIMEOUT_SEC = 60
+
+
+def load_env_file(filepath: str) -> None:
+    if not os.path.exists(filepath):
+        return
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, val = line.split("=", 1)
+            key = key.strip().strip("'\"")
+            if key and not os.environ.get(key):
+                os.environ[key] = val
+
+
+def extract_retry_delay(body_str: str) -> float | None:
+    """Mirrors Dart _extractRetryDelay implementation in gemini_ai_service.dart."""
+    try:
+        data = json.loads(body_str)
+        if isinstance(data, dict) and "error" in data:
+            err = data["error"]
+            # 1. Check google.rpc.RetryInfo in error.details
+            details = err.get("details", [])
+            if isinstance(details, list):
+                for item in details:
+                    if isinstance(item, dict) and "retryDelay" in item:
+                        delay_str = str(item["retryDelay"]).replace("s", "").strip()
+                        val = float(delay_str)
+                        if val > 0:
+                            return min(max(val + 0.35, 0.5), 45.0)
+            # 2. Regex search in error.message (e.g. "Please retry in 23.690750876s.")
+            msg = err.get("message", "")
+            if isinstance(msg, str):
+                match = re.search(r"retry in\s+([\d.]+)\s*s", msg, re.IGNORECASE)
+                if match:
+                    val = float(match.group(1))
+                    if val > 0:
+                        return min(max(val + 0.35, 0.5), 45.0)
+    except Exception:
+        pass
+    return None
+
+
+def is_daily_quota_exhausted(body: str) -> bool:
+    # Mirrors Dart _isDailyQuotaExhausted: only daily-limit-specific
+    # identifiers. Generic "QuotaExceeded"/"RESOURCE_EXHAUSTED" markers also
+    # fire for per-minute rate limits, which should retry-with-delay instead
+    # of triggering a model fallback.
+    return "GenerateRequestsPerDay" in body or "free_tier_requests" in body
+
+
+def get_fallback_model(current_model: str) -> str | None:
+    fallbacks = {
+        "gemini-3.6-flash": "gemini-3.5-flash",
+        "gemini-3.5-flash": "gemini-3.5-flash-lite",
+        "gemini-3.5-flash-lite": "gemini-2.5-flash",
+    }
+    return fallbacks.get(current_model)
+
+
+def thinking_config_for(model: str) -> dict:
+    """Mirrors Dart _thinkingConfig: every gemini-2.x model predates the Gemini
+    3.x thinkingLevel enum and only understands the older thinkingBudget shape.
+    Matched by family, like the Dart side, so a 2.x id the quota fallback lands
+    on still gets the right shape."""
+    if model.startswith("gemini-2"):
+        return {"thinkingBudget": 0}
+    return {"thinkingLevel": "minimal"}
+
+
+def post_generate_content_with_retry(model: str, api_key: str, payload: dict, max_attempts: int = 4) -> dict:
+    current_model = model
+    attempt = 0
+
+    while True:
+        # Rebuild the request body for whichever model is currently selected —
+        # a daily-quota fallback mid-retry can switch to a model needing a
+        # different thinkingConfig shape (see thinking_config_for()), so the
+        # previous model's config must not be reused verbatim.
+        body = dict(payload)
+        gen_cfg = dict(body.get("generationConfig", {}))
+        gen_cfg["thinkingConfig"] = thinking_config_for(current_model)
+        body["generationConfig"] = gen_cfg
+        data_bytes = json.dumps(body).encode("utf-8")
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
+        req = urllib.request.Request(
+            url,
+            data=data_bytes,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=_REQUEST_TIMEOUT_SEC) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except (TimeoutError, socket.timeout) as e:
+            # A hung socket is transient in the same way a 503 is; apply the
+            # same backoff rather than blocking the script forever.
+            if attempt < max_attempts - 1:
+                wait = 0.5 * (2**attempt)
+                print(f"  [TIMEOUT] No response in {_REQUEST_TIMEOUT_SEC}s. Retrying in {wait:.2f}s (Attempt {attempt+1}/{max_attempts})...")
+                time.sleep(wait)
+                attempt += 1
+                continue
+            raise e
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8")
+            # The stream is consumed now, so cache it for callers that need to
+            # classify the failure after this re-raises.
+            e.error_body = body
+            if is_daily_quota_exhausted(body):
+                fallback = get_fallback_model(current_model)
+                if fallback:
+                    print(f"  [QUOTA EXHAUSTED] {current_model} daily free quota reached! Automatically falling back to {fallback}...")
+                    current_model = fallback
+                    continue
+
+            if e.code in (429, 500, 502, 503, 504):
+                retry_sec = extract_retry_delay(body) or (0.5 * (2**attempt))
+                print(f"  [HTTP {e.code}] Rate limit/server error detected. Google retryDelay: {retry_sec:.2f}s (Attempt {attempt+1}/{max_attempts})")
+                if attempt < max_attempts - 1:
+                    print(f"  --> Waiting {retry_sec:.2f}s before retry...")
+                    time.sleep(retry_sec)
+                    attempt += 1
+                    continue
+            print(f"\n[!] HTTP {e.code} Error Body:\n{body}")
+            raise e
+
+
+def is_invalid_api_key(body: str) -> bool:
+    """True only for a 400 that names the key itself, not a malformed request."""
+    lowered = body.lower()
+    return "api_key_invalid" in lowered or "api key not valid" in lowered
+
+
+def parse_genui_component(text: str) -> dict | None:
+    """Mirrors Dart A2UiComponent.tryParse + property normalization."""
+    trimmed = text.strip()
+    if not trimmed or not trimmed.startswith("{"):
+        return None
+    try:
+        data = json.loads(trimmed)
+        if not isinstance(data, dict):
+            return None
+        comp = data.get("component")
+        if not comp or not isinstance(comp, str):
+            return None
+        # Extract props (supporting both wrapped 'props' and flat properties)
+        if isinstance(data.get("props"), dict):
+            props = data["props"]
+        else:
+            props = {k: v for k, v in data.items() if k != "component"}
+        return {"component": comp, "props": props}
+    except Exception:
+        return None
+
+
+def main() -> None:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.abspath(os.path.join(script_dir, ".."))
+    load_env_file(os.path.join(root_dir, ".env"))
+    load_env_file(os.path.join(os.getcwd(), ".env"))
+
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        print("[!] GEMINI_API_KEY not found in environment or .env file.")
+        sys.exit(1)
+
+    model = "gemini-3.6-flash"
+
+    tools = [
+        {
+            "functionDeclarations": [
+                {
+                    "name": "get_muscle_group_volume",
+                    "description": "Fetch volume history for muscle groups.",
+                    "parameters": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "muscle_groups": {
+                                "type": "ARRAY",
+                                "items": {"type": "STRING"},
+                            },
+                            # Optional, mirroring the production declaration in
+                            # CoachToolService.
+                            "days": {
+                                "type": "INTEGER",
+                                "description": "Optional. Number of days to look back (defaults to 60).",
+                                "nullable": True,
+                            },
+                        },
+                        "required": ["muscle_groups"],
+                    },
+                }
+            ]
+        }
+    ]
+
+    system_instruction = {
+        "parts": [
+            {
+                "text": (
+                    "You are an expert personal trainer embedded in RepForge. "
+                    'When asked for dashboards or comparison charts, return ONLY valid A2UI JSON: '
+                    '{"component":"GridContainer","props":{"columns":1,"children":[...]}}'
+                )
+            }
+        ]
+    }
+
+    print("=" * 70)
+    print("VERIFYING GEMINI API RETRY & COMPONENT PARSING IN A LOOP")
+    print("=" * 70)
+
+    # Unit Test: Retry parsing regex & RetryInfo extraction
+    sample_error = json.dumps({
+        "error": {
+            "code": 429,
+            "message": "Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash. Please retry in 23.690750876s.",
+            "status": "RESOURCE_EXHAUSTED",
+            "details": [{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "23.690750876s"}]
+        }
+    })
+    parsed_delay = extract_retry_delay(sample_error)
+    print(f"[TEST 1] Testing retryDelay parser on sample 429 payload:")
+    print(f"  Extracted Retry Delay: {parsed_delay:.3f} seconds (Expected ~24.04s)")
+    assert parsed_delay is not None and 23.0 <= parsed_delay <= 25.0, "Parser failed!"
+    print("  --> PASSED!\n")
+
+    # Unit Test: Flat vs Wrapped GenUI Component Parser
+    print("[TEST 2] Testing GenUI Flat & Wrapped Property Normalization:")
+    flat_json = '{"component":"DynamicChart","type":"line","title":"Biceps vs Triceps","labels":["W1"],"series":[{"name":"Biceps","values":[100]}]}'
+    parsed_flat = parse_genui_component(flat_json)
+    print("  Parsed Flat JSON:", json.dumps(parsed_flat, indent=2))
+    assert parsed_flat is not None and "props" in parsed_flat and parsed_flat["props"]["type"] == "line"
+    print("  --> PASSED!\n")
+
+    # Live Executions Loop
+    num_runs = 2
+    for run in range(1, num_runs + 1):
+        print("=" * 70)
+        print(f"RUN {run}/{num_runs}: Executing Live Multi-Turn Query against {model}...")
+        print("=" * 70)
+
+        contents = [
+            {"role": "user", "parts": [{"text": "Generate a volume graph for my triceps vs biceps"}]}
+        ]
+
+        payload1 = {
+            "contents": contents,
+            "systemInstruction": system_instruction,
+            "tools": tools,
+            "generationConfig": {"thinkingConfig": {"thinkingLevel": "minimal"}},
+        }
+
+        try:
+            res1 = post_generate_content_with_retry(model, api_key, payload1)
+        except urllib.error.HTTPError as e:
+            # Only an invalid key is a legitimate skip. Any other 400 is a real
+            # failure — a malformed request is exactly what this script exists
+            # to catch, so it must not exit 0. The body was already read (and
+            # printed) by the retry helper, which caches it here.
+            err_body = getattr(e, "error_body", "")
+            if e.code == 400 and is_invalid_api_key(err_body):
+                print("[NOTE] Live call skipped: API key in .env is invalid or unconfigured.")
+                print("[SUCCESS] Local retryDelay & component normalization tests verified.")
+                sys.exit(0)
+            raise e
+        candidates = res1.get("candidates", [])
+        if not candidates:
+            print(f"[!] No candidates returned. Raw response:\n{json.dumps(res1)[:500]}")
+            sys.exit(1)
+        first_cand = candidates[0]
+        model_content = first_cand.get("content", {})
+        raw_parts = model_content.get("parts", [])
+
+        function_calls = [p["functionCall"] for p in raw_parts if "functionCall" in p]
+        print(f"  Turn 1 Model Response: {len(function_calls)} function call(s) received.")
+
+        # A run that produced no tool call proved nothing, so it is a failure
+        # rather than a quietly skipped turn 2.
+        volume_calls = [
+            fc for fc in function_calls if fc.get("name") == "get_muscle_group_volume"
+        ]
+        if not volume_calls:
+            print(f"[!] Expected a get_muscle_group_volume call, got {[fc.get('name') for fc in function_calls]}.")
+            print(json.dumps(raw_parts)[:500])
+            sys.exit(1)
+        if not any(
+            isinstance(fc.get("args"), dict) and fc["args"].get("muscle_groups")
+            for fc in volume_calls
+        ):
+            print("[!] get_muscle_group_volume called without a muscle_groups argument.")
+            print(json.dumps(volume_calls)[:500])
+            sys.exit(1)
+
+        if function_calls:
+            contents.append(model_content)
+            func_response_parts = [{
+                "functionResponse": {
+                    "name": fc["name"],
+                    **({"id": fc["id"]} if "id" in fc else {}),
+                    "response": {
+                        "dates": ["2026-07-06", "2026-07-09", "2026-07-16"],
+                        "series": [
+                            {"name": "Biceps", "values": [600, 750, 900]},
+                            {"name": "Triceps", "values": [1200, 1400, 1600]}
+                        ]
+                    }
+                }
+            } for fc in function_calls]
+
+            contents.append({"role": "user", "parts": func_response_parts})
+
+            payload2 = {
+                "contents": contents,
+                "systemInstruction": system_instruction,
+                "tools": tools,
+                "generationConfig": {"thinkingConfig": {"thinkingLevel": "minimal"}},
+            }
+
+            res2 = post_generate_content_with_retry(model, api_key, payload2)
+            cands2 = res2.get("candidates", [])
+            final_text = ""
+            for part in cands2[0].get("content", {}).get("parts", []):
+                if "text" in part:
+                    final_text += part["text"]
+
+            print(f"  Turn 2 Final Model Output (Length: {len(final_text)} chars):")
+            parsed_comp = parse_genui_component(final_text)
+            if parsed_comp is None:
+                print("[!] Final output did not parse as a GenUI component.")
+                print("  Output Text:\n", final_text[:300])
+                sys.exit(1)
+            print("  [SUCCESS] Successfully parsed GenUI Component structure!")
+            print(f"  Root Component: {parsed_comp['component']}")
+
+        print(f"\n[SUCCESS] Run {run} completed successfully.\n")
+
+
+if __name__ == "__main__":
+    main()
+

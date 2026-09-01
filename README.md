@@ -125,7 +125,7 @@ RepForge is licensed under the [Apache License 2.0](LICENSE).
 
 **Devasy Patel**
 - Email: patel.devasy.23@gmail.com
-- GitHub: [@Devasy23](https://github.com/Devasy23)
+- GitHub: [@Devasy](https://github.com/Devasy)
 
 ---
 <div align="center">

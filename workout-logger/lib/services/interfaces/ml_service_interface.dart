@@ -75,16 +75,48 @@ abstract class IMLService {
     DateTime? asOf,
   });
 
-  /// Get recommended sets based on last session and growth model.
+  /// The history-dependent half of [computeMuscleRecoveryScores]: when each
+  /// muscle group was last trained. Sorts and walks all of [sessions], so
+  /// callers on a hot path cache this and pair it with
+  /// [recoveryScoresFrom] rather than recomputing per call.
+  Map<String, DateTime> lastTrainedPerMuscle(
+    List<WorkoutSession> sessions,
+    Map<String, Exercise> exerciseMap,
+  );
+
+  /// The clock-dependent half: applies the recovery decay to a
+  /// [lastTrainedPerMuscle] result. O(muscle groups).
+  Map<String, MuscleRecoveryStatus> recoveryScoresFrom(
+    Map<String, DateTime> lastTrained, {
+    DateTime? asOf,
+  });
+
+  /// Get recommended sets based on last session, recent-session trend, and growth model.
+  /// [pastSessions], if provided, only has its first two entries read for
+  /// deload/recovery detection: index 0 is the latest prior session, index 1
+  /// is the session immediately before that. Any further entries are ignored.
   /// [minReps]/[maxReps] define the double-progression rep range.
   /// Pass [recoveryScores] + [primaryMuscleIds] for recovery-aware advice.
+  /// Pass [readinessBand] (from the cached `ReadinessManager.snapshot` — this
+  /// method never fetches it itself, keeping this synchronous/offline) to
+  /// hold load on a low-readiness day.
+  /// Pass [sessionFatigueFactor] (a pre-computed 0.0–1.0 dampening factor —
+  /// see `SessionFatigueAccumulator`) for same-session fatigue awareness.
+  /// Deliberately exercise-agnostic, not muscle-specific: a backtest found no
+  /// statistically significant same-session order effect for this app's
+  /// hand-authored `muscleActivations` groupings, so this only tracks total
+  /// prior same-session training load, not which muscles it hit.
   List<SetRecommendation> recommendSets({
     required List<WorkoutSet> lastSession,
+    List<List<WorkoutSet>>? pastSessions,
     GrowthModel? growthModel,
     int minReps = 6,
     int maxReps = 12,
     Map<String, MuscleRecoveryStatus>? recoveryScores,
     List<String>? primaryMuscleIds,
+    ReadinessBand? readinessBand,
+    double sessionFatigueFactor = 0.0,
+    DateTime? asOf,
   });
 
   /// Get default recommendations when no history exists.

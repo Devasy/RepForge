@@ -2,10 +2,10 @@
 // All widgets consume AppColors/AppSpacing/AppRadius tokens only.
 
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
+import 'rf_shell.dart';
 
 // ── Route helper ──────────────────────────────────────────────────────────────
 // Right-to-left slide push, shared by the home screen and detail entry points.
@@ -45,6 +45,7 @@ class GlassCard extends StatelessWidget {
   final BorderRadius? borderRadius;
   final Color? glowColor;
   final Color? borderColor;
+
   /// When true, uses accent colour border (e.g. Analytics exercise selector).
   final bool accentBorder;
   final VoidCallback? onTap;
@@ -53,18 +54,22 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = borderRadius ?? BorderRadius.circular(AppRadius.xl);
-    final effectiveBorderColor = accentBorder
-        ? AppColors.primary
-        : (borderColor ?? AppColors.glassBorder);
+
+    // An explicit border is a state signal (selected, accented), so it stays a
+    // flat ring at full strength. The graded ring is the default *material*,
+    // and grading it would mute the signal.
+    final overrideColor = accentBorder ? AppColors.primary : borderColor;
 
     final decoration = BoxDecoration(
       gradient: const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0x09FFFFFF), Color(0x04FFFFFF)],
+        colors: [AppColors.glassFillTop, AppColors.glassFillBottom],
       ),
       borderRadius: radius,
-      border: Border.all(color: effectiveBorderColor, width: 1),
+      border: overrideColor != null
+          ? Border.all(color: overrideColor, width: 1)
+          : null,
       boxShadow: glowColor != null
           ? [
               BoxShadow(
@@ -76,207 +81,374 @@ class GlassCard extends StatelessWidget {
           : null,
     );
 
-    final content = Container(
+    Widget content = Container(
       padding: padding ?? const EdgeInsets.all(AppSpacing.md),
-      margin: margin,
       decoration: decoration,
       child: child,
     );
+
+    if (overrideColor == null) {
+      content = CustomPaint(
+        foregroundPainter: _GradedRingPainter(radius: radius),
+        child: content,
+      );
+    }
+    if (margin != null) {
+      content = Padding(padding: margin!, child: content);
+    }
 
     if (onTap == null) return content;
     return Semantics(
       button: true,
       label: semanticsLabel,
-      child: GestureDetector(
-        onTap: onTap,
-        child: content,
-      ),
+      child: GestureDetector(onTap: onTap, child: content),
+    );
+  }
+}
+
+/// A 1px border that grades from [AppColors.glassEdgeTop] down to
+/// [AppColors.glassEdgeBottom].
+///
+/// Real glass catches light on the edge facing the source; a flat ring on all
+/// four sides is the thing that made these panels read as outlines. Flutter's
+/// [Border] takes a single colour per side, so the ring is stroked by hand.
+class _GradedRingPainter extends CustomPainter {
+  const _GradedRingPainter({required this.radius});
+
+  final BorderRadius radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    // A stroke straddles its path, so pull in by half the width to keep the
+    // full pixel inside the card rather than bleeding over the neighbour.
+    final rrect = radius.toRRect(rect).deflate(0.5);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [AppColors.glassEdgeTop, AppColors.glassEdgeBottom],
+      ).createShader(rect);
+    canvas.drawRRect(rrect, paint);
+  }
+
+  @override
+  bool shouldRepaint(_GradedRingPainter oldDelegate) =>
+      oldDelegate.radius != radius;
+}
+
+// ── AmbientMotion ────────────────────────────────────────────────────────────
+
+/// App-wide vertical scroll position, published for [AmbientGlow] to lean against.
+class AmbientMotion extends InheritedNotifier<ValueNotifier<double>> {
+  const AmbientMotion({
+    super.key,
+    required ValueNotifier<double> super.notifier,
+    required super.child,
+  });
+
+  /// Reads the current offset without subscribing.
+  static double read(BuildContext context) {
+    final element = context
+        .getElementForInheritedWidgetOfExactType<AmbientMotion>();
+    final widget = element?.widget as AmbientMotion?;
+    return widget?.notifier?.value ?? 0;
+  }
+}
+
+/// Installs the [AmbientMotion] signal. Mount once, above the app's Navigator.
+class AmbientMotionScope extends StatefulWidget {
+  const AmbientMotionScope({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<AmbientMotionScope> createState() => _AmbientMotionScopeState();
+}
+
+class _AmbientMotionScopeState extends State<AmbientMotionScope> {
+  final _offset = ValueNotifier<double>(0);
+
+  @override
+  void dispose() {
+    _offset.dispose();
+    super.dispose();
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (n is ScrollUpdateNotification && n.metrics.axis == Axis.vertical) {
+      _offset.value = n.metrics.pixels;
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: AmbientMotion(notifier: _offset, child: widget.child),
     );
   }
 }
 
 // ── AmbientGlow ──────────────────────────────────────────────────────────────
-// Matches the design's rf-ambient pseudo-elements.
-class AmbientGlow extends StatelessWidget {
+
+/// Violet wash behind every screen: a full-height floor plus three radial
+/// pools that drift slowly and lean against the user's scroll. Only transforms
+/// and opacity animate.
+///
+/// The floor is not decorative. Pools are finite and a scrolling column is not,
+/// so pools alone can only ever light the top of a screen — the previous rig
+/// lit the content column from 0 to 264dp and left the remaining 70% of a
+/// Pixel flat. The floor guarantees light everywhere; the pools give it a
+/// direction.
+class AmbientGlow extends StatefulWidget {
   const AmbientGlow({super.key});
+
+  /// Set false to render the wash static. The drift loop never ends, so under
+  /// the test binding it would hold `pumpAndSettle` open forever.
+  static bool motionEnabled = true;
+
+  @override
+  State<AmbientGlow> createState() => _AmbientGlowState();
+}
+
+class _AmbientGlowState extends State<AmbientGlow>
+    with SingleTickerProviderStateMixin {
+  /// Every drift period divides this evenly, so the loop closes without a snap.
+  static const _cycle = Duration(seconds: 120);
+
+  /// Scroll travel that maps to the full counter-offset.
+  static const _parallaxRange = 640.0;
+
+  /// Peak counter-offset, in logical pixels.
+  static const _parallaxDepthNear = 34.0;
+  static const _parallaxDepthFar = 14.0;
+
+  /// Pool boxes are a fraction of viewport height, not fixed dp. The old fixed
+  /// sizes meant coverage degraded as phones got taller — the same 480dp pool
+  /// lit 37% of a 720dp screen but only 28% of a 956dp one.
+  static const _keyScale = 0.82;
+  static const _counterScale = 0.97;
+
+  /// Counterweight centre, as a fraction of viewport height, and its horizontal
+  /// offset from centre. Offset rather than centred so the pair reads as two
+  /// sources instead of a symmetric vignette.
+  static const _counterCentreY = 0.74;
+  static const _counterOffsetX = 58.0;
+
+  /// The far pool hugs the right bezel: its centre sits 166dp from the content
+  /// column with a 108dp reach, so it never touches the cards. It is edge
+  /// atmosphere, and sized in fixed dp on purpose.
+  static const _farBox = 360.0;
+
+  late final AnimationController _ctrl;
+
+  double _parallax = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Constructed eagerly: a lazy late-final would build its Ticker inside
+    // dispose(), when ancestor lookup is already unsafe.
+    _ctrl = AnimationController(vsync: this, duration: _cycle);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_animates) {
+      if (!_ctrl.isAnimating) _ctrl.repeat();
+    } else if (_ctrl.isAnimating) {
+      _ctrl.stop();
+    }
+  }
+
+  bool get _animates =>
+      AmbientGlow.motionEnabled && !MediaQuery.disableAnimationsOf(context);
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  /// Sine at [harmonic] cycles per loop; coprime harmonics never resync.
+  double _wave(double t, int harmonic) => math.sin(2 * math.pi * harmonic * t);
+
+  /// Eased toward the live scroll position so route changes glide, not jump.
+  double _sampleParallax(BuildContext context) {
+    final target = (AmbientMotion.read(context) / _parallaxRange).clamp(
+      0.0,
+      1.0,
+    );
+    _parallax += (target - _parallax) * 0.08;
+    return _parallax;
+  }
+
+  /// One pool. When the rig is static the drift and fade are skipped entirely
+  /// rather than sampled at rest, so nothing wraps the wash that need not.
+  Widget _pool({
+    required double box,
+    required double left,
+    required double top,
+    required double opacity,
+    required bool animate,
+    Offset drift = Offset.zero,
+    double fade = 1,
+  }) {
+    // The fade is folded into the gradient's own alpha rather than wrapped in
+    // an Opacity: these boxes are a large fraction of the viewport and the
+    // drift loop never stops, so an Opacity here would mean three
+    // near-fullscreen saveLayers on every frame, forever. Equivalent output —
+    // the gradient's far stop is fully transparent, so scaling the near stop
+    // scales the whole ramp.
+    return Positioned(
+      left: left,
+      top: top,
+      child: animate
+          ? Transform.translate(
+              offset: drift,
+              child: _Wash(size: box, opacity: opacity * fade),
+            )
+          : _Wash(size: box, opacity: opacity),
+    );
+  }
+
+  Widget _rig(Size size, {required bool animate, double t = 0, double p = 0}) {
+    final w = size.width;
+    final h = size.height;
+    final keyBox = h * _keyScale;
+    final counterBox = h * _counterScale;
+
+    return Stack(
+      children: [
+        const Positioned.fill(child: _WashFloor()),
+        // Key: top-anchored and centred. Establishes the light direction.
+        _pool(
+          box: keyBox,
+          left: (w - keyBox) / 2,
+          top: -120,
+          opacity: 0.32,
+          animate: animate,
+          drift: Offset(
+            _wave(t, 2) * 20,
+            _wave(t, 3) * 13 - p * _parallaxDepthNear,
+          ),
+          fade: 0.86 + 0.14 * (0.5 + 0.5 * _wave(t, 5)),
+        ),
+        // Far: right bezel only. Less travel — the gap is the parallax.
+        _pool(
+          box: _farBox,
+          left: w + 140 - _farBox,
+          top: 40,
+          opacity: 0.16,
+          animate: animate,
+          drift: Offset(
+            _wave(t, 3) * -9,
+            _wave(t, 2) * 7 - p * _parallaxDepthFar,
+          ),
+          fade: 0.80 + 0.20 * (0.5 + 0.5 * _wave(t, 3)),
+        ),
+        // Counterweight: lower third, off-axis, and quiet. It gives the bottom
+        // of the screen a source rather than a flat tint.
+        _pool(
+          box: counterBox,
+          left: (w - counterBox) / 2 + _counterOffsetX,
+          top: h * _counterCentreY - counterBox / 2,
+          opacity: 0.14,
+          animate: animate,
+          drift: Offset(
+            _wave(t, 2) * -11,
+            _wave(t, 3) * 8 - p * _parallaxDepthFar,
+          ),
+          fade: 0.84 + 0.16 * (0.5 + 0.5 * _wave(t, 2)),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Positioned.fill(
       child: IgnorePointer(
-        child: Stack(
-          children: [
-            // Top violet wash
-            Positioned(
-              top: -120,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  width: 480,
-                  height: 480,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFF5B21B6).withValues(alpha: 0.35),
-                        Colors.transparent,
-                      ],
-                      stops: const [0, 0.6],
-                    ),
-                  ),
+        child: RepaintBoundary(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final size = constraints.biggest;
+              // An always-moving backdrop is what this setting exists to stop.
+              if (!_animates) return _rig(size, animate: false);
+              return AnimatedBuilder(
+                animation: _ctrl,
+                builder: (context, _) => _rig(
+                  size,
+                  animate: true,
+                  t: _ctrl.value,
+                  p: _sampleParallax(context),
                 ),
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
 
-// ── RFNavBar ─────────────────────────────────────────────────────────────────
-// Premium floating glassmorphic bottom navigation bar with perfect rounded blur,
-// deep drop shadow, and clean transparent padding so it sits elegantly above the content.
-class RFNavBar extends StatelessWidget {
-  const RFNavBar({
-    super.key,
-    required this.currentIndex,
-    required this.onTap,
-    required this.items,
-  });
-
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-  final List<RFNavItem> items;
+/// The floor: a full-height grade that keeps every pixel of canvas fractionally
+/// above flat black, so glass always has something behind it to sit on.
+class _WashFloor extends StatelessWidget {
+  const _WashFloor();
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.washFloorTop,
+            AppColors.washFloorMid,
+            AppColors.washFloorBottom,
+          ],
+          stops: [0, 0.45, 1],
+        ),
+      ),
+    );
+  }
+}
+
+class _Wash extends StatelessWidget {
+  const _Wash({required this.size, required this.opacity});
+
+  final double size;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      color: Colors.transparent, // Completely transparent outer container
-      padding: EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        bottomPadding > 0 ? bottomPadding + 8 : 16,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
-              blurRadius: 28,
-              spreadRadius: -4,
-              offset: const Offset(0, 10),
-            ),
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            AppColors.primaryDeep.withValues(alpha: opacity),
+            Colors.transparent,
           ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.xxl),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.8), // Sleek transparent surface
-                borderRadius: BorderRadius.circular(AppRadius.xxl),
-                border: Border.all(
-                  color: AppColors.glassBorderStrong,
-                  width: 1.5,
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(items.length, (i) {
-                  final active = i == currentIndex;
-                  return _NavItem(
-                    item: items[i],
-                    active: active,
-                    onTap: () => onTap(i),
-                  );
-                }),
-              ),
-            ),
-          ),
+          stops: const [0, 0.6],
         ),
       ),
     );
   }
 }
 
-class RFNavItem {
-  const RFNavItem({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.item,
-    required this.active,
-    required this.onTap,
-  });
-
-  final RFNavItem item;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: item.label,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          width: 60,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Accent indicator above icon
-              AnimatedContainer(
-                duration: AppDurations.normal,
-                width: active ? 18 : 0,
-                height: 2,
-                margin: const EdgeInsets.only(bottom: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(2),
-                  color: AppColors.primary,
-                  boxShadow: active
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.6),
-                            blurRadius: 6,
-                          ),
-                        ]
-                      : null,
-                ),
-              ),
-              Icon(
-                item.icon,
-                size: 19,
-                color: active ? AppColors.textPrimary : AppColors.textMuted,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                item.label,
-                style: TextStyle(fontFamily: 'Geist', 
-                  fontSize: 10,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                  color: active ? AppColors.textPrimary : AppColors.textMuted,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+// ── Nav bar ──────────────────────────────────────────────────────────────────
+// Moved to floating_nav_bar.dart (zero-dependency, drop-in portable widget).
+// Import and use FloatingNavBar / FloatingNavBarScaffold / FloatingNavItem.
 
 // ── GlowButton ──────────────────────────────────────────────────────────────
 // Full-width primary action button with glow shadow + haptic feedback.
@@ -351,10 +523,8 @@ class _GlowButtonState extends State<GlowButton>
 
     return AnimatedBuilder(
       animation: _scale,
-      builder: (context, child) => Transform.scale(
-        scale: _scale.value,
-        child: child,
-      ),
+      builder: (context, child) =>
+          Transform.scale(scale: _scale.value, child: child),
       child: Semantics(
         button: true,
         label: widget.label,
@@ -388,8 +558,9 @@ class _GlowButtonState extends State<GlowButton>
                     ],
             ),
             child: Row(
-              mainAxisSize:
-                  widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
+              mainAxisSize: widget.fullWidth
+                  ? MainAxisSize.max
+                  : MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (widget.icon != null) ...[
@@ -400,13 +571,17 @@ class _GlowButtonState extends State<GlowButton>
                   ),
                   const SizedBox(width: AppSpacing.sm),
                 ],
-                Text(
-                  widget.label,
-                  style: TextStyle(
-                    color: disabled ? AppColors.textMuted : Colors.white,
-                    fontSize: widget.small ? 14 : 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: disabled ? AppColors.textMuted : Colors.white,
+                      fontSize: widget.small ? 14 : 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ],
@@ -530,18 +705,7 @@ class RFSectionHeader extends StatelessWidget {
       padding: EdgeInsets.only(bottom: bottomPad ? AppSpacing.sm : 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-            ),
-          ),
-          ?trailing,
-        ],
+        children: [RFLabel(title), ?trailing],
       ),
     );
   }
@@ -637,7 +801,8 @@ class AnimatedCounter extends StatelessWidget {
             : v.toInt().toString();
         return Text(
           '$display$suffix',
-          style: style ??
+          style:
+              style ??
               const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 22,
@@ -871,10 +1036,17 @@ class RFProgressBar extends StatelessWidget {
                 curve: Curves.easeOutCubic,
                 width: constraints.maxWidth * clamped,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [c, Color.lerp(c, Colors.white, 0.2)!]),
+                  gradient: LinearGradient(
+                    colors: [c, Color.lerp(c, Colors.white, 0.2)!],
+                  ),
                   borderRadius: BorderRadius.circular(AppRadius.full),
                   boxShadow: showGlow
-                      ? [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 8)]
+                      ? [
+                          BoxShadow(
+                            color: c.withValues(alpha: 0.5),
+                            blurRadius: 8,
+                          ),
+                        ]
                       : null,
                 ),
               ),
@@ -905,8 +1077,9 @@ class RestTimerRing extends StatelessWidget {
     final progress = total > 0 ? (remaining / total).clamp(0.0, 1.0) : 0.0;
     final mins = remaining ~/ 60;
     final secs = remaining % 60;
-    final label =
-        mins > 0 ? '$mins:${secs.toString().padLeft(2, '0')}' : '$secs';
+    final label = mins > 0
+        ? '$mins:${secs.toString().padLeft(2, '0')}'
+        : '$secs';
 
     return SizedBox(
       width: size,
@@ -1034,6 +1207,115 @@ class _SkeletonBoxState extends State<SkeletonBox>
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── RFTextField ─────────────────────────────────────────────────────────────
+/// Standardized RepForge glassmorphic text input field.
+class RFTextField extends StatefulWidget {
+  const RFTextField({
+    super.key,
+    required this.controller,
+    required this.hint,
+    this.label,
+    this.keyboardType,
+    this.inputFormatters,
+    this.maxLines = 1,
+    this.onChanged,
+    this.prefixIcon,
+    this.suffixIcon,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final String? label;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final int maxLines;
+  final ValueChanged<String>? onChanged;
+  final IconData? prefixIcon;
+  final Widget? suffixIcon;
+
+  @override
+  State<RFTextField> createState() => _RFTextFieldState();
+}
+
+class _RFTextFieldState extends State<RFTextField> {
+  late final FocusNode _focusNode;
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    setState(() => _isFocused = _focusNode.hasFocus);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.label != null) ...[
+          Text(
+            widget.label!,
+            style: const TextStyle(
+              fontFamily: 'GeistMono',
+              color: AppColors.textSoft,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: _isFocused ? AppColors.primary : AppColors.glassBorder,
+              width: _isFocused ? 1.5 : 1.0,
+            ),
+          ),
+          child: TextField(
+            controller: widget.controller,
+            focusNode: _focusNode,
+            keyboardType: widget.keyboardType,
+            inputFormatters: widget.inputFormatters,
+            maxLines: widget.maxLines,
+            onChanged: widget.onChanged,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              hintStyle: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 14,
+              ),
+              prefixIcon: widget.prefixIcon != null
+                  ? Icon(widget.prefixIcon, color: AppColors.textSoft, size: 20)
+                  : null,
+              suffixIcon: widget.suffixIcon,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -64,19 +64,34 @@ class MuscleActivation {
 
 // ==================== Exercise ====================
 
+// Exercise IDs treated as bodyweight-assisted (e.g. an assisted-dip/pull-up
+// machine). Computed once here so every consumer (the load panel, the input
+// row, set persistence) agrees on which exercises count as "assisted".
+const Set<String> _assistedBodyweightExerciseIds = {
+  'pull_ups',
+  'chin_ups',
+  'dips',
+  'push_ups',
+};
+
+bool isAssistedBodyweightExercise(String? exerciseId) =>
+    exerciseId != null && _assistedBodyweightExerciseIds.contains(exerciseId);
+
 class Exercise {
   final String id;
   final String name;
   final List<MuscleActivation> muscleActivations;
   final String category; // 'compound' or 'isolation'
   final bool isCustom; // User-created exercise
+  final List<String>? availableHandles; // Attachment/handle options e.g. ['Rope', 'Bar']
 
-  Exercise({
+  const Exercise({
     required this.id,
     required this.name,
     required this.muscleActivations,
     required this.category,
     this.isCustom = false,
+    this.availableHandles,
   });
 
   String get primaryMuscle {
@@ -93,6 +108,7 @@ class Exercise {
     'muscleActivations': muscleActivations.map((m) => m.toJson()).toList(),
     'category': category,
     'isCustom': isCustom,
+    'availableHandles': availableHandles,
   };
 
   factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
@@ -103,6 +119,7 @@ class Exercise {
         .toList(),
     category: json['category'],
     isCustom: json['isCustom'] ?? false,
+    availableHandles: (json['availableHandles'] as List?)?.cast<String>(),
   );
 }
 
@@ -115,6 +132,10 @@ class WorkoutSet {
   final List<DropsetEntry>? drops; // For dropsets
   final int? timeTaken; // seconds
   final DateTime timestamp;
+  final double? assistWeight;
+  final double? extraWeight;
+  final String? handle;
+  final double? bodyWeightAtLog;
 
   WorkoutSet({
     required this.weight,
@@ -123,17 +144,46 @@ class WorkoutSet {
     this.drops,
     this.timeTaken,
     DateTime? timestamp,
+    this.assistWeight,
+    this.extraWeight,
+    this.handle,
+    this.bodyWeightAtLog,
   }) : timestamp = timestamp ?? DateTime.now();
 
-  double get volume {
-    double vol = weight * reps;
+  /// Per-rep effective load for the main (non-drop) entry of this set: for
+  /// assisted-bodyweight sets (i.e. [assistWeight] is set) this is
+  /// `bodyweight − assist + extra`, snapshotted against [bodyWeightAtLog]
+  /// (falling back to 70.0) so historical values stay correct even if the
+  /// user's current bodyweight later changes. Conventional (non-assisted)
+  /// sets just use [weight]. Use this (not raw [weight]) wherever a
+  /// "how heavy was this set" comparison needs to be consistent with
+  /// [calculateVolume] for assisted-bodyweight exercises.
+  double get effectiveWeight {
+    final assist = assistWeight;
+    if (assist == null) return weight;
+    final bw = bodyWeightAtLog ?? 70.0;
+    return max(0.0, bw - assist + (extraWeight ?? 0.0));
+  }
+
+  double calculateVolume({double? userBodyWeight, bool? isAssistedBW}) {
+    final assisted = isAssistedBW ?? (assistWeight != null);
+    final bw = bodyWeightAtLog ?? userBodyWeight ?? 70.0;
+    final effW = assisted
+        ? max(0.0, bw - (assistWeight ?? weight) + (extraWeight ?? 0.0))
+        : weight;
+    double vol = effW * reps;
     if (isDropset && drops != null) {
-      for (var drop in drops!) {
-        vol += drop.weight * drop.reps;
+      for (final drop in drops!) {
+        final dropEff = assisted
+            ? max(0.0, bw - drop.weight + (extraWeight ?? 0.0))
+            : drop.weight;
+        vol += dropEff * drop.reps;
       }
     }
     return vol;
   }
+
+  double get volume => calculateVolume();
 
   Map<String, dynamic> toJson() => {
     'weight': weight,
@@ -142,6 +192,10 @@ class WorkoutSet {
     'drops': drops?.map((d) => d.toJson()).toList(),
     'timeTaken': timeTaken,
     'timestamp': timestamp.toIso8601String(),
+    'assistWeight': assistWeight,
+    'extraWeight': extraWeight,
+    'handle': handle,
+    'bodyWeightAtLog': bodyWeightAtLog,
   };
 
   factory WorkoutSet.fromJson(Map<String, dynamic> json) => WorkoutSet(
@@ -153,6 +207,10 @@ class WorkoutSet {
         : null,
     timeTaken: json['timeTaken'],
     timestamp: DateTime.parse(json['timestamp']),
+    assistWeight: (json['assistWeight'] as num?)?.toDouble(),
+    extraWeight: (json['extraWeight'] as num?)?.toDouble(),
+    handle: json['handle'] as String?,
+    bodyWeightAtLog: (json['bodyWeightAtLog'] as num?)?.toDouble(),
   );
 
   WorkoutSet copyWith({
@@ -162,6 +220,10 @@ class WorkoutSet {
     Object? drops = _sentinel,
     Object? timeTaken = _sentinel,
     Object? timestamp = _sentinel,
+    Object? assistWeight = _sentinel,
+    Object? extraWeight = _sentinel,
+    Object? handle = _sentinel,
+    Object? bodyWeightAtLog = _sentinel,
   }) => WorkoutSet(
     weight: weight == _sentinel ? this.weight : weight as double,
     reps: reps == _sentinel ? this.reps : reps as int,
@@ -169,6 +231,10 @@ class WorkoutSet {
     drops: drops == _sentinel ? this.drops : drops as List<DropsetEntry>?,
     timeTaken: timeTaken == _sentinel ? this.timeTaken : timeTaken as int?,
     timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime?,
+    assistWeight: assistWeight == _sentinel ? this.assistWeight : assistWeight as double?,
+    extraWeight: extraWeight == _sentinel ? this.extraWeight : extraWeight as double?,
+    handle: handle == _sentinel ? this.handle : handle as String?,
+    bodyWeightAtLog: bodyWeightAtLog == _sentinel ? this.bodyWeightAtLog : bodyWeightAtLog as double?,
   );
 }
 
@@ -195,8 +261,17 @@ class ExerciseLog {
   final String exerciseId;
   final List<WorkoutSet> sets;
   final String? notes;
+  final String? handle;
 
-  ExerciseLog({required this.exerciseId, required this.sets, this.notes});
+  const ExerciseLog({
+    required this.exerciseId,
+    required this.sets,
+    this.notes,
+    this.handle,
+  });
+
+  double calculateTotalVolume({double? userBodyWeight, bool? isAssistedBW}) =>
+      sets.fold(0.0, (sum, set) => sum + set.calculateVolume(userBodyWeight: userBodyWeight, isAssistedBW: isAssistedBW));
 
   double get totalVolume => sets.fold(0.0, (sum, set) => sum + set.volume);
 
@@ -204,24 +279,28 @@ class ExerciseLog {
     'exerciseId': exerciseId,
     'sets': sets.map((s) => s.toJson()).toList(),
     'notes': notes,
+    'handle': handle,
   };
 
   factory ExerciseLog.fromJson(Map<String, dynamic> json) => ExerciseLog(
     exerciseId: json['exerciseId'],
     sets: (json['sets'] as List).map((s) => WorkoutSet.fromJson(s)).toList(),
     notes: json['notes'],
+    handle: json['handle'] as String?,
   );
 
   ExerciseLog copyWith({
     Object? exerciseId = _sentinel,
     Object? sets = _sentinel,
     Object? notes = _sentinel,
+    Object? handle = _sentinel,
   }) => ExerciseLog(
     exerciseId: exerciseId == _sentinel
         ? this.exerciseId
         : exerciseId as String,
     sets: sets == _sentinel ? this.sets : sets as List<WorkoutSet>,
     notes: notes == _sentinel ? this.notes : notes as String?,
+    handle: handle == _sentinel ? this.handle : handle as String?,
   );
 }
 
@@ -236,6 +315,10 @@ class WorkoutSession {
   final String? notes;
   /// Non-null when this session was successfully synced to Health Connect.
   final DateTime? hcSyncedAt;
+  /// Optional once-per-workout subjective effort (1 = Easy, 2 = Solid,
+  /// 3 = Brutal), captured on the post-workout summary screen. Used only to
+  /// calibrate [EffortEstimator]'s per-set RPE anchor — never required.
+  final int? sessionEffort;
 
   WorkoutSession({
     required this.id,
@@ -245,6 +328,7 @@ class WorkoutSession {
     required this.duration,
     this.notes,
     this.hcSyncedAt,
+    this.sessionEffort,
   });
 
   double get totalVolume =>
@@ -258,6 +342,7 @@ class WorkoutSession {
     'duration': duration,
     'notes': notes,
     'hcSyncedAt': hcSyncedAt?.toIso8601String(),
+    'sessionEffort': sessionEffort,
   };
 
   factory WorkoutSession.fromJson(Map<String, dynamic> json) => WorkoutSession(
@@ -272,6 +357,7 @@ class WorkoutSession {
     hcSyncedAt: json['hcSyncedAt'] != null
         ? DateTime.parse(json['hcSyncedAt'] as String)
         : null,
+    sessionEffort: json['sessionEffort'] as int?,
   );
 
   WorkoutSession copyWith({
@@ -282,6 +368,7 @@ class WorkoutSession {
     Object? duration = _sentinel,
     Object? notes = _sentinel,
     Object? hcSyncedAt = _sentinel,
+    Object? sessionEffort = _sentinel,
   }) => WorkoutSession(
     id: id == _sentinel ? this.id : id as String,
     date: date == _sentinel ? this.date : date as DateTime,
@@ -294,6 +381,9 @@ class WorkoutSession {
     hcSyncedAt: hcSyncedAt == _sentinel
         ? this.hcSyncedAt
         : hcSyncedAt as DateTime?,
+    sessionEffort: sessionEffort == _sentinel
+        ? this.sessionEffort
+        : sessionEffort as int?,
   );
 }
 
@@ -398,6 +488,34 @@ class SetRecommendation {
     required this.reps,
     required this.confidence,
     required this.reasoning,
+  });
+}
+
+// ==================== Effort Estimate ====================
+
+/// Where an [EffortEstimate]'s RPE value came from.
+///
+/// No per-set RPE picker exists in this app — [userReported] is reserved
+/// for if one is ever added, so estimated values can never be confused with
+/// a real logged one.
+enum EffortSource { userReported, estimatedWithHr, estimatedHrless }
+
+/// A 0–10 RPE (rate of perceived exertion) estimate for one set, inferred
+/// from data already logged rather than asked of the user. See
+/// [EffortEstimator] for how it's computed.
+class EffortEstimate {
+  final double rpe;
+  final EffortSource source;
+
+  /// 0–1. Capped below 1.0 (see [EffortEstimator.maxEstimatedConfidence]) —
+  /// an estimate can never claim the certainty a real user-reported value
+  /// would have.
+  final double confidence;
+
+  const EffortEstimate({
+    required this.rpe,
+    required this.source,
+    required this.confidence,
   });
 }
 
@@ -870,12 +988,16 @@ class ChatMessage {
   final String role; // 'user' | 'model'
   final String text;
   final DateTime timestamp;
+  // Names of tools the model called (in order) while producing this reply.
+  // Null/empty for user messages and replies that used no tools.
+  final List<String>? toolCalls;
 
   ChatMessage({
     String? id,
     required this.role,
     required this.text,
     DateTime? timestamp,
+    this.toolCalls,
   })  : id = id ?? _uuid.v4(),
         timestamp = timestamp ?? DateTime.now();
 
@@ -884,6 +1006,7 @@ class ChatMessage {
     'role': role,
     'text': text,
     'timestamp': timestamp.toIso8601String(),
+    if (toolCalls != null && toolCalls!.isNotEmpty) 'toolCalls': toolCalls,
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
@@ -891,17 +1014,22 @@ class ChatMessage {
     role: json['role'] as String,
     text: json['text'] as String,
     timestamp: DateTime.parse(json['timestamp'] as String),
+    toolCalls: (json['toolCalls'] as List?)?.cast<String>(),
   );
 
   ChatMessage copyWith({
     Object? role = _sentinel,
     Object? text = _sentinel,
     Object? timestamp = _sentinel,
+    Object? toolCalls = _sentinel,
   }) => ChatMessage(
     id: id,
     role: role == _sentinel ? this.role : role as String,
     text: text == _sentinel ? this.text : text as String,
     timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime,
+    toolCalls: toolCalls == _sentinel
+        ? this.toolCalls
+        : toolCalls as List<String>?,
   );
 }
 
