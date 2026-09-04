@@ -6,6 +6,7 @@
 // - Calls IHealthConnectService.syncWorkoutSession in a fire-and-forget pattern.
 // - On success, invokes the optional onSynced callback with the updated session.
 // - Swallows all errors so callers are never affected.
+// - Reads storage once, on first sync, to cache exercise names for the notes.
 
 import 'package:flutter/foundation.dart' show debugPrint;
 
@@ -56,8 +57,8 @@ class HealthSyncManager implements IHealthSyncManager {
         });
   }
 
-  // Loaded once per process; exercise names only change when the user adds a
-  // custom exercise, and a stale name only affects the notes text.
+  /// Loaded once per process; exercise names only change when the user adds a
+  /// custom exercise, and a stale name only affects the notes text.
   Future<Map<String, String>> _resolveExerciseNames() async {
     final cached = _exerciseNames;
     if (cached != null) return cached;
