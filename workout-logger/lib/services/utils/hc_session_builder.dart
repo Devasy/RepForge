@@ -129,3 +129,42 @@ List<ExerciseSessionSegmentEvent> buildHcSegments({
   }
   return segments;
 }
+
+/// Composes the Health Connect session notes: the user's own notes first,
+/// then one line per exercise with numbered sets. Health Connect has no
+/// per-segment label, so this is the only place the real exercise names and
+/// set order survive the export.
+String? buildHcNotes({
+  required WorkoutSession session,
+  required Map<String, String> exerciseNames,
+  int maxLength = 2000,
+}) {
+  final lines = <String>[];
+  final userNotes = session.notes?.trim();
+  if (userNotes != null && userNotes.isNotEmpty) lines.add(userNotes);
+
+  for (final log in session.exercises) {
+    final sets = log.sets.where((s) => s.reps > 0).toList();
+    if (sets.isEmpty) continue;
+    final name = exerciseNames[log.exerciseId] ?? log.exerciseId;
+    final entries = <String>[];
+    for (var i = 0; i < sets.length; i++) {
+      final set = sets[i];
+      final weight = set.weight > 0 ? '${_formatKg(set.weight)}kg ' : '';
+      entries.add('${i + 1}) $weight× ${set.reps}');
+    }
+    lines.add('$name: ${entries.join(', ')}');
+  }
+
+  if (lines.isEmpty) return null;
+  final text = lines.join('\n');
+  if (text.length <= maxLength) return text;
+  return '${text.substring(0, maxLength - 1)}…';
+}
+
+String _formatKg(double kg) {
+  final rounded = (kg * 10).round() / 10;
+  return rounded == rounded.roundToDouble()
+      ? rounded.toStringAsFixed(0)
+      : rounded.toStringAsFixed(1);
+}

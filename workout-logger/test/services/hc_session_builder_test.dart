@@ -165,4 +165,112 @@ void main() {
       expect(segments.every((s) => s.weight == null), isTrue);
     });
   });
+
+  group('buildHcNotes', () {
+    test('lists each exercise by name with numbered sets', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 40,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'bench_press',
+            sets: [
+              WorkoutSet(weight: 60, reps: 10, timestamp: start),
+              WorkoutSet(weight: 72.5, reps: 8, timestamp: start.add(const Duration(minutes: 4))),
+            ],
+          ),
+          ExerciseLog(
+            exerciseId: 'lat_pulldown',
+            sets: [WorkoutSet(weight: 50, reps: 12, timestamp: start.add(const Duration(minutes: 9)))],
+          ),
+        ],
+      );
+
+      final notes = buildHcNotes(
+        session: session,
+        exerciseNames: const {'bench_press': 'Bench Press', 'lat_pulldown': 'Lat Pulldown'},
+      );
+
+      expect(notes, contains('Bench Press: 1) 60kg × 10, 2) 72.5kg × 8'));
+      expect(notes, contains('Lat Pulldown: 1) 50kg × 12'));
+    });
+
+    test('keeps the user session notes on the first line', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 20,
+        notes: 'Felt strong',
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [WorkoutSet(weight: 100, reps: 5, timestamp: start)],
+          ),
+        ],
+      );
+
+      final notes = buildHcNotes(session: session, exerciseNames: const {'squat': 'Squat'});
+
+      expect(notes!.startsWith('Felt strong'), isTrue);
+      expect(notes, contains('Squat: 1) 100kg × 5'));
+    });
+
+    test('renders bodyweight sets without a weight prefix', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 15,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'pull_ups',
+            sets: [WorkoutSet(weight: 0, reps: 8, timestamp: start)],
+          ),
+        ],
+      );
+
+      final notes = buildHcNotes(session: session, exerciseNames: const {'pull_ups': 'Pull Ups'});
+
+      expect(notes, contains('Pull Ups: 1) × 8'));
+    });
+
+    test('falls back to the exercise id when no name is known', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 15,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'custom_abc',
+            sets: [WorkoutSet(weight: 20, reps: 10, timestamp: start)],
+          ),
+        ],
+      );
+
+      final notes = buildHcNotes(session: session, exerciseNames: const {});
+
+      expect(notes, contains('custom_abc: 1) 20kg × 10'));
+    });
+
+    test('returns null when the session has no notes and no sets', () {
+      final session = _session(start: start, durationMinutes: 10, exercises: []);
+
+      expect(buildHcNotes(session: session, exerciseNames: const {}), isNull);
+    });
+
+    test('truncates to maxLength with an ellipsis', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 60,
+        exercises: List.generate(
+          30,
+          (i) => ExerciseLog(
+            exerciseId: 'ex_$i',
+            sets: [WorkoutSet(weight: 100, reps: 10, timestamp: start.add(Duration(minutes: i)))],
+          ),
+        ),
+      );
+
+      final notes = buildHcNotes(session: session, exerciseNames: const {}, maxLength: 100);
+
+      expect(notes!.length, 100);
+      expect(notes.endsWith('…'), isTrue);
+    });
+  });
 }
