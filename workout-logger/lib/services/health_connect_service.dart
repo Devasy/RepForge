@@ -1,6 +1,6 @@
 import 'dart:math' show max;
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:health_connector/health_connector.dart';
 
 import '../models/models.dart';
@@ -262,8 +262,44 @@ class HealthConnectService implements IHealthConnectService {
     }
   }
 
+  static bool _segmentWeightUnsupported = false;
+
+  @visibleForTesting
+  static void resetSegmentWeightSupport() => _segmentWeightUnsupported = false;
+
+  /// Runs [write] with segment weights, retrying once without them when the
+  /// device's Health Connect module predates SDK Extension 21. Without this
+  /// the whole session — reps, segments and all — would fail to sync there.
+  @visibleForTesting
+  static Future<bool> writeWithWeightFallback(
+    Future<void> Function({required bool includeWeight}) write,
+  ) async {
+    try {
+      await write(includeWeight: !_segmentWeightUnsupported);
+      return true;
+    } on UnsupportedOperationException catch (e) {
+      if (_segmentWeightUnsupported) {
+        debugPrint('[HC] write failed without segment weight: $e');
+        return false;
+      }
+      _segmentWeightUnsupported = true;
+      debugPrint('[HC] segment weight unsupported, retrying without it: $e');
+      try {
+        await write(includeWeight: false);
+        return true;
+      } catch (retryError) {
+        debugPrint('[HC] weightless retry failed: $retryError');
+        return false;
+      }
+    }
+  }
+
   @override
-  Future<bool> syncWorkoutSession(WorkoutSession session, {String? title}) async {
+  Future<bool> syncWorkoutSession(
+    WorkoutSession session, {
+    String? title,
+    Map<String, String>? exerciseNames,
+  }) async {
     try {
       final connector = await _getConnector();
       if (connector == null) return false;
@@ -271,24 +307,29 @@ class HealthConnectService implements IHealthConnectService {
       final sessionStart = session.date;
       final durationMinutes = max(session.duration, 1);
       final sessionEnd = sessionStart.add(Duration(minutes: durationMinutes));
-      final segments = buildHcSegments(
-        session: session,
-        sessionStart: sessionStart,
-        sessionEnd: sessionEnd,
-      );
 
-      final record = ExerciseSessionRecord(
-        startTime: sessionStart,
-        endTime: sessionEnd,
-        exerciseType: ExerciseType.strengthTraining,
-        metadata: Metadata.manualEntry(clientRecordId: 'workout_${session.id}'),
-        title: title?.isNotEmpty == true ? title : null,
-        notes: session.notes?.isNotEmpty == true ? session.notes : null,
-        events: segments,
-      );
+      Future<void> write({required bool includeWeight}) async {
+        final record = ExerciseSessionRecord(
+          startTime: sessionStart,
+          endTime: sessionEnd,
+          exerciseType: ExerciseType.strengthTraining,
+          metadata: Metadata.manualEntry(clientRecordId: 'workout_${session.id}'),
+          title: title?.isNotEmpty == true ? title : null,
+          notes: buildHcNotes(
+            session: session,
+            exerciseNames: exerciseNames ?? const {},
+          ),
+          events: buildHcSegments(
+            session: session,
+            sessionStart: sessionStart,
+            sessionEnd: sessionEnd,
+            includeWeight: includeWeight,
+          ),
+        );
+        await connector.writeRecords([record]).timeout(_queryDeadline);
+      }
 
-      await connector.writeRecords([record]).timeout(_queryDeadline);
-      return true;
+      return await writeWithWeightFallback(write);
     } catch (e) {
       debugPrint('Health Connect sync failed: $e');
       return false;
