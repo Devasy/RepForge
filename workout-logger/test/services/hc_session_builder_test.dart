@@ -293,6 +293,29 @@ void main() {
       expect(segments.every((s) => s.weight == null), isTrue);
       expect(segments.any((s) => s.repetitions == 5), isTrue);
     });
+
+    test('falls back to even spacing when the first set lands on the session start', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 30,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [WorkoutSet(weight: 80, reps: 5, timeTaken: 20, timestamp: start)],
+          ),
+        ],
+      );
+
+      final segments = buildHcSegments(
+        session: session,
+        sessionStart: start,
+        sessionEnd: start.add(const Duration(minutes: 30)),
+      );
+
+      expect(segments, isNotEmpty);
+      expect(segments.first.startTime, start);
+      expect(segments.last.endTime, start.add(const Duration(minutes: 30)));
+    });
   });
 
   group('buildHcNotes', () {
