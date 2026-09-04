@@ -28,6 +28,35 @@ void main() {
     test('falls back to otherWorkout for an unknown custom exercise', () {
       expect(hcSegmentTypeFor('custom_abc'), ExerciseSegmentType.otherWorkout);
     });
+
+    test('maps generic barbell and cable lifts to weightlifting', () {
+      const generic = [
+        'push_ups',
+        'dips',
+        'cable_fly',
+        'pec_deck',
+        'barbell_row',
+        'seated_cable_row',
+        't_bar_row',
+        'face_pull',
+        'rear_delt_fly',
+        'shrugs',
+        'calf_raise',
+        'tricep_pushdown',
+        'skull_crushers',
+      ];
+      for (final id in generic) {
+        expect(
+          hcSegmentTypeFor(id),
+          ExerciseSegmentType.weightlifting,
+          reason: '$id should map to weightlifting',
+        );
+      }
+    });
+
+    test('keeps otherWorkout only for unmapped custom exercises', () {
+      expect(hcSegmentTypeFor('some_custom_uuid'), ExerciseSegmentType.otherWorkout);
+    });
   });
 
   group('buildHcSegments', () {
