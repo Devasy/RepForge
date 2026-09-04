@@ -164,6 +164,135 @@ void main() {
       expect(segments, isNotEmpty);
       expect(segments.every((s) => s.weight == null), isTrue);
     });
+
+    test('emits rest segments between work segments', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 30,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [
+              WorkoutSet(weight: 80, reps: 5, timeTaken: 30, timestamp: start.add(const Duration(minutes: 5))),
+              WorkoutSet(weight: 90, reps: 5, timeTaken: 30, timestamp: start.add(const Duration(minutes: 12))),
+            ],
+          ),
+        ],
+      );
+
+      final segments = buildHcSegments(
+        session: session,
+        sessionStart: start,
+        sessionEnd: start.add(const Duration(minutes: 30)),
+      );
+
+      final rests = segments.where((s) => s.segmentType == ExerciseSegmentType.rest).toList();
+      expect(rests.length, 2);
+      expect(rests.every((s) => s.repetitions == null && s.weight == null), isTrue);
+    });
+
+    test('sizes a work segment from timeTaken', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 30,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [
+              WorkoutSet(weight: 80, reps: 5, timeTaken: 45, timestamp: start.add(const Duration(minutes: 5))),
+              WorkoutSet(weight: 90, reps: 5, timeTaken: 45, timestamp: start.add(const Duration(minutes: 12))),
+            ],
+          ),
+        ],
+      );
+
+      final segments = buildHcSegments(
+        session: session,
+        sessionStart: start,
+        sessionEnd: start.add(const Duration(minutes: 30)),
+      );
+
+      final work = segments.firstWhere((s) => s.segmentType == ExerciseSegmentType.squat);
+      expect(work.duration, const Duration(seconds: 45));
+      expect(work.endTime, start.add(const Duration(minutes: 5)));
+    });
+
+    test('estimates work duration from reps when timeTaken is missing', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 30,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [
+              WorkoutSet(weight: 80, reps: 12, timestamp: start.add(const Duration(minutes: 5))),
+              WorkoutSet(weight: 90, reps: 12, timestamp: start.add(const Duration(minutes: 12))),
+            ],
+          ),
+        ],
+      );
+
+      final segments = buildHcSegments(
+        session: session,
+        sessionStart: start,
+        sessionEnd: start.add(const Duration(minutes: 30)),
+      );
+
+      final work = segments.firstWhere((s) => s.segmentType == ExerciseSegmentType.squat);
+      expect(work.duration, const Duration(seconds: 36));
+    });
+
+    test('skips rest segments shorter than 30 seconds', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 30,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [
+              WorkoutSet(weight: 80, reps: 5, timeTaken: 20, timestamp: start.add(const Duration(seconds: 25))),
+              WorkoutSet(weight: 90, reps: 5, timeTaken: 20, timestamp: start.add(const Duration(seconds: 60))),
+            ],
+          ),
+        ],
+      );
+
+      final segments = buildHcSegments(
+        session: session,
+        sessionStart: start,
+        sessionEnd: start.add(const Duration(minutes: 30)),
+      );
+
+      expect(segments.any((s) => s.segmentType == ExerciseSegmentType.rest), isFalse);
+      expect(segments.length, 2);
+    });
+
+    test('omits every weight when includeWeight is false', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 30,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [
+              WorkoutSet(weight: 80, reps: 5, timeTaken: 30, timestamp: start.add(const Duration(minutes: 5))),
+              WorkoutSet(weight: 90, reps: 5, timeTaken: 30, timestamp: start.add(const Duration(minutes: 12))),
+            ],
+          ),
+        ],
+      );
+
+      final segments = buildHcSegments(
+        session: session,
+        sessionStart: start,
+        sessionEnd: start.add(const Duration(minutes: 30)),
+        includeWeight: false,
+      );
+
+      expect(segments, isNotEmpty);
+      expect(segments.every((s) => s.weight == null), isTrue);
+      expect(segments.any((s) => s.repetitions == 5), isTrue);
+    });
   });
 
   group('buildHcNotes', () {

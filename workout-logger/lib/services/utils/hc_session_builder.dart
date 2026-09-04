@@ -61,71 +61,97 @@ const _segmentTypeMap = <String, ExerciseSegmentType>{
 ExerciseSegmentType hcSegmentTypeFor(String exerciseId) =>
     _segmentTypeMap[exerciseId] ?? ExerciseSegmentType.otherWorkout;
 
+const _minWorkSeconds = 10;
+const _maxWorkSeconds = 180;
+const _minRestSeconds = 30;
+const _secondsPerRep = 3;
+
 /// Builds non-overlapping segments for [session] inside
-/// [sessionStart]–[sessionEnd], ordered by each set's recorded timestamp.
+/// [sessionStart]–[sessionEnd].
 ///
-/// Falls back to an evenly-spaced layout when the recorded timestamps cannot
-/// produce a valid layout (duplicate timestamps on legacy data, or a final
-/// set clamped onto [sessionEnd]), since zero-duration or overlapping
-/// segments make Health Connect reject the whole record.
+/// Each set becomes a work segment ending at its recorded timestamp and
+/// starting [WorkoutSet.timeTaken] seconds earlier (estimated from reps when
+/// unrecorded); gaps of at least 30 seconds between work segments become
+/// explicit rest segments. Health Connect permits gaps, so shorter gaps are
+/// simply left unmarked.
+///
+/// Falls back to an evenly-spaced layout with no rest segments when the
+/// recorded timestamps cannot produce a valid layout (duplicate timestamps on
+/// legacy data, or a final set clamped onto [sessionEnd]), since zero-duration
+/// or overlapping segments make Health Connect reject the whole record.
+///
+/// Pass [includeWeight] as false on devices that reject segment weights.
 List<ExerciseSessionSegmentEvent> buildHcSegments({
   required WorkoutSession session,
   required DateTime sessionStart,
   required DateTime sessionEnd,
+  bool includeWeight = true,
 }) {
-  final allSets = <(ExerciseSegmentType, int, DateTime, double)>[];
-
+  final allSets = <(ExerciseSegmentType, WorkoutSet)>[];
   for (final log in session.exercises) {
     final type = hcSegmentTypeFor(log.exerciseId);
     for (final set in log.sets) {
-      if (set.reps > 0) {
-        allSets.add((type, set.reps, set.timestamp, set.weight));
-      }
+      if (set.reps > 0) allSets.add((type, set));
     }
   }
-
   if (allSets.isEmpty) return [];
 
-  allSets.sort((a, b) => a.$3.compareTo(b.$3));
+  allSets.sort((a, b) => a.$2.timestamp.compareTo(b.$2.timestamp));
 
-  final clampedSets = allSets.map((s) {
-    var ts = s.$3;
+  final clamped = allSets.map((entry) {
+    var ts = entry.$2.timestamp;
     if (ts.isBefore(sessionStart)) ts = sessionStart;
     if (ts.isAfter(sessionEnd)) ts = sessionEnd;
-    return (s.$1, s.$2, ts, s.$4);
+    return (entry.$1, entry.$2, ts);
   }).toList();
 
-  final uniqueTimestamps = clampedSets.map((s) => s.$3).toSet();
-  if (uniqueTimestamps.length < clampedSets.length ||
-      clampedSets.last.$3 == sessionEnd) {
+  Mass? massOf(WorkoutSet set) =>
+      includeWeight && set.weight > 0 ? Mass.kilograms(set.weight) : null;
+
+  final uniqueTimestamps = clamped.map((s) => s.$3).toSet();
+  if (uniqueTimestamps.length < clamped.length || clamped.last.$3 == sessionEnd) {
     final totalMs = sessionEnd.difference(sessionStart).inMilliseconds;
-    final slotMs = totalMs ~/ clampedSets.length;
-    return List.generate(clampedSets.length, (i) {
-      final start = sessionStart.add(Duration(milliseconds: slotMs * i));
-      final end = i < clampedSets.length - 1
+    final slotMs = totalMs ~/ clamped.length;
+    return List.generate(clamped.length, (i) {
+      final segStart = sessionStart.add(Duration(milliseconds: slotMs * i));
+      final segEnd = i < clamped.length - 1
           ? sessionStart.add(Duration(milliseconds: slotMs * (i + 1)))
           : sessionEnd;
       return ExerciseSessionSegmentEvent(
-        startTime: start,
-        endTime: end,
-        segmentType: clampedSets[i].$1,
-        repetitions: clampedSets[i].$2,
-        weight: clampedSets[i].$4 > 0 ? Mass.kilograms(clampedSets[i].$4) : null,
+        startTime: segStart,
+        endTime: segEnd,
+        segmentType: clamped[i].$1,
+        repetitions: clamped[i].$2.reps,
+        weight: massOf(clamped[i].$2),
       );
     });
   }
 
   final segments = <ExerciseSessionSegmentEvent>[];
-  for (var i = 0; i < clampedSets.length; i++) {
-    final start = clampedSets[i].$3;
-    final end = i < clampedSets.length - 1 ? clampedSets[i + 1].$3 : sessionEnd;
+  var cursor = sessionStart;
+  for (final (type, set, ts) in clamped) {
+    final workSeconds = (set.timeTaken ?? set.reps * _secondsPerRep)
+        .clamp(_minWorkSeconds, _maxWorkSeconds)
+        .toInt();
+    var workStart = ts.subtract(Duration(seconds: workSeconds));
+    if (workStart.isBefore(cursor)) workStart = cursor;
+    if (!workStart.isBefore(ts)) continue;
+
+    if (workStart.difference(cursor).inSeconds >= _minRestSeconds) {
+      segments.add(ExerciseSessionSegmentEvent(
+        startTime: cursor,
+        endTime: workStart,
+        segmentType: ExerciseSegmentType.rest,
+      ));
+    }
     segments.add(ExerciseSessionSegmentEvent(
-      startTime: start,
-      endTime: end,
-      segmentType: clampedSets[i].$1,
-      repetitions: clampedSets[i].$2,
-      weight: clampedSets[i].$4 > 0 ? Mass.kilograms(clampedSets[i].$4) : null,
+      startTime: workStart,
+      endTime: ts,
+      segmentType: type,
+      repetitions: set.reps,
+      weight: massOf(set),
     ));
+    cursor = ts;
   }
   return segments;
 }
