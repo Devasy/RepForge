@@ -17,6 +17,26 @@ WorkoutSession _session({
       notes: notes,
     );
 
+/// Asserts that Health Connect's own [ExerciseSessionRecord] validation
+/// accepts [segments], exercising the real invariant checks instead of a
+/// hand-rolled approximation of them.
+void _expectValidHcRecord({
+  required List<ExerciseSessionSegmentEvent> segments,
+  required DateTime sessionStart,
+  required DateTime sessionEnd,
+}) {
+  expect(
+    () => ExerciseSessionRecord(
+      startTime: sessionStart,
+      endTime: sessionEnd,
+      exerciseType: ExerciseType.strengthTraining,
+      metadata: Metadata.manualEntry(clientRecordId: 'test'),
+      events: segments,
+    ),
+    returnsNormally,
+  );
+}
+
 void main() {
   final start = DateTime(2026, 9, 4, 18);
 
@@ -72,13 +92,15 @@ void main() {
         ],
       );
 
+      final sessionEnd = start.add(const Duration(minutes: 30));
       final segments = buildHcSegments(
         session: session,
         sessionStart: start,
-        sessionEnd: start.add(const Duration(minutes: 30)),
+        sessionEnd: sessionEnd,
       );
 
       expect(segments, isEmpty);
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
     });
 
     test('spaces segments evenly when set timestamps are identical', () {
@@ -96,10 +118,11 @@ void main() {
         ],
       );
 
+      final sessionEnd = start.add(const Duration(minutes: 30));
       final segments = buildHcSegments(
         session: session,
         sessionStart: start,
-        sessionEnd: start.add(const Duration(minutes: 30)),
+        sessionEnd: sessionEnd,
       );
 
       expect(segments.length, 2);
@@ -108,6 +131,7 @@ void main() {
       expect(segments.last.endTime, start.add(const Duration(minutes: 30)));
       expect(segments.first.repetitions, 10);
       expect(segments.first.weight, const Mass.kilograms(60));
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
     });
 
     test('never emits overlapping segments for distinct timestamps', () {
@@ -126,10 +150,11 @@ void main() {
         ],
       );
 
+      final sessionEnd = start.add(const Duration(minutes: 30));
       final segments = buildHcSegments(
         session: session,
         sessionStart: start,
-        sessionEnd: start.add(const Duration(minutes: 30)),
+        sessionEnd: sessionEnd,
       );
 
       for (var i = 0; i < segments.length - 1; i++) {
@@ -138,6 +163,7 @@ void main() {
       }
       expect(segments.first.startTime.isBefore(start), isFalse);
       expect(segments.last.endTime.isAfter(start.add(const Duration(minutes: 30))), isFalse);
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
     });
 
     test('omits weight when the set weight is zero', () {
@@ -155,14 +181,16 @@ void main() {
         ],
       );
 
+      final sessionEnd = start.add(const Duration(minutes: 20));
       final segments = buildHcSegments(
         session: session,
         sessionStart: start,
-        sessionEnd: start.add(const Duration(minutes: 20)),
+        sessionEnd: sessionEnd,
       );
 
       expect(segments, isNotEmpty);
       expect(segments.every((s) => s.weight == null), isTrue);
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
     });
 
     test('emits rest segments between work segments', () {
@@ -180,15 +208,17 @@ void main() {
         ],
       );
 
+      final sessionEnd = start.add(const Duration(minutes: 30));
       final segments = buildHcSegments(
         session: session,
         sessionStart: start,
-        sessionEnd: start.add(const Duration(minutes: 30)),
+        sessionEnd: sessionEnd,
       );
 
       final rests = segments.where((s) => s.segmentType == ExerciseSegmentType.rest).toList();
       expect(rests.length, 2);
       expect(rests.every((s) => s.repetitions == null && s.weight == null), isTrue);
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
     });
 
     test('sizes a work segment from timeTaken', () {
@@ -206,15 +236,17 @@ void main() {
         ],
       );
 
+      final sessionEnd = start.add(const Duration(minutes: 30));
       final segments = buildHcSegments(
         session: session,
         sessionStart: start,
-        sessionEnd: start.add(const Duration(minutes: 30)),
+        sessionEnd: sessionEnd,
       );
 
       final work = segments.firstWhere((s) => s.segmentType == ExerciseSegmentType.squat);
       expect(work.duration, const Duration(seconds: 45));
       expect(work.endTime, start.add(const Duration(minutes: 5)));
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
     });
 
     test('estimates work duration from reps when timeTaken is missing', () {
@@ -232,14 +264,16 @@ void main() {
         ],
       );
 
+      final sessionEnd = start.add(const Duration(minutes: 30));
       final segments = buildHcSegments(
         session: session,
         sessionStart: start,
-        sessionEnd: start.add(const Duration(minutes: 30)),
+        sessionEnd: sessionEnd,
       );
 
       final work = segments.firstWhere((s) => s.segmentType == ExerciseSegmentType.squat);
       expect(work.duration, const Duration(seconds: 36));
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
     });
 
     test('skips rest segments shorter than 30 seconds', () {
@@ -257,14 +291,16 @@ void main() {
         ],
       );
 
+      final sessionEnd = start.add(const Duration(minutes: 30));
       final segments = buildHcSegments(
         session: session,
         sessionStart: start,
-        sessionEnd: start.add(const Duration(minutes: 30)),
+        sessionEnd: sessionEnd,
       );
 
       expect(segments.any((s) => s.segmentType == ExerciseSegmentType.rest), isFalse);
       expect(segments.length, 2);
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
     });
 
     test('omits every weight when includeWeight is false', () {
@@ -282,16 +318,18 @@ void main() {
         ],
       );
 
+      final sessionEnd = start.add(const Duration(minutes: 30));
       final segments = buildHcSegments(
         session: session,
         sessionStart: start,
-        sessionEnd: start.add(const Duration(minutes: 30)),
+        sessionEnd: sessionEnd,
         includeWeight: false,
       );
 
       expect(segments, isNotEmpty);
       expect(segments.every((s) => s.weight == null), isTrue);
       expect(segments.any((s) => s.repetitions == 5), isTrue);
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
     });
 
     test('falls back to even spacing when the first set lands on the session start', () {
@@ -306,15 +344,77 @@ void main() {
         ],
       );
 
+      final sessionEnd = start.add(const Duration(minutes: 30));
       final segments = buildHcSegments(
         session: session,
         sessionStart: start,
-        sessionEnd: start.add(const Duration(minutes: 30)),
+        sessionEnd: sessionEnd,
       );
 
       expect(segments, isNotEmpty);
       expect(segments.first.startTime, start);
       expect(segments.last.endTime, start.add(const Duration(minutes: 30)));
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
+    });
+
+    test('does not fall back to even spacing when the last set lands on the session end', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 30,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [
+              WorkoutSet(weight: 80, reps: 5, timeTaken: 20, timestamp: start.add(const Duration(minutes: 5))),
+              WorkoutSet(weight: 90, reps: 5, timeTaken: 20, timestamp: start.add(const Duration(minutes: 30))),
+            ],
+          ),
+        ],
+      );
+
+      final sessionEnd = start.add(const Duration(minutes: 30));
+      final segments = buildHcSegments(
+        session: session,
+        sessionStart: start,
+        sessionEnd: sessionEnd,
+      );
+
+      expect(segments.any((s) => s.segmentType == ExerciseSegmentType.rest), isTrue);
+      expect(segments.first.endTime, isNot(start.add(const Duration(minutes: 15))));
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
+    });
+
+    test('uses effective weight (not raw assistance) for an assisted-bodyweight set', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 20,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'pull_ups',
+            sets: [
+              WorkoutSet(
+                weight: 40,
+                reps: 8,
+                timestamp: start.add(const Duration(minutes: 4)),
+                assistWeight: 40,
+                extraWeight: 0,
+                bodyWeightAtLog: 70,
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final sessionEnd = start.add(const Duration(minutes: 20));
+      final segments = buildHcSegments(
+        session: session,
+        sessionStart: start,
+        sessionEnd: sessionEnd,
+      );
+
+      final work = segments.firstWhere((s) => s.segmentType == ExerciseSegmentType.pullUp);
+      expect(work.weight, const Mass.kilograms(30));
+      _expectValidHcRecord(segments: segments, sessionStart: start, sessionEnd: sessionEnd);
     });
   });
 
@@ -381,6 +481,32 @@ void main() {
       final notes = buildHcNotes(session: session, exerciseNames: const {'pull_ups': 'Pull Ups'});
 
       expect(notes, contains('Pull Ups: 1) × 8'));
+    });
+
+    test('uses effective weight (not raw assistance) for an assisted-bodyweight set', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 15,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'pull_ups',
+            sets: [
+              WorkoutSet(
+                weight: 40,
+                reps: 8,
+                timestamp: start,
+                assistWeight: 40,
+                extraWeight: 0,
+                bodyWeightAtLog: 70,
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final notes = buildHcNotes(session: session, exerciseNames: const {'pull_ups': 'Pull Ups'});
+
+      expect(notes, contains('Pull Ups: 1) 30kg × 8'));
     });
 
     test('falls back to the exercise id when no name is known', () {

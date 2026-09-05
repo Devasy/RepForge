@@ -77,9 +77,9 @@ const _secondsPerRep = 3;
 ///
 /// Falls back to an evenly-spaced layout with no rest segments when the
 /// recorded timestamps cannot produce a valid layout (duplicate timestamps on
-/// legacy data, a final set clamped onto [sessionEnd], or a first set clamped
-/// onto [sessionStart]), since zero-duration or overlapping segments make
-/// Health Connect reject the whole record.
+/// legacy data, or a first set clamped onto [sessionStart]), since
+/// zero-duration or overlapping segments make Health Connect reject the whole
+/// record.
 ///
 /// Pass [includeWeight] as false on devices that reject segment weights.
 List<ExerciseSessionSegmentEvent> buildHcSegments({
@@ -106,12 +106,12 @@ List<ExerciseSessionSegmentEvent> buildHcSegments({
     return (entry.$1, entry.$2, ts);
   }).toList();
 
-  Mass? massOf(WorkoutSet set) =>
-      includeWeight && set.weight > 0 ? Mass.kilograms(set.weight) : null;
+  Mass? massOf(WorkoutSet set) => includeWeight && set.effectiveWeight > 0
+      ? Mass.kilograms(set.effectiveWeight)
+      : null;
 
   final uniqueTimestamps = clamped.map((s) => s.$3).toSet();
   if (uniqueTimestamps.length < clamped.length ||
-      clamped.last.$3 == sessionEnd ||
       clamped.first.$3 == sessionStart) {
     final totalMs = sessionEnd.difference(sessionStart).inMilliseconds;
     final slotMs = totalMs ~/ clamped.length;
@@ -179,7 +179,8 @@ String? buildHcNotes({
     final entries = <String>[];
     for (var i = 0; i < sets.length; i++) {
       final set = sets[i];
-      final weight = set.weight > 0 ? '${_formatKg(set.weight)}kg ' : '';
+      final weight =
+          set.effectiveWeight > 0 ? '${_formatKg(set.effectiveWeight)}kg ' : '';
       entries.add('${i + 1}) $weight× ${set.reps}');
     }
     lines.add('$name: ${entries.join(', ')}');
