@@ -550,5 +550,23 @@ void main() {
       expect(notes!.length, 100);
       expect(notes.endsWith('…'), isTrue);
     });
+    test('includes session effort RPE in buildHcNotes when sessionEffort is set', () {
+      final session = _session(
+        start: start,
+        durationMinutes: 20,
+        sessionEffort: 2,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [WorkoutSet(weight: 100, reps: 5, timestamp: start)],
+          ),
+        ],
+      );
+
+      final notes = buildHcNotes(session: session, exerciseNames: const {'squat': 'Squat'});
+
+      expect(notes, contains('Session Effort: Solid (RPE ~8.0)'));
+      expect(notes, contains('Squat: 1) 100kg × 5'));
+    });
   });
 }

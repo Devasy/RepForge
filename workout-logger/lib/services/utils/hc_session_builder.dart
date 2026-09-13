@@ -172,6 +172,12 @@ String? buildHcNotes({
   final userNotes = session.notes?.trim();
   if (userNotes != null && userNotes.isNotEmpty) lines.add(userNotes);
 
+  if (session.sessionEffort != null) {
+    const effortLabels = {1: 'Easy (RPE ~6.5)', 2: 'Solid (RPE ~8.0)', 3: 'Brutal (RPE ~9.5)'};
+    final effortLabel = effortLabels[session.sessionEffort] ?? 'RPE ${session.sessionEffort}';
+    lines.add('Session Effort: $effortLabel');
+  }
+
   for (final log in session.exercises) {
     final sets = log.sets.where((s) => s.reps > 0).toList();
     if (sets.isEmpty) continue;
