@@ -8,6 +8,7 @@ WorkoutSession _session({
   required int durationMinutes,
   required List<ExerciseLog> exercises,
   String? notes,
+  int? sessionEffort,
 }) =>
     WorkoutSession(
       id: 'sess_1',
@@ -15,6 +16,7 @@ WorkoutSession _session({
       duration: durationMinutes,
       exercises: exercises,
       notes: notes,
+      sessionEffort: sessionEffort,
     );
 
 /// Asserts that Health Connect's own [ExerciseSessionRecord] validation
