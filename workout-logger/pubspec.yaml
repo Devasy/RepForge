@@ -78,6 +78,9 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  dart_code_linter: ^3.2.1
+  custom_lint: ^0.8.1
+  awesome_lints: ^2.2.0
   
   # Testing
   mockito: ^5.4.4
