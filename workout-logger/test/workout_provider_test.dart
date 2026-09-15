@@ -6,7 +6,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/managers/program_manager.dart';
+import 'package:repforge/services/managers/history_manager.dart';
+import 'package:repforge/services/interfaces/health_sync_manager_interface.dart';
 import 'test_utils/mock_storage_service.dart';
+
+class _StubSync implements IHealthSyncManager {
+  final List<WorkoutSession> synced = [];
+  String? capturedRoutineName;
+
+  @override
+  void syncSession(
+    WorkoutSession session, {
+    String? routineName,
+    void Function(WorkoutSession updated)? onSynced,
+  }) {
+    synced.add(session);
+    capturedRoutineName = routineName;
+  }
+}
 
 void main() {
   group('WorkoutProvider Tests', () {
@@ -530,6 +547,32 @@ void main() {
             reason: 'the failed first write must not roll back over the second',
           );
         });
+
+        test(
+          'triggers Health Connect sync on historyManager when sessionEffort is recorded',
+          () async {
+            final stub = _StubSync();
+            final historyManager = HistoryManager(
+              mockStorage,
+              healthSyncManager: stub,
+            );
+            final providerWithHistory = WorkoutProvider(
+              mockStorage,
+              historyManager: historyManager,
+              programManager: ProgramManager(mockStorage),
+            );
+            mockStorage.addMockSession(
+              session('s1', DateTime(2025, 1, 1), [log('bench_press')]),
+            );
+            await providerWithHistory.init();
+
+            await providerWithHistory.recordSessionEffort('s1', 2);
+
+            expect(stub.synced.length, 1);
+            expect(stub.synced.first.id, 's1');
+            expect(stub.synced.first.sessionEffort, 2);
+          },
+        );
       });
     });
 

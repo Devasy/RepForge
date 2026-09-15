@@ -42,7 +42,7 @@ android {
                 keyProperties.load(FileInputStream(keyPropertiesFile))
             }
             val keystorePath = System.getenv("KEYSTORE_PATH") ?: keyProperties.getProperty("storeFile")
-            val storePass    = System.getenv("KEY_STORE_PASSWORD") ?: keyProperties.getProperty("storePassword")
+            val storePass    = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("KEY_STORE_PASSWORD") ?: keyProperties.getProperty("storePassword")
             val alias        = System.getenv("KEY_ALIAS") ?: keyProperties.getProperty("keyAlias")
             val keyPass      = System.getenv("KEY_PASSWORD") ?: keyProperties.getProperty("keyPassword")
             if (!keystorePath.isNullOrEmpty() && !storePass.isNullOrEmpty() && !alias.isNullOrEmpty() && !keyPass.isNullOrEmpty()) {

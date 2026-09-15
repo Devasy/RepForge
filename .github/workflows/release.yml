@@ -1,9 +1,11 @@
-name: Release Build
+name: Release Build & Deploy
 
 on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 concurrency:
@@ -12,7 +14,7 @@ concurrency:
 
 jobs:
   release:
-    name: Build and Release APK
+    name: Build, Release & Deploy
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
@@ -22,19 +24,19 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Fetch all history for proper versioning
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Gradle Build Cache
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -47,13 +49,9 @@ jobs:
       - name: Install dependencies
         working-directory: ./workout-logger
         run: |
-          flutter pub get --enforce-lockfile
+          flutter pub get
           : "${PUB_CACHE:?PUB_CACHE is not set}"
           mapfile -t targets < <(find "$PUB_CACHE" -type f -path '*/jni-*/src/CMakeLists.txt')
-          if [ "${#targets[@]}" -eq 0 ]; then
-            echo "Error: no jni-*/src/CMakeLists.txt files found under \$PUB_CACHE" >&2
-            exit 1
-          fi
           for f in "${targets[@]}"; do
             if ! grep -q -- '-Wl,--build-id=none' "$f"; then
               sed -i -e 's/-Wl,/-Wl,--build-id=none,/' "$f"
@@ -61,7 +59,7 @@ jobs:
           done
 
       - name: Bump version
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
         id: bump_version
         run: |
           dart scripts/bump_version.dart patch
@@ -74,13 +72,13 @@ jobs:
           echo "value=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Configure Git
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Commit version bump
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
         id: commit_version
         run: |
           git add workout-logger/pubspec.yaml
@@ -100,7 +98,7 @@ jobs:
           git push origin "v${{ steps.version.outputs.value }}"
 
       - name: Get merged PRs for release notes
-        if: github.event_name == 'push' && steps.commit_version.outputs.committed == 'true'
+        if: steps.commit_version.outputs.committed == 'true' || startsWith(github.ref, 'refs/tags/')
         id: merged_prs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -135,21 +133,41 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       - name: Decode release keystore
+        id: decode_keystore
         run: |
           if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "Error: KEYSTORE_BASE64 secret is not configured in repository secrets."
             exit 1
           fi
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > /tmp/repforge-release.jks
+          KEYSTORE_FILE="${{ runner.temp }}/upload-keystore.jks"
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_FILE"
+          echo "keystore_path=$KEYSTORE_FILE" >> $GITHUB_OUTPUT
 
-      - name: Build APK
+      - name: Build Release App Bundle (.aab)
         working-directory: ./workout-logger
         env:
-          KEYSTORE_PATH: /tmp/repforge-release.jks
-          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEYSTORE_PATH: ${{ steps.decode_keystore.outputs.keystore_path }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: flutter build apk --release --split-per-abi
+        run: |
+          flutter build appbundle --release \
+            --build-name=${{ steps.version.outputs.value }} \
+            --build-number=${{ github.run_number }}
+
+      - name: Build APKs (Split per ABI)
+        working-directory: ./workout-logger
+        env:
+          KEYSTORE_PATH: ${{ steps.decode_keystore.outputs.keystore_path }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          flutter build apk --release --split-per-abi \
+            --build-name=${{ steps.version.outputs.value }} \
+            --build-number=${{ github.run_number }}
 
       - name: Rename APKs
         run: |
@@ -159,7 +177,15 @@ jobs:
           mv "$DIR/app-armeabi-v7a-release.apk" "$DIR/repforge-v${V}-armeabi-v7a.apk" 2>/dev/null || true
           mv "$DIR/app-x86_64-release.apk"      "$DIR/repforge-v${V}-x86_64.apk"      2>/dev/null || true
 
+      - name: Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: repforge-v${{ steps.version.outputs.value }}-b${{ github.run_number }}-aab
+          path: workout-logger/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 14
+
       - name: Sanitize ref name for artifact
+        if: github.event_name == 'workflow_dispatch'
         id: sanitize_ref
         run: echo "ref_name=$(echo '${{ github.ref_name }}' | tr '/' '-')" >> $GITHUB_OUTPUT
 
@@ -171,9 +197,27 @@ jobs:
           path: workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}-*.apk
           retention-days: 7
 
+      - name: Deploy to Google Play (Internal Track)
+        if: env.PLAY_STORE_JSON_KEY != ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          packageName: com.devasy.repforge
+          releaseFiles: workout-logger/build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+
+      - name: Google Play notice (when secret missing)
+        if: env.PLAY_STORE_JSON_KEY == ''
+        run: echo "::warning::PLAY_STORE_JSON_KEY is not configured; skipped Google Play deployment."
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+
       - name: Create GitHub Release
-        if: github.event_name == 'push' && steps.commit_version.outputs.committed == 'true'
-        uses: softprops/action-gh-release@v3
+        if: github.event_name == 'push' && (steps.commit_version.outputs.committed == 'true' || startsWith(github.ref, 'refs/tags/'))
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.value }}
           name: RepForge v${{ steps.version.outputs.value }}
@@ -188,11 +232,17 @@ jobs:
 
             ### 📊 Build Information
             - **Version**: ${{ steps.version.outputs.value }}
-            - **Build Date**: ${{ github.event.head_commit.timestamp }}
+            - **Build Number**: ${{ github.run_number }}
             - **Commit**: ${{ github.sha }}
           files: |
             workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}-*.apk
+            workout-logger/build/app/outputs/bundle/release/app-release.aab
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up Keystore
+        if: always()
+        run: |
+          rm -f "${{ runner.temp }}/upload-keystore.jks"

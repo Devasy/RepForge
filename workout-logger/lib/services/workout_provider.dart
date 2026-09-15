@@ -975,6 +975,10 @@ class WorkoutProvider extends ChangeNotifier {
     _effortCalibrationOffset = nextOffset;
     _invalidateHistoryCache();
     _historyManager?.patchSession(updated);
+    final routineName = updated.routineId != null
+        ? _routines.where((r) => r.id == updated.routineId).firstOrNull?.name
+        : null;
+    _historyManager?.syncSession(updated, routineName: routineName);
 
     notifyListeners();
   }

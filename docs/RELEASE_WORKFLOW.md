@@ -1,168 +1,155 @@
-# Automated Release Workflow
+# Automated CI/CD & Google Play Release Workflow
 
-This repository uses GitHub Actions to automatically create releases when PRs are merged to the `main` branch.
+This document details the automated GitHub Actions CI/CD pipelines for **RepForge**, covering PR quality gates, Android dry-run verification, version automation, and continuous delivery of Android App Bundles (`.aab`) to the Google Play Store's **Internal Testing Track**.
 
-## 🚀 How It Works
+---
 
-1. **PR Merge**: When a pull request is merged to `main`, the workflow triggers automatically
-2. **Version Bump**: The script increments the patch version and build number in `pubspec.yaml`
-3. **Commit & Tag**: Changes are committed and a new git tag is created (e.g., `v1.0.3`)
-4. **Build APK**: Flutter builds a release APK for Android
-5. **Create Release**: A GitHub release is created with the APK attached
+## 🏗️ Pipeline Architecture
 
-## 📋 Version Bumping Strategy
+The CI/CD system is split into two specialized workflows:
 
-- **Automatic**: Patch version increments on every merge (e.g., `1.0.2` → `1.0.3`)
-- **Build number**: Also increments automatically (e.g., `+3` → `+4`)
-- **Manual bumps**: For minor/major version changes, edit `pubspec.yaml` manually before merging
+```mermaid
+graph TD
+    subgraph PR & Push Workflow: ci.yml
+        A[Pull Request / Push] --> B[Security Scan: Gitleaks & Dependency Review]
+        A --> C[Quality & Architecture Gates]
+        C --> C1[flutter analyze]
+        C --> C2[dart_code_linter: metrics, unused files/code]
+        C --> C3[custom_lint: Provider architecture rules]
+        A --> D[Tests & Coverage: flutter test --coverage & Codecov]
+        A --> E[Android Build Verification: flutter build appbundle --debug]
+    end
 
-### Version Format
- 
-```yaml
-version: MAJOR.MINOR.PATCH+BUILD
-# Example: 1.0.2+3
+    subgraph Release & CD Workflow: release.yml
+        M[Push to main or Release Tag v*] --> N[Bump Version & Create Tag]
+        N --> O[Decode Disposable Keystore]
+        O --> P[Build Release App Bundle: flutter build appbundle --release]
+        P --> Q[Build Split APKs for GitHub Releases]
+        P --> R[Deploy AAB to Google Play Internal Track: r0adkll/upload-google-play]
+        Q --> S[Publish GitHub Release]
+        R & S --> T[Purge Keystore File: always cleanup]
+    end
 ```
 
-## 🔧 Setup Instructions
+---
 
-### 1. Enable GitHub Actions
- 
-Ensure GitHub Actions is enabled in your repository settings:
-- Go to **Settings** → **Actions** → **General**
-- Under "Actions permissions", select "Allow all actions and reusable workflows"
+## 1. Continuous Integration (`.github/workflows/ci.yml`)
 
-### 2. Configure Branch Protection (Optional but Recommended)
-If you have branch protection on `main`:
-- Go to **Settings** → **Branches** → **Branch protection rules**
-- Edit the rule for `main`
-- Under "Allow specified actors to bypass required pull requests", add `github-actions[bot]`
-- This allows the workflow to push version bump commits
+Triggered on every Pull Request and Push to `main` (and release branches):
 
-### 3. Verify Workflow Permissions
-The workflow needs write permissions to create releases:
-- Go to **Settings** → **Actions** → **General**
-- Under "Workflow permissions", ensure "Read and write permissions" is selected
-- Check "Allow GitHub Actions to create and approve pull requests" (optional)
+1. **`security_scan`**:
+   - **Gitleaks**: Scans commits for accidental secret leakage, tokens, or private keys.
+   - **Dependency Review**: Blocks PRs introducing vulnerable dependencies or incompatible licenses.
+2. **`quality_and_metrics`**:
+   - **Flutter Analyzer**: Runs static code analysis across the Dart codebase.
+   - **Dart Code Linter (DCL)**: Enforces strict complexity thresholds:
+     - Cyclomatic Complexity: `max 20`
+     - Maximum Nesting Level: `max 5`
+     - Lines of Executable Code: `max 50`
+     - Unused Files Detection (`check-unused-files lib`)
+     - Dead Code Detection (`check-unused-code lib`)
+   - **Architecture Custom Lints (`custom_lint`)**:
+     - State-management architecture checks for Provider:
+       - `avoid_read_inside_build`: Flags usage of `context.read()` inside `build()` methods to prevent stale widget trees.
+       - `avoid_watch_outside_build`: Flags usage of `context.watch()` outside `build()` to prevent uncontrolled rebuild triggers.
+3. **`test_and_coverage`**:
+   - Runs unit and widget tests (`flutter test --coverage`).
+   - Automatically uploads coverage to Codecov.
+4. **`android_dry_run`**:
+   - Compiles a debug Android App Bundle (`flutter build appbundle --debug`).
+   - Verifies Gradle compilation, Android Gradle Plugin (AGP) compatibility, and native C++ JNI builds early in PRs.
 
-## 📦 First Release
+---
 
-To trigger your first automated release:
+## 2. Continuous Delivery (`.github/workflows/release.yml`)
 
-1. Create a feature branch:
-   ```bash
-   git checkout -b feature/test-release
-   ```
+Triggered on:
+- Merges/pushes to `main`
+- Release tags matching `v*` (e.g., `v2.1.2`)
+- Manual execution via `workflow_dispatch`
 
-2. Make any change (or just update README):
-   ```bash
-   echo "# Test" >> README.md
-   git add README.md
-   git commit -m "test: trigger first automated release"
-   git push origin feature/test-release
-   ```
+### Release Steps:
+1. **Version Bumping**: On push to `main`, `scripts/bump_version.dart patch` automatically increments the patch version in `workout-logger/pubspec.yaml`, creates a commit, and pushes a new Git tag (`vX.Y.Z`).
+2. **Automated Build Numbering**: Uses `${{ github.run_number }}` with `flutter build appbundle --release --build-name=${{ steps.version.outputs.value }} --build-number=${{ github.run_number }}`. This ensures monotonically increasing `versionCode` for Google Play.
+3. **Disposable Keystore Decoding**: Safely decodes `KEYSTORE_BASE64` to `${{ runner.temp }}/upload-keystore.jks` and cleans it up in a guaranteed `if: always()` step.
+4. **Google Play Internal Testing Deployment**: Automatically uploads the signed `.aab` to the **Internal Track** via `r0adkll/upload-google-play@v1`.
+5. **GitHub Release Publication**: Builds split release APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) and attaches both the APKs and `.aab` bundle to the GitHub release along with automatically generated release notes from merged pull requests.
 
-3. Create and merge a PR to `main`
+---
 
-4. Check the **Actions** tab to see the workflow running
+## 🔐 Required GitHub Secrets Configuration
 
-5. Once complete, check the **Releases** section for your new release with APK
+To enable automated release signing and Google Play deployments, configure the following secrets in your GitHub repository:
 
-## 📱 Installing the APK
+> Navigation: **GitHub Repository &rarr; Settings &rarr; Secrets and variables &rarr; Actions &rarr; New repository secret**
 
-After each release:
-1. Go to **Releases** in your GitHub repository
-2. Download the latest `repforge-vX.X.X.apk` file
-3. Transfer to your Android device
-4. Enable "Install from unknown sources" in Android settings
-5. Install the APK
+| Secret Name | Description | Example / Format |
+|---|---|---|
+| `PLAY_STORE_JSON_KEY` | Google Cloud Service Account JSON key with access to Google Play Developer API | `{ "type": "service_account", "project_id": "...", ... }` |
+| `KEYSTORE_BASE64` | Base64-encoded string of your release/upload keystore (`.jks`) | `MIIKogIBAzCCCm8GCSqGSIb3DQEHAaCCCmAEg...` |
+| `KEYSTORE_PASSWORD` | Password protecting the keystore file | `YourKeystorePassword123` |
+| `KEY_ALIAS` | Alias name of the key pair inside the keystore | `repforge-upload` (or `release`) |
+| `KEY_PASSWORD` | Password protecting the private key alias | `YourKeyPassword123` |
+| `CODECOV_TOKEN` | *(Optional)* Upload token for Codecov test coverage reports | `UUID string from Codecov dashboard` |
 
-## 🔐 Production Signing (Recommended)
+---
 
-Currently, the APK is signed with debug keys. For production releases:
+## 📋 Step-by-Step Setup Guide
 
-1. Generate a release keystore:
-   ```bash
-   keytool -genkey -v -keystore release-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release
-   ```
+### 1. Generating `KEYSTORE_BASE64`
+If you already have a release keystore (`upload-keystore.jks` or `repforge-release.jks`):
+```bash
+# On Linux / macOS
+base64 -w 0 upload-keystore.jks > keystore_base64.txt
 
-2. Add keystore to GitHub Secrets:
-   - Encode keystore: `base64 release-keystore.jks > keystore.txt`
-   - Add to **Settings** → **Secrets** → **Actions**:
-     - `KEYSTORE_BASE64`: Contents of `keystore.txt`
-     - `KEYSTORE_PASSWORD`: Your keystore password
-     - `KEY_ALIAS`: Your key alias (e.g., "release")
-     - `KEY_PASSWORD`: Your key password
-
-3. Update `android/app/build.gradle.kts` to use release signing
-
-4. Update the workflow to decode and use the keystore
-
-## 🛠️ Manual Version Bumping
-
-To manually control version numbers:
-
-### Bump Minor Version (e.g., 1.0.3 → 1.1.0)
-Edit `pubspec.yaml` before merging:
-```yaml
-version: 1.1.0+5
+# On Windows (PowerShell)
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("upload-keystore.jks")) | Out-File -FilePath keystore_base64.txt -NoNewline
 ```
+Copy the entire contents of `keystore_base64.txt` and paste into the `KEYSTORE_BASE64` secret.
 
-### Bump Major Version (e.g., 1.1.0 → 2.0.0)
-Edit `pubspec.yaml` before merging:
-```yaml
-version: 2.0.0+6
-```
+### 2. Generating `PLAY_STORE_JSON_KEY` (Google Cloud Service Account)
+To allow GitHub Actions to upload to Google Play Console:
 
-The workflow will still increment from whatever version you set.
+1. Open [Google Cloud Console](https://console.cloud.google.com/).
+2. Select your Google Play linked GCP project.
+3. Enable the **Google Play Android Developer API**.
+4. Go to **IAM & Admin &rarr; Service Accounts &rarr; Create Service Account**:
+   - Name: `repforge-play-deployer`
+   - Role: Not required at the GCP project level (permissions are granted in Play Console).
+5. Open the newly created Service Account &rarr; **Keys** tab &rarr; **Add Key** &rarr; **Create new key** &rarr; Select **JSON** &rarr; **Create**.
+6. Download the generated `.json` file.
+7. Open [Google Play Console](https://play.google.com/console):
+   - Go to **Users and permissions** &rarr; **Invite new users**.
+   - Enter the service account email (e.g., `repforge-play-deployer@<project>.iam.gserviceaccount.com`).
+   - Under **App permissions**, select `com.devasy.repforge`.
+   - Under **Account permissions**, grant:
+     - **Releases**: *Create, edit, and roll out releases to internal testing tracks*.
+     - *View app information and download bulk reports (read-only)*.
+   - Click **Invite user** and accept permissions.
+8. Paste the entire contents of the downloaded JSON key into the `PLAY_STORE_JSON_KEY` GitHub Secret.
 
-## 📊 Monitoring Releases
+> [!NOTE]
+> When uploading your **first** release of a new application, Google Play Console requires the initial `.aab` to be uploaded manually once through the web interface before the API can deploy subsequent releases.
 
-- **Actions Tab**: View workflow runs and logs
-- **Releases Tab**: See all published releases
-- **Tags**: View all version tags in the repository
+---
 
-## 🐛 Troubleshooting
+## 🛠️ Local Quality Commands
 
-### Workflow fails with "Permission denied"
-- Check that workflow permissions are set to "Read and write"
-- Verify branch protection settings allow `github-actions[bot]` to push
+You can run the exact quality suite locally:
 
-### APK not attached to release
-- Check the workflow logs in the Actions tab
-- Verify the build step completed successfully
-- Ensure the APK path in the workflow matches the actual build output
+```powershell
+cd workout-logger
 
-### Version not bumping
-- Check that `scripts/bump_version.dart` has execute permissions
-- Verify the script can parse your `pubspec.yaml` format
-- Review workflow logs for script errors
+# 1. Custom Lint (Provider state-management architecture rules)
+dart run custom_lint
 
-## 📝 Files Created
+# 2. Dart Code Linter (Metrics & complexity)
+dart run dart_code_linter:metrics analyze lib
 
-- `.github/workflows/release.yml` - Main workflow configuration
-- `scripts/bump_version.dart` - Version bumping script
-- `docs/RELEASE_WORKFLOW.md` - This documentation
+# 3. Unused files and code detection
+dart run dart_code_linter:metrics check-unused-files lib
+dart run dart_code_linter:metrics check-unused-code lib
 
-## 🔄 Workflow Diagram
-
-```text
-PR Merged to main
-       ↓
-Checkout code
-       ↓
-Setup Flutter & Java
-       ↓
-Bump version in pubspec.yaml
-       ↓
-Commit & push version change
-       ↓
-Create git tag (v1.0.3)
-       ↓
-Build release APK
-       ↓
-Create GitHub Release
-       ↓
-Upload APK to release
-       ↓
-✅ Done!
+# 4. Tests and Coverage
+flutter test --coverage
 ```
