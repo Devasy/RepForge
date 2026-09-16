@@ -140,7 +140,7 @@ jobs:
             exit 1
           fi
           KEYSTORE_FILE="${{ runner.temp }}/upload-keystore.jks"
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_FILE"
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 -d > "$KEYSTORE_FILE"
           echo "keystore_path=$KEYSTORE_FILE" >> $GITHUB_OUTPUT
 
       - name: Build Release App Bundle (.aab)
