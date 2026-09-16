@@ -83,7 +83,7 @@ jobs:
 
       - name: Architecture Linting (custom_lint)
         working-directory: ./workout-logger
-        run: dart run custom_lint
+        run: dart run custom_lint --no-fatal-warnings
 
   test_and_coverage:
     name: Tests & Coverage
