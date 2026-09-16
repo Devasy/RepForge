@@ -1,6 +1,6 @@
 # Automated CI/CD & Google Play Release Workflow
 
-This document details the automated GitHub Actions CI/CD pipelines for **RepForge**, covering PR quality gates, Android dry-run verification, version automation, and continuous delivery of Android App Bundles (`.aab`) to the Google Play Store's **Internal Testing Track**.
+This document details the automated GitHub Actions CI/CD pipelines for **RepForge**, covering PR quality gates, Android dry-run verification, version automation, and continuous delivery of Android App Bundles (`.aab`) to the Google Play Store's **Closed Testing Track (Alpha)**.
 
 ---
 
@@ -25,7 +25,7 @@ graph TD
         N --> O[Decode Disposable Keystore]
         O --> P[Build Release App Bundle: flutter build appbundle --release]
         P --> Q[Build Split APKs for GitHub Releases]
-        P --> R[Deploy AAB to Google Play Internal Track: r0adkll/upload-google-play]
+        P --> R[Deploy AAB to Google Play Closed Testing Alpha Track: r0adkll/upload-google-play]
         Q --> S[Publish GitHub Release]
         R & S --> T[Purge Keystore File: always cleanup]
     end
@@ -72,7 +72,7 @@ Triggered on:
 1. **Version Bumping**: On push to `main`, `scripts/bump_version.dart patch` automatically increments the patch version in `workout-logger/pubspec.yaml`, creates a commit, and pushes a new Git tag (`vX.Y.Z`).
 2. **Automated Build Numbering**: Uses `${{ github.run_number }}` with `flutter build appbundle --release --build-name=${{ steps.version.outputs.value }} --build-number=${{ github.run_number }}`. This ensures monotonically increasing `versionCode` for Google Play.
 3. **Disposable Keystore Decoding**: Safely decodes `KEYSTORE_BASE64` to `${{ runner.temp }}/upload-keystore.jks` and cleans it up in a guaranteed `if: always()` step.
-4. **Google Play Internal Testing Deployment**: Automatically uploads the signed `.aab` to the **Internal Track** via `r0adkll/upload-google-play@v1`.
+4. **Google Play Closed Testing Deployment**: Automatically uploads the signed `.aab` to the **Closed Testing (Alpha) Track** via `r0adkll/upload-google-play@v1`.
 5. **GitHub Release Publication**: Builds split release APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) and attaches both the APKs and `.aab` bundle to the GitHub release along with automatically generated release notes from merged pull requests.
 
 ---
@@ -123,7 +123,7 @@ To allow GitHub Actions to upload to Google Play Console:
    - Enter the service account email (e.g., `repforge-play-deployer@<project>.iam.gserviceaccount.com`).
    - Under **App permissions**, select `com.devasy.repforge`.
    - Under **Account permissions**, grant:
-     - **Releases**: *Create, edit, and roll out releases to internal testing tracks*.
+     - **Releases**: *Create, edit, and roll out releases to testing tracks* (including Closed Testing).
      - *View app information and download bulk reports (read-only)*.
    - Click **Invite user** and accept permissions.
 8. Paste the entire contents of the downloaded JSON key into the `PLAY_STORE_JSON_KEY` GitHub Secret.
