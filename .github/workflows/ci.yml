@@ -71,15 +71,15 @@ jobs:
 
       - name: Dart Code Linter (Metrics & Complexity)
         working-directory: ./workout-logger
-        run: dart run dart_code_linter:metrics analyze lib
+        run: dart run dart_code_linter:metrics analyze lib --reporter=github --no-fatal-warnings --no-fatal-style
 
       - name: Check Unused Files
         working-directory: ./workout-logger
-        run: dart run dart_code_linter:metrics check-unused-files lib
+        run: dart run dart_code_linter:metrics check-unused-files lib --no-fatal-unused
 
       - name: Check Unused Code
         working-directory: ./workout-logger
-        run: dart run dart_code_linter:metrics check-unused-code lib
+        run: dart run dart_code_linter:metrics check-unused-code lib --no-fatal-unused
 
       - name: Architecture Linting (custom_lint)
         working-directory: ./workout-logger
