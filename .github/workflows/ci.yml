@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'r[0-9]+.[0-9]+.*'
+  pull_request:
+    branches:
+      - main
+      - 'r[0-9]+.[0-9]+.*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  security_scan:
+    name: Security & Secret Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dependency Review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+
+  quality_and_metrics:
+    name: Code Quality, Complexity & Architecture
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        id: flutter-action
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: './workout-logger/pubspec.yaml'
+          channel: 'stable'
+          cache: true
+          pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
+
+      - name: Install dependencies
+        working-directory: ./workout-logger
+        run: flutter pub get
+
+      - name: Flutter Analyze
+        working-directory: ./workout-logger
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos --no-fatal-warnings | tee analyze_output.txt
+          SUMMARY=$(tail -n 1 analyze_output.txt)
+          echo "Analysis Summary: $SUMMARY"
+          echo "### Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
+
+      - name: Dart Code Linter (Metrics & Complexity)
+        working-directory: ./workout-logger
+        run: dart run dart_code_linter:metrics analyze lib --reporter=github --no-fatal-warnings --no-fatal-style
+
+      - name: Check Unused Files
+        working-directory: ./workout-logger
+        run: dart run dart_code_linter:metrics check-unused-files lib --no-fatal-unused
+
+      - name: Check Unused Code
+        working-directory: ./workout-logger
+        run: dart run dart_code_linter:metrics check-unused-code lib --no-fatal-unused
+
+      - name: Architecture Linting (custom_lint)
+        working-directory: ./workout-logger
+        run: dart run custom_lint --no-fatal-warnings
+
+  test_and_coverage:
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        id: flutter-action
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: './workout-logger/pubspec.yaml'
+          channel: 'stable'
+          cache: true
+          pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
+
+      - name: Install dependencies
+        working-directory: ./workout-logger
+        run: flutter pub get
+
+      - name: Run tests with coverage
+        working-directory: ./workout-logger
+        run: flutter test --coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: workout-logger/coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: Devasy/RepForge
+
+  android_dry_run:
+    name: Android Build Verification (Dry Run)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: './workout-logger/pubspec.yaml'
+          channel: 'stable'
+          cache: true
+          pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
+
+      - name: Install dependencies
+        working-directory: ./workout-logger
+        run: |
+          flutter pub get
+          : "${PUB_CACHE:?PUB_CACHE is not set}"
+          mapfile -t targets < <(find "$PUB_CACHE" -type f -path '*/jni-*/src/CMakeLists.txt')
+          for f in "${targets[@]}"; do
+            if ! grep -q -- '-Wl,--build-id=none' "$f"; then
+              sed -i -e 's/-Wl,/-Wl,--build-id=none,/' "$f"
+            fi
+          done
+
+      - name: Build Debug App Bundle (Dry Run)
+        working-directory: ./workout-logger
+        run: flutter build appbundle --debug

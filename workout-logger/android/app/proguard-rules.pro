@@ -12,3 +12,9 @@
 
 # Keep Native plugins and Health Connect interfaces
 -dontwarn com.google.android.gms.**
+
+# R8 Optimizations for Google Play App Bundle
+# Repackages obfuscated classes into a flat root package to minimize DEX string table overhead
+-repackageclasses ''
+# Widens access permissions to allow R8 to inline and devirtualize methods across package boundaries
+-allowaccessmodification
