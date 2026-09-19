@@ -185,6 +185,117 @@ void main() {
       expect(deleted, isFalse);
       expect(manager.getExercise(exercise.id), isNotNull);
     });
+
+    test('returns false for unknown exercise id', () async {
+      final deleted = await manager.deleteCustomExercise('does_not_exist');
+      expect(deleted, isFalse);
+    });
+  });
+
+  group('ExerciseManager - updateExercise', () {
+    setUp(() async => await manager.loadExercises());
+
+    test('updates name, category, and muscle group for a custom exercise', () async {
+      final exercise = await manager.addCustomExercise(
+        name: 'Old Name',
+        category: 'isolation',
+        primaryMuscleGroupId: 'chest',
+      );
+
+      final updated = await manager.updateExercise(
+        id: exercise.id,
+        name: 'New Name',
+        category: 'compound',
+        primaryMuscleGroupId: 'back',
+      );
+
+      expect(updated.name, 'New Name');
+      expect(updated.category, 'compound');
+      expect(updated.muscleActivations.first.muscleGroupId, 'back');
+      expect(manager.getExercise(exercise.id)!.name, 'New Name');
+    });
+
+    test('updates exerciseType to timeBased', () async {
+      final exercise = await manager.addCustomExercise(
+        name: 'Dead Hang',
+        category: 'compound',
+        primaryMuscleGroupId: 'back',
+        exerciseType: ExerciseType.weightAndReps,
+      );
+
+      final updated = await manager.updateExercise(
+        id: exercise.id,
+        exerciseType: ExerciseType.timeBased,
+      );
+
+      expect(updated.exerciseType, ExerciseType.timeBased);
+      expect(manager.getExercise(exercise.id)!.exerciseType, ExerciseType.timeBased);
+    });
+
+    test('updates availableHandles when provided', () async {
+      final exercise = await manager.addCustomExercise(
+        name: 'Cable Row',
+        category: 'compound',
+        primaryMuscleGroupId: 'back',
+      );
+
+      final updated = await manager.updateExercise(
+        id: exercise.id,
+        availableHandles: ['Bar', 'Rope'],
+      );
+
+      expect(updated.availableHandles, containsAll(['Bar', 'Rope']));
+    });
+
+    test('clears availableHandles when empty list is provided', () async {
+      final exercise = await manager.addCustomExercise(
+        name: 'Pull-up',
+        category: 'compound',
+        primaryMuscleGroupId: 'back',
+        availableHandles: ['Wide', 'Neutral'],
+      );
+
+      final updated = await manager.updateExercise(
+        id: exercise.id,
+        availableHandles: [],
+      );
+
+      expect(updated.availableHandles, isEmpty);
+    });
+
+    test('throws ArgumentError when exercise id not found', () async {
+      await expectLater(
+        manager.updateExercise(id: 'nonexistent_id'),
+        throwsArgumentError,
+      );
+    });
+
+    test('throws ArgumentError when updated name is empty', () async {
+      final exercise = await manager.addCustomExercise(
+        name: 'Valid Name',
+        category: 'isolation',
+        primaryMuscleGroupId: 'shoulders',
+      );
+
+      await expectLater(
+        manager.updateExercise(id: exercise.id, name: '   '),
+        throwsArgumentError,
+      );
+    });
+
+    test('add with time-based exerciseType and handles stores both fields', () async {
+      final exercise = await manager.addCustomExercise(
+        name: 'Ring Rows',
+        category: 'compound',
+        primaryMuscleGroupId: 'back',
+        exerciseType: ExerciseType.timeBased,
+        availableHandles: ['Rings'],
+      );
+
+      expect(exercise.exerciseType, ExerciseType.timeBased);
+      expect(exercise.availableHandles, contains('Rings'));
+      expect(manager.getExercise(exercise.id)!.exerciseType, ExerciseType.timeBased);
+    });
   });
 
   group('ExerciseManager - filtering and search', () {
