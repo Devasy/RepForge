@@ -418,8 +418,11 @@ class _NewestPRHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
+    final provider = context.watch<WorkoutProvider>();
     final dateStr = DateFormat('MMM d, yyyy').format(record.achievedAt);
     final w = settings.toDisplay(record.bestWeight);
+    final isTimeBased = (record.bestDuration != null && record.bestDuration! > 0) ||
+        provider.allExercises.any((e) => e.id == record.exerciseId && e.exerciseType == ExerciseType.timeBased);
 
     return GlassCard(
       glowColor: AppColors.warning,
@@ -430,15 +433,20 @@ class _NewestPRHero extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.warning, Color(0xFFFF9500)],
+              gradient: LinearGradient(
+                colors: isTimeBased
+                    ? [AppColors.cyan, const Color(0xFF00B4D8)]
+                    : [AppColors.warning, const Color(0xFFFF9500)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: const Icon(Icons.emoji_events_rounded,
-                color: Colors.white, size: 22),
+            child: Icon(
+              isTimeBased ? Icons.timer_rounded : Icons.emoji_events_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -448,7 +456,7 @@ class _NewestPRHero extends StatelessWidget {
                 Text(
                   'Latest PR',
                   style: TextStyle(fontFamily: 'Geist', 
-                    color: AppColors.warning,
+                    color: isTimeBased ? AppColors.cyan : AppColors.warning,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.8,
@@ -476,16 +484,22 @@ class _NewestPRHero extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1)} ${settings.unitLabel}',
+                isTimeBased
+                    ? formatHoldDuration(record.bestDuration ?? 0)
+                    : '${w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1)} ${settings.unitLabel}',
                 style: TextStyle(fontFamily: 'GeistMono', 
-                  color: AppColors.warning,
+                  color: isTimeBased ? AppColors.cyan : AppColors.warning,
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               Text(
-                '${record.bestReps} reps',
+                isTimeBased
+                    ? (record.bestWeight > 0
+                        ? '+${w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1)} ${settings.unitLabel}'
+                        : 'Best Hold')
+                    : '${record.bestReps} reps',
                 style: TextStyle(fontFamily: 'GeistMono', 
                   color: AppColors.textMuted,
                   fontSize: 11,
@@ -507,8 +521,14 @@ class _ExercisePRGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final best = records.reduce(
-        (a, b) => a.bestWeight >= b.bestWeight ? a : b);
+    final best = records.reduce((a, b) {
+      final aDur = a.bestDuration ?? 0;
+      final bDur = b.bestDuration ?? 0;
+      if (aDur > 0 || bDur > 0) {
+        return aDur >= bDur ? a : b;
+      }
+      return a.bestWeight >= b.bestWeight ? a : b;
+    });
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -583,10 +603,13 @@ class _PRCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
+    final provider = context.watch<WorkoutProvider>();
     final dateStr = DateFormat('MMM d, yyyy').format(record.achievedAt);
     final displayWeight = settings.toDisplay(record.bestWeight);
     final displayVol = settings.toDisplay(record.bestVolume);
     final unit = settings.unitLabel;
+    final isTimeBased = (record.bestDuration != null && record.bestDuration! > 0) ||
+        provider.allExercises.any((e) => e.id == record.exerciseId && e.exerciseType == ExerciseType.timeBased);
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 10),
@@ -600,11 +623,14 @@ class _PRCard extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.15),
+                  color: (isTimeBased ? AppColors.cyan : AppColors.warning).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.emoji_events_rounded,
-                    color: AppColors.warning, size: 18),
+                child: Icon(
+                  isTimeBased ? Icons.timer_rounded : Icons.emoji_events_rounded,
+                  color: isTimeBased ? AppColors.cyan : AppColors.warning,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -633,21 +659,28 @@ class _PRCard extends StatelessWidget {
           Row(
             children: [
               _PRStat(
-                label: 'Best Weight',
-                value:
-                    '${displayWeight.toStringAsFixed(displayWeight % 1 == 0 ? 0 : 1)} $unit',
-                color: AppColors.warning,
+                label: isTimeBased ? 'Best Hold' : 'Best Weight',
+                value: isTimeBased
+                    ? formatHoldDuration(record.bestDuration ?? 0)
+                    : '${displayWeight.toStringAsFixed(displayWeight % 1 == 0 ? 0 : 1)} $unit',
+                color: isTimeBased ? AppColors.cyan : AppColors.warning,
               ),
               const SizedBox(width: AppSpacing.sm),
               _PRStat(
-                label: 'Best Reps',
-                value: '${record.bestReps}',
+                label: isTimeBased ? 'Added Load' : 'Best Reps',
+                value: isTimeBased
+                    ? (record.bestWeight > 0
+                        ? '${displayWeight.toStringAsFixed(displayWeight % 1 == 0 ? 0 : 1)} $unit'
+                        : 'BW')
+                    : '${record.bestReps}',
                 color: AppColors.secondary,
               ),
               const SizedBox(width: AppSpacing.sm),
               _PRStat(
-                label: 'Best Vol.',
-                value: '${displayVol.toStringAsFixed(0)} $unit',
+                label: isTimeBased ? 'Hold Type' : 'Best Vol.',
+                value: isTimeBased
+                    ? 'Timed'
+                    : '${displayVol.toStringAsFixed(0)} $unit',
                 color: AppColors.success,
               ),
             ],

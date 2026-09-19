@@ -429,7 +429,10 @@ class _ExerciseStats extends StatelessWidget {
     final progression = provider.getVolumeProgression(exerciseId);
     final setProgression = provider.getSetProgression(exerciseId);
     final growthModel = provider.getGrowthModel(exerciseId);
-    final bestOneRM = provider.getBestOneRM(exerciseId);
+    final exercise = provider.allExercises.where((e) => e.id == exerciseId).firstOrNull;
+    final isTimeBased = exercise?.exerciseType == ExerciseType.timeBased;
+    final bestOneRM = isTimeBased ? null : provider.getBestOneRM(exerciseId);
+    final bestHold = isTimeBased ? provider.getBestHold(exerciseId) : null;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -442,7 +445,10 @@ class _ExerciseStats extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (bestOneRM != null) ...[
+          if (isTimeBased && bestHold != null && bestHold > 0) ...[
+            _BestHoldCard(seconds: bestHold),
+            const SizedBox(height: AppSpacing.sm),
+          ] else if (bestOneRM != null) ...[
             _OneRMCard(oneRM: bestOneRM, settings: settings),
             const SizedBox(height: AppSpacing.sm),
           ],
@@ -464,6 +470,80 @@ class _ExerciseStats extends StatelessWidget {
           _AskCoachButton(
             exerciseName: provider.getExerciseName(exerciseId),
             growthModel: growthModel,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Best Hold card ────────────────────────────────────────────────────────────
+
+class _BestHoldCard extends StatelessWidget {
+  const _BestHoldCard({required this.seconds});
+  final int seconds;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      glowColor: AppColors.cyan,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.cyan.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: const Icon(
+              Icons.timer_rounded,
+              color: AppColors.cyan,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Best Hold',
+                  style: TextStyle(fontFamily: 'Geist', 
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                  ),
+                ),
+                Text(
+                  formatHoldDuration(seconds),
+                  style: TextStyle(fontFamily: 'GeistMono', 
+                    color: AppColors.cyan,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'Personal Record',
+                style: TextStyle(fontFamily: 'Geist', 
+                  color: AppColors.textMuted,
+                  fontSize: 10,
+                ),
+              ),
+              Text(
+                'Max duration hold',
+                style: TextStyle(fontFamily: 'Geist', 
+                  color: AppColors.textFaint,
+                  fontSize: 10,
+                ),
+              ),
+            ],
           ),
         ],
       ),

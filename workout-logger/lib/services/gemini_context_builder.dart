@@ -80,6 +80,24 @@ class GeminiContextBuilder {
         'an empty dashboard.',
       );
 
+    final isLbs = unitLabel.toLowerCase().contains('lb');
+    final loadInc = isLbs ? '5 lb' : '2.5 kg';
+
+    buf
+      ..writeln()
+      ..writeln(
+        'EXERCISE TYPES & PROGRESSION GUIDELINES:\n'
+        '- Rep-Based Exercises (weightAndReps): progressive overload via weight (kg/lbs) and reps.\n'
+        '- Time-Based Exercises (timeBased, e.g. planks, dead hangs, wall sits, L-sits): measured in hold duration (seconds) with optional added load. '
+        'Recommend duration progression (+5s to +10s hold targets) until reaching target ceiling (e.g. 60s or 90s). '
+        'Once target ceiling is reached, recommend stepping up external load (+$loadInc plate or dip belt) and resetting hold duration to base (30s hold).\n'
+        '- Multimodal Image Analysis: When the user attaches an image, analyze it directly and provide actionable coaching feedback: '
+        '1) Form checks (spine neutrality, joint stacking, depth, elbow flare, bar path, pelvic positioning). '
+        '2) Gym machine & equipment photos (identify machine, how to set seat/pins, proper grip, primary target muscles, setup cues). '
+        '3) Nutrition labels (macros, calories, protein quality). '
+        '4) Progress photos (constructive, motivating feedback).',
+      );
+
     if (userName != null && userName.isNotEmpty) {
       buf.writeln('\nThe user\'s name is $userName.');
     }

@@ -92,7 +92,9 @@ List<ExerciseSessionSegmentEvent> buildHcSegments({
   for (final log in session.exercises) {
     final type = hcSegmentTypeFor(log.exerciseId);
     for (final set in log.sets) {
-      if (set.reps > 0) allSets.add((type, set));
+      if (set.reps > 0 || (set.timeTaken != null && set.timeTaken! > 0)) {
+        allSets.add((type, set));
+      }
     }
   }
   if (allSets.isEmpty) return [];

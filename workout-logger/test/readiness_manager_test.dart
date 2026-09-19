@@ -72,7 +72,7 @@ class _MockHcService implements IHealthConnectService {
     _maybeThrow();
     rhrReadCount++;
     return restingHr
-        .where((s) => !s.time.isBefore(start) && s.time.isBefore(end))
+        .where((s) => !s.time.isBefore(start) && !s.time.isAfter(end))
         .toList();
   }
 
@@ -81,7 +81,7 @@ class _MockHcService implements IHealthConnectService {
     _maybeThrow();
     hrvReadCount++;
     return hrv
-        .where((s) => !s.time.isBefore(start) && s.time.isBefore(end))
+        .where((s) => !s.time.isBefore(start) && !s.time.isAfter(end))
         .toList();
   }
 
@@ -90,7 +90,7 @@ class _MockHcService implements IHealthConnectService {
     _maybeThrow();
     hrReadCount++;
     return heartRate
-        .where((s) => !s.time.isBefore(start) && s.time.isBefore(end))
+        .where((s) => !s.time.isBefore(start) && !s.time.isAfter(end))
         .toList();
   }
 

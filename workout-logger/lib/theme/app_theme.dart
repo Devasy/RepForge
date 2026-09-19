@@ -14,6 +14,7 @@ class AppColors {
 
   // Glassmorphism surfaces
   static const glass = Color(0x0AFFFFFF);           // --surface  4%
+  static const glass1 = glass;
   static const glass2 = Color(0x0FFFFFFF);          // --surface-2 6%
   static const glass3 = Color(0x17FFFFFF);          // --surface-3 9%
   static const glassBorder = Color(0x12FFFFFF);     // --border 7%
@@ -41,6 +42,7 @@ class AppColors {
   static const primary = Color(0xFF7C3AED);         // --accent oklch(0.68 0.18 285)
   static const primaryDeep = Color(0xFF5B21B6);     // gradient end / ambient wash
   static const secondary = Color(0xFF00C2D4);       // --data  oklch(0.78 0.14 200)
+  static const cyan = secondary;                    // alias for secondary
   static const accent = Color(0xFF7C3AED);          // alias for primary
 
   /// The one brand gradient, so every violet surface catches the same light.

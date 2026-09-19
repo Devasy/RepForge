@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/add_custom_exercise_screen.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/managers/program_manager.dart';
@@ -189,6 +190,100 @@ void main() {
         find.text('Single muscle group'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('should show tracking type options (Reps & Weight and Time-Based)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          child: const AddCustomExerciseScreen(),
+          provider: provider,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reps & Weight'), findsOneWidget);
+      expect(find.text('Time-Based'), findsOneWidget);
+    });
+
+    testWidgets('should pre-populate form in edit mode and show Edit Exercise title', (
+      tester,
+    ) async {
+      final exercise = Exercise(
+        id: 'cable_curl',
+        name: 'Cable Bicep Curl',
+        category: 'isolation',
+        muscleActivations: [
+          MuscleActivation(muscleGroupId: 'biceps', activationPercentage: 100),
+        ],
+        exerciseType: ExerciseType.weightAndReps,
+        availableHandles: ['Rope', 'Straight Bar'],
+      );
+
+      await tester.pumpWidget(
+        createTestWidget(
+          child: AddCustomExerciseScreen(initialExercise: exercise),
+          provider: provider,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Exercise'), findsOneWidget);
+      expect(find.text('Cable Bicep Curl'), findsOneWidget);
+      expect(find.text('Rope'), findsOneWidget);
+      expect(find.text('Straight Bar'), findsOneWidget);
+    });
+
+    testWidgets('can add and remove handle attachments and save time-based exercise', (tester) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          child: const AddCustomExerciseScreen(),
+          provider: provider,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Enter Name
+      await tester.enterText(find.byType(TextFormField).first, 'Dead Hang');
+
+      // Select Time-Based
+      await tester.ensureVisible(find.text('Time-Based'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Time-Based'));
+      await tester.pumpAndSettle();
+
+      // Add handle attachments
+      final handleField = find.widgetWithText(TextField, 'e.g. Rope, V-Bar, Straight Bar');
+      await tester.ensureVisible(handleField);
+      await tester.pumpAndSettle();
+      await tester.enterText(handleField, 'Bar');
+      await tester.tap(find.byIcon(Icons.add_circle_outline_rounded));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(handleField, 'Rings');
+      await tester.tap(find.byIcon(Icons.add_circle_outline_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bar'), findsOneWidget);
+      expect(find.text('Rings'), findsOneWidget);
+
+      // Select muscle group
+      await tester.ensureVisible(find.text('Back'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Back'));
+      await tester.pumpAndSettle();
+
+      // Save
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(mockStorage.saveCustomExerciseCalled, isTrue);
+      final saved = mockStorage.lastSavedExercise;
+      expect(saved?.name, 'Dead Hang');
+      expect(saved?.exerciseType, ExerciseType.timeBased);
+      expect(saved?.availableHandles, contains('Bar'));
+      expect(saved?.availableHandles, contains('Rings'));
     });
   });
 }

@@ -56,14 +56,18 @@ void main() {
       final db = await openDatabase(storage.databasePath, singleInstance: false);
       const localString = '2026-11-01T01:30:00.000';
       await db.insert('health_samples', {
+        'id': 'heart_rate_2026-11-01T05:30:00.000Z',
         'type': 'heart_rate',
-        'timestamp': localString,
+        'start_ts': localString,
+        'end_ts': localString,
         'utc_ts': '2026-11-01T05:30:00.000Z',
         'value': 60.0,
       });
       await db.insert('health_samples', {
+        'id': 'heart_rate_2026-11-01T06:30:00.000Z',
         'type': 'heart_rate',
-        'timestamp': localString,
+        'start_ts': localString,
+        'end_ts': localString,
         'utc_ts': '2026-11-01T06:30:00.000Z',
         'value': 65.0,
       });
@@ -132,11 +136,12 @@ void main() {
 
       final rows = await rawQuery(
         storage,
-        "SELECT timestamp FROM health_samples WHERE type = 'heart_rate'",
+        "SELECT start_ts, end_ts FROM health_samples WHERE type = 'heart_rate'",
       );
-      final stored = rows.first['timestamp'] as String;
+      final stored = rows.first['start_ts'] as String;
       expect(stored.contains('Z'), isFalse);
       expect(stored, utcTime.toLocal().toIso8601String());
+      expect(rows.first['end_ts'], stored);
     });
 
     test('upsertSleepSessions replaces stage intervals for a re-synced session', () async {
@@ -288,6 +293,75 @@ void main() {
 
       // ...and unrelated settings are left alone.
       expect(await upgraded.getSetting('userName'), 'Devasy');
+
+      await upgraded.close();
+      await File(path).delete();
+    });
+
+    test('onUpgrade from v3 adds exercise_type, default_handle, and best_duration', () async {
+      final path =
+          '${Directory.systemTemp.path}/sqlite_v3_upgrade_${DateTime.now().microsecondsSinceEpoch}.db';
+      final v3 = await openDatabase(
+        path,
+        version: 3,
+        onCreate: (db, v) async {
+          await db.execute('''CREATE TABLE exercises (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            is_custom INTEGER NOT NULL DEFAULT 0,
+            available_handles TEXT
+          )''');
+          await db.execute('''CREATE TABLE routine_exercises (
+            routine_id TEXT NOT NULL,
+            exercise_id TEXT NOT NULL,
+            order_index INTEGER NOT NULL
+          )''');
+          await db.execute('''CREATE TABLE personal_records (
+            exercise_id TEXT PRIMARY KEY,
+            best_weight REAL NOT NULL,
+            best_reps INTEGER NOT NULL,
+            best_volume REAL NOT NULL,
+            achieved_at TEXT NOT NULL
+          )''');
+          await db.execute('''CREATE TABLE muscle_groups (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            growth_rate REAL NOT NULL DEFAULT 0,
+            last_updated TEXT NOT NULL
+          )''');
+          await db.insert('exercises', {
+            'id': 'bench',
+            'name': 'Bench Press',
+            'category': 'Chest',
+            'is_custom': 0,
+          });
+          await db.insert('personal_records', {
+            'exercise_id': 'bench',
+            'best_weight': 100.0,
+            'best_reps': 5,
+            'best_volume': 500.0,
+            'achieved_at': '2026-01-01T00:00:00.000',
+          });
+        },
+      );
+      await v3.close();
+
+      final upgraded = SqliteStorageService(databasePathOverride: path);
+      await upgraded.init();
+
+      final exCols = await rawQuery(upgraded, 'PRAGMA table_info(exercises)');
+      expect(exCols.map((c) => c['name']), contains('exercise_type'));
+
+      final prCols = await rawQuery(upgraded, 'PRAGMA table_info(personal_records)');
+      expect(prCols.map((c) => c['name']), contains('best_duration'));
+
+      final reCols = await rawQuery(upgraded, 'PRAGMA table_info(routine_exercises)');
+      expect(reCols.map((c) => c['name']), contains('default_handle'));
+
+      // Existing data preserved with default
+      final exRow = await rawQuery(upgraded, "SELECT exercise_type FROM exercises WHERE id = 'bench'");
+      expect(exRow.first['exercise_type'], 'weightAndReps');
 
       await upgraded.close();
       await File(path).delete();
@@ -585,6 +659,19 @@ void main() {
       expect(await storage.getExercise('custom3'), isNull);
       final custom = await storage.getCustomExercises();
       expect(custom.any((e) => e.id == 'custom3'), isFalse);
+    });
+
+    test('getExercise throws ArgumentError on unsupported non-null exercise_type', () async {
+      final db = await openDatabase(storage.databasePath, singleInstance: false);
+      await db.insert('exercises', {
+        'id': 'invalid_type_ex',
+        'name': 'Invalid Type',
+        'category': 'isolation',
+        'is_custom': 1,
+        'exercise_type': 'unsupported_type',
+      });
+      await db.close();
+      expect(storage.getExercise('invalid_type_ex'), throwsArgumentError);
     });
   });
 

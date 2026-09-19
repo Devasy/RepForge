@@ -37,6 +37,8 @@ class _SimpleAi implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) async* {
     calls++;
     final tc = toolCall;
@@ -68,6 +70,8 @@ class _SimpleAi implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) =>
       streamCoachReply(
         userMessage: userMessage,
@@ -75,6 +79,8 @@ class _SimpleAi implements IAiService {
         history: history,
         tools: tools,
         onToolCall: onToolCall,
+        imageBytesBase64: imageBytesBase64,
+        imageMimeType: imageMimeType,
       );
 
   @override
@@ -99,6 +105,8 @@ class _ThrowingAi implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) async* {
     throw Exception('Network error');
   }
@@ -125,6 +133,8 @@ class _ThrowingAi implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) =>
       streamCoachReply(
         userMessage: userMessage,
@@ -132,6 +142,8 @@ class _ThrowingAi implements IAiService {
         history: history,
         tools: tools,
         onToolCall: onToolCall,
+        imageBytesBase64: imageBytesBase64,
+        imageMimeType: imageMimeType,
       );
 
   @override
