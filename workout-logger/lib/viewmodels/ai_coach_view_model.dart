@@ -9,7 +9,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, TextPart, DataPart, Part, FunctionCall;
+    show Content, TextPart, Part, FunctionCall;
 
 import '../models/models.dart';
 import '../services/interfaces/ai_service_interface.dart';
@@ -97,7 +97,6 @@ class AiCoachViewModel extends ChangeNotifier {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
-        withData: false, // disable eager byte loading
       );
       if (result == null || result.files.isEmpty) return;
       final file = result.files.first;
@@ -132,11 +131,10 @@ class AiCoachViewModel extends ChangeNotifier {
         return;
       }
 
-      Uint8List? bytes = file.bytes;
-      if (bytes == null && file.path != null) {
-        bytes = await File(file.path!).readAsBytes();
-      }
-      if (bytes == null || bytes.isEmpty) return;
+      final Uint8List bytes = file.path != null
+          ? await File(file.path!).readAsBytes()
+          : await file.readAsBytes();
+      if (bytes.isEmpty) return;
 
       _pendingImageBytes = bytes;
       _pendingImageMimeType = mimeType;
