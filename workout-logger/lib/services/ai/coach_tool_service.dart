@@ -471,12 +471,12 @@ class CoachToolService {
             'exercise_logs(id, session_id, exercise_id, notes, handle)\n'
             'sets(id, exercise_log_id, weight, reps, is_dropset, drops_json, '
             'time_taken, timestamp, assist_weight, extra_weight, handle)\n'
-            'exercises(id, name, category, is_custom, available_handles) — custom '
-            'exercises only; built-ins are not stored here\n'
+            'exercises(id, name, category, is_custom, available_handles, exercise_type) — custom '
+            'exercises and built-in overrides (is_custom=0 indicates an override of a built-in exercise)\n'
             'muscle_groups(id, name, growth_rate, last_updated)\n'
             'exercise_muscle_activations(exercise_id, muscle_group_id, activation_percentage)\n'
             'routines(id, name, created_at)\n'
-            'routine_exercises(routine_id, exercise_id, position)\n'
+            'routine_exercises(routine_id, exercise_id, position, default_handle)\n'
             'targets(id, exercise_id, target_type, target_value, current_value, '
             'estimated_completion_date, created_at, is_completed)\n'
             'personal_records(exercise_id, best_weight, best_reps, best_volume, best_duration, achieved_at)\n'
@@ -734,7 +734,7 @@ class CoachToolService {
         var vol = 0.0;
         for (final exLog in s.exercises) {
           for (final set in exLog.sets) {
-            vol += (set.weight * set.reps);
+            vol += set.volume;
           }
         }
         m['y'] = vol;
@@ -895,7 +895,7 @@ class CoachToolService {
         for (final exLog in session.exercises) {
           if (matchingExerciseIds.contains(exLog.exerciseId)) {
             for (final set in exLog.sets) {
-              groupVol += (set.weight * set.reps);
+              groupVol += set.volume;
             }
           }
         }

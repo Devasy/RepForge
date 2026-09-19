@@ -245,22 +245,37 @@ class SqliteStorageService implements IStorageService {
           for (final statement in _healthSchemaStatements) {
             await db.execute(statement);
           }
-          await db.delete(
-            'settings',
-            where: 'key LIKE ?',
-            whereArgs: ['health_sync.%'],
-          );
+          final hasSettings = (await db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'settings'",
+          )).isNotEmpty;
+          if (hasSettings) {
+            await db.delete(
+              'settings',
+              where: 'key LIKE ?',
+              whereArgs: ['health_sync.%'],
+            );
+          }
         }
         if (oldVersion < 4) {
-          await db.execute(
-            "ALTER TABLE exercises ADD COLUMN exercise_type TEXT NOT NULL DEFAULT 'weightAndReps'",
-          );
-          await db.execute(
-            'ALTER TABLE routine_exercises ADD COLUMN default_handle TEXT',
-          );
-          await db.execute(
-            'ALTER TABLE personal_records ADD COLUMN best_duration INTEGER',
-          );
+          final tables = (await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'table'",
+          )).map((r) => r['name'] as String).toSet();
+
+          if (tables.contains('exercises')) {
+            await db.execute(
+              "ALTER TABLE exercises ADD COLUMN exercise_type TEXT NOT NULL DEFAULT 'weightAndReps'",
+            );
+          }
+          if (tables.contains('routine_exercises')) {
+            await db.execute(
+              'ALTER TABLE routine_exercises ADD COLUMN default_handle TEXT',
+            );
+          }
+          if (tables.contains('personal_records')) {
+            await db.execute(
+              'ALTER TABLE personal_records ADD COLUMN best_duration INTEGER',
+            );
+          }
         }
       },
     );
@@ -651,6 +666,18 @@ class SqliteStorageService implements IStorageService {
       where: 'exercise_id = ?',
       whereArgs: [row['id']],
     );
+    final rawType = row['exercise_type'] as String?;
+    final ExerciseType type;
+    if (rawType == null) {
+      type = ExerciseType.weightAndReps;
+    } else if (rawType == 'timeBased' || rawType == ExerciseType.timeBased.name) {
+      type = ExerciseType.timeBased;
+    } else if (rawType == 'weightAndReps' || rawType == ExerciseType.weightAndReps.name) {
+      type = ExerciseType.weightAndReps;
+    } else {
+      throw ArgumentError('Unsupported exerciseType: $rawType');
+    }
+
     return Exercise(
       id: row['id'] as String,
       name: row['name'] as String,
@@ -659,9 +686,7 @@ class SqliteStorageService implements IStorageService {
       availableHandles: row['available_handles'] == null
           ? null
           : (jsonDecode(row['available_handles'] as String) as List).cast<String>(),
-      exerciseType: (row['exercise_type'] as String?) == 'timeBased'
-          ? ExerciseType.timeBased
-          : ExerciseType.weightAndReps,
+      exerciseType: type,
       muscleActivations: activations
           .map((a) => MuscleActivation(
                 muscleGroupId: a['muscle_group_id'] as String,

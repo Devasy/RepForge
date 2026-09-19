@@ -165,6 +165,24 @@ void main() {
       expect(rec.reasoning, contains('deload ~10%'));
     });
 
+    test('DeclineDeloadRule never recommends hold time exceeding curTime on short holds', () {
+      const rule = DeclineDeloadRule();
+      final set = WorkoutSet(weight: 0, reps: 0, timeTaken: 10);
+      final ctx = ProgressionContext(
+        set: set,
+        minReps: 6,
+        maxReps: 12,
+        isPlateau: false,
+        isDeclining: true,
+        isUnderRecovered: false,
+        isPostDeloadRecovery: false,
+      );
+
+      final rec = rule.apply(ctx);
+      expect(rec, isNotNull);
+      expect(rec!.targetDuration, lessThanOrEqualTo(10));
+    });
+
     test('MLService.getDefaultRecommendations produces time-based defaults when isTimeBased is true', () {
       final ml = MLService();
       final recs = ml.getDefaultRecommendations(3, isTimeBased: true);

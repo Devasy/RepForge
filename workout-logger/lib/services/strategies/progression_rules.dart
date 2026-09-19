@@ -189,7 +189,7 @@ class DeclineDeloadRule implements ProgressionRule {
     if (!c.isDeclining) return null;
     if (c.isTimeBased) {
       final curTime = c.set.timeTaken ?? 30;
-      final deloadedTime = max(15, ((curTime * 0.9) / 5).round() * 5);
+      final deloadedTime = min(curTime, max(15, ((curTime * 0.9) / 5).round() * 5));
       return SetRecommendation(
         weight: c.set.weight,
         reps: 0,
