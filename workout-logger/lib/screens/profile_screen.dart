@@ -18,6 +18,7 @@ import '../services/interfaces/health_connect_service_interface.dart';
 import '../services/managers/readiness_manager.dart';
 import '../services/health_data_sync_service.dart';
 import '../theme/app_theme.dart';
+import 'health_data_inspector_screen.dart';
 import 'widgets/profile_sections.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -373,7 +374,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                     }
                   },
                   isHealthSyncLoading: _isSyncingHealthData,
-                  onHealthSyncNow: _isSyncingHealthData ? null : _syncHealthDataNow,
+                  onHealthSyncNow:
+                      _isSyncingHealthData ? null : _syncHealthDataNow,
+                  onOpenHealthInspector: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const HealthDataInspectorScreen(),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DataManagementSection(

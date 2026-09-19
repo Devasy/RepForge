@@ -74,6 +74,8 @@
         </intent>
         <!-- Health Connect availability check -->
         <package android:name="com.google.android.apps.healthdata" />
+        <!-- Samsung Health app availability check -->
+        <package android:name="com.sec.android.app.shealth" />
         <intent>
             <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
         </intent>

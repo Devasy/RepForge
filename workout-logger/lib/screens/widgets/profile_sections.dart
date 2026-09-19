@@ -242,6 +242,7 @@ class HealthConnectSection extends StatelessWidget {
     required this.onReadinessToggle,
     required this.isHealthSyncLoading,
     required this.onHealthSyncNow,
+    this.onOpenHealthInspector,
   });
 
   final SettingsProvider settings;
@@ -251,6 +252,7 @@ class HealthConnectSection extends StatelessWidget {
   final Future<void> Function(bool) onReadinessToggle;
   final bool isHealthSyncLoading;
   final VoidCallback? onHealthSyncNow;
+  final VoidCallback? onOpenHealthInspector;
 
   static const _hcColor = Color(0xFF00BFA5);
 
@@ -360,6 +362,20 @@ class HealthConnectSection extends StatelessWidget {
               subtitle: "Pull recent sleep & heart rate into the coach's database",
               loading: isHealthSyncLoading,
               onTap: isHealthSyncLoading ? null : onHealthSyncNow,
+            ),
+          ],
+          if (onOpenHealthInspector != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            const Divider(color: AppColors.glassBorder, height: 1),
+            const SizedBox(height: AppSpacing.sm),
+            _ActionTile(
+              icon: Icons.biotech_rounded,
+              iconColor: const Color(0xFF0381FE),
+              title: 'Wearable & S-Health Inspector (PoC)',
+              subtitle:
+                  'Inspect live BIA, vitals, sleep & Samsung Health records',
+              loading: false,
+              onTap: onOpenHealthInspector,
             ),
           ],
         ],

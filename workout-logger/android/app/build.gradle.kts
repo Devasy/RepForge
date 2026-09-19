@@ -7,6 +7,7 @@ plugins {
     // kotlin-android is injected automatically by Flutter's built-in Kotlin support.
     // (android.builtInKotlin=true in gradle.properties)
     id("dev.flutter.flutter-gradle-plugin")
+    id("kotlin-parcelize")
 }
 
 android {
@@ -56,11 +57,8 @@ android {
 
     defaultConfig {
         applicationId = "com.devasy.repforge"
-        // MIGRATION NOTE: minSdk is intentionally set to 26 (Android 8.0 Oreo).
-        // Health Connect requires API 26+. Devices running API <26 are no longer
-        // supported. If downgrading, remove the health_connector dependency and
-        // all HealthConnectService usages, then restore minSdk to flutter.minSdkVersion.
-        minSdk = 26
+        // MIGRATION NOTE: minSdk is set to 29 (Android 10) required by Samsung Health Data SDK 1.1.0.
+        minSdk = 29
         targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -114,4 +112,11 @@ android.applicationVariants.configureEach {
         }
     }
 }
+
+dependencies {
+    implementation(files("libs/samsung-health-data-api-1.1.0.aar"))
+    implementation("com.google.code.gson:gson:2.13.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+}
+
 
