@@ -16,7 +16,7 @@ class SqliteStorageService implements IStorageService {
         _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 3;
+  static const int _dbVersion = 4;
 
   /// Dropped and rebuilt by the v2 → v3 upgrade. The health tables are a cache
   /// of Health Connect, so rebuilding them costs one re-sync rather than user
@@ -43,9 +43,10 @@ class SqliteStorageService implements IStorageService {
   /// one of them.
   static const List<String> _healthSchemaStatements = [
     '''CREATE TABLE IF NOT EXISTS health_samples (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
-      timestamp TEXT NOT NULL,
+      start_ts TEXT NOT NULL,
+      end_ts TEXT NOT NULL,
       utc_ts TEXT NOT NULL,
       value REAL NOT NULL
     )''',
@@ -75,7 +76,8 @@ class SqliteStorageService implements IStorageService {
       name TEXT NOT NULL,
       category TEXT NOT NULL,
       is_custom INTEGER NOT NULL DEFAULT 0,
-      available_handles TEXT
+      available_handles TEXT,
+      exercise_type TEXT NOT NULL DEFAULT 'weightAndReps'
     )''',
     '''CREATE TABLE muscle_groups (
       id TEXT PRIMARY KEY,
@@ -96,7 +98,8 @@ class SqliteStorageService implements IStorageService {
     '''CREATE TABLE routine_exercises (
       routine_id TEXT NOT NULL,
       exercise_id TEXT NOT NULL,
-      position INTEGER NOT NULL
+      position INTEGER NOT NULL,
+      default_handle TEXT
     )''',
     '''CREATE TABLE sessions (
       id TEXT PRIMARY KEY,
@@ -142,7 +145,8 @@ class SqliteStorageService implements IStorageService {
       best_weight REAL NOT NULL,
       best_reps INTEGER NOT NULL,
       best_volume REAL NOT NULL,
-      achieved_at TEXT NOT NULL
+      achieved_at TEXT NOT NULL,
+      best_duration INTEGER
     )''',
     '''CREATE TABLE training_programs (
       id TEXT PRIMARY KEY,
@@ -229,7 +233,8 @@ class SqliteStorageService implements IStorageService {
           for (final statement in _healthSchemaStatements) {
             await db.execute(statement);
           }
-        } else if (oldVersion < 3) {
+        }
+        if (oldVersion < 3) {
           // v2 keyed health rows by a local-time string, which collides across
           // a DST fall-back. Rebuild the tables on the v3 shape and clear the
           // sync watermarks so the next run re-pulls the window from Health
@@ -244,6 +249,17 @@ class SqliteStorageService implements IStorageService {
             'settings',
             where: 'key LIKE ?',
             whereArgs: ['health_sync.%'],
+          );
+        }
+        if (oldVersion < 4) {
+          await db.execute(
+            "ALTER TABLE exercises ADD COLUMN exercise_type TEXT NOT NULL DEFAULT 'weightAndReps'",
+          );
+          await db.execute(
+            'ALTER TABLE routine_exercises ADD COLUMN default_handle TEXT',
+          );
+          await db.execute(
+            'ALTER TABLE personal_records ADD COLUMN best_duration INTEGER',
           );
         }
       },
@@ -454,10 +470,12 @@ class SqliteStorageService implements IStorageService {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       for (var i = 0; i < routine.exerciseIds.length; i++) {
+        final exId = routine.exerciseIds[i];
         await txn.insert('routine_exercises', {
           'routine_id': routine.id,
-          'exercise_id': routine.exerciseIds[i],
+          'exercise_id': exId,
           'position': i,
+          'default_handle': routine.defaultHandles?[exId],
         });
       }
     });
@@ -470,11 +488,19 @@ class SqliteStorageService implements IStorageService {
       whereArgs: [row['id']],
       orderBy: 'position ASC',
     );
+    final defaultHandles = <String, String>{};
+    for (final r in exRows) {
+      final handle = r['default_handle'] as String?;
+      if (handle != null && handle.isNotEmpty) {
+        defaultHandles[r['exercise_id'] as String] = handle;
+      }
+    }
     return Routine(
       id: row['id'] as String,
       name: row['name'] as String,
       exerciseIds: exRows.map((r) => r['exercise_id'] as String).toList(),
       createdAt: DateTime.parse(row['created_at'] as String),
+      defaultHandles: defaultHandles.isEmpty ? null : defaultHandles,
     );
   }
 
@@ -602,9 +628,10 @@ class SqliteStorageService implements IStorageService {
           'id': exercise.id,
           'name': exercise.name,
           'category': exercise.category,
-          'is_custom': 1,
+          'is_custom': exercise.isCustom ? 1 : 0,
           'available_handles':
               exercise.availableHandles == null ? null : jsonEncode(exercise.availableHandles),
+          'exercise_type': exercise.exerciseType.name,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -628,10 +655,13 @@ class SqliteStorageService implements IStorageService {
       id: row['id'] as String,
       name: row['name'] as String,
       category: row['category'] as String,
-      isCustom: true,
+      isCustom: (row['is_custom'] as int?) == 1,
       availableHandles: row['available_handles'] == null
           ? null
           : (jsonDecode(row['available_handles'] as String) as List).cast<String>(),
+      exerciseType: (row['exercise_type'] as String?) == 'timeBased'
+          ? ExerciseType.timeBased
+          : ExerciseType.weightAndReps,
       muscleActivations: activations
           .map((a) => MuscleActivation(
                 muscleGroupId: a['muscle_group_id'] as String,
@@ -661,18 +691,24 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<List<Exercise>> getAllExercises() async {
-    final builtIn = ExerciseDatabase.getAll();
-    final custom = await getCustomExercises();
-    return [...builtIn, ...custom];
+    final rows = await _db.query('exercises');
+    final dbExercises = <String, Exercise>{};
+    for (final row in rows) {
+      final ex = await _loadCustomExerciseRow(row);
+      dbExercises[ex.id] = ex;
+    }
+    final builtIn = ExerciseDatabase.getAll().map((e) => dbExercises[e.id] ?? e).toList();
+    final customOnly = dbExercises.values.where((e) => e.isCustom && ExerciseDatabase.getById(e.id) == null);
+    return [...builtIn, ...customOnly];
   }
 
   @override
   Future<Exercise?> getExercise(String id) async {
-    final builtIn = ExerciseDatabase.getById(id);
-    if (builtIn != null) return builtIn;
     final rows = await _db.query('exercises', where: 'id = ?', whereArgs: [id]);
-    if (rows.isEmpty) return null;
-    return _loadCustomExerciseRow(rows.first);
+    if (rows.isNotEmpty) {
+      return _loadCustomExerciseRow(rows.first);
+    }
+    return ExerciseDatabase.getById(id);
   }
 
   // ==================== SETTINGS ====================
@@ -755,6 +791,7 @@ class SqliteStorageService implements IStorageService {
         'best_reps': record.bestReps,
         'best_volume': record.bestVolume,
         'achieved_at': record.achievedAt.toIso8601String(),
+        'best_duration': record.bestDuration,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -766,6 +803,7 @@ class SqliteStorageService implements IStorageService {
         bestReps: row['best_reps'] as int,
         bestVolume: (row['best_volume'] as num).toDouble(),
         achievedAt: DateTime.parse(row['achieved_at'] as String),
+        bestDuration: row['best_duration'] as int?,
       );
 
   @override

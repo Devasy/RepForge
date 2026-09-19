@@ -6,6 +6,7 @@ import '../../models/models.dart';
 import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
 import 'rf_shell.dart';
+import 'time_exercise_card.dart';
 
 // ── ExerciseInputSection ──────────────────────────────────────────────────────
 // Suggestion card, weight/reps inputs, dropset, session history, program meta.
@@ -39,6 +40,9 @@ class ExerciseInputSection extends StatelessWidget {
     this.availableHandles,
     this.selectedHandle,
     this.onHandleChanged,
+    this.isTimeBased = false,
+    this.durationSeconds = 60,
+    this.onDurationChanged,
   });
 
   /// Layout width minus padding. Passed in, not measured: the host screen's [IntrinsicHeight] (which [Spacer] needs) forbids a [LayoutBuilder] under it.
@@ -70,6 +74,9 @@ class ExerciseInputSection extends StatelessWidget {
   final List<String>? availableHandles;
   final String? selectedHandle;
   final ValueChanged<String?>? onHandleChanged;
+  final bool isTimeBased;
+  final int durationSeconds;
+  final ValueChanged<int>? onDurationChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -112,61 +119,72 @@ class ExerciseInputSection extends StatelessWidget {
 
         const SizedBox(height: AppSpacing.lg),
 
-        // Weight + reps inputs
-        if (!isDropset) ...[
-          _InputRow(
-            contentWidth: contentWidth,
+        if (isTimeBased) ...[
+          TimeExerciseCard(
+            durationSeconds: durationSeconds,
+            onDurationChanged: onDurationChanged ?? (_) {},
+            currentWeight: currentWeight,
+            onWeightChanged: onWeightChanged,
+            settings: settings,
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ] else ...[
+          // Weight + reps inputs
+          if (!isDropset) ...[
+            _InputRow(
+              contentWidth: contentWidth,
+              currentWeight: currentWeight,
+              currentReps: currentReps,
+              settings: settings,
+              isAssistedBW: isAssistedBW,
+              onWeightChanged: onWeightChanged,
+              onRepsChanged: onRepsChanged,
+            ),
+            if (isAssistedBW) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.fitness_center_rounded, size: 14, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    // Long enough to wrap on a narrow phone, more so at a large text scale.
+                    Expanded(
+                      child: Text(
+                        'Effective Volume Load: ${effectiveWeightDisplay.toStringAsFixed(1)} ${settings.unitLabel} (${bodyWeightDisplay.toStringAsFixed(1)} BW − ${currentWeightDisplay.toStringAsFixed(1)} Assist) × $currentReps reps',
+                        style: const TextStyle(fontSize: 11, color: AppColors.textSoft, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.md),
+          ],
+
+          // Dropset section
+          _DropsetSection(
+            isDropset: isDropset,
+            drops: drops,
             currentWeight: currentWeight,
             currentReps: currentReps,
+            mainWeightController: mainWeightController,
+            mainRepsController: mainRepsController,
+            dropWeightControllers: dropWeightControllers,
+            dropRepsControllers: dropRepsControllers,
             settings: settings,
-            isAssistedBW: isAssistedBW,
-            onWeightChanged: onWeightChanged,
-            onRepsChanged: onRepsChanged,
+            onToggled: onDropsetToggled,
+            onDropAdded: onDropAdded,
+            onDropRemoved: onDropRemoved,
+            onDropWeightChanged: onDropWeightChanged,
+            onDropRepsChanged: onDropRepsChanged,
           ),
-          if (isAssistedBW) ...[
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.fitness_center_rounded, size: 14, color: AppColors.primary),
-                  const SizedBox(width: 6),
-                  // Long enough to wrap on a narrow phone, more so at a large text scale.
-                  Expanded(
-                    child: Text(
-                      'Effective Volume Load: ${effectiveWeightDisplay.toStringAsFixed(1)} ${settings.unitLabel} (${bodyWeightDisplay.toStringAsFixed(1)} BW − ${currentWeightDisplay.toStringAsFixed(1)} Assist) × $currentReps reps',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSoft, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: AppSpacing.md),
         ],
-
-        // Dropset section
-        _DropsetSection(
-          isDropset: isDropset,
-          drops: drops,
-          currentWeight: currentWeight,
-          currentReps: currentReps,
-          mainWeightController: mainWeightController,
-          mainRepsController: mainRepsController,
-          dropWeightControllers: dropWeightControllers,
-          dropRepsControllers: dropRepsControllers,
-          settings: settings,
-          onToggled: onDropsetToggled,
-          onDropAdded: onDropAdded,
-          onDropRemoved: onDropRemoved,
-          onDropWeightChanged: onDropWeightChanged,
-          onDropRepsChanged: onDropRepsChanged,
-        ),
 
         const SizedBox(height: AppSpacing.lg),
 
@@ -254,6 +272,17 @@ class _RecommendationCard extends StatelessWidget {
             ? AppColors.warning
             : AppColors.textMuted;
 
+    final String suggestionText;
+    if (rec.targetDuration != null && rec.targetDuration! > 0) {
+      if (rec.weight > 0) {
+        suggestionText = '$weightStr ${settings.unitLabel} × ${rec.targetDuration}s hold';
+      } else {
+        suggestionText = '${rec.targetDuration}s hold';
+      }
+    } else {
+      suggestionText = '$weightStr ${settings.unitLabel} × ${rec.reps} reps';
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -315,7 +344,7 @@ class _RecommendationCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$weightStr ${settings.unitLabel} × ${rec.reps} reps',
+                  suggestionText,
                   style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 18,
@@ -323,6 +352,18 @@ class _RecommendationCard extends StatelessWidget {
                     fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 ),
+                if (rec.reasoning.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    rec.reasoning,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

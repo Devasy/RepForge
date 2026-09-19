@@ -70,6 +70,8 @@ class ExerciseManager extends ChangeNotifier {
     required String name,
     required String category,
     required String primaryMuscleGroupId,
+    ExerciseType exerciseType = ExerciseType.weightAndReps,
+    List<String>? availableHandles,
   }) async {
     // Validate and normalize name
     final normalizedName = name.trim().replaceAll(RegExp(r'\s+'), ' ');
@@ -107,6 +109,8 @@ class ExerciseManager extends ChangeNotifier {
       muscleActivations: muscleActivations,
       category: normalizedCategory,
       isCustom: true,
+      availableHandles: availableHandles,
+      exerciseType: exerciseType,
     );
 
     await _storage.saveCustomExercise(exercise);
@@ -115,6 +119,70 @@ class ExerciseManager extends ChangeNotifier {
     notifyListeners();
 
     return exercise;
+  }
+
+  /// Update an existing exercise (custom or built-in override).
+  ///
+  /// Throws [ArgumentError] if exercise is not found or inputs are invalid.
+  Future<Exercise> updateExercise({
+    required String id,
+    String? name,
+    ExerciseType? exerciseType,
+    List<String>? availableHandles,
+    String? category,
+    String? primaryMuscleGroupId,
+  }) async {
+    final existing = getExercise(id);
+    if (existing == null) {
+      throw ArgumentError('Exercise with id "$id" not found');
+    }
+
+    final normalizedName = name != null
+        ? name.trim().replaceAll(RegExp(r'\s+'), ' ')
+        : existing.name;
+    if (normalizedName.isEmpty) {
+      throw ArgumentError('Exercise name cannot be empty');
+    }
+
+    final normalizedCategory = category != null
+        ? category.toLowerCase().trim()
+        : existing.category;
+    if (!allowedCategories.contains(normalizedCategory)) {
+      throw ArgumentError(
+        'Invalid category "$normalizedCategory". Must be one of: ${allowedCategories.join(", ")}',
+      );
+    }
+
+    List<MuscleActivation> activations = existing.muscleActivations;
+    if (primaryMuscleGroupId != null && primaryMuscleGroupId.isNotEmpty) {
+      activations = [
+        MuscleActivation(
+          muscleGroupId: primaryMuscleGroupId,
+          activationPercentage: 100,
+        ),
+      ];
+    }
+
+    final updated = existing.copyWith(
+      name: normalizedName,
+      category: normalizedCategory,
+      muscleActivations: activations,
+      exerciseType: exerciseType ?? existing.exerciseType,
+      availableHandles: availableHandles ?? existing.availableHandles,
+    );
+
+    await _storage.saveCustomExercise(updated);
+
+    final idx = _allExercises.indexWhere((e) => e.id == id);
+    if (idx != -1) {
+      _allExercises = List.from(_allExercises)..[idx] = updated;
+    } else {
+      _allExercises = List.from(_allExercises)..add(updated);
+    }
+    _exerciseIndex[id] = updated;
+    notifyListeners();
+
+    return updated;
   }
 
   /// Delete a custom exercise

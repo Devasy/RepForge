@@ -226,5 +226,67 @@ void main() {
       expect(first['recovery_percent'], isA<int>());
       expect(first['status'], isA<String>());
     });
+
+    test('add_custom_exercise creates timeBased exercise with handles', () async {
+      final result = await tools.handleCall(
+        FunctionCall('add_custom_exercise', {
+          'name': 'Dead Hang',
+          'category': 'isolation',
+          'primary_muscle': 'forearms',
+          'exercise_type': 'timeBased',
+          'available_handles': ['Thick Bar', 'Standard Bar'],
+        }),
+      );
+      expect(result['created'], true);
+      expect(result['exercise_name'], 'Dead Hang');
+      expect(result['exercise_type'], 'timeBased');
+      expect(result['available_handles'], ['Thick Bar', 'Standard Bar']);
+
+      final ex = provider.allExercises.firstWhere((e) => e.name == 'Dead Hang');
+      expect(ex.exerciseType, ExerciseType.timeBased);
+      expect(ex.availableHandles, ['Thick Bar', 'Standard Bar']);
+    });
+
+    test('update_exercise updates exercise metadata, type, and handles', () async {
+      // First ensure an exercise exists
+      await tools.handleCall(
+        FunctionCall('add_custom_exercise', {
+          'name': 'Cable Lateral Raise',
+          'category': 'isolation',
+          'primary_muscle': 'shoulders',
+        }),
+      );
+
+      final updateResult = await tools.handleCall(
+        FunctionCall('update_exercise', {
+          'exercise_name': 'Cable Lateral Raise',
+          'new_name': 'Cable Lateral Raise (Cuff)',
+          'available_handles': ['Ankle Cuff', 'D-Handle'],
+        }),
+      );
+      expect(updateResult['updated'], true);
+      expect(updateResult['exercise_name'], 'Cable Lateral Raise (Cuff)');
+      expect(updateResult['available_handles'], ['Ankle Cuff', 'D-Handle']);
+
+      final updated = provider.allExercises.firstWhere(
+        (e) => e.name == 'Cable Lateral Raise (Cuff)',
+      );
+      expect(updated.availableHandles, ['Ankle Cuff', 'D-Handle']);
+    });
+
+    test('create_routine saves default exercise_handles', () async {
+      final result = await tools.handleCall(
+        FunctionCall('create_routine', {
+          'name': 'Upper Hypertrophy',
+          'exercise_names': ['Bench Press'],
+          'exercise_handles': {'Bench Press': 'Wide Grip'},
+        }),
+      );
+      expect(result['created'], true);
+      expect(result['routine_name'], 'Upper Hypertrophy');
+
+      final routine = provider.routines.firstWhere((r) => r.name == 'Upper Hypertrophy');
+      expect(routine.defaultHandles?['bench_press'], 'Wide Grip');
+    });
   });
 }

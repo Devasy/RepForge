@@ -1,16 +1,19 @@
-// add_custom_exercise_screen.dart — Form for creating a custom exercise
+// add_custom_exercise_screen.dart — Form for creating or editing an exercise
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../data/exercise_database.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
 
 class AddCustomExerciseScreen extends StatefulWidget {
-  const AddCustomExerciseScreen({super.key});
+  final Exercise? initialExercise;
+
+  const AddCustomExerciseScreen({super.key, this.initialExercise});
 
   @override
   State<AddCustomExerciseScreen> createState() =>
@@ -19,16 +22,48 @@ class AddCustomExerciseScreen extends StatefulWidget {
 
 class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  late final TextEditingController _nameController;
+  final TextEditingController _handleInputController = TextEditingController();
 
-  String _category = 'compound';
-  String? _muscleId;
+  late String _category;
+  late String? _muscleId;
+  late ExerciseType _exerciseType;
+  late List<String> _availableHandles;
   bool _isSubmitting = false;
+
+  bool get _isEditing => widget.initialExercise != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final init = widget.initialExercise;
+    _nameController = TextEditingController(text: init?.name ?? '');
+    _category = init?.category ?? 'compound';
+    _muscleId = (init != null && init.muscleActivations.isNotEmpty)
+        ? init.primaryMuscle
+        : null;
+    _exerciseType = init?.exerciseType ?? ExerciseType.weightAndReps;
+    _availableHandles = List<String>.from(init?.availableHandles ?? []);
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _handleInputController.dispose();
     super.dispose();
+  }
+
+  void _addHandle() {
+    final text = _handleInputController.text.trim();
+    if (text.isEmpty) return;
+    if (_availableHandles.any((h) => h.toLowerCase() == text.toLowerCase())) {
+      _handleInputController.clear();
+      return;
+    }
+    setState(() {
+      _availableHandles.add(text);
+      _handleInputController.clear();
+    });
   }
 
   Future<void> _save() async {
@@ -44,16 +79,36 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
     }
 
     setState(() => _isSubmitting = true);
+    final provider = context.read<WorkoutProvider>();
+    final exerciseName = _nameController.text.trim();
+    final handles = _availableHandles.isEmpty ? null : _availableHandles;
+
     try {
-      await context.read<WorkoutProvider>().addCustomExercise(
-            name: _nameController.text.trim(),
-            category: _category,
-            primaryMuscleGroupId: _muscleId!,
-          );
+      if (_isEditing) {
+        await provider.updateExercise(
+          id: widget.initialExercise!.id,
+          name: exerciseName,
+          category: _category,
+          primaryMuscleGroupId: _muscleId!,
+          exerciseType: _exerciseType,
+          availableHandles: handles,
+        );
+      } else {
+        await provider.addCustomExercise(
+          name: exerciseName,
+          category: _category,
+          primaryMuscleGroupId: _muscleId!,
+          exerciseType: _exerciseType,
+          availableHandles: handles,
+        );
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${_nameController.text.trim()} added!'),
+            content: Text(
+              _isEditing ? '$exerciseName updated!' : '$exerciseName added!',
+            ),
             backgroundColor: AppColors.cardHigh,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -64,7 +119,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
         Navigator.of(context).pop(true);
       }
     } catch (e) {
-      debugPrint('Failed to save custom exercise: $e');
+      debugPrint('Failed to save exercise: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -84,9 +139,9 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
-        title: const Text(
-          'New Exercise',
-          style: TextStyle(color: AppColors.textPrimary),
+        title: Text(
+          _isEditing ? 'Edit Exercise' : 'New Exercise',
+          style: const TextStyle(color: AppColors.textPrimary),
         ),
         iconTheme: const IconThemeData(color: AppColors.textSoft),
         actions: [
@@ -129,16 +184,17 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                     color: AppColors.primary.withValues(alpha: 0.2),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.info_outline_rounded,
+                    const Icon(Icons.info_outline_rounded,
                         color: AppColors.primary, size: 18),
-                    SizedBox(width: AppSpacing.sm),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        'Create a custom exercise to track workouts '
-                        'not in the built-in library.',
-                        style: TextStyle(
+                        _isEditing
+                            ? 'Update exercise tracking type, attachments, category, or muscle group.'
+                            : 'Create a custom exercise to track workouts not in the built-in library.',
+                        style: const TextStyle(
                           color: AppColors.textSoft,
                           fontSize: 13,
                         ),
@@ -195,8 +251,37 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
 
               const SizedBox(height: AppSpacing.lg),
 
+              // Tracking Mode
+              _label('TRACKING TYPE'),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  _CategoryTile(
+                    label: 'Reps & Weight',
+                    icon: Icons.repeat_rounded,
+                    description: 'Sets & repetitions',
+                    selected: _exerciseType == ExerciseType.weightAndReps,
+                    onTap: () => setState(
+                      () => _exerciseType = ExerciseType.weightAndReps,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  _CategoryTile(
+                    label: 'Time-Based',
+                    icon: Icons.timer_rounded,
+                    description: 'Holds & duration (s)',
+                    selected: _exerciseType == ExerciseType.timeBased,
+                    onTap: () => setState(
+                      () => _exerciseType = ExerciseType.timeBased,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: AppSpacing.lg),
+
               // Category toggle
-              _label('EXERCISE TYPE'),
+              _label('EXERCISE CATEGORY'),
               const SizedBox(height: AppSpacing.sm),
               Row(
                 children: [
@@ -217,6 +302,99 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                   ),
                 ],
               ),
+
+              const SizedBox(height: AppSpacing.lg),
+
+              // Attachments & Handles section
+              _label('ATTACHMENTS / HANDLES (OPTIONAL)'),
+              const SizedBox(height: AppSpacing.sm),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.glassBorder),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _handleInputController,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. Rope, V-Bar, Straight Bar',
+                          hintStyle: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 13,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.sm,
+                          ),
+                        ),
+                        onSubmitted: (_) => _addHandle(),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.add_circle_outline_rounded,
+                        color: AppColors.primary,
+                        size: 22,
+                      ),
+                      tooltip: 'Add attachment',
+                      onPressed: _addHandle,
+                    ),
+                  ],
+                ),
+              ),
+              if (_availableHandles.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: _availableHandles.map((handle) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(color: AppColors.glassBorder),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            handle,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () => setState(
+                              () => _availableHandles.remove(handle),
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 14,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
 
               const SizedBox(height: AppSpacing.lg),
 
@@ -272,8 +450,10 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
               const SizedBox(height: AppSpacing.xxl),
 
               GlowButton(
-                label: _isSubmitting ? 'Saving…' : 'Add Exercise',
-                icon: Icons.add_rounded,
+                label: _isSubmitting
+                    ? 'Saving…'
+                    : (_isEditing ? 'Save Changes' : 'Add Exercise'),
+                icon: _isEditing ? Icons.check_rounded : Icons.add_rounded,
                 onPressed: _isSubmitting ? null : _save,
                 fullWidth: true,
               ),

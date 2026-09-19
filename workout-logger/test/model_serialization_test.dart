@@ -611,4 +611,119 @@ void main() {
       expect(pq.questions.first.question, 'Goal?');
     });
   });
+
+  // ── ExerciseType & Time-based Tracking ────────────────────────────────────
+
+  group('ExerciseType & Time-Based Extensions', () {
+    test('Exercise.exerciseType defaults to weightAndReps', () {
+      final ex = Exercise(
+        id: 'bench',
+        name: 'Bench Press',
+        category: 'compound',
+        muscleActivations: [
+          MuscleActivation(muscleGroupId: 'chest', activationPercentage: 100),
+        ],
+      );
+      expect(ex.exerciseType, ExerciseType.weightAndReps);
+      expect(ex.exerciseType.displayName, 'Weight & Reps');
+      expect(ex.toJson()['exerciseType'], 'weightAndReps');
+    });
+
+    test('Exercise with timeBased round-trips through toJson / fromJson', () {
+      final ex = Exercise(
+        id: 'plank',
+        name: 'Plank',
+        category: 'isolation',
+        muscleActivations: [
+          MuscleActivation(muscleGroupId: 'abs', activationPercentage: 100),
+        ],
+        exerciseType: ExerciseType.timeBased,
+        availableHandles: ['Standard', 'Weighted'],
+      );
+      expect(ex.exerciseType.displayName, 'Time-Based');
+      final json = ex.toJson();
+      expect(json['exerciseType'], 'timeBased');
+      expect(json['availableHandles'], ['Standard', 'Weighted']);
+
+      final restored = Exercise.fromJson(json);
+      expect(restored.exerciseType, ExerciseType.timeBased);
+      expect(restored.availableHandles, ['Standard', 'Weighted']);
+    });
+
+    test('Exercise.copyWith changes exerciseType and availableHandles', () {
+      final ex = Exercise(
+        id: 'bench',
+        name: 'Bench Press',
+        category: 'compound',
+        muscleActivations: [
+          MuscleActivation(muscleGroupId: 'chest', activationPercentage: 100),
+        ],
+      );
+      final updated = ex.copyWith(
+        exerciseType: ExerciseType.timeBased,
+        availableHandles: ['Rope'],
+      );
+      expect(updated.exerciseType, ExerciseType.timeBased);
+      expect(updated.availableHandles, ['Rope']);
+      expect(updated.id, 'bench');
+    });
+
+    test('WorkoutSet.volume calculates duration-based volume for time-based holds', () {
+      // Bodyweight hold (weight = 0, reps = 0, timeTaken = 60s)
+      final bodyweightHold = WorkoutSet(
+        weight: 0.0,
+        reps: 0,
+        timeTaken: 60,
+      );
+      expect(bodyweightHold.volume, 60.0);
+
+      // Weighted hold (weight = 20kg, reps = 0, timeTaken = 45s)
+      final weightedHold = WorkoutSet(
+        weight: 20.0,
+        reps: 0,
+        timeTaken: 45,
+      );
+      expect(weightedHold.volume, 900.0);
+    });
+
+    test('Routine with defaultHandles round-trips through toJson / fromJson', () {
+      final r = Routine(
+        id: 'r_pull',
+        name: 'Pull Day',
+        exerciseIds: ['cable_row', 'lat_pulldown'],
+        defaultHandles: {'cable_row': 'V-Bar', 'lat_pulldown': 'Wide Grip'},
+      );
+      final json = r.toJson();
+      expect(json['defaultHandles'], {
+        'cable_row': 'V-Bar',
+        'lat_pulldown': 'Wide Grip',
+      });
+
+      final restored = Routine.fromJson(json);
+      expect(restored.defaultHandles?['cable_row'], 'V-Bar');
+      expect(restored.defaultHandles?['lat_pulldown'], 'Wide Grip');
+
+      final copy = restored.copyWith(defaultHandles: {'cable_row': 'Straight Bar'});
+      expect(copy.defaultHandles?['cable_row'], 'Straight Bar');
+    });
+
+    test('PersonalRecord with bestDuration round-trips through toJson / fromJson', () {
+      final pr = PersonalRecord(
+        exerciseId: 'plank',
+        bestWeight: 0.0,
+        bestReps: 0,
+        bestVolume: 120.0,
+        bestDuration: 120,
+        achievedAt: DateTime(2026, 6, 1),
+      );
+      final json = pr.toJson();
+      expect(json['bestDuration'], 120);
+
+      final restored = PersonalRecord.fromJson(json);
+      expect(restored.bestDuration, 120);
+
+      final copy = restored.copyWith(bestDuration: 180);
+      expect(copy.bestDuration, 180);
+    });
+  });
 }

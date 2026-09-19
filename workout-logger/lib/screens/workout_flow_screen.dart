@@ -53,6 +53,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   // Set entry state
   double _currentWeight = 20;
   int _currentReps = 10;
+  int _currentDurationSeconds = 60;
   bool _isDropset = false;
   final List<DropsetEntry> _drops = [];
 
@@ -172,6 +173,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final exercise = provider.currentExercise;
     if (exercise == null) return;
 
+    final isTimeBased = exercise.exerciseType == ExerciseType.timeBased;
     final currentHandle = provider.currentExerciseLog?.handle;
     final last = provider.getLastSessionForExercise(
       exercise.id,
@@ -182,11 +184,19 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       setState(() {
         _currentWeight = lastSet.weight;
         _currentReps = lastSet.reps;
+        if (lastSet.timeTaken != null && lastSet.timeTaken! > 0) {
+          _currentDurationSeconds = lastSet.timeTaken!;
+        }
         final dw = settings.toDisplay(_currentWeight);
         _mainWeightCtrl.text = dw == dw.truncateToDouble()
             ? dw.toStringAsFixed(0)
             : dw.toStringAsFixed(1);
         _mainRepsCtrl.text = _currentReps.toString();
+      });
+    } else if (isTimeBased) {
+      setState(() {
+        _currentWeight = 0;
+        _currentDurationSeconds = 60;
       });
     }
   }
@@ -339,6 +349,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 provider.setExerciseHandle(h);
                 _loadLastSessionData();
               },
+              isTimeBased: exercise?.exerciseType == ExerciseType.timeBased,
+              durationSeconds: _currentDurationSeconds,
+              onDurationChanged: (s) => setState(() => _currentDurationSeconds = s),
               programSlot: _slot(idx, p: provider),
               programWeek: _resolvedWeek(provider),
               onWeightChanged: (v) => setState(() => _currentWeight = v),
@@ -368,6 +381,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 setState(() {
                   _currentWeight = rec.weight;
                   _currentReps = rec.reps;
+                  if (rec.targetDuration != null && rec.targetDuration! > 0) {
+                    _currentDurationSeconds = rec.targetDuration!;
+                  }
                   final settings = context.read<SettingsProvider>();
                   final dw = settings.toDisplay(rec.weight);
                   _mainWeightCtrl.text = dw == dw.truncateToDouble()
@@ -517,15 +533,26 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     // changes in settings.
     final isAssistedBW =
         isAssistedBodyweightExercise(provider.currentExercise?.id);
+    final isTimeBased =
+        provider.currentExercise?.exerciseType == ExerciseType.timeBased;
 
-    final set = WorkoutSet(
-      weight: _currentWeight,
-      reps: _currentReps,
-      isDropset: _isDropset,
-      drops: _isDropset ? List.from(_drops) : null,
-      assistWeight: isAssistedBW ? _currentWeight : null,
-      bodyWeightAtLog: isAssistedBW ? settings.userBodyWeight : null,
-    );
+    final set = isTimeBased
+        ? WorkoutSet(
+            weight: _currentWeight,
+            reps: 0,
+            timeTaken: _currentDurationSeconds,
+            isDropset: false,
+            handle: provider.currentExerciseLog?.handle,
+          )
+        : WorkoutSet(
+            weight: _currentWeight,
+            reps: _currentReps,
+            isDropset: _isDropset,
+            drops: _isDropset ? List.from(_drops) : null,
+            assistWeight: isAssistedBW ? _currentWeight : null,
+            bodyWeightAtLog: isAssistedBW ? settings.userBodyWeight : null,
+            handle: provider.currentExerciseLog?.handle,
+          );
 
     provider.addSet(set);
     HapticFeedback.heavyImpact();

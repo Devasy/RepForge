@@ -355,6 +355,8 @@ class WorkoutProvider extends ChangeNotifier {
     required String name,
     required String category,
     required String primaryMuscleGroupId,
+    ExerciseType exerciseType = ExerciseType.weightAndReps,
+    List<String>? availableHandles,
   }) async {
     // Validate and normalize name (trim and collapse whitespace)
     final normalizedName = name.trim().replaceAll(RegExp(r'\s+'), ' ');
@@ -393,6 +395,8 @@ class WorkoutProvider extends ChangeNotifier {
       muscleActivations: muscleActivations,
       category: normalizedCategory,
       isCustom: true,
+      availableHandles: availableHandles,
+      exerciseType: exerciseType,
     );
 
     // Persist to storage
@@ -403,6 +407,68 @@ class WorkoutProvider extends ChangeNotifier {
     _invalidateHistoryCache();
 
     notifyListeners();
+  }
+
+  /// Update an existing exercise (custom or built-in override)
+  Future<Exercise> updateExercise({
+    required String id,
+    String? name,
+    ExerciseType? exerciseType,
+    List<String>? availableHandles,
+    String? category,
+    String? primaryMuscleGroupId,
+  }) async {
+    final existing = getExercise(id);
+    if (existing == null) {
+      throw ArgumentError('Exercise with id "$id" not found');
+    }
+
+    final normalizedName = name != null
+        ? name.trim().replaceAll(RegExp(r'\s+'), ' ')
+        : existing.name;
+    if (normalizedName.isEmpty) {
+      throw ArgumentError('Exercise name cannot be empty');
+    }
+
+    final normalizedCategory = category != null
+        ? category.toLowerCase().trim()
+        : existing.category;
+    if (!_allowedCategories.contains(normalizedCategory)) {
+      throw ArgumentError(
+        'Invalid category "$normalizedCategory". Must be one of: ${_allowedCategories.join(", ")}',
+      );
+    }
+
+    List<MuscleActivation> activations = existing.muscleActivations;
+    if (primaryMuscleGroupId != null && primaryMuscleGroupId.isNotEmpty) {
+      activations = [
+        MuscleActivation(
+          muscleGroupId: primaryMuscleGroupId,
+          activationPercentage: 100,
+        ),
+      ];
+    }
+
+    final updated = existing.copyWith(
+      name: normalizedName,
+      category: normalizedCategory,
+      muscleActivations: activations,
+      exerciseType: exerciseType ?? existing.exerciseType,
+      availableHandles: availableHandles ?? existing.availableHandles,
+    );
+
+    await _storage.saveCustomExercise(updated);
+
+    final idx = _allExercises.indexWhere((e) => e.id == id);
+    if (idx != -1) {
+      _allExercises = List.from(_allExercises)..[idx] = updated;
+    } else {
+      _allExercises = List.from(_allExercises)..add(updated);
+    }
+    _invalidateHistoryCache();
+    notifyListeners();
+
+    return updated;
   }
 
   /// Delete a custom exercise
@@ -493,7 +559,12 @@ class WorkoutProvider extends ChangeNotifier {
     // Initialize exercise logs based on routine or provided exercise IDs
     final ids = routine?.exerciseIds ?? exerciseIds ?? [];
     for (var id in ids) {
-      _currentExerciseLogs.add(ExerciseLog(exerciseId: id, sets: []));
+      final defaultHandle = routine?.defaultHandles?[id];
+      _currentExerciseLogs.add(ExerciseLog(
+        exerciseId: id,
+        sets: [],
+        handle: defaultHandle,
+      ));
     }
 
     notifyListeners();
@@ -724,9 +795,12 @@ class WorkoutProvider extends ChangeNotifier {
     ReadinessBand? readinessBand,
   }) {
     final recent = getRecentSessionsForExercise(exerciseId, handle: handle, limit: 3);
+    final derived = _historyDerived();
+    final exercise = derived.exerciseMap[exerciseId];
+    final isTimeBased = exercise?.exerciseType == ExerciseType.timeBased;
 
     if (recent.isEmpty) {
-      return _mlService.getDefaultRecommendations(3);
+      return _mlService.getDefaultRecommendations(3, isTimeBased: isTimeBased);
     }
 
     // _growthModels is trained per-exerciseId across every handle variation,
@@ -736,7 +810,6 @@ class WorkoutProvider extends ChangeNotifier {
     // Cached: this runs from WorkoutFlowScreen's build, so the exercise map
     // and the walk over every session are reused until history changes. Only
     // the decay is recomputed per call, and that's O(muscle groups).
-    final derived = _historyDerived();
     final recoveryInputs = recoveryRecommendationInputs(
       exerciseId: exerciseId,
       sessions: _sessions,
@@ -1014,11 +1087,16 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== ROUTINES ====================
 
-  Future<Routine> createRoutine(String name, List<String> exerciseIds) async {
+  Future<Routine> createRoutine(
+    String name,
+    List<String> exerciseIds, {
+    Map<String, String>? defaultHandles,
+  }) async {
     final routine = Routine(
       id: _uuid.v4(),
       name: name,
       exerciseIds: exerciseIds,
+      defaultHandles: defaultHandles,
     );
     await _storage.saveRoutine(routine);
     _routines.add(routine);

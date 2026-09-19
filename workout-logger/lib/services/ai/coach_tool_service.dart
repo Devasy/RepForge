@@ -14,6 +14,7 @@ import '../../models/sleep_hr_models.dart';
 import '../workout_provider.dart';
 import '../managers/pr_manager.dart';
 import '../managers/health_history_manager.dart';
+import '../../data/exercise_database.dart';
 import 'sql_query_service.dart';
 
 class AmbiguousMatchException implements Exception {
@@ -241,7 +242,8 @@ class CoachToolService {
           FunctionDeclaration(
             'create_routine',
             'Create a new workout routine with a name and an ordered list of '
-                'exercises. Exercises are matched by name from the catalogue.',
+                'exercises. Exercises are matched by name from the catalogue. '
+                'Optionally provide default attachment handles for exercises in this routine.',
             Schema.object(
               properties: {
                 'name': Schema.string(
@@ -252,15 +254,21 @@ class CoachToolService {
                   description:
                       'Ordered list of exercise names to include in the routine.',
                 ),
+                'exercise_handles': Schema.object(
+                  properties: {},
+                  description:
+                      'Optional. Map of exercise name to default attachment handle, e.g. {"Cable Row": "V-Bar", "Triceps Pushdown": "Rope"}.',
+                  nullable: true,
+                ),
               },
               requiredProperties: ['name', 'exercise_names'],
             ),
           ),
           FunctionDeclaration(
             'update_routine',
-            'Modify an existing routine: add exercises, remove exercises, or '
-                'reorder them. Specify the routine by name. Exercises are '
-                'matched by name from the catalogue.',
+            'Modify an existing routine: add exercises, remove exercises, reorder them, '
+                'or set default attachment handles. Specify the routine by name. '
+                'Exercises are matched by name from the catalogue.',
             Schema.object(
               properties: {
                 'routine_name': Schema.string(
@@ -281,6 +289,12 @@ class CoachToolService {
                   description:
                       'Optional. Full new ordering of all exercise names in '
                       'the routine. Must include every exercise you want to keep.',
+                  nullable: true,
+                ),
+                'exercise_handles': Schema.object(
+                  properties: {},
+                  description:
+                      'Optional. Map of exercise name to default attachment handle, e.g. {"Cable Row": "V-Bar"}. Set handle to empty string to clear.',
                   nullable: true,
                 ),
               },
@@ -308,8 +322,59 @@ class CoachToolService {
                       'Primary muscle group this exercise targets, e.g. "Chest" '
                       'or "Biceps". Must match an existing muscle group.',
                 ),
+                'exercise_type': Schema.string(
+                  description:
+                      'Optional. Either "weightAndReps" (standard sets/reps) or "timeBased" (duration holds). Defaults to "weightAndReps".',
+                  nullable: true,
+                ),
+                'available_handles': Schema.array(
+                  items: Schema.string(),
+                  description:
+                      'Optional. List of attachment/handle variations, e.g. ["Rope", "V-Bar"].',
+                  nullable: true,
+                ),
               },
               requiredProperties: ['name', 'category', 'primary_muscle'],
+            ),
+          ),
+          FunctionDeclaration(
+            'update_exercise',
+            'Modify an existing exercise in the catalogue (both custom exercises and '
+                'library exercises). You can update its name, exercise type '
+                '("weightAndReps" or "timeBased"), category ("compound" or "isolation"), '
+                'primary muscle group, or available attachments/handles '
+                '(e.g. ["Rope", "V-Bar", "D-Handles"]).',
+            Schema.object(
+              properties: {
+                'exercise_name': Schema.string(
+                  description: 'Current name of the exercise to update.',
+                ),
+                'new_name': Schema.string(
+                  description: 'Optional. New display name for the exercise.',
+                  nullable: true,
+                ),
+                'exercise_type': Schema.string(
+                  description:
+                      'Optional. Either "weightAndReps" or "timeBased".',
+                  nullable: true,
+                ),
+                'category': Schema.string(
+                  description: 'Optional. Either "compound" or "isolation".',
+                  nullable: true,
+                ),
+                'primary_muscle': Schema.string(
+                  description:
+                      'Optional. Primary muscle group name (e.g. "Chest", "Biceps").',
+                  nullable: true,
+                ),
+                'available_handles': Schema.array(
+                  items: Schema.string(),
+                  description:
+                      'Optional. List of allowed attachment/handle variations, e.g. ["Rope", "V-Bar"].',
+                  nullable: true,
+                ),
+              },
+              requiredProperties: ['exercise_name'],
             ),
           ),
           FunctionDeclaration(
@@ -453,6 +518,8 @@ class CoachToolService {
         return await _updateRoutine(call.args);
       case 'add_custom_exercise':
         return await _addCustomExercise(call.args);
+      case 'update_exercise':
+        return await _updateExercise(call.args);
       case 'run_sql_query':
         final sql = _sql;
         if (sql == null) return {'error': 'SQL query tool is not available.'};
@@ -1180,12 +1247,32 @@ class CoachToolService {
       };
     }
 
-    await _wp.createRoutine(name, resolvedIds);
+    final handlesArg = args['exercise_handles'] as Map?;
+    final defaultHandles = <String, String>{};
+    if (handlesArg != null) {
+      for (final entry in handlesArg.entries) {
+        final exName = entry.key.toString().trim();
+        final handle = entry.value.toString().trim();
+        try {
+          final ex = _resolveExercise(exName);
+          if (ex != null && handle.isNotEmpty) {
+            defaultHandles[ex.id] = handle;
+          }
+        } catch (_) {}
+      }
+    }
+
+    await _wp.createRoutine(
+      name,
+      resolvedIds,
+      defaultHandles: defaultHandles.isEmpty ? null : defaultHandles,
+    );
     return {
       'created': true,
       'routine_name': name,
       'exercise_count': resolvedIds.length,
       'exercises': [for (final id in resolvedIds) _wp.getExerciseName(id)],
+      if (defaultHandles.isNotEmpty) 'default_handles': defaultHandles,
     };
   }
 
@@ -1248,11 +1335,28 @@ class CoachToolService {
       }
     }
 
-    final updated = Routine(
-      id: routine.id,
-      name: routine.name,
+    final handlesArg = args['exercise_handles'] as Map?;
+    final defaultHandles = Map<String, String>.from(routine.defaultHandles ?? {});
+    if (handlesArg != null) {
+      for (final entry in handlesArg.entries) {
+        final exName = entry.key.toString().trim();
+        final handle = entry.value.toString().trim();
+        try {
+          final ex = _resolveExercise(exName);
+          if (ex != null) {
+            if (handle.isEmpty) {
+              defaultHandles.remove(ex.id);
+            } else {
+              defaultHandles[ex.id] = handle;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    final updated = routine.copyWith(
       exerciseIds: ids,
-      createdAt: routine.createdAt,
+      defaultHandles: defaultHandles.isEmpty ? null : defaultHandles,
     );
     await _wp.updateRoutine(updated);
 
@@ -1261,6 +1365,7 @@ class CoachToolService {
       'routine_name': routine.name,
       'exercise_count': ids.length,
       'exercises': [for (final id in ids) _wp.getExerciseName(id)],
+      if (defaultHandles.isNotEmpty) 'default_handles': defaultHandles,
     };
   }
 
@@ -1305,11 +1410,21 @@ class CoachToolService {
       };
     }
 
+    final typeStr = (args['exercise_type'] as String?)?.trim();
+    final exerciseType = typeStr == 'timeBased' ? ExerciseType.timeBased : ExerciseType.weightAndReps;
+
+    final handles = (args['available_handles'] as List?)
+        ?.map((h) => h.toString().trim())
+        .where((h) => h.isNotEmpty)
+        .toList();
+
     try {
       await _wp.addCustomExercise(
         name: name,
         category: category,
         primaryMuscleGroupId: muscle.id,
+        exerciseType: exerciseType,
+        availableHandles: handles?.isEmpty == true ? null : handles,
       );
     } catch (e) {
       return {'error': 'Could not create exercise: $e'};
@@ -1320,7 +1435,97 @@ class CoachToolService {
       'exercise_name': name,
       'category': category,
       'primary_muscle': muscle.name,
+      'exercise_type': exerciseType.name,
+      if (handles != null && handles.isNotEmpty) 'available_handles': handles,
     };
+  }
+
+  Future<Map<String, Object?>> _updateExercise(
+      Map<String, Object?> args) async {
+    final name = (args['exercise_name'] as String?)?.trim() ?? '';
+    if (name.isEmpty) return {'error': 'exercise_name cannot be empty.'};
+
+    final Exercise exercise;
+    try {
+      final resolved = _resolveExercise(name);
+      if (resolved == null) {
+        return {'error': 'No exercise found matching "$name".'};
+      }
+      exercise = resolved;
+    } on AmbiguousMatchException catch (e) {
+      return {
+        'error': 'Multiple exercises match "$name". Did you mean one of:',
+        'ambiguous_matches': e.candidates,
+      };
+    }
+
+    final newName = (args['new_name'] as String?)?.trim();
+    final category = (args['category'] as String?)?.trim().toLowerCase();
+    if (category != null && category.isNotEmpty && category != 'compound' && category != 'isolation') {
+      return {
+        'error': 'category must be "compound" or "isolation", got "$category".',
+      };
+    }
+
+    String? primaryMuscleId;
+    String? primaryMuscleName;
+    final muscleName = (args['primary_muscle'] as String?)?.trim();
+    if (muscleName != null && muscleName.isNotEmpty) {
+      try {
+        final resolved = _resolveMuscleGroup(muscleName);
+        if (resolved == null) {
+          return {
+            'error': 'No muscle group found matching "$muscleName".',
+            'available_muscles': [for (final m in _wp.muscleGroups) m.name],
+          };
+        }
+        primaryMuscleId = resolved.id;
+        primaryMuscleName = resolved.name;
+      } on AmbiguousMatchException catch (e) {
+        return {
+          'error': 'Multiple muscle groups match "$muscleName". Did you mean:',
+          'ambiguous_matches': e.candidates,
+        };
+      }
+    }
+
+    ExerciseType? exerciseType;
+    final typeStr = (args['exercise_type'] as String?)?.trim();
+    if (typeStr != null && typeStr.isNotEmpty) {
+      exerciseType = typeStr == 'timeBased' ? ExerciseType.timeBased : ExerciseType.weightAndReps;
+    }
+
+    List<String>? availableHandles;
+    if (args.containsKey('available_handles')) {
+      final handlesList = (args['available_handles'] as List?)
+          ?.map((h) => h.toString().trim())
+          .where((h) => h.isNotEmpty)
+          .toList();
+      availableHandles = handlesList;
+    }
+
+    try {
+      final updated = await _wp.updateExercise(
+        id: exercise.id,
+        name: (newName != null && newName.isNotEmpty) ? newName : null,
+        category: (category != null && category.isNotEmpty) ? category : null,
+        primaryMuscleGroupId: primaryMuscleId,
+        exerciseType: exerciseType,
+        availableHandles: availableHandles,
+      );
+
+      return {
+        'updated': true,
+        'exercise_id': updated.id,
+        'exercise_name': updated.name,
+        'category': updated.category,
+        'primary_muscle': primaryMuscleName ?? _wp.getMuscleGroupName(updated.primaryMuscle),
+        'exercise_type': updated.exerciseType.name,
+        'available_handles': updated.availableHandles,
+      };
+    } catch (e) {
+      return {'error': 'Could not update exercise: $e'};
+    }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1388,11 +1593,13 @@ class CoachToolService {
   MuscleGroup? _resolveMuscleGroup(String query) {
     final q = query.toLowerCase().trim();
     if (q.isEmpty) return null;
-    for (final m in _wp.muscleGroups) {
-      if (m.name.toLowerCase() == q) return m;
+    final groups = _wp.muscleGroups.isNotEmpty ? _wp.muscleGroups : MuscleGroups.getAll();
+    for (final m in groups) {
+      if (m.name.toLowerCase() == q || m.id.toLowerCase() == q) return m;
     }
     final partials = [
-      for (final m in _wp.muscleGroups) if (m.name.toLowerCase().contains(q)) m
+      for (final m in groups)
+        if (m.name.toLowerCase().contains(q) || m.id.toLowerCase().contains(q)) m
     ];
     if (partials.isEmpty) return null;
     if (partials.length == 1) return partials.first;

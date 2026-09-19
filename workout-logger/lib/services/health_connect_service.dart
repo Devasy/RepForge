@@ -3,7 +3,7 @@ import 'dart:math' show max;
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:health_connector/health_connector.dart';
 
-import '../models/models.dart';
+import '../models/models.dart' hide ExerciseType;
 import 'interfaces/health_connect_service_interface.dart';
 import 'utils/hc_session_builder.dart';
 

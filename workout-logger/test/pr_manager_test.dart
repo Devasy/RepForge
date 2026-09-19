@@ -222,6 +222,33 @@ void main() {
       expect(results, isEmpty);
       expect(manager.getRecord('bench'), isNull);
     });
+
+    test('returns NewPRResult when duration PR is achieved or broken', () async {
+      final initialResults = await manager.checkAndUpdatePRs(
+        _session(exercises: [
+          _log('plank', sets: [
+            WorkoutSet(weight: 0, reps: 0, timeTaken: 60),
+          ]),
+        ]),
+      );
+      expect(initialResults, hasLength(1));
+      expect(initialResults.first.types, contains('duration'));
+      expect(manager.getRecord('plank')?.bestDuration, 60);
+
+      final nextResults = await manager.checkAndUpdatePRs(
+        _session(
+          id: 's2',
+          exercises: [
+            _log('plank', sets: [
+              WorkoutSet(weight: 0, reps: 0, timeTaken: 90),
+            ]),
+          ],
+        ),
+      );
+      expect(nextResults, hasLength(1));
+      expect(nextResults.first.types, contains('duration'));
+      expect(manager.getRecord('plank')?.bestDuration, 90);
+    });
   });
 
   group('PRManager - getRecord', () {

@@ -4,6 +4,7 @@
 // system-prompt building) lives in AiCoachViewModel. The widget only renders
 // state, forwards user intents, and holds UI-local controllers.
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -95,11 +96,12 @@ class _AiCoachViewState extends State<_AiCoachView> {
   }
 
   void _send() {
+    final vm = context.read<AiCoachViewModel>();
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && !vm.hasPendingImage) return;
     HapticFeedback.lightImpact();
     _controller.clear();
-    context.read<AiCoachViewModel>().sendMessage(text);
+    vm.sendMessage(text);
   }
 
   void _scrollToBottom() {
@@ -300,62 +302,134 @@ class _AiCoachViewState extends State<_AiCoachView> {
 
   Widget _buildInputBar(AiCoachViewModel vm) {
     return RFBottomBar(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 44),
-              alignment: Alignment.centerLeft,
+          if (vm.hasPendingImage) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+              padding: const EdgeInsets.all(AppSpacing.xs + 2),
               decoration: BoxDecoration(
                 color: AppColors.glass2,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                border: Border.all(color: AppColors.glassBorderStrong),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
               ),
-              child: TextField(
-                controller: _controller,
-                style: const TextStyle(
-                  fontFamily: 'Geist',
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                  height: 1.4,
-                ),
-                maxLines: 5,
-                minLines: 1,
-                textCapitalization: TextCapitalization.sentences,
-                cursorColor: AppColors.primary,
-                decoration: const InputDecoration(
-                  hintText: 'Ask your coach…',
-                  hintStyle: TextStyle(
-                    fontFamily: 'Geist',
-                    color: AppColors.textFaint,
-                    fontSize: 14,
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: Image.memory(
+                      vm.pendingImageBytes!,
+                      width: 46,
+                      height: 46,
+                      fit: BoxFit.cover,
+                    ),
                   ),
-                  // The container draws the only frame; the theme otherwise nests
-                  // a filled 12-radius box and focus ring inside this 18-radius pill.
-                  filled: false,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm + 4,
+                  const SizedBox(width: AppSpacing.sm),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Image attached',
+                          style: TextStyle(
+                            fontFamily: 'Geist',
+                            color: AppColors.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Form check, equipment setup, or progress',
+                          style: TextStyle(
+                            fontFamily: 'Geist',
+                            color: AppColors.textMuted,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                onSubmitted: (_) => _send(),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
+                    tooltip: 'Remove image',
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      vm.clearPendingImage();
+                    },
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          // Keystrokes rebuild only this button, not the whole transcript.
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _controller,
-            builder: (_, value, _) => _SendButton(
-              loading: vm.isLoading,
-              enabled: value.text.trim().isNotEmpty,
-              onTap: _send,
-            ),
+          ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(right: AppSpacing.xs),
+                child: RFIconButton(
+                  icon: Icons.add_photo_alternate_rounded,
+                  tooltip: 'Attach image (form check / equipment)',
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    vm.pickImage();
+                  },
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  alignment: Alignment.centerLeft,
+                  decoration: BoxDecoration(
+                    color: AppColors.glass2,
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    border: Border.all(color: AppColors.glassBorderStrong),
+                  ),
+                  child: TextField(
+                    controller: _controller,
+                    style: const TextStyle(
+                      fontFamily: 'Geist',
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                    maxLines: 5,
+                    minLines: 1,
+                    textCapitalization: TextCapitalization.sentences,
+                    cursorColor: AppColors.primary,
+                    decoration: const InputDecoration(
+                      hintText: 'Ask your coach…',
+                      hintStyle: TextStyle(
+                        fontFamily: 'Geist',
+                        color: AppColors.textFaint,
+                        fontSize: 14,
+                      ),
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm + 4,
+                      ),
+                    ),
+                    onSubmitted: (_) => _send(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              // Keystrokes or pending image rebuild this button
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _controller,
+                builder: (_, value, _) => _SendButton(
+                  loading: vm.isLoading,
+                  enabled: value.text.trim().isNotEmpty || vm.hasPendingImage,
+                  onTap: _send,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -630,14 +704,44 @@ class _MessageBubble extends StatelessWidget {
       isUser: isUser,
       toolCalls: isUser ? const [] : (message.toolCalls ?? const []),
       child: isUser
-          ? Text(
-              message.text,
-              style: const TextStyle(
-                fontFamily: 'Geist',
-                color: Colors.white,
-                fontSize: 14,
-                height: 1.55,
-              ),
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (message.imageBytesBase64 != null &&
+                    message.imageBytesBase64!.isNotEmpty) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        maxWidth: 240,
+                        maxHeight: 200,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: AppColors.glassBorderStrong,
+                        ),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Image.memory(
+                        base64Decode(message.imageBytesBase64!),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  if (message.text.isNotEmpty) const SizedBox(height: AppSpacing.xs),
+                ],
+                if (message.text.isNotEmpty)
+                  Text(
+                    message.text,
+                    style: const TextStyle(
+                      fontFamily: 'Geist',
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.55,
+                    ),
+                  ),
+              ],
             )
           : CoachMessageContent(text: message.text),
     );

@@ -31,6 +31,8 @@ abstract mixin class IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) =>
       streamCoachReply(
         userMessage: userMessage,
@@ -38,6 +40,8 @@ abstract mixin class IAiService {
         history: history,
         tools: tools,
         onToolCall: onToolCall,
+        imageBytesBase64: imageBytesBase64,
+        imageMimeType: imageMimeType,
       );
 
   /// Stream a coach reply (alias for backward compatibility).
@@ -47,6 +51,8 @@ abstract mixin class IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   });
 
   /// Generic domain-agnostic structured JSON generator.

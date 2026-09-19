@@ -41,11 +41,16 @@ class RoutineManager extends ChangeNotifier {
   }
 
   /// Create a new routine
-  Future<Routine> createRoutine(String name, List<String> exerciseIds) async {
+  Future<Routine> createRoutine(
+    String name,
+    List<String> exerciseIds, {
+    Map<String, String>? defaultHandles,
+  }) async {
     final routine = Routine(
       id: _uuid.v4(),
       name: name,
       exerciseIds: exerciseIds,
+      defaultHandles: defaultHandles,
     );
     await _storage.saveRoutine(routine);
     _routines.add(routine);

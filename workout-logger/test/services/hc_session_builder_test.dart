@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_connector/health_connector.dart';
-import 'package:repforge/models/models.dart';
+import 'package:repforge/models/models.dart' hide ExerciseType;
 import 'package:repforge/services/utils/hc_session_builder.dart';
 
 WorkoutSession _session({

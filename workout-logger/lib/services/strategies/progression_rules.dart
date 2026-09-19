@@ -37,6 +37,9 @@ class ProgressionContext {
   /// weight increment instead of blocking it outright.
   final double sessionFatigueFactor;
 
+  /// True when this set is time-based (e.g. plank, dead hang, wall sit).
+  bool get isTimeBased => set.isTimeBased;
+
   const ProgressionContext({
     required this.set,
     required this.minReps,
@@ -67,6 +70,16 @@ class UnderRecoveredRule implements ProgressionRule {
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (!c.isUnderRecovered) return null;
+    if (c.isTimeBased) {
+      return SetRecommendation(
+        weight: c.set.weight,
+        reps: 0,
+        targetDuration: c.set.timeTaken,
+        confidence: 'low',
+        reasoning: 'Muscle only ${c.recoveryPercent}% recovered — maintain '
+            'hold duration, skip progression',
+      );
+    }
     return SetRecommendation(
       weight: c.set.weight,
       reps: c.set.reps,
@@ -85,6 +98,16 @@ class PostDeloadRecoveryRule implements ProgressionRule {
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (!c.isPostDeloadRecovery) return null;
+    if (c.isTimeBased) {
+      return SetRecommendation(
+        weight: c.set.weight,
+        reps: 0,
+        targetDuration: c.set.timeTaken,
+        confidence: 'high',
+        reasoning: 'Resuming training after deload — anchored on pre-deload '
+            'baseline (${c.set.timeTaken ?? 30}s hold)',
+      );
+    }
     return SetRecommendation(
       weight: c.set.weight,
       reps: c.set.reps,
@@ -107,6 +130,16 @@ class ReadinessRule implements ProgressionRule {
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (!c.isLowReadiness) return null;
+    if (c.isTimeBased) {
+      return SetRecommendation(
+        weight: c.set.weight,
+        reps: 0,
+        targetDuration: c.set.timeTaken,
+        confidence: 'low',
+        reasoning: 'Low readiness today (sleep/recovery signals) — hold duration '
+            'and reassess next session',
+      );
+    }
     return SetRecommendation(
       weight: c.set.weight,
       reps: c.set.reps,
@@ -127,6 +160,16 @@ class SessionFatigueRule implements ProgressionRule {
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (c.sessionFatigueFactor < 1.0) return null;
+    if (c.isTimeBased) {
+      return SetRecommendation(
+        weight: c.set.weight,
+        reps: 0,
+        targetDuration: c.set.timeTaken,
+        confidence: 'medium',
+        reasoning: "Already trained hard for this muscle earlier in today's "
+            'session — hold duration and finish strong',
+      );
+    }
     return SetRecommendation(
       weight: c.set.weight,
       reps: c.set.reps,
@@ -144,6 +187,18 @@ class DeclineDeloadRule implements ProgressionRule {
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (!c.isDeclining) return null;
+    if (c.isTimeBased) {
+      final curTime = c.set.timeTaken ?? 30;
+      final deloadedTime = max(15, ((curTime * 0.9) / 5).round() * 5);
+      return SetRecommendation(
+        weight: c.set.weight,
+        reps: 0,
+        targetDuration: deloadedTime,
+        confidence: 'medium',
+        reasoning: 'Hold performance trending down — deload ~10% for a session or two, '
+            'then rebuild',
+      );
+    }
     // Round the deload to the plate increment users can actually load.
     final deloaded = max(0.0, ((c.set.weight * 0.9) / 2.5).round() * 2.5);
     return SetRecommendation(
@@ -163,6 +218,15 @@ class PlateauRule implements ProgressionRule {
   @override
   SetRecommendation? apply(ProgressionContext c) {
     if (!c.isPlateau) return null;
+    if (c.isTimeBased) {
+      return SetRecommendation(
+        weight: c.set.weight,
+        reps: 0,
+        targetDuration: c.set.timeTaken,
+        confidence: 'medium',
+        reasoning: 'Plateau detected — maintain hold duration and focus on form quality',
+      );
+    }
     return SetRecommendation(
       weight: c.set.weight,
       reps: c.set.reps,
@@ -186,6 +250,55 @@ class DoubleProgressionRule implements ProgressionRule {
 
   @override
   SetRecommendation apply(ProgressionContext c) {
+    if (c.isTimeBased) {
+      final currentDuration = c.set.timeTaken ?? 30;
+      final ceiling = currentDuration >= 90 ? 120 : 60;
+
+      if (currentDuration >= ceiling) {
+        const baseIncrement = 2.5;
+        final increment = c.sessionFatigueFactor > 0
+            ? max(
+                0.0,
+                ((baseIncrement * (1 - c.sessionFatigueFactor)) / 2.5).round() *
+                    2.5,
+              )
+            : baseIncrement;
+
+        if (increment <= 0) {
+          return SetRecommendation(
+            weight: c.set.weight,
+            reps: 0,
+            targetDuration: currentDuration,
+            confidence: 'medium',
+            reasoning: 'Hold ceiling reached (${currentDuration}s), but earlier fatigue '
+                'today means holding steady for now',
+          );
+        }
+
+        const resetDuration = 30;
+        return SetRecommendation(
+          weight: c.set.weight + increment,
+          reps: 0,
+          targetDuration: resetDuration,
+          confidence: increment < baseIncrement ? 'medium' : 'high',
+          reasoning: increment < baseIncrement
+              ? 'Hold ceiling reached (${currentDuration}s) — step the weight up a little '
+                  'and reset to ${resetDuration}s hold'
+              : 'Hold ceiling reached (${currentDuration}s) — step up load (+2.5kg) '
+                  'and reset to ${resetDuration}s hold',
+        );
+      }
+
+      final nextDuration = currentDuration + 5;
+      return SetRecommendation(
+        weight: c.set.weight,
+        reps: 0,
+        targetDuration: nextDuration,
+        confidence: 'high',
+        reasoning: 'Add 5s hold (${nextDuration}s / ${ceiling}s target) — progressive overload',
+      );
+    }
+
     if (c.set.reps >= c.maxReps) {
       final baseIncrement = c.set.weight < 40 ? 2.5 : 5.0;
       final increment = c.sessionFatigueFactor > 0

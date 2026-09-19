@@ -234,6 +234,7 @@ class WorkoutSummaryScreen extends StatelessWidget {
             final (label, color) = switch (t) {
               'weight' => ('Best Weight', AppColors.warning),
               'reps' => ('Best Reps', AppColors.secondary),
+              'duration' => ('Best Duration', AppColors.cyan),
               _ => ('Best Volume', AppColors.success),
             };
             return RFChip(label: label, color: color);

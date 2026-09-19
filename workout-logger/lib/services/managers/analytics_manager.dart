@@ -187,15 +187,17 @@ class AnalyticsManager extends ChangeNotifier {
         ? logs.first.log // already sorted newest-first
         : findMostRecentExerciseLog(exerciseId, sessions); // fallback
 
+    final lookup = exerciseMap ?? _fallbackLookupFrom(exercises);
+    final isTimeBased = lookup[exerciseId]?.exerciseType == ExerciseType.timeBased;
+
     if (lastLog == null || lastLog.sets.isEmpty) {
-      return _mlService.getDefaultRecommendations(3);
+      return _mlService.getDefaultRecommendations(3, isTimeBased: isTimeBased);
     }
 
     final pastSessions = (logs != null && logs.isNotEmpty)
         ? logs.take(3).map((e) => e.log.sets).toList()
         : [lastLog.sets];
 
-    final lookup = exerciseMap ?? _fallbackLookupFrom(exercises);
     // Reuse the last-trained walk across calls — it's invalidated by
     // buildSessionIndex, the same signal that invalidates _sessionIndex.
     if (!isFresh || !identical(_lastTrainedFor, lookup)) {

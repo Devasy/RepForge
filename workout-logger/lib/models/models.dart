@@ -77,6 +77,20 @@ const Set<String> _assistedBodyweightExerciseIds = {
 bool isAssistedBodyweightExercise(String? exerciseId) =>
     exerciseId != null && _assistedBodyweightExerciseIds.contains(exerciseId);
 
+enum ExerciseType {
+  weightAndReps,
+  timeBased;
+
+  String get displayName {
+    switch (this) {
+      case ExerciseType.weightAndReps:
+        return 'Weight & Reps';
+      case ExerciseType.timeBased:
+        return 'Time-Based';
+    }
+  }
+}
+
 class Exercise {
   final String id;
   final String name;
@@ -84,6 +98,7 @@ class Exercise {
   final String category; // 'compound' or 'isolation'
   final bool isCustom; // User-created exercise
   final List<String>? availableHandles; // Attachment/handle options e.g. ['Rope', 'Bar']
+  final ExerciseType exerciseType;
 
   const Exercise({
     required this.id,
@@ -92,7 +107,27 @@ class Exercise {
     required this.category,
     this.isCustom = false,
     this.availableHandles,
+    this.exerciseType = ExerciseType.weightAndReps,
   });
+
+  Exercise copyWith({
+    String? id,
+    String? name,
+    List<MuscleActivation>? muscleActivations,
+    String? category,
+    bool? isCustom,
+    List<String>? availableHandles,
+    ExerciseType? exerciseType,
+  }) =>
+      Exercise(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        muscleActivations: muscleActivations ?? this.muscleActivations,
+        category: category ?? this.category,
+        isCustom: isCustom ?? this.isCustom,
+        availableHandles: availableHandles ?? this.availableHandles,
+        exerciseType: exerciseType ?? this.exerciseType,
+      );
 
   String get primaryMuscle {
     if (muscleActivations.isEmpty) return 'Unknown';
@@ -109,6 +144,7 @@ class Exercise {
     'category': category,
     'isCustom': isCustom,
     'availableHandles': availableHandles,
+    'exerciseType': exerciseType.name,
   };
 
   factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
@@ -120,6 +156,9 @@ class Exercise {
     category: json['category'],
     isCustom: json['isCustom'] ?? false,
     availableHandles: (json['availableHandles'] as List?)?.cast<String>(),
+    exerciseType: json['exerciseType'] == 'timeBased'
+        ? ExerciseType.timeBased
+        : ExerciseType.weightAndReps,
   );
 }
 
@@ -171,7 +210,9 @@ class WorkoutSet {
     final effW = assisted
         ? max(0.0, bw - (assistWeight ?? weight) + (extraWeight ?? 0.0))
         : weight;
-    double vol = effW * reps;
+    double vol = reps == 0 && (timeTaken != null && timeTaken! > 0)
+        ? (effW > 0 ? effW : 1.0) * timeTaken!
+        : effW * reps;
     if (isDropset && drops != null) {
       for (final drop in drops!) {
         final dropEff = assisted
@@ -184,6 +225,9 @@ class WorkoutSet {
   }
 
   double get volume => calculateVolume();
+
+  /// True when this set represents an isometric time-based hold rather than rep-based work.
+  bool get isTimeBased => reps == 0 && (timeTaken != null && timeTaken! > 0);
 
   Map<String, dynamic> toJson() => {
     'weight': weight,
@@ -394,12 +438,14 @@ class Routine {
   final String name;
   final List<String> exerciseIds;
   final DateTime createdAt;
+  final Map<String, String>? defaultHandles;
 
   Routine({
     required this.id,
     required this.name,
     required this.exerciseIds,
     DateTime? createdAt,
+    this.defaultHandles,
   }) : createdAt = createdAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
@@ -407,6 +453,7 @@ class Routine {
     'name': name,
     'exerciseIds': exerciseIds,
     'createdAt': createdAt.toIso8601String(),
+    'defaultHandles': defaultHandles,
   };
 
   factory Routine.fromJson(Map<String, dynamic> json) => Routine(
@@ -414,13 +461,19 @@ class Routine {
     name: json['name'],
     exerciseIds: List<String>.from(json['exerciseIds']),
     createdAt: DateTime.parse(json['createdAt']),
+    defaultHandles: (json['defaultHandles'] as Map?)?.cast<String, String>(),
   );
 
-  Routine copyWith({String? name, List<String>? exerciseIds}) => Routine(
+  Routine copyWith({
+    String? name,
+    List<String>? exerciseIds,
+    Map<String, String>? defaultHandles,
+  }) => Routine(
     id: id,
     name: name ?? this.name,
     exerciseIds: exerciseIds ?? this.exerciseIds,
     createdAt: createdAt,
+    defaultHandles: defaultHandles ?? this.defaultHandles,
   );
 }
 
@@ -480,12 +533,14 @@ class Target {
 class SetRecommendation {
   final double weight;
   final int reps;
+  final int? targetDuration; // Target hold duration in seconds for time-based exercises
   final String confidence; // 'high', 'medium', 'low'
   final String reasoning;
 
   SetRecommendation({
     required this.weight,
     required this.reps,
+    this.targetDuration,
     required this.confidence,
     required this.reasoning,
   });
@@ -587,6 +642,7 @@ class PersonalRecord {
   final int bestReps;      // most reps in any single set
   final double bestVolume; // highest single-set volume (weight × reps)
   final DateTime achievedAt;
+  final int? bestDuration; // longest duration in seconds for time-based holds
 
   PersonalRecord({
     required this.exerciseId,
@@ -594,6 +650,7 @@ class PersonalRecord {
     required this.bestReps,
     required this.bestVolume,
     required this.achievedAt,
+    this.bestDuration,
   });
 
   Map<String, dynamic> toJson() => {
@@ -602,6 +659,7 @@ class PersonalRecord {
     'bestReps': bestReps,
     'bestVolume': bestVolume,
     'achievedAt': achievedAt.toIso8601String(),
+    'bestDuration': bestDuration,
   };
 
   factory PersonalRecord.fromJson(Map<String, dynamic> json) => PersonalRecord(
@@ -610,6 +668,7 @@ class PersonalRecord {
     bestReps: json['bestReps'] as int,
     bestVolume: (json['bestVolume'] as num).toDouble(),
     achievedAt: DateTime.parse(json['achievedAt'] as String),
+    bestDuration: json['bestDuration'] as int?,
   );
 
   PersonalRecord copyWith({
@@ -617,12 +676,14 @@ class PersonalRecord {
     int? bestReps,
     double? bestVolume,
     DateTime? achievedAt,
+    int? bestDuration,
   }) => PersonalRecord(
     exerciseId: exerciseId,
     bestWeight: bestWeight ?? this.bestWeight,
     bestReps: bestReps ?? this.bestReps,
     bestVolume: bestVolume ?? this.bestVolume,
     achievedAt: achievedAt ?? this.achievedAt,
+    bestDuration: bestDuration ?? this.bestDuration,
   );
 }
 
@@ -991,6 +1052,8 @@ class ChatMessage {
   // Names of tools the model called (in order) while producing this reply.
   // Null/empty for user messages and replies that used no tools.
   final List<String>? toolCalls;
+  final String? imageBytesBase64;
+  final String? imageMimeType;
 
   ChatMessage({
     String? id,
@@ -998,6 +1061,8 @@ class ChatMessage {
     required this.text,
     DateTime? timestamp,
     this.toolCalls,
+    this.imageBytesBase64,
+    this.imageMimeType,
   })  : id = id ?? _uuid.v4(),
         timestamp = timestamp ?? DateTime.now();
 
@@ -1007,6 +1072,8 @@ class ChatMessage {
     'text': text,
     'timestamp': timestamp.toIso8601String(),
     if (toolCalls != null && toolCalls!.isNotEmpty) 'toolCalls': toolCalls,
+    if (imageBytesBase64 != null) 'imageBytesBase64': imageBytesBase64,
+    if (imageMimeType != null) 'imageMimeType': imageMimeType,
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
@@ -1015,6 +1082,8 @@ class ChatMessage {
     text: json['text'] as String,
     timestamp: DateTime.parse(json['timestamp'] as String),
     toolCalls: (json['toolCalls'] as List?)?.cast<String>(),
+    imageBytesBase64: json['imageBytesBase64'] as String?,
+    imageMimeType: json['imageMimeType'] as String?,
   );
 
   ChatMessage copyWith({
@@ -1022,6 +1091,8 @@ class ChatMessage {
     Object? text = _sentinel,
     Object? timestamp = _sentinel,
     Object? toolCalls = _sentinel,
+    Object? imageBytesBase64 = _sentinel,
+    Object? imageMimeType = _sentinel,
   }) => ChatMessage(
     id: id,
     role: role == _sentinel ? this.role : role as String,
@@ -1030,6 +1101,12 @@ class ChatMessage {
     toolCalls: toolCalls == _sentinel
         ? this.toolCalls
         : toolCalls as List<String>?,
+    imageBytesBase64: imageBytesBase64 == _sentinel
+        ? this.imageBytesBase64
+        : imageBytesBase64 as String?,
+    imageMimeType: imageMimeType == _sentinel
+        ? this.imageMimeType
+        : imageMimeType as String?,
   );
 }
 

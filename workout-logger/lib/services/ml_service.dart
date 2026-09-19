@@ -260,15 +260,23 @@ class MLService implements IMLService {
 
   /// Fill in default recommendations when no history exists.
   @override
-  List<SetRecommendation> getDefaultRecommendations(int setCount) {
+  List<SetRecommendation> getDefaultRecommendations(int setCount, {bool isTimeBased = false}) {
     return List.generate(
       setCount,
-      (_) => SetRecommendation(
-        weight: 0,
-        reps: 10,
-        confidence: 'low',
-        reasoning: 'No previous data — adjust based on feel',
-      ),
+      (_) => isTimeBased
+          ? SetRecommendation(
+              weight: 0,
+              reps: 0,
+              targetDuration: 30,
+              confidence: 'low',
+              reasoning: 'No previous data — aim for a solid 30s hold',
+            )
+          : SetRecommendation(
+              weight: 0,
+              reps: 10,
+              confidence: 'low',
+              reasoning: 'No previous data — adjust based on feel',
+            ),
     );
   }
 

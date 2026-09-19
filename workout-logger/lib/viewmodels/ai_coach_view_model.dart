@@ -4,9 +4,12 @@
 // drives the streaming tool-call loop via IAiService + CoachToolService, and
 // persists each turn through ConversationManager. Exposes immutable state.
 
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, TextPart, FunctionCall;
+    show Content, TextPart, DataPart, Part, FunctionCall;
 
 import '../models/models.dart';
 import '../services/interfaces/ai_service_interface.dart';
@@ -24,6 +27,8 @@ class AiCoachViewModel extends ChangeNotifier {
   bool _loading = false;
   String _streamingText = '';
   final List<String> _streamingToolCalls = [];
+  Uint8List? _pendingImageBytes;
+  String? _pendingImageMimeType;
 
   AiCoachViewModel({
     required IAiService ai,
@@ -54,6 +59,8 @@ class AiCoachViewModel extends ChangeNotifier {
   List<ChatMessage> get messages => _conversations.activeMessages;
   List<Conversation> get conversations => _conversations.conversations;
   String? get activeConversationId => _conversations.active?.id;
+  Uint8List? get pendingImageBytes => _pendingImageBytes;
+  bool get hasPendingImage => _pendingImageBytes != null;
 
   // ── Commands ───────────────────────────────────────────────────────────────
 
@@ -76,20 +83,70 @@ class AiCoachViewModel extends ChangeNotifier {
   Future<void> deleteConversation(String id) =>
       _conversations.deleteConversation(id);
 
+  /// Pick an image to attach to the next message.
+  Future<void> pickImage() async {
+    if (_loading) return;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      Uint8List? bytes = file.bytes;
+      if (bytes == null && file.path != null) {
+        bytes = await File(file.path!).readAsBytes();
+      }
+      if (bytes == null || bytes.isEmpty) return;
+
+      final ext = (file.extension ?? '').toLowerCase();
+      final mimeType = ext == 'png'
+          ? 'image/png'
+          : ext == 'webp'
+              ? 'image/webp'
+              : 'image/jpeg';
+
+      _pendingImageBytes = bytes;
+      _pendingImageMimeType = mimeType;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
+  /// Clear the currently attached pending image.
+  void clearPendingImage() {
+    _pendingImageBytes = null;
+    _pendingImageMimeType = null;
+    notifyListeners();
+  }
+
   /// Send a user message and stream the coach's reply (running the tool-call
   /// loop). Both the user message and the final reply are persisted.
   Future<void> sendMessage(String text) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _loading) return;
+    if ((trimmed.isEmpty && _pendingImageBytes == null) || _loading) return;
 
     _loading = true;
     _streamingText = '';
     _streamingToolCalls.clear();
+
+    final imageBytes = _pendingImageBytes;
+    final imageMimeType = _pendingImageMimeType;
+    final imageBase64 = imageBytes != null ? base64Encode(imageBytes) : null;
+
+    _pendingImageBytes = null;
+    _pendingImageMimeType = null;
     notifyListeners();
 
     // Persist the user message first; history is derived from the store.
     await _conversations.appendMessage(
-      ChatMessage(role: 'user', text: trimmed),
+      ChatMessage(
+        role: 'user',
+        text: trimmed,
+        imageBytesBase64: imageBase64,
+        imageMimeType: imageMimeType,
+      ),
     );
 
     final systemPrompt = _buildSystemPrompt();
@@ -103,6 +160,8 @@ class AiCoachViewModel extends ChangeNotifier {
         history: history,
         tools: _coachTools.buildTools(),
         onToolCall: _recordAndDispatch,
+        imageBytesBase64: imageBase64,
+        imageMimeType: imageMimeType,
       )) {
         buffer.write(chunk);
         _streamingText = buffer.toString();
@@ -157,6 +216,20 @@ class AiCoachViewModel extends ChangeNotifier {
     final msgs = _conversations.activeMessages;
     final prior =
         msgs.length > 1 ? msgs.sublist(0, msgs.length - 1) : <ChatMessage>[];
-    return prior.map((m) => Content(m.role, [TextPart(m.text)])).toList();
+    return prior.map((m) {
+      final parts = <Part>[];
+      if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
+        try {
+          final bytes = base64Decode(m.imageBytesBase64!);
+          parts.add(DataPart(m.imageMimeType ?? 'image/jpeg', bytes));
+        } catch (_) {}
+      }
+      if (m.text.isNotEmpty) {
+        parts.add(TextPart(m.text));
+      } else if (parts.isEmpty) {
+        parts.add(const TextPart(''));
+      }
+      return Content(m.role, parts);
+    }).toList();
   }
 }
