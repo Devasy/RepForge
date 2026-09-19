@@ -20,6 +20,8 @@ class TimeExerciseCard extends StatefulWidget {
     required this.onWeightChanged,
     required this.settings,
     this.initialWeight = 0.0,
+    this.onTimerFinished,
+    this.stopwatch,
   });
 
   final int durationSeconds;
@@ -28,6 +30,8 @@ class TimeExerciseCard extends StatefulWidget {
   final ValueChanged<double> onWeightChanged;
   final SettingsProvider settings;
   final double initialWeight;
+  final VoidCallback? onTimerFinished;
+  final Stopwatch? stopwatch;
 
   @override
   State<TimeExerciseCard> createState() => _TimeExerciseCardState();
@@ -36,7 +40,7 @@ class TimeExerciseCard extends StatefulWidget {
 class _TimeExerciseCardState extends State<TimeExerciseCard> {
   TimeTrackMode _mode = TimeTrackMode.stopwatch;
   Timer? _ticker;
-  final Stopwatch _stopwatch = Stopwatch();
+  late final Stopwatch _stopwatch = widget.stopwatch ?? Stopwatch();
   int _stopwatchBaseElapsed = 0;
   int _stopwatchAccumulated = 0;
   int _timerStartRemaining = 0;
@@ -176,11 +180,12 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
           _stopwatch.reset();
           timer.cancel();
           setState(() {
-            _timerRemainingSeconds = 0;
+            _timerRemainingSeconds = _timerInitialSeconds;
             _isRunning = false;
           });
           widget.onDurationChanged(_timerInitialSeconds);
           HapticFeedback.heavyImpact();
+          widget.onTimerFinished?.call();
         }
       });
     }

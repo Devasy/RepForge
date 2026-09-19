@@ -58,6 +58,49 @@ void main() {
       expect(weightedTimeSet.isTimeBased, isTrue);
     });
 
+    test('formatHoldDuration formats seconds correctly', () {
+      expect(formatHoldDuration(0), '0s');
+      expect(formatHoldDuration(-5), '0s');
+      expect(formatHoldDuration(45), '45s');
+      expect(formatHoldDuration(60), '1m');
+      expect(formatHoldDuration(90), '1m 30s');
+      expect(formatHoldDuration(120), '2m');
+      expect(formatHoldDuration(125), '2m 5s');
+    });
+
+    test('WorkoutSet.calculateVolume calculates duration-based volume and formats duration', () {
+      final unweightedHold = WorkoutSet(weight: 0, reps: 0, timeTaken: 60);
+      expect(unweightedHold.calculateVolume(), 60.0);
+
+      // Weighted hold
+      final weightedHold = WorkoutSet(weight: 10, reps: 0, timeTaken: 60);
+      expect(weightedHold.calculateVolume(), 600.0);
+
+      expect(unweightedHold.formattedDuration, '1m');
+    });
+
+    test('ExerciseLog totalHoldDuration and isTimeBased', () {
+      final log = ExerciseLog(
+        exerciseId: 'plank',
+        sets: [
+          WorkoutSet(weight: 0, reps: 0, timeTaken: 45),
+          WorkoutSet(weight: 0, reps: 0, timeTaken: 60),
+        ],
+      );
+      expect(log.isTimeBased, isTrue);
+      expect(log.totalHoldDuration, 105);
+      expect(log.totalVolume, 105.0);
+
+      final mixedLog = ExerciseLog(
+        exerciseId: 'bench',
+        sets: [
+          WorkoutSet(weight: 60, reps: 10),
+          WorkoutSet(weight: 0, reps: 0, timeTaken: 30),
+        ],
+      );
+      expect(mixedLog.isTimeBased, isFalse);
+    });
+
     test('DoubleProgressionRule adds 5s hold when duration < ceiling (60s)', () {
       const rule = DoubleProgressionRule();
       final set = WorkoutSet(weight: 0, reps: 0, timeTaken: 45);

@@ -1356,6 +1356,23 @@ class WorkoutProvider extends ChangeNotifier {
     return best;
   }
 
+  /// Get the longest hold duration across all logged sets for an exercise.
+  /// Returns null if no sets with timeTaken exist.
+  int? getBestHold(String exerciseId) {
+    int? best;
+    for (final session in _sessions) {
+      for (final log in session.exercises) {
+        if (log.exerciseId != exerciseId) continue;
+        for (final set in log.sets) {
+          if (set.timeTaken != null && (best == null || set.timeTaken! > best)) {
+            best = set.timeTaken!;
+          }
+        }
+      }
+    }
+    return best;
+  }
+
   /// Per-exercise contribution to a muscle group's volume within a time window.
   ///
   /// [start]/[end] default to the last 7 days. Results are sorted by contributed

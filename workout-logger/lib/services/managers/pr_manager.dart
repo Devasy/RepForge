@@ -91,16 +91,26 @@ class PRManager extends ChangeNotifier {
       }
     }
 
+    final isTimeBased = log.sets.any((s) => s.isTimeBased);
+
     final broken = <String>{};
     if (existing == null) {
-      broken.addAll(['weight', 'reps', 'volume']);
-      if (newBestDuration != null && newBestDuration > 0) broken.add('duration');
+      if (isTimeBased) {
+        if (newBestDuration != null && newBestDuration > 0) broken.add('duration');
+        if (newBestWeight > 0) broken.add('weight');
+      } else {
+        broken.addAll(['weight', 'reps', 'volume']);
+      }
     } else {
-      if (newBestWeight > existing.bestWeight) broken.add('weight');
-      if (newBestReps > existing.bestReps) broken.add('reps');
-      if (newBestVolume > existing.bestVolume) broken.add('volume');
-      if (newBestDuration != null && newBestDuration > (existing.bestDuration ?? 0)) {
-        broken.add('duration');
+      if (isTimeBased) {
+        if (newBestDuration != null && newBestDuration > (existing.bestDuration ?? 0)) {
+          broken.add('duration');
+        }
+        if (newBestWeight > existing.bestWeight) broken.add('weight');
+      } else {
+        if (newBestWeight > existing.bestWeight) broken.add('weight');
+        if (newBestReps > existing.bestReps) broken.add('reps');
+        if (newBestVolume > existing.bestVolume) broken.add('volume');
       }
     }
 

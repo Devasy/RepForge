@@ -352,6 +352,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
               isTimeBased: exercise?.exerciseType == ExerciseType.timeBased,
               durationSeconds: _currentDurationSeconds,
               onDurationChanged: (s) => setState(() => _currentDurationSeconds = s),
+              onTimerFinished: _completeSet,
               programSlot: _slot(idx, p: provider),
               programWeek: _resolvedWeek(provider),
               onWeightChanged: (v) => setState(() => _currentWeight = v),

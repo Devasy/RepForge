@@ -174,6 +174,15 @@ class Exercise {
   }
 }
 
+/// Formats a duration in seconds to a human-friendly string (e.g. "45s", "1m 30s", "2m").
+String formatHoldDuration(int seconds) {
+  if (seconds <= 0) return '0s';
+  if (seconds < 60) return '${seconds}s';
+  final m = seconds ~/ 60;
+  final s = seconds % 60;
+  return s == 0 ? '${m}m' : '${m}m ${s}s';
+}
+
 // ==================== Workout Set ====================
 
 class WorkoutSet {
@@ -240,6 +249,9 @@ class WorkoutSet {
 
   /// True when this set represents an isometric time-based hold rather than rep-based work.
   bool get isTimeBased => reps == 0 && (timeTaken != null && timeTaken! > 0);
+
+  /// Human-friendly duration string (e.g. "45s", "1m 30s")
+  String get formattedDuration => formatHoldDuration(timeTaken ?? 0);
 
   Map<String, dynamic> toJson() => {
     'weight': weight,
@@ -330,6 +342,13 @@ class ExerciseLog {
       sets.fold(0.0, (sum, set) => sum + set.calculateVolume(userBodyWeight: userBodyWeight, isAssistedBW: isAssistedBW));
 
   double get totalVolume => sets.fold(0.0, (sum, set) => sum + set.volume);
+
+  /// Total hold duration in seconds across all sets for time-based exercises.
+  int get totalHoldDuration =>
+      sets.fold(0, (sum, set) => sum + (set.timeTaken ?? 0));
+
+  /// True when all logged sets represent time-based holds.
+  bool get isTimeBased => sets.isNotEmpty && sets.every((s) => s.isTimeBased);
 
   Map<String, dynamic> toJson() => {
     'exerciseId': exerciseId,

@@ -6,6 +6,44 @@ import 'package:repforge/services/settings_provider.dart';
 import '../../test_utils/mock_storage_service.dart';
 import '../../test_utils/test_harness.dart';
 
+class FakeStopwatch implements Stopwatch {
+  Duration customElapsed = Duration.zero;
+  bool _running = false;
+
+  @override
+  Duration get elapsed => customElapsed;
+
+  @override
+  int get elapsedMilliseconds => customElapsed.inMilliseconds;
+
+  @override
+  int get elapsedMicroseconds => customElapsed.inMicroseconds;
+
+  @override
+  int get elapsedTicks => customElapsed.inMicroseconds;
+
+  @override
+  int get frequency => 1000000;
+
+  @override
+  bool get isRunning => _running;
+
+  @override
+  void reset() {
+    customElapsed = Duration.zero;
+  }
+
+  @override
+  void start() {
+    _running = true;
+  }
+
+  @override
+  void stop() {
+    _running = false;
+  }
+}
+
 void main() {
   late MockStorageService storage;
   late SettingsProvider settings;
@@ -21,6 +59,8 @@ void main() {
     required double currentWeight,
     required ValueChanged<double> onWeightChanged,
     double initialWeight = 0.0,
+    VoidCallback? onTimerFinished,
+    Stopwatch? stopwatch,
   }) {
     return TestHarness.wrap(
       Scaffold(
@@ -32,6 +72,8 @@ void main() {
             onWeightChanged: onWeightChanged,
             settings: settings,
             initialWeight: initialWeight,
+            onTimerFinished: onTimerFinished,
+            stopwatch: stopwatch,
           ),
         ),
       ),
@@ -258,6 +300,42 @@ void main() {
       await tester.tap(find.text('Countdown'));
       await tester.pumpAndSettle();
       expect(find.text('01:30'), findsOneWidget);
+    });
+
+    testWidgets('Countdown timer completion calls onTimerFinished and resets timer for next set', (tester) async {
+      bool finishedCalled = false;
+      int changedDuration = 0;
+      final fakeStopwatch = FakeStopwatch();
+
+      await tester.pumpWidget(
+        buildCard(
+          durationSeconds: 1, // 1 second countdown
+          onDurationChanged: (d) => changedDuration = d,
+          currentWeight: 0,
+          onWeightChanged: (_) {},
+          onTimerFinished: () => finishedCalled = true,
+          stopwatch: fakeStopwatch,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Switch to countdown mode
+      await tester.tap(find.text('Countdown'));
+      await tester.pumpAndSettle();
+
+      // Tap play to start countdown
+      final playBtn = find.byIcon(Icons.play_arrow_rounded);
+      await tester.tap(playBtn);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Simulate stopwatch reaching and exceeding 1 second
+      fakeStopwatch.customElapsed = const Duration(seconds: 1);
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(finishedCalled, isTrue);
+      expect(changedDuration, 1);
+      // Verify timer reset to initial duration ready for next set
+      expect(find.text('00:01'), findsOneWidget);
     });
   });
 }

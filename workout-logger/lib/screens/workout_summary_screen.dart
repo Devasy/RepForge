@@ -234,7 +234,7 @@ class WorkoutSummaryScreen extends StatelessWidget {
             final (label, color) = switch (t) {
               'weight' => ('Best Weight', AppColors.warning),
               'reps' => ('Best Reps', AppColors.secondary),
-              'duration' => ('Best Duration', AppColors.cyan),
+              'duration' => ('Best Hold', AppColors.cyan),
               _ => ('Best Volume', AppColors.success),
             };
             return RFChip(label: label, color: color);
@@ -346,6 +346,9 @@ class _ExerciseSummaryRow extends StatelessWidget {
         ? '${(volume / 1000).toStringAsFixed(1)}k'
         : volume.toStringAsFixed(0);
 
+    final isTimeBased = log.isTimeBased || log.sets.any((s) => s.isTimeBased);
+    final totalHold = log.totalHoldDuration;
+
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -370,7 +373,9 @@ class _ExerciseSummaryRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${log.sets.length} sets',
+                  isTimeBased && totalHold > 0
+                      ? '${log.sets.length} sets · ${formatHoldDuration(totalHold)} total hold'
+                      : '${log.sets.length} sets',
                   style: const TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 12,
@@ -380,9 +385,11 @@ class _ExerciseSummaryRow extends StatelessWidget {
             ),
           ),
           Text(
-            '$volStr ${settings.unitLabel}',
-            style: const TextStyle(
-              color: AppColors.success,
+            isTimeBased && volume == 0
+                ? formatHoldDuration(totalHold)
+                : '$volStr ${settings.unitLabel}',
+            style: TextStyle(
+              color: isTimeBased && volume == 0 ? AppColors.cyan : AppColors.success,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),

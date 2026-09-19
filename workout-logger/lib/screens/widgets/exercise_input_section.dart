@@ -43,6 +43,7 @@ class ExerciseInputSection extends StatelessWidget {
     this.isTimeBased = false,
     this.durationSeconds = 60,
     this.onDurationChanged,
+    this.onTimerFinished,
   });
 
   /// Layout width minus padding. Passed in, not measured: the host screen's [IntrinsicHeight] (which [Spacer] needs) forbids a [LayoutBuilder] under it.
@@ -77,6 +78,7 @@ class ExerciseInputSection extends StatelessWidget {
   final bool isTimeBased;
   final int durationSeconds;
   final ValueChanged<int>? onDurationChanged;
+  final VoidCallback? onTimerFinished;
 
   @override
   Widget build(BuildContext context) {
@@ -126,6 +128,7 @@ class ExerciseInputSection extends StatelessWidget {
             currentWeight: currentWeight,
             onWeightChanged: onWeightChanged,
             settings: settings,
+            onTimerFinished: onTimerFinished,
           ),
           const SizedBox(height: AppSpacing.md),
         ] else ...[
