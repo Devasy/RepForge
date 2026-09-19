@@ -97,7 +97,7 @@ void main() {
       expect(rec.reps, 0);
       expect(rec.targetDuration, 30); // Resets to 30s
       expect(rec.confidence, 'high');
-      expect(rec.reasoning, contains('step up load (+2.5kg) and reset to 30s hold'));
+      expect(rec.reasoning, contains('step up load and reset to 30s hold'));
     });
 
     test('UnderRecoveredRule holds duration on time-based set', () {

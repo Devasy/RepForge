@@ -113,9 +113,9 @@ class CoachToolService {
           FunctionDeclaration(
             'get_exercise_performance',
             'Get how a specific exercise has progressed: per-session volume '
-                'trend, the full per-session weight×reps set history, growth '
+                'trend, the full per-session weight×reps and duration set history, growth '
                 'slope, best estimated 1RM, last logged sets, and personal '
-                'record. Use for questions like "how is my bench press '
+                'record (including best duration). Use for questions like "how is my bench press '
                 'progressing" or "what weight and reps did I do for squats '
                 'last month".',
             Schema.object(
@@ -201,7 +201,7 @@ class CoachToolService {
           ),
           FunctionDeclaration(
             'get_personal_records',
-            'Get personal records (best weight, reps, and single-set volume). '
+            'Get personal records (best weight, reps, single-set volume, and duration for time-based exercises). '
                 'Pass an exercise name for one exercise, or omit for all PRs.',
             Schema.object(
               properties: {
@@ -254,10 +254,21 @@ class CoachToolService {
                   description:
                       'Ordered list of exercise names to include in the routine.',
                 ),
-                'exercise_handles': Schema.object(
-                  properties: {},
+                'exercise_handles': Schema.array(
+                  items: Schema.object(
+                    properties: {
+                      'exercise_name': Schema.string(
+                        description: 'Name of the exercise.',
+                      ),
+                      'handle': Schema.string(
+                        description:
+                            'Attachment or handle name, or empty string to clear.',
+                      ),
+                    },
+                    requiredProperties: ['exercise_name', 'handle'],
+                  ),
                   description:
-                      'Optional. Map of exercise name to default attachment handle, e.g. {"Cable Row": "V-Bar", "Triceps Pushdown": "Rope"}.',
+                      'Optional. List of exercise-to-handle mappings, e.g. [{"exercise_name": "Cable Row", "handle": "V-Bar"}, {"exercise_name": "Triceps Pushdown", "handle": "Rope"}].',
                   nullable: true,
                 ),
               },
@@ -291,10 +302,21 @@ class CoachToolService {
                       'the routine. Must include every exercise you want to keep.',
                   nullable: true,
                 ),
-                'exercise_handles': Schema.object(
-                  properties: {},
+                'exercise_handles': Schema.array(
+                  items: Schema.object(
+                    properties: {
+                      'exercise_name': Schema.string(
+                        description: 'Name of the exercise.',
+                      ),
+                      'handle': Schema.string(
+                        description:
+                            'Attachment or handle name, or empty string to clear.',
+                      ),
+                    },
+                    requiredProperties: ['exercise_name', 'handle'],
+                  ),
                   description:
-                      'Optional. Map of exercise name to default attachment handle, e.g. {"Cable Row": "V-Bar"}. Set handle to empty string to clear.',
+                      'Optional. List of exercise-to-handle mappings, e.g. [{"exercise_name": "Cable Row", "handle": "V-Bar"}]. Set handle to empty string to clear.',
                   nullable: true,
                 ),
               },
@@ -457,10 +479,10 @@ class CoachToolService {
             'routine_exercises(routine_id, exercise_id, position)\n'
             'targets(id, exercise_id, target_type, target_value, current_value, '
             'estimated_completion_date, created_at, is_completed)\n'
-            'personal_records(exercise_id, best_weight, best_reps, best_volume, achieved_at)\n'
-            'health_samples(id, type, timestamp, utc_ts, value) — type is '
+            'personal_records(exercise_id, best_weight, best_reps, best_volume, best_duration, achieved_at)\n'
+            'health_samples(id, type, start_ts, end_ts, utc_ts, value) — type is '
             'heart_rate | resting_heart_rate | hrv_rmssd; one row per Health '
-            'Connect sample. Join on timestamp (local wall-clock, same clock as '
+            'Connect sample. Join on start_ts/end_ts (local wall-clock, same clock as '
             'workout_sessions.date); utc_ts is the UTC instant, for ordering '
             'and de-duplication only\n'
             'sleep_sessions(id, start_ts, end_ts, light_min, deep_min, rem_min, '
@@ -991,7 +1013,12 @@ class CoachToolService {
           ? null
           : [
               for (final s in lastLog.sets)
-                {'weight': _round(s.weight), 'reps': s.reps},
+                {
+                  'weight': _round(s.weight),
+                  'reps': s.reps,
+                  if (s.timeTaken != null && s.timeTaken! > 0)
+                    'duration_seconds': s.timeTaken,
+                },
             ],
       'personal_record': pr == null
           ? null
@@ -999,6 +1026,7 @@ class CoachToolService {
               'best_weight': _round(pr.bestWeight),
               'best_reps': pr.bestReps,
               'best_volume': _round(pr.bestVolume),
+              if (pr.bestDuration != null) 'best_duration': pr.bestDuration,
               'achieved_at': _d(pr.achievedAt),
             },
     };
@@ -1123,6 +1151,7 @@ class CoachToolService {
                 'best_weight': _round(pr.bestWeight),
                 'best_reps': pr.bestReps,
                 'best_volume': _round(pr.bestVolume),
+                if (pr.bestDuration != null) 'best_duration': pr.bestDuration,
                 'achieved_at': _d(pr.achievedAt),
               },
       };
@@ -1136,6 +1165,7 @@ class CoachToolService {
             'best_weight': _round(pr.bestWeight),
             'best_reps': pr.bestReps,
             'best_volume': _round(pr.bestVolume),
+            if (pr.bestDuration != null) 'best_duration': pr.bestDuration,
             'achieved_at': _d(pr.achievedAt),
           },
       ],
@@ -1247,12 +1277,12 @@ class CoachToolService {
       };
     }
 
-    final handlesArg = args['exercise_handles'] as Map?;
+    final handlesArg = _parseExerciseHandles(args['exercise_handles']);
     final defaultHandles = <String, String>{};
     if (handlesArg != null) {
       for (final entry in handlesArg.entries) {
-        final exName = entry.key.toString().trim();
-        final handle = entry.value.toString().trim();
+        final exName = entry.key.trim();
+        final handle = entry.value.trim();
         try {
           final ex = _resolveExercise(exName);
           if (ex != null && handle.isNotEmpty) {
@@ -1335,12 +1365,12 @@ class CoachToolService {
       }
     }
 
-    final handlesArg = args['exercise_handles'] as Map?;
+    final handlesArg = _parseExerciseHandles(args['exercise_handles']);
     final defaultHandles = Map<String, String>.from(routine.defaultHandles ?? {});
     if (handlesArg != null) {
       for (final entry in handlesArg.entries) {
-        final exName = entry.key.toString().trim();
-        final handle = entry.value.toString().trim();
+        final exName = entry.key.trim();
+        final handle = entry.value.trim();
         try {
           final ex = _resolveExercise(exName);
           if (ex != null) {
@@ -1356,7 +1386,7 @@ class CoachToolService {
 
     final updated = routine.copyWith(
       exerciseIds: ids,
-      defaultHandles: defaultHandles.isEmpty ? null : defaultHandles,
+      defaultHandles: defaultHandles,
     );
     await _wp.updateRoutine(updated);
 
@@ -1410,8 +1440,16 @@ class CoachToolService {
       };
     }
 
-    final typeStr = (args['exercise_type'] as String?)?.trim();
-    final exerciseType = typeStr == 'timeBased' ? ExerciseType.timeBased : ExerciseType.weightAndReps;
+    ExerciseType exerciseType = ExerciseType.weightAndReps;
+    if (args.containsKey('exercise_type')) {
+      final typeStr = (args['exercise_type'] as String?)?.trim();
+      if (typeStr == null || typeStr.isEmpty || (typeStr != 'timeBased' && typeStr != 'weightAndReps')) {
+        return {
+          'error': 'Invalid exercise_type "$typeStr". Allowed values are "weightAndReps" or "timeBased".',
+        };
+      }
+      exerciseType = typeStr == 'timeBased' ? ExerciseType.timeBased : ExerciseType.weightAndReps;
+    }
 
     final handles = (args['available_handles'] as List?)
         ?.map((h) => h.toString().trim())
@@ -1490,8 +1528,13 @@ class CoachToolService {
     }
 
     ExerciseType? exerciseType;
-    final typeStr = (args['exercise_type'] as String?)?.trim();
-    if (typeStr != null && typeStr.isNotEmpty) {
+    if (args.containsKey('exercise_type')) {
+      final typeStr = (args['exercise_type'] as String?)?.trim();
+      if (typeStr == null || typeStr.isEmpty || (typeStr != 'timeBased' && typeStr != 'weightAndReps')) {
+        return {
+          'error': 'Invalid exercise_type "$typeStr". Allowed values are "weightAndReps" or "timeBased".',
+        };
+      }
       exerciseType = typeStr == 'timeBased' ? ExerciseType.timeBased : ExerciseType.weightAndReps;
     }
 
@@ -1551,6 +1594,8 @@ class CoachToolService {
                 {
                   'weight': _round(set.weight),
                   'reps': set.reps,
+                  if (set.timeTaken != null && set.timeTaken! > 0)
+                    'duration_seconds': set.timeTaken,
                   if (set.isDropset) 'dropset': true,
                   if (set.isDropset && set.drops != null)
                     'drops': [
@@ -1561,6 +1606,27 @@ class CoachToolService {
           ],
         },
     ];
+  }
+
+  Map<String, String>? _parseExerciseHandles(Object? handlesArg) {
+    if (handlesArg == null) return null;
+    final map = <String, String>{};
+    if (handlesArg is List) {
+      for (final item in handlesArg) {
+        if (item is Map) {
+          final name = item['exercise_name']?.toString().trim();
+          final handle = item['handle']?.toString().trim();
+          if (name != null && name.isNotEmpty && handle != null) {
+            map[name] = handle;
+          }
+        }
+      }
+    } else if (handlesArg is Map) {
+      for (final entry in handlesArg.entries) {
+        map[entry.key.toString().trim()] = entry.value.toString().trim();
+      }
+    }
+    return map;
   }
 
   Exercise? _resolveExercise(String query) {

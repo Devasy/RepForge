@@ -36,6 +36,8 @@ class _FakeAiService implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) async* {
     if (invokeTool && onToolCall != null) {
       await onToolCall(FunctionCall('get_muscle_recovery', {}));
@@ -66,6 +68,8 @@ class _FakeAiService implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) =>
       streamCoachReply(
         userMessage: userMessage,
@@ -73,6 +77,8 @@ class _FakeAiService implements IAiService {
         history: history,
         tools: tools,
         onToolCall: onToolCall,
+        imageBytesBase64: imageBytesBase64,
+        imageMimeType: imageMimeType,
       );
 
   @override

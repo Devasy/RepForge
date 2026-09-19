@@ -81,7 +81,9 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
     setState(() => _isSubmitting = true);
     final provider = context.read<WorkoutProvider>();
     final exerciseName = _nameController.text.trim();
-    final handles = _availableHandles.isEmpty ? null : _availableHandles;
+    final handles = _isEditing
+        ? _availableHandles
+        : (_availableHandles.isEmpty ? null : _availableHandles);
 
     try {
       if (_isEditing) {

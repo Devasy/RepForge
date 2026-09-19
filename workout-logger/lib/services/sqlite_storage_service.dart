@@ -681,6 +681,16 @@ class SqliteStorageService implements IStorageService {
     return result;
   }
 
+  /// Returns persisted built-in exercise overrides (rows where is_custom = 0).
+  Future<List<Exercise>> getBuiltInExerciseOverrides() async {
+    final rows = await _db.query('exercises', where: 'is_custom = 0');
+    final result = <Exercise>[];
+    for (final row in rows) {
+      result.add(await _loadCustomExerciseRow(row));
+    }
+    return result;
+  }
+
   @override
   Future<void> deleteCustomExercise(String id) async {
     await _db.transaction((txn) async {
@@ -897,14 +907,17 @@ class SqliteStorageService implements IStorageService {
     if (samples.isEmpty) return;
     final batch = _db.batch();
     for (final s in samples) {
+      final utcIso = s.time.toUtc().toIso8601String();
+      final localIso = s.time.toLocal().toIso8601String();
+      final id = '${type}_$utcIso';
       batch.insert(
         'health_samples',
         {
+          'id': id,
           'type': type,
-          // Local for date joins, UTC for identity — see
-          // [_healthSchemaStatements].
-          'timestamp': s.time.toLocal().toIso8601String(),
-          'utc_ts': s.time.toUtc().toIso8601String(),
+          'start_ts': localIso,
+          'end_ts': localIso,
+          'utc_ts': utcIso,
           'value': s.value,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
@@ -973,6 +986,7 @@ class SqliteStorageService implements IStorageService {
     final targets = await getAllTargets();
     final muscleGroups = await getAllMuscleGroups();
     final customExercises = await getCustomExercises();
+    final exerciseOverrides = await getBuiltInExerciseOverrides();
     final conversations = await getAllConversations();
     final settingsRows = await _db.query('settings');
     final settingsMap = <String, String>{
@@ -986,6 +1000,7 @@ class SqliteStorageService implements IStorageService {
       'targets': targets.map((t) => t.toJson()).toList(),
       'muscleGroups': muscleGroups.map((m) => m.toJson()).toList(),
       'customExercises': customExercises.map((e) => e.toJson()).toList(),
+      'exerciseOverrides': exerciseOverrides.map((e) => e.toJson()).toList(),
       'conversations': conversations.map((c) => c.toJson()).toList(),
       'settings': settingsMap,
       'exportDate': DateTime.now().toIso8601String(),
@@ -1054,6 +1069,19 @@ class SqliteStorageService implements IStorageService {
     final customExercises = data['customExercises'];
     if (customExercises is List) {
       for (final item in customExercises) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final exercise = Exercise.fromJson(map);
+        final rows = await _db.query('exercises', where: 'id = ?', whereArgs: [exercise.id]);
+        if (rows.isEmpty) {
+          await saveCustomExercise(exercise);
+        }
+      }
+    }
+
+    final exerciseOverrides = data['exerciseOverrides'];
+    if (exerciseOverrides is List) {
+      for (final item in exerciseOverrides) {
         final map = _normalizeImportItem(item);
         if (map == null) continue;
         final exercise = Exercise.fromJson(map);

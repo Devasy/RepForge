@@ -36,6 +36,9 @@ class TimeExerciseCard extends StatefulWidget {
 class _TimeExerciseCardState extends State<TimeExerciseCard> {
   TimeTrackMode _mode = TimeTrackMode.stopwatch;
   Timer? _ticker;
+  final Stopwatch _stopwatch = Stopwatch();
+  int _stopwatchBaseElapsed = 0;
+  int _timerStartRemaining = 0;
   bool _isRunning = false;
 
   // Stopwatch state
@@ -51,6 +54,7 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
   void initState() {
     super.initState();
     _stopwatchElapsed = widget.durationSeconds > 0 ? widget.durationSeconds : 0;
+    _stopwatchBaseElapsed = _stopwatchElapsed;
     _timerInitialSeconds = widget.durationSeconds > 0 ? widget.durationSeconds : 60;
     _timerRemainingSeconds = _timerInitialSeconds;
     final initialDisplay = widget.currentWeight > 0 ? widget.settings.toDisplay(widget.currentWeight) : 0.0;
@@ -66,40 +70,66 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
   @override
   void didUpdateWidget(covariant TimeExerciseCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_isRunning && widget.durationSeconds != oldWidget.durationSeconds) {
-      _stopwatchElapsed = widget.durationSeconds;
+    if (!_isRunning) {
+      if (widget.durationSeconds != oldWidget.durationSeconds) {
+        _stopwatchElapsed = widget.durationSeconds > 0 ? widget.durationSeconds : 0;
+        _stopwatchBaseElapsed = _stopwatchElapsed;
+        _timerInitialSeconds = widget.durationSeconds > 0 ? widget.durationSeconds : 60;
+        _timerRemainingSeconds = _timerInitialSeconds;
+      }
+      if (widget.currentWeight != oldWidget.currentWeight) {
+        final newDisplay = widget.currentWeight > 0 ? widget.settings.toDisplay(widget.currentWeight) : 0.0;
+        _weightController.text = newDisplay > 0
+            ? (newDisplay == newDisplay.truncateToDouble()
+                ? newDisplay.toStringAsFixed(0)
+                : newDisplay.toStringAsFixed(1))
+            : '';
+      }
     }
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _stopwatch.stop();
     _weightController.dispose();
     super.dispose();
   }
 
   void _toggleStopwatch() {
     if (_isRunning) {
+      _stopwatch.stop();
       _ticker?.cancel();
+      _stopwatchElapsed = _stopwatchBaseElapsed + _stopwatch.elapsed.inSeconds;
+      _stopwatchBaseElapsed = _stopwatchElapsed;
+      _stopwatch.reset();
       setState(() => _isRunning = false);
       widget.onDurationChanged(_stopwatchElapsed);
     } else {
       setState(() => _isRunning = true);
       HapticFeedback.lightImpact();
-      _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _stopwatch.reset();
+      _stopwatch.start();
+      _ticker = Timer.periodic(const Duration(milliseconds: 200), (timer) {
         if (!mounted) {
           timer.cancel();
           return;
         }
-        setState(() {
-          _stopwatchElapsed++;
-        });
-        widget.onDurationChanged(_stopwatchElapsed);
+        final currentElapsed = _stopwatchBaseElapsed + _stopwatch.elapsed.inSeconds;
+        if (currentElapsed != _stopwatchElapsed) {
+          setState(() {
+            _stopwatchElapsed = currentElapsed;
+          });
+          widget.onDurationChanged(_stopwatchElapsed);
+        }
       });
     }
   }
 
   void _resetStopwatch() {
+    _stopwatch.stop();
+    _stopwatch.reset();
+    _stopwatchBaseElapsed = 0;
     _ticker?.cancel();
     setState(() {
       _isRunning = false;
@@ -110,25 +140,38 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
 
   void _toggleTimer() {
     if (_isRunning) {
+      _stopwatch.stop();
       _ticker?.cancel();
+      final elapsed = _stopwatch.elapsed.inSeconds;
+      _timerRemainingSeconds = (_timerStartRemaining - elapsed).clamp(0, _timerInitialSeconds);
+      _stopwatch.reset();
       setState(() => _isRunning = false);
     } else {
       if (_timerRemainingSeconds <= 0) {
         _timerRemainingSeconds = _timerInitialSeconds;
       }
+      _timerStartRemaining = _timerRemainingSeconds;
       setState(() => _isRunning = true);
       HapticFeedback.lightImpact();
-      _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _stopwatch.reset();
+      _stopwatch.start();
+      _ticker = Timer.periodic(const Duration(milliseconds: 200), (timer) {
         if (!mounted) {
           timer.cancel();
           return;
         }
-        if (_timerRemainingSeconds > 1) {
-          setState(() {
-            _timerRemainingSeconds--;
-          });
-          widget.onDurationChanged(_timerInitialSeconds - _timerRemainingSeconds);
+        final elapsed = _stopwatch.elapsed.inSeconds;
+        final remaining = _timerStartRemaining - elapsed;
+        if (remaining > 0) {
+          if (remaining != _timerRemainingSeconds) {
+            setState(() {
+              _timerRemainingSeconds = remaining;
+            });
+            widget.onDurationChanged(_timerInitialSeconds - _timerRemainingSeconds);
+          }
         } else {
+          _stopwatch.stop();
+          _stopwatch.reset();
           timer.cancel();
           setState(() {
             _timerRemainingSeconds = 0;
@@ -142,6 +185,8 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
   }
 
   void _resetTimer() {
+    _stopwatch.stop();
+    _stopwatch.reset();
     _ticker?.cancel();
     setState(() {
       _isRunning = false;
@@ -151,21 +196,28 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
   }
 
   void _selectPreset(int seconds) {
+    _stopwatch.stop();
+    _stopwatch.reset();
     _ticker?.cancel();
     setState(() {
       _isRunning = false;
       _timerInitialSeconds = seconds;
       _timerRemainingSeconds = seconds;
       _stopwatchElapsed = seconds;
+      _stopwatchBaseElapsed = seconds;
     });
     widget.onDurationChanged(seconds);
     HapticFeedback.selectionClick();
   }
 
   void _adjustSeconds(int delta) {
+    if (_isRunning) return;
     if (_mode == TimeTrackMode.stopwatch) {
       final updated = (_stopwatchElapsed + delta).clamp(0, 3600);
-      setState(() => _stopwatchElapsed = updated);
+      setState(() {
+        _stopwatchElapsed = updated;
+        _stopwatchBaseElapsed = updated;
+      });
       widget.onDurationChanged(updated);
     } else {
       final updated = (_timerRemainingSeconds + delta).clamp(5, 3600);
@@ -236,6 +288,7 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
       setState(() {
         if (_mode == TimeTrackMode.stopwatch) {
           _stopwatchElapsed = entered;
+          _stopwatchBaseElapsed = entered;
         } else {
           _timerInitialSeconds = entered;
           _timerRemainingSeconds = entered;
@@ -284,6 +337,8 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
                       onTap: () {
                         if (_mode != TimeTrackMode.stopwatch) {
                           _ticker?.cancel();
+                          _stopwatch.stop();
+                          _stopwatch.reset();
                           setState(() {
                             _mode = TimeTrackMode.stopwatch;
                             _isRunning = false;
@@ -298,6 +353,8 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
                       onTap: () {
                         if (_mode != TimeTrackMode.timer) {
                           _ticker?.cancel();
+                          _stopwatch.stop();
+                          _stopwatch.reset();
                           setState(() {
                             _mode = TimeTrackMode.timer;
                             _isRunning = false;

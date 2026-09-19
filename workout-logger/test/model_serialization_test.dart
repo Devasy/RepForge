@@ -650,6 +650,65 @@ void main() {
       expect(restored.availableHandles, ['Standard', 'Weighted']);
     });
 
+    test('Exercise.fromJson validation: absent defaults to weightAndReps, unsupported throws', () {
+      final baseJson = {
+        'id': 'ex_test',
+        'name': 'Test Exercise',
+        'category': 'compound',
+        'muscleActivations': [
+          {'muscleGroupId': 'chest', 'activationPercentage': 100},
+        ],
+      };
+
+      // Absent defaults to weightAndReps
+      final exAbsent = Exercise.fromJson(Map.from(baseJson));
+      expect(exAbsent.exerciseType, ExerciseType.weightAndReps);
+
+      // Null defaults to weightAndReps
+      final exNull = Exercise.fromJson(Map.from(baseJson)..['exerciseType'] = null);
+      expect(exNull.exerciseType, ExerciseType.weightAndReps);
+
+      // Supported timeBased
+      final exTime = Exercise.fromJson(Map.from(baseJson)..['exerciseType'] = 'timeBased');
+      expect(exTime.exerciseType, ExerciseType.timeBased);
+
+      // Supported weightAndReps
+      final exWeight = Exercise.fromJson(Map.from(baseJson)..['exerciseType'] = 'weightAndReps');
+      expect(exWeight.exerciseType, ExerciseType.weightAndReps);
+
+      // Unsupported throws ArgumentError
+      expect(
+        () => Exercise.fromJson(Map.from(baseJson)..['exerciseType'] = 'distanceBased'),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(
+        () => Exercise.fromJson(Map.from(baseJson)..['exerciseType'] = 'unknown'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('Routine.copyWith allows clearing defaultHandles', () {
+      final routine = Routine(
+        id: 'r1',
+        name: 'Pull Day',
+        exerciseIds: ['lat_pulldown'],
+        defaultHandles: {'lat_pulldown': 'Wide Grip'},
+      );
+      expect(routine.defaultHandles?['lat_pulldown'], 'Wide Grip');
+
+      // Passing null clears handles
+      final clearedNull = routine.copyWith(defaultHandles: null);
+      expect(clearedNull.defaultHandles, isNull);
+
+      // Passing empty map clears handles
+      final clearedEmpty = routine.copyWith(defaultHandles: {});
+      expect(clearedEmpty.defaultHandles, isEmpty);
+
+      // Omission preserves handles
+      final unchanged = routine.copyWith(name: 'New Name');
+      expect(unchanged.defaultHandles?['lat_pulldown'], 'Wide Grip');
+    });
+
     test('Exercise.copyWith changes exerciseType and availableHandles', () {
       final ex = Exercise(
         id: 'bench',

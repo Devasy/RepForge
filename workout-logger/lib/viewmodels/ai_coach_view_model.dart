@@ -83,28 +83,60 @@ class AiCoachViewModel extends ChangeNotifier {
   Future<void> deleteConversation(String id) =>
       _conversations.deleteConversation(id);
 
+  static const int _maxImageBytes = 5 * 1024 * 1024; // 5 MB limit
+  static const Set<String> _supportedImageMimes = {
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+  };
+
   /// Pick an image to attach to the next message.
   Future<void> pickImage() async {
     if (_loading) return;
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        withData: true,
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+        withData: false, // disable eager byte loading
       );
       if (result == null || result.files.isEmpty) return;
       final file = result.files.first;
+
+      // Determine MIME type strictly from extension
+      final ext = (file.extension ?? '').toLowerCase().trim();
+      final String? mimeType = switch (ext) {
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        _ => null,
+      };
+
+      if (mimeType == null || !_supportedImageMimes.contains(mimeType)) {
+        debugPrint('Unsupported or missing image format: "$ext"');
+        return;
+      }
+
+      // Check file length before reading bytes
+      int? fileLength;
+      if (file.size > 0) {
+        fileLength = file.size;
+      } else if (file.path != null) {
+        final ioFile = File(file.path!);
+        if (await ioFile.exists()) {
+          fileLength = await ioFile.length();
+        }
+      }
+
+      if (fileLength == null || fileLength <= 0 || fileLength > _maxImageBytes) {
+        debugPrint('File size unavailable or exceeds limit ($fileLength bytes)');
+        return;
+      }
+
       Uint8List? bytes = file.bytes;
       if (bytes == null && file.path != null) {
         bytes = await File(file.path!).readAsBytes();
       }
       if (bytes == null || bytes.isEmpty) return;
-
-      final ext = (file.extension ?? '').toLowerCase();
-      final mimeType = ext == 'png'
-          ? 'image/png'
-          : ext == 'webp'
-              ? 'image/webp'
-              : 'image/jpeg';
 
       _pendingImageBytes = bytes;
       _pendingImageMimeType = mimeType;
@@ -212,22 +244,20 @@ class AiCoachViewModel extends ChangeNotifier {
       );
 
   /// Prior turns (everything before the user message just appended).
+  /// Replaces historical image payloads with concise textual placeholder
+  /// so multi-turn conversations do not cause unbounded storage or token consumption.
   List<Content> _buildHistory() {
     final msgs = _conversations.activeMessages;
     final prior =
         msgs.length > 1 ? msgs.sublist(0, msgs.length - 1) : <ChatMessage>[];
     return prior.map((m) {
       final parts = <Part>[];
-      if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
-        try {
-          final bytes = base64Decode(m.imageBytesBase64!);
-          parts.add(DataPart(m.imageMimeType ?? 'image/jpeg', bytes));
-        } catch (_) {}
-      }
       if (m.text.isNotEmpty) {
         parts.add(TextPart(m.text));
-      } else if (parts.isEmpty) {
-        parts.add(const TextPart(''));
+      } else if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
+        parts.add(TextPart('[Attached image]'));
+      } else {
+        parts.add(TextPart(''));
       }
       return Content(m.role, parts);
     }).toList();

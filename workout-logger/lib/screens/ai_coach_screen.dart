@@ -700,6 +700,17 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
+    Uint8List? decodedImageBytes;
+    if (isUser &&
+        message.imageBytesBase64 != null &&
+        message.imageBytesBase64!.isNotEmpty) {
+      try {
+        decodedImageBytes = base64Decode(message.imageBytesBase64!);
+      } catch (_) {
+        decodedImageBytes = null;
+      }
+    }
+
     return _Turn(
       isUser: isUser,
       toolCalls: isUser ? const [] : (message.toolCalls ?? const []),
@@ -708,8 +719,7 @@ class _MessageBubble extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (message.imageBytesBase64 != null &&
-                    message.imageBytesBase64!.isNotEmpty) ...[
+                if (decodedImageBytes != null) ...[
                   ClipRRect(
                     borderRadius: BorderRadius.circular(AppRadius.md),
                     child: Container(
@@ -724,7 +734,7 @@ class _MessageBubble extends StatelessWidget {
                         borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: Image.memory(
-                        base64Decode(message.imageBytesBase64!),
+                        decodedImageBytes,
                         fit: BoxFit.cover,
                       ),
                     ),

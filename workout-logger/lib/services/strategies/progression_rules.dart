@@ -284,7 +284,7 @@ class DoubleProgressionRule implements ProgressionRule {
           reasoning: increment < baseIncrement
               ? 'Hold ceiling reached (${currentDuration}s) — step the weight up a little '
                   'and reset to ${resetDuration}s hold'
-              : 'Hold ceiling reached (${currentDuration}s) — step up load (+2.5kg) '
+              : 'Hold ceiling reached (${currentDuration}s) — step up load '
                   'and reset to ${resetDuration}s hold',
         );
       }

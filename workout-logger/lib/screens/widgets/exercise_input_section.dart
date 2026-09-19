@@ -932,7 +932,11 @@ class _PreviousSetsSection extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '$wStr × ${s.reps}',
+                    s.isTimeBased
+                        ? (s.weight > 0
+                            ? '$wStr × ${s.timeTaken ?? 0}s'
+                            : '${s.timeTaken ?? 0}s')
+                        : '$wStr × ${s.reps}',
                     style: const TextStyle(
                       color: AppColors.success,
                       fontSize: 12,
@@ -1038,7 +1042,11 @@ class _LastSessionSection extends StatelessWidget {
                 : dw.toStringAsFixed(1);
             return Chip(
               label: Text(
-                '$wStr × ${s.reps}',
+                s.isTimeBased
+                    ? (s.weight > 0
+                        ? '$wStr × ${s.timeTaken ?? 0}s'
+                        : '${s.timeTaken ?? 0}s')
+                    : '$wStr × ${s.reps}',
                 style: const TextStyle(fontSize: 12, color: AppColors.textSoft),
               ),
               backgroundColor: AppColors.surface,

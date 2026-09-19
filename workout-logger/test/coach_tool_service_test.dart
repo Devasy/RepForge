@@ -288,5 +288,53 @@ void main() {
       final routine = provider.routines.firstWhere((r) => r.name == 'Upper Hypertrophy');
       expect(routine.defaultHandles?['bench_press'], 'Wide Grip');
     });
+
+    test('create_routine and update_routine support list of object handles and clearing handles', () async {
+      final createRes = await tools.handleCall(
+        FunctionCall('create_routine', {
+          'name': 'Back and Biceps',
+          'exercise_names': ['Bench Press'],
+          'exercise_handles': [
+            {'exercise_name': 'Bench Press', 'handle': 'Close Grip'},
+          ],
+        }),
+      );
+      expect(createRes['created'], true);
+      var routine = provider.routines.firstWhere((r) => r.name == 'Back and Biceps');
+      expect(routine.defaultHandles?['bench_press'], 'Close Grip');
+
+      // Update routine to clear handle
+      final updateRes = await tools.handleCall(
+        FunctionCall('update_routine', {
+          'routine_name': 'Back and Biceps',
+          'exercise_handles': [
+            {'exercise_name': 'Bench Press', 'handle': ''},
+          ],
+        }),
+      );
+      expect(updateRes['updated'], true);
+      routine = provider.routines.firstWhere((r) => r.name == 'Back and Biceps');
+      expect(routine.defaultHandles?.containsKey('bench_press') ?? false, false);
+    });
+
+    test('add_custom_exercise and update_exercise reject invalid exercise_type', () async {
+      final invalidAdd = await tools.handleCall(
+        FunctionCall('add_custom_exercise', {
+          'name': 'Invalid Exercise',
+          'category': 'isolation',
+          'primary_muscle': 'shoulders',
+          'exercise_type': 'repsOnly',
+        }),
+      );
+      expect(invalidAdd['error'], contains('Invalid exercise_type'));
+
+      final invalidUpdate = await tools.handleCall(
+        FunctionCall('update_exercise', {
+          'exercise_name': 'Bench Press',
+          'exercise_type': 'cardioBased',
+        }),
+      );
+      expect(invalidUpdate['error'], contains('Invalid exercise_type'));
+    });
   });
 }

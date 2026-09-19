@@ -147,19 +147,31 @@ class Exercise {
     'exerciseType': exerciseType.name,
   };
 
-  factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
-    id: json['id'],
-    name: json['name'],
-    muscleActivations: (json['muscleActivations'] as List)
-        .map((m) => MuscleActivation.fromJson(m))
-        .toList(),
-    category: json['category'],
-    isCustom: json['isCustom'] ?? false,
-    availableHandles: (json['availableHandles'] as List?)?.cast<String>(),
-    exerciseType: json['exerciseType'] == 'timeBased'
-        ? ExerciseType.timeBased
-        : ExerciseType.weightAndReps,
-  );
+  factory Exercise.fromJson(Map<String, dynamic> json) {
+    final rawType = json['exerciseType'];
+    final ExerciseType type;
+    if (rawType == null) {
+      type = ExerciseType.weightAndReps;
+    } else if (rawType == 'timeBased' || rawType == ExerciseType.timeBased.name) {
+      type = ExerciseType.timeBased;
+    } else if (rawType == 'weightAndReps' || rawType == ExerciseType.weightAndReps.name) {
+      type = ExerciseType.weightAndReps;
+    } else {
+      throw ArgumentError('Unsupported exerciseType: $rawType');
+    }
+
+    return Exercise(
+      id: json['id'],
+      name: json['name'],
+      muscleActivations: (json['muscleActivations'] as List)
+          .map((m) => MuscleActivation.fromJson(m))
+          .toList(),
+      category: json['category'],
+      isCustom: json['isCustom'] ?? false,
+      availableHandles: (json['availableHandles'] as List?)?.cast<String>(),
+      exerciseType: type,
+    );
+  }
 }
 
 // ==================== Workout Set ====================
@@ -433,6 +445,8 @@ class WorkoutSession {
 
 // ==================== Routine ====================
 
+const _routineSentinel = Object();
+
 class Routine {
   final String id;
   final String name;
@@ -467,13 +481,17 @@ class Routine {
   Routine copyWith({
     String? name,
     List<String>? exerciseIds,
-    Map<String, String>? defaultHandles,
+    Object? defaultHandles = _routineSentinel,
   }) => Routine(
     id: id,
     name: name ?? this.name,
     exerciseIds: exerciseIds ?? this.exerciseIds,
     createdAt: createdAt,
-    defaultHandles: defaultHandles ?? this.defaultHandles,
+    defaultHandles: identical(defaultHandles, _routineSentinel)
+        ? this.defaultHandles
+        : (defaultHandles is Map
+            ? defaultHandles.cast<String, String>()
+            : null),
   );
 }
 
