@@ -509,11 +509,14 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
             children: [
               const Icon(Icons.fitness_center_rounded, size: 16, color: AppColors.textMuted),
               const SizedBox(width: AppSpacing.xs),
-              const Text(
-                'Added Weight (Optional)',
-                style: TextStyle(fontSize: 12, color: AppColors.textSoft, fontWeight: FontWeight.w500),
+              const Expanded(
+                child: Text(
+                  'Added Weight (Optional)',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: AppColors.textSoft, fontWeight: FontWeight.w500),
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: AppSpacing.sm),
               SizedBox(
                 width: 100,
                 child: TextField(

@@ -151,6 +151,13 @@ class AiCoachViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  @visibleForTesting
+  void setPendingImageForTesting(Uint8List? bytes, String? mimeType) {
+    _pendingImageBytes = bytes;
+    _pendingImageMimeType = mimeType;
+    notifyListeners();
+  }
+
   /// Send a user message and stream the coach's reply (running the tool-call
   /// loop). Both the user message and the final reply are persisted.
   Future<void> sendMessage(String text) async {

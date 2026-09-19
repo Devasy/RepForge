@@ -1,6 +1,9 @@
 // Unit tests for AiCoachViewModel — verifies orchestration (send → stream →
 // persist) using a fake IAiService, so the View has no logic left to test.
 
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
     show Content, Tool, FunctionCall;
@@ -22,6 +25,8 @@ class _FakeAiService implements IAiService {
   final List<String> chunks;
   final bool invokeTool;
   int toolCallsMade = 0;
+  String? lastImageBytesBase64;
+  String? lastImageMimeType;
 
   @override
   bool get isConfigured => true;
@@ -39,6 +44,8 @@ class _FakeAiService implements IAiService {
     String? imageBytesBase64,
     String? imageMimeType,
   }) async* {
+    lastImageBytesBase64 = imageBytesBase64;
+    lastImageMimeType = imageMimeType;
     if (invokeTool && onToolCall != null) {
       await onToolCall(FunctionCall('get_muscle_recovery', {}));
       toolCallsMade++;
@@ -173,6 +180,41 @@ void main() {
       vm.selectConversation(firstId!);
       expect(vm.activeConversationId, firstId);
       expect(vm.messages.first.text, 'first chat');
+    });
+
+    test('pending image state can be set and cleared', () async {
+      final vm = await buildVm(_FakeAiService());
+      expect(vm.hasPendingImage, isFalse);
+      expect(vm.pendingImageBytes, isNull);
+
+      final testBytes = Uint8List.fromList([1, 2, 3, 4]);
+      vm.setPendingImageForTesting(testBytes, 'image/jpeg');
+
+      expect(vm.hasPendingImage, isTrue);
+      expect(vm.pendingImageBytes, testBytes);
+
+      vm.clearPendingImage();
+      expect(vm.hasPendingImage, isFalse);
+      expect(vm.pendingImageBytes, isNull);
+    });
+
+    test('sendMessage attaches pending image, passes to IAiService, and clears pending', () async {
+      final ai = _FakeAiService();
+      final vm = await buildVm(ai);
+
+      final testBytes = Uint8List.fromList([10, 20, 30, 40]);
+      vm.setPendingImageForTesting(testBytes, 'image/png');
+
+      await vm.sendMessage('Check my form');
+
+      expect(ai.lastImageBytesBase64, base64Encode(testBytes));
+      expect(ai.lastImageMimeType, 'image/png');
+      expect(vm.hasPendingImage, isFalse);
+      expect(vm.pendingImageBytes, isNull);
+
+      final userMsg = vm.messages.firstWhere((m) => m.role == 'user');
+      expect(userMsg.imageBytesBase64, base64Encode(testBytes));
+      expect(userMsg.imageMimeType, 'image/png');
     });
   });
 }
