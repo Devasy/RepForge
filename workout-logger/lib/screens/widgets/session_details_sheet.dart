@@ -376,7 +376,7 @@ class _ExerciseDetailCard extends StatelessWidget {
                 ),
                 Text(
                   log.isTimeBased
-                      ? (log.totalVolume > 0
+                      ? (log.sets.any((s) => s.weight > 0)
                           ? '${formatHoldDuration(log.totalHoldDuration)} · ${settings.toDisplay(log.totalVolume).toStringAsFixed(0)} ${settings.unitLabel}'
                           : formatHoldDuration(log.totalHoldDuration))
                       : '${settings.toDisplay(log.totalVolume).toStringAsFixed(0)} ${settings.unitLabel}',

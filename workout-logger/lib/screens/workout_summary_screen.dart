@@ -348,6 +348,7 @@ class _ExerciseSummaryRow extends StatelessWidget {
 
     final isTimeBased = log.isTimeBased || log.sets.any((s) => s.isTimeBased);
     final totalHold = log.totalHoldDuration;
+    final hasAddedLoad = log.sets.any((s) => s.weight > 0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -385,11 +386,11 @@ class _ExerciseSummaryRow extends StatelessWidget {
             ),
           ),
           Text(
-            isTimeBased && volume == 0
+            isTimeBased && !hasAddedLoad
                 ? formatHoldDuration(totalHold)
                 : '$volStr ${settings.unitLabel}',
             style: TextStyle(
-              color: isTimeBased && volume == 0 ? AppColors.cyan : AppColors.success,
+              color: isTimeBased && !hasAddedLoad ? AppColors.cyan : AppColors.success,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),

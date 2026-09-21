@@ -426,11 +426,22 @@ class _ExerciseStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final progression = provider.getVolumeProgression(exerciseId);
-    final setProgression = provider.getSetProgression(exerciseId);
-    final growthModel = provider.getGrowthModel(exerciseId);
     final exercise = provider.allExercises.where((e) => e.id == exerciseId).firstOrNull;
     final isTimeBased = exercise?.exerciseType == ExerciseType.timeBased;
+    final setProgression = provider.getSetProgression(exerciseId);
+    final progression = isTimeBased
+        ? [
+            for (final session in setProgression)
+              (
+                date: session.date,
+                volume: session.sets.fold<double>(
+                  0.0,
+                  (sum, s) => sum + (s.timeTaken ?? 0).toDouble(),
+                ),
+              )
+          ]
+        : provider.getVolumeProgression(exerciseId);
+    final growthModel = provider.getGrowthModel(exerciseId);
     final bestOneRM = isTimeBased ? null : provider.getBestOneRM(exerciseId);
     final bestHold = isTimeBased ? provider.getBestHold(exerciseId) : null;
 
@@ -452,7 +463,7 @@ class _ExerciseStats extends StatelessWidget {
             _OneRMCard(oneRM: bestOneRM, settings: settings),
             const SizedBox(height: AppSpacing.sm),
           ],
-          if (growthModel != null) ...[
+          if (!isTimeBased && growthModel != null) ...[
             _GrowthCard(model: growthModel),
             const SizedBox(height: AppSpacing.sm),
           ],
@@ -460,12 +471,17 @@ class _ExerciseStats extends StatelessWidget {
             exerciseId: exerciseId,
             progression: progression,
             setProgression: setProgression,
-            growthModel: growthModel,
+            growthModel: isTimeBased ? null : growthModel,
             chartMode: chartMode,
             onChartModeChanged: onChartModeChanged,
+            isTimeBased: isTimeBased,
           ),
           const SizedBox(height: AppSpacing.sm),
-          _SessionHistory(progression: progression, settings: settings),
+          _SessionHistory(
+            progression: progression,
+            settings: settings,
+            isTimeBased: isTimeBased,
+          ),
           const SizedBox(height: AppSpacing.md),
           _AskCoachButton(
             exerciseName: provider.getExerciseName(exerciseId),
@@ -711,6 +727,7 @@ class _ChartSection extends StatelessWidget {
     required this.growthModel,
     required this.chartMode,
     required this.onChartModeChanged,
+    this.isTimeBased = false,
   });
 
   final String exerciseId;
@@ -719,6 +736,7 @@ class _ChartSection extends StatelessWidget {
   final GrowthModel? growthModel;
   final _ChartMode chartMode;
   final ValueChanged<_ChartMode> onChartModeChanged;
+  final bool isTimeBased;
 
   @override
   Widget build(BuildContext context) {
@@ -732,7 +750,7 @@ class _ChartSection extends StatelessWidget {
               Expanded(
                 child: Text(
                   chartMode == _ChartMode.volume
-                      ? 'Volume Progression'
+                      ? (isTimeBased ? 'Hold Duration' : 'Volume Progression')
                       : 'Set Progression',
                   style: TextStyle(fontFamily: 'Geist', 
                     color: AppColors.textPrimary,
@@ -744,14 +762,22 @@ class _ChartSection extends StatelessWidget {
               _ChartModeToggle(
                 value: chartMode,
                 onChanged: onChartModeChanged,
+                isTimeBased: isTimeBased,
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
           if (chartMode == _ChartMode.volume)
-            _VolumeChart(progression: progression, growthModel: growthModel)
+            _VolumeChart(
+              progression: progression,
+              growthModel: growthModel,
+              isTimeBased: isTimeBased,
+            )
           else
-            _SetProgressionChart(setProgression: setProgression),
+            _SetProgressionChart(
+              setProgression: setProgression,
+              isTimeBased: isTimeBased,
+            ),
         ],
       ),
     );
@@ -759,9 +785,14 @@ class _ChartSection extends StatelessWidget {
 }
 
 class _ChartModeToggle extends StatelessWidget {
-  const _ChartModeToggle({required this.value, required this.onChanged});
+  const _ChartModeToggle({
+    required this.value,
+    required this.onChanged,
+    this.isTimeBased = false,
+  });
   final _ChartMode value;
   final ValueChanged<_ChartMode> onChanged;
+  final bool isTimeBased;
 
   @override
   Widget build(BuildContext context) {
@@ -786,7 +817,9 @@ class _ChartModeToggle extends StatelessWidget {
                   borderRadius: BorderRadius.circular(7),
                 ),
                 child: Text(
-                  mode == _ChartMode.volume ? 'Volume' : 'Sets',
+                  mode == _ChartMode.volume
+                      ? (isTimeBased ? 'Hold' : 'Volume')
+                      : 'Sets',
                   style: TextStyle(fontFamily: 'GeistMono', 
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -804,9 +837,14 @@ class _ChartModeToggle extends StatelessWidget {
 // ── Volume progression line chart ─────────────────────────────────────────────
 
 class _VolumeChart extends StatelessWidget {
-  const _VolumeChart({required this.progression, this.growthModel});
+  const _VolumeChart({
+    required this.progression,
+    this.growthModel,
+    this.isTimeBased = false,
+  });
   final List<({DateTime date, double volume})> progression;
   final GrowthModel? growthModel;
+  final bool isTimeBased;
 
   @override
   Widget build(BuildContext context) {
@@ -833,14 +871,19 @@ class _VolumeChart extends StatelessWidget {
     }
     final ci95 = settings.toDisplay(rse * 1.96);
     final bestVol = n > 0
-        ? settings.toDisplay(progression.map((e) => e.volume).reduce(max))
+        ? (isTimeBased
+            ? progression.map((e) => e.volume).reduce(max)
+            : settings.toDisplay(progression.map((e) => e.volume).reduce(max)))
         : 0.0;
 
     final actualSpots = List<FlSpot>.generate(
       n,
-      (i) => FlSpot(i.toDouble(), settings.toDisplay(progression[i].volume)),
+      (i) => FlSpot(
+        i.toDouble(),
+        isTimeBased ? progression[i].volume : settings.toDisplay(progression[i].volume),
+      ),
     );
-    final trendSpots = (growthModel != null && n >= 2)
+    final trendSpots = (!isTimeBased && growthModel != null && n >= 2)
         ? List<FlSpot>.generate(
             n + 2,
             (i) => FlSpot(
@@ -953,15 +996,17 @@ class _VolumeChart extends StatelessWidget {
               getTooltipItems: (spots) => spots.map((spot) {
                 if (spot.barIndex != 0) return null;
                 final v = spot.y;
-                final volStr = v >= 1000
-                    ? '${(v / 1000).toStringAsFixed(1)}k'
-                    : v.toStringAsFixed(0);
+                final volStr = isTimeBased
+                    ? formatHoldDuration(v.round())
+                    : (v >= 1000
+                        ? '${(v / 1000).toStringAsFixed(1)}k'
+                        : v.toStringAsFixed(0));
                 final i = spot.x.toInt();
                 final dateStr = (i >= 0 && i < n)
                     ? DateFormat('MMM d').format(progression[i].date)
                     : '';
                 return LineTooltipItem(
-                  '$volStr ${settings.unitLabel}',
+                  isTimeBased ? volStr : '$volStr ${settings.unitLabel}',
                   TextStyle(fontFamily: 'GeistMono', 
                     color: AppColors.secondary,
                     fontSize: 13,
@@ -993,9 +1038,11 @@ class _VolumeChart extends StatelessWidget {
                 showTitles: true,
                 reservedSize: 38,
                 getTitlesWidget: (v, _) {
-                  final label = v >= 1000
-                      ? '${(v / 1000).toStringAsFixed(1)}k'
-                      : v.toStringAsFixed(0);
+                  final label = isTimeBased
+                      ? '${v.toStringAsFixed(0)}s'
+                      : (v >= 1000
+                          ? '${(v / 1000).toStringAsFixed(1)}k'
+                          : v.toStringAsFixed(0));
                   return Text(
                     label,
                     style: TextStyle(fontFamily: 'GeistMono', 
@@ -1026,8 +1073,9 @@ class _VolumeChart extends StatelessWidget {
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
                     ),
-                    labelResolver: (line) =>
-                        'BEST ${bestVol.toStringAsFixed(0)}',
+                    labelResolver: (line) => isTimeBased
+                        ? 'BEST ${formatHoldDuration(bestVol.round())}'
+                        : 'BEST ${bestVol.toStringAsFixed(0)}',
                   ),
                 ),
             ],
@@ -1051,8 +1099,12 @@ class _VolumeChart extends StatelessWidget {
 enum _SetViewMode { recent, weekly }
 
 class _SetProgressionChart extends StatefulWidget {
-  const _SetProgressionChart({required this.setProgression});
+  const _SetProgressionChart({
+    required this.setProgression,
+    this.isTimeBased = false,
+  });
   final List<({DateTime date, List<WorkoutSet> sets})> setProgression;
+  final bool isTimeBased;
 
   static const _maxSetsPerSession = 4;
   static const _weightColor = AppColors.primary;
@@ -1102,7 +1154,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
           )).toList();
     }
 
-    // Weekly aggregation — one synthetic set (avg weight, avg reps) per week.
+    // Weekly aggregation — one synthetic set (avg weight, avg reps/hold) per week.
     final byWeek = <DateTime, List<WorkoutSet>>{};
     for (final s in raw) {
       byWeek.putIfAbsent(_weekStart(s.date), () => []).addAll(s.sets);
@@ -1115,8 +1167,17 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
     return visible.map((e) {
       final sets = e.value;
       final avgW = sets.fold(0.0, (s, x) => s + x.weight) / sets.length;
-      final avgR = (sets.fold(0.0, (s, x) => s + x.reps) / sets.length).round();
-      return (date: e.key, sets: [WorkoutSet(weight: avgW, reps: avgR)]);
+      final avgMetric = (sets.fold(0.0, (s, x) => s + (widget.isTimeBased ? (x.timeTaken ?? 0) : x.reps)) / sets.length).round();
+      return (
+        date: e.key,
+        sets: [
+          WorkoutSet(
+            weight: avgW,
+            reps: widget.isTimeBased ? 0 : avgMetric,
+            timeTaken: widget.isTimeBased ? avgMetric : null,
+          ),
+        ],
+      );
     }).toList();
   }
 
@@ -1147,8 +1208,9 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
               ));
             }
             if (_showReps) {
+              final metricVal = widget.isTimeBased ? (set.timeTaken ?? 0) : set.reps;
               rods.add(BarChartRodData(
-                toY: set.reps * scale,
+                toY: metricVal * scale,
                 width: 6,
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(3)),
@@ -1222,8 +1284,11 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
         ],
       );
     } else {
+      final metricStr = widget.isTimeBased
+          ? '${set.timeTaken ?? 0}s'
+          : '${set.reps} reps';
       return BarTooltipItem(
-        '$setLabel  ${set.reps} reps',
+        '$setLabel  $metricStr',
         TextStyle(fontFamily: 'GeistMono', 
             color: _rc, fontSize: 12, fontWeight: FontWeight.w700),
         children: [
@@ -1262,7 +1327,8 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
       for (final set in s.sets) {
         final w = settings.toDisplay(set.weight);
         if (w > maxW) maxW = w;
-        if (set.reps > maxR) maxR = set.reps.toDouble();
+        final m = widget.isTimeBased ? (set.timeTaken ?? 0).toDouble() : set.reps.toDouble();
+        if (m > maxR) maxR = m;
       }
     }
     if (maxW == 0) maxW = 1;
@@ -1295,7 +1361,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                   const SizedBox(width: 14),
                   _ToggleLegend(
                     color: _rc,
-                    label: 'Reps',
+                    label: widget.isTimeBased ? 'Hold' : 'Reps',
                     active: _showReps,
                     onTap: () => setState(() => _showReps = !_showReps),
                   ),
@@ -1356,7 +1422,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                   ),
                   rightTitles: AxisTitles(
                     axisNameWidget: Text(
-                      'reps',
+                      widget.isTimeBased ? 'sec' : 'reps',
                       style: TextStyle(fontFamily: 'GeistMono', 
                           color: _rc,
                           fontSize: 9,
@@ -1369,7 +1435,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                       getTitlesWidget: (v, _) {
                         final r = (v / scale).round();
                         if (r <= 0) return const Text('');
-                        return Text('$r',
+                        return Text(widget.isTimeBased ? '${r}s' : '$r',
                             style: TextStyle(fontFamily: 'GeistMono', 
                                 color: _rc.withValues(alpha: 0.7),
                                 fontSize: 9));
@@ -1510,10 +1576,12 @@ class _SessionHistory extends StatelessWidget {
   const _SessionHistory({
     required this.progression,
     required this.settings,
+    this.isTimeBased = false,
   });
 
   final List<({DateTime date, double volume})> progression;
   final SettingsProvider settings;
+  final bool isTimeBased;
 
   @override
   Widget build(BuildContext context) {
@@ -1535,6 +1603,9 @@ class _SessionHistory extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           ...progression.take(10).map((entry) {
             final displayVol = settings.toDisplay(entry.volume);
+            final textVal = isTimeBased
+                ? formatHoldDuration(entry.volume.round())
+                : '${displayVol.toStringAsFixed(0)} ${settings.unitLabel}';
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: Row(
@@ -1548,7 +1619,7 @@ class _SessionHistory extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${displayVol.toStringAsFixed(0)} ${settings.unitLabel}',
+                    textVal,
                     style: TextStyle(fontFamily: 'GeistMono', 
                       color: AppColors.textPrimary,
                       fontSize: 13,

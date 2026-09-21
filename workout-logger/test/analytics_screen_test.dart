@@ -502,5 +502,34 @@ void main() {
 
       expect(find.text('1 this month'), findsOneWidget);
     });
+
+    testWidgets('time-based PR hero and card render Best Hold based on record.bestDuration without exercise type check',
+        (tester) async {
+      final session = WorkoutSession(
+        id: 's_time',
+        date: DateTime.now(),
+        duration: 20,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'plank',
+            sets: [
+              WorkoutSet(weight: 0, reps: 0, timeTaken: 75),
+            ],
+          ),
+        ],
+      );
+      await prManager.checkAndUpdatePRs(session);
+
+      await tester.pumpWidget(_wrap(
+        workoutProvider: provider,
+        prManager: prManager,
+      ));
+      await tester.pumpAndSettle();
+      await _switchTab(tester, 'Records');
+
+      expect(find.text('Latest PR'), findsOneWidget);
+      expect(find.text('Best Hold'), findsWidgets);
+      expect(find.text('1m 15s'), findsWidgets);
+    });
   });
 }

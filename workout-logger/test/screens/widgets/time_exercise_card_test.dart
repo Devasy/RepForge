@@ -309,7 +309,7 @@ void main() {
 
       await tester.pumpWidget(
         buildCard(
-          durationSeconds: 1, // 1 second countdown
+          durationSeconds: 5, // 5 second countdown
           onDurationChanged: (d) => changedDuration = d,
           currentWeight: 0,
           onWeightChanged: (_) {},
@@ -328,14 +328,47 @@ void main() {
       await tester.tap(playBtn);
       await tester.pump(const Duration(milliseconds: 50));
 
-      // Simulate stopwatch reaching and exceeding 1 second
-      fakeStopwatch.customElapsed = const Duration(seconds: 1);
+      // Simulate stopwatch reaching and exceeding 5 seconds
+      fakeStopwatch.customElapsed = const Duration(seconds: 5);
       await tester.pump(const Duration(milliseconds: 250));
 
       expect(finishedCalled, isTrue);
-      expect(changedDuration, 1);
+      expect(changedDuration, 5);
       // Verify timer reset to initial duration ready for next set
-      expect(find.text('00:01'), findsOneWidget);
+      expect(find.text('00:05'), findsOneWidget);
+    });
+
+    testWidgets('Manual timer input below 5 seconds is clamped to 5 seconds', (tester) async {
+      int recordedDuration = 0;
+      await tester.pumpWidget(
+        buildCard(
+          durationSeconds: 30,
+          onDurationChanged: (d) => recordedDuration = d,
+          currentWeight: 0,
+          onWeightChanged: (_) {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Switch to countdown mode
+      await tester.tap(find.text('Countdown'));
+      await tester.pumpAndSettle();
+
+      // Tap edit icon
+      await tester.tap(find.byIcon(Icons.edit_outlined));
+      await tester.pumpAndSettle();
+
+      final dialogInput = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(dialogInput, '2');
+      await tester.tap(find.text('Set'));
+      await tester.pumpAndSettle();
+
+      // Should be clamped to 5
+      expect(recordedDuration, 5);
+      expect(find.text('00:05'), findsOneWidget);
     });
   });
 }

@@ -418,11 +418,9 @@ class _NewestPRHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final provider = context.watch<WorkoutProvider>();
     final dateStr = DateFormat('MMM d, yyyy').format(record.achievedAt);
     final w = settings.toDisplay(record.bestWeight);
-    final isTimeBased = (record.bestDuration != null && record.bestDuration! > 0) ||
-        provider.allExercises.any((e) => e.id == record.exerciseId && e.exerciseType == ExerciseType.timeBased);
+    final isTimeBased = record.bestDuration != null && record.bestDuration! > 0;
 
     return GlassCard(
       glowColor: AppColors.warning,
@@ -603,13 +601,11 @@ class _PRCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final provider = context.watch<WorkoutProvider>();
     final dateStr = DateFormat('MMM d, yyyy').format(record.achievedAt);
     final displayWeight = settings.toDisplay(record.bestWeight);
     final displayVol = settings.toDisplay(record.bestVolume);
     final unit = settings.unitLabel;
-    final isTimeBased = (record.bestDuration != null && record.bestDuration! > 0) ||
-        provider.allExercises.any((e) => e.id == record.exerciseId && e.exerciseType == ExerciseType.timeBased);
+    final isTimeBased = record.bestDuration != null && record.bestDuration! > 0;
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 10),

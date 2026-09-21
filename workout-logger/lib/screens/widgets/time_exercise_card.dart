@@ -61,7 +61,9 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
     _stopwatchElapsed = 0;
     _stopwatchAccumulated = 0;
     _stopwatchBaseElapsed = widget.durationSeconds > 0 ? widget.durationSeconds : 0;
-    _timerInitialSeconds = widget.durationSeconds > 0 ? widget.durationSeconds : 60;
+    _timerInitialSeconds = widget.durationSeconds >= 5
+        ? widget.durationSeconds
+        : (widget.durationSeconds > 0 ? 5 : 60);
     _timerRemainingSeconds = _timerInitialSeconds;
     final initialDisplay = widget.currentWeight > 0 ? widget.settings.toDisplay(widget.currentWeight) : 0.0;
     _weightController = TextEditingController(
@@ -79,7 +81,9 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
     if (!_isRunning) {
       if (widget.durationSeconds != oldWidget.durationSeconds) {
         _stopwatchBaseElapsed = widget.durationSeconds > 0 ? widget.durationSeconds : 0;
-        _timerInitialSeconds = widget.durationSeconds > 0 ? widget.durationSeconds : 60;
+        _timerInitialSeconds = widget.durationSeconds >= 5
+            ? widget.durationSeconds
+            : (widget.durationSeconds > 0 ? 5 : 60);
         _timerRemainingSeconds = _timerInitialSeconds;
       }
       if (widget.currentWeight != oldWidget.currentWeight) {
@@ -155,6 +159,13 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
     } else {
       if (_timerRemainingSeconds <= 0) {
         _timerRemainingSeconds = _timerInitialSeconds;
+      }
+      if (_timerRemainingSeconds < 5) {
+        _timerRemainingSeconds = 5;
+        if (_timerInitialSeconds < 5) {
+          _timerInitialSeconds = 5;
+        }
+        widget.onDurationChanged(5);
       }
       _timerStartRemaining = _timerRemainingSeconds;
       setState(() => _isRunning = true);
@@ -297,12 +308,14 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
         if (_mode == TimeTrackMode.stopwatch) {
           _stopwatchElapsed = entered;
           _stopwatchAccumulated = entered;
+          widget.onDurationChanged(entered);
         } else {
-          _timerInitialSeconds = entered;
-          _timerRemainingSeconds = entered;
+          final clamped = entered.clamp(5, 3600);
+          _timerInitialSeconds = clamped;
+          _timerRemainingSeconds = clamped;
+          widget.onDurationChanged(clamped);
         }
       });
-      widget.onDurationChanged(entered);
     }
   }
 
