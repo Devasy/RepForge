@@ -105,7 +105,7 @@ void main() {
     late SettingsProvider settings;
     late PRManager pr;
 
-    Future<AiCoachViewModel> buildVm(_FakeAiService ai) async {
+    Future<AiCoachViewModel> buildVm(IAiService ai) async {
       provider = WorkoutProvider(
         storage,
         programManager: ProgramManager(storage),
@@ -234,19 +234,7 @@ void main() {
     });
 
     test('sendMessage stores error message when IAiService throws', () async {
-      final ai = _FakeAiService(chunks: const []);
-      final vm = await buildVm(ai);
-
-      // Replace with a service that throws on first chunk
-      final throwingVm = await (() async {
-        final throwingAi = _ThrowingAiService();
-        return AiCoachViewModel(
-          ai: throwingAi,
-          coachTools: CoachToolService(workoutProvider: provider, prManager: pr),
-          conversations: conversations,
-          settings: settings,
-        );
-      })();
+      final throwingVm = await buildVm(_ThrowingAiService());
 
       await throwingVm.sendMessage('cause error');
 

@@ -69,13 +69,11 @@ void main() {
 
   group('ExerciseInputSection Time-Based Tests', () {
     testWidgets('renders TimeExerciseCard when isTimeBased is true', (tester) async {
-      int changedDuration = -1;
-
       await tester.pumpWidget(
         buildSection(
           isTimeBased: true,
           durationSeconds: 60,
-          onDurationChanged: (d) => changedDuration = d,
+          onDurationChanged: (_) {},
         ),
       );
       await tester.pumpAndSettle();

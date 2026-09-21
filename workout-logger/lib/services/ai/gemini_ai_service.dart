@@ -306,7 +306,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   // ── Raw HTTP helpers ────────────────────────────────────────────────────────
 
   Map<String, dynamic> _makeBody({
-    required List<dynamic> contents,
+    required List<Object?> contents,
     String? system,
     List<Tool>? tools,
     bool jsonMode = false,
@@ -516,7 +516,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
       return;
     }
     try {
-      final userParts = <dynamic>[];
+      final userParts = <Map<String, Object?>>[];
       if (imageBytesBase64 != null && imageBytesBase64.isNotEmpty) {
         userParts.add({
           'inlineData': {
@@ -532,7 +532,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
       });
 
       // Build the mutable contents list; grows with each tool-call round.
-      final contents = <dynamic>[
+      final contents = <Object?>[
         ...history.map((c) => c.toJson()),
         {
           'role': 'user',
