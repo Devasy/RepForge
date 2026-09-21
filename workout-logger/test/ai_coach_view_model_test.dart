@@ -6,7 +6,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, Tool, FunctionCall;
+    show Content, Tool, FunctionCall, DataPart, TextPart, Part;
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/interfaces/ai_service_interface.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
@@ -27,6 +27,7 @@ class _FakeAiService implements IAiService {
   int toolCallsMade = 0;
   String? lastImageBytesBase64;
   String? lastImageMimeType;
+  List<Content>? lastHistory;
 
   @override
   bool get isConfigured => true;
@@ -44,6 +45,7 @@ class _FakeAiService implements IAiService {
     String? imageBytesBase64,
     String? imageMimeType,
   }) async* {
+    lastHistory = history;
     lastImageBytesBase64 = imageBytesBase64;
     lastImageMimeType = imageMimeType;
     if (invokeTool && onToolCall != null) {
@@ -245,8 +247,9 @@ void main() {
       expect(throwingVm.isLoading, isFalse);
     });
 
-    test('_buildHistory replaces image-only messages with [Attached image] placeholder', () async {
-      final vm = await buildVm(_FakeAiService());
+    test('_buildHistory preserves attached images with DataPart and [Attached image] placeholder', () async {
+      final ai = _FakeAiService();
+      final vm = await buildVm(ai);
 
       // Send a message with image — this gets stored and becomes part of history
       // in the next turn.
@@ -254,12 +257,33 @@ void main() {
       vm.setPendingImageForTesting(imgBytes, 'image/jpeg');
       await vm.sendMessage(''); // image-only first message
 
-      // Second message triggers _buildHistory which must replace the image bytes
-      // with '[Attached image]' to avoid unbounded token use.
+      // Second message triggers _buildHistory which must preserve the image bytes
+      // as a DataPart while retaining the text fallback.
       await vm.sendMessage('follow up');
 
-      // If we reach here without error the history building worked.
       expect(vm.messages.length, greaterThanOrEqualTo(4));
+      expect(ai.lastHistory, isNotNull);
+      expect(ai.lastHistory, isNotEmpty);
+      final historyContent = ai.lastHistory!.first;
+      final historyParts = historyContent.parts.toList();
+      expect(historyParts.any((p) => p is DataPart), isTrue);
+      final dataPart = historyParts.firstWhere((p) => p is DataPart) as DataPart;
+      expect(dataPart.mimeType, 'image/jpeg');
+      expect(dataPart.bytes, equals(imgBytes));
+      expect(historyParts.any((p) => p is TextPart && p.text == '[Attached image]'), isTrue);
+
+      // Verify Content.toJson() serializes the DataPart and TextPart
+      final json = historyContent.toJson();
+      expect(json['role'], 'user');
+      final serializedParts = json['parts'] as List;
+      expect(serializedParts, hasLength(2));
+      expect(serializedParts[0], {
+        'inlineData': {
+          'mimeType': 'image/jpeg',
+          'data': base64Encode(imgBytes),
+        },
+      });
+      expect(serializedParts[1], {'text': '[Attached image]'});
     });
 
     test('deleteConversation removes it from the list', () async {

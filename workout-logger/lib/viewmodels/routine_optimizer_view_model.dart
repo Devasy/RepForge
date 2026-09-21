@@ -5,9 +5,10 @@
 // a Completer.future, suspending the stream until submitAnswers() is called.
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, TextPart, FunctionCall, Tool;
+    show Content, TextPart, FunctionCall, Tool, Part, DataPart;
 
 import '../models/models.dart';
 import '../services/interfaces/ai_service_interface.dart';
@@ -199,6 +200,22 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
     final msgs = _conversations.activeMessages;
     final prior =
         msgs.length > 1 ? msgs.sublist(0, msgs.length - 1) : <ChatMessage>[];
-    return prior.map((m) => Content(m.role, [TextPart(m.text)])).toList();
+    return prior.map((m) {
+      final parts = <Part>[];
+      if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
+        try {
+          final bytes = base64Decode(m.imageBytesBase64!);
+          parts.add(DataPart(m.imageMimeType ?? 'image/jpeg', bytes));
+        } catch (_) {}
+      }
+      if (m.text.isNotEmpty) {
+        parts.add(TextPart(m.text));
+      } else if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
+        parts.add(TextPart('[Attached image]'));
+      } else {
+        parts.add(TextPart(''));
+      }
+      return Content(m.role, parts);
+    }).toList();
   }
 }

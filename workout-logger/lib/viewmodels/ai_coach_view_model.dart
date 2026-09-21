@@ -9,7 +9,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, TextPart, Part, FunctionCall;
+    show Content, TextPart, Part, FunctionCall, DataPart;
 
 import '../models/models.dart';
 import '../services/interfaces/ai_service_interface.dart';
@@ -249,14 +249,20 @@ class AiCoachViewModel extends ChangeNotifier {
       );
 
   /// Prior turns (everything before the user message just appended).
-  /// Replaces historical image payloads with concise textual placeholder
-  /// so multi-turn conversations do not cause unbounded storage or token consumption.
+  /// Preserves attached images as data parts alongside text, while retaining
+  /// text fallback for image-only turns.
   List<Content> _buildHistory() {
     final msgs = _conversations.activeMessages;
     final prior =
         msgs.length > 1 ? msgs.sublist(0, msgs.length - 1) : <ChatMessage>[];
     return prior.map((m) {
       final parts = <Part>[];
+      if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
+        try {
+          final bytes = base64Decode(m.imageBytesBase64!);
+          parts.add(DataPart(m.imageMimeType ?? 'image/jpeg', bytes));
+        } catch (_) {}
+      }
       if (m.text.isNotEmpty) {
         parts.add(TextPart(m.text));
       } else if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {

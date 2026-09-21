@@ -1,10 +1,11 @@
 // Unit tests for RoutineOptimizerViewModel
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, Tool, FunctionCall;
+    show Content, TextPart, FunctionCall, Tool, Part, DataPart;
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/interfaces/ai_service_interface.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
@@ -24,6 +25,7 @@ class _SimpleAi implements IAiService {
   final List<String> chunks;
   final FunctionCall? toolCall;
   int calls = 0;
+  List<Content>? lastHistory;
 
   @override
   bool get isConfigured => true;
@@ -41,6 +43,7 @@ class _SimpleAi implements IAiService {
     String? imageMimeType,
   }) async* {
     calls++;
+    lastHistory = history;
     final tc = toolCall;
     if (tc != null && onToolCall != null) {
       await onToolCall(tc);
@@ -160,16 +163,17 @@ class _ThrowingAi implements IAiService {
 RoutineOptimizerViewModel _buildVm({
   required MockStorageService storage,
   required IAiService ai,
+  ConversationManager? conversations,
 }) {
   final wp = WorkoutProvider(storage, programManager: ProgramManager(storage));
   final pr = PRManager(storage);
-  final conversations = ConversationManager(storage, kind: 'optimizer');
+  final conv = conversations ?? ConversationManager(storage, kind: 'optimizer');
   final settings = SettingsProvider(storage);
   final coachTools = CoachToolService(workoutProvider: wp, prManager: pr);
   return RoutineOptimizerViewModel(
     ai: ai,
     coachTools: coachTools,
-    conversations: conversations,
+    conversations: conv,
     settings: settings,
   );
 }
@@ -289,6 +293,43 @@ void main() {
       // The future should complete (not hang) after dispose
       await future.timeout(const Duration(seconds: 2));
       expect(vm.pendingQuestions, isNull);
+    });
+
+    test('_buildHistory preserves attached images with DataPart in routine optimizer', () async {
+      final ai = _SimpleAi();
+      final convManager = ConversationManager(storage, kind: 'optimizer');
+      await convManager.loadConversations();
+      await convManager.appendMessage(ChatMessage(
+        role: 'user',
+        text: 'Initial review',
+        imageBytesBase64: base64Encode([1, 2, 3]),
+        imageMimeType: 'image/png',
+      ));
+      await convManager.appendMessage(ChatMessage(role: 'model', text: 'Looks good!'));
+
+      final vm = _buildVm(storage: storage, ai: ai, conversations: convManager);
+      await vm.sendMessage('Can we modify this?');
+
+      expect(ai.lastHistory, isNotNull);
+      expect(ai.lastHistory, isNotEmpty);
+      final firstTurn = ai.lastHistory!.first;
+      final parts = firstTurn.parts.toList();
+      expect(parts.any((p) => p is DataPart), isTrue);
+      final dataPart = parts.firstWhere((p) => p is DataPart) as DataPart;
+      expect(dataPart.mimeType, 'image/png');
+      expect(dataPart.bytes, [1, 2, 3]);
+      expect(parts.any((p) => p is TextPart && p.text == 'Initial review'), isTrue);
+
+      final json = firstTurn.toJson();
+      expect(json['role'], 'user');
+      final serializedParts = json['parts'] as List;
+      expect(serializedParts[0], {
+        'inlineData': {
+          'mimeType': 'image/png',
+          'data': base64Encode([1, 2, 3]),
+        },
+      });
+      expect(serializedParts[1], {'text': 'Initial review'});
     });
   });
 }
