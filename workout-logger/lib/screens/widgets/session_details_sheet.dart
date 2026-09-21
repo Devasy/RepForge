@@ -464,7 +464,7 @@ class _SetRow extends StatelessWidget {
             ),
           if (!set.isTimeBased || set.weight > 0)
             Text(
-              '${set.volume.toStringAsFixed(0)} ${settings.unitLabel}',
+              '${settings.toDisplay(set.volume).toStringAsFixed(0)} ${settings.unitLabel}',
               style: const TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 12,

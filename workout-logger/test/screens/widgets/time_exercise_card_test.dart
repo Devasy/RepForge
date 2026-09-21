@@ -84,13 +84,12 @@ void main() {
 
   group('TimeExerciseCard Widget Tests', () {
     testWidgets('Renders initial state with hold time, weight, and mode chips', (tester) async {
-      int changedDuration = -1;
       double changedWeight = -1.0;
 
       await tester.pumpWidget(
         buildCard(
           durationSeconds: 45,
-          onDurationChanged: (d) => changedDuration = d,
+          onDurationChanged: (_) {},
           currentWeight: 10.0,
           onWeightChanged: (w) => changedWeight = w,
         ),
@@ -369,6 +368,57 @@ void main() {
       // Should be clamped to 5
       expect(recordedDuration, 5);
       expect(find.text('00:05'), findsOneWidget);
+    });
+
+    testWidgets('Countdown pause with remainder below 5s preserves remaining time on resume', (tester) async {
+      int recordedDuration = -1;
+      final fakeStopwatch = FakeStopwatch();
+
+      await tester.pumpWidget(
+        buildCard(
+          durationSeconds: 10,
+          onDurationChanged: (d) => recordedDuration = d,
+          currentWeight: 0,
+          onWeightChanged: (_) {},
+          stopwatch: fakeStopwatch,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Switch to countdown mode
+      await tester.tap(find.text('Countdown'));
+      await tester.pumpAndSettle();
+
+      // Start countdown
+      await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Advance 7s so remaining is 3s
+      fakeStopwatch.customElapsed = const Duration(seconds: 7);
+      await tester.pump(const Duration(milliseconds: 250));
+
+      // Pause
+      await tester.tap(find.byIcon(Icons.pause_rounded));
+      await tester.pumpAndSettle();
+
+      // Remaining should be 3s (00:03) and recorded duration should be 7s
+      expect(find.text('00:03'), findsOneWidget);
+      expect(recordedDuration, 7);
+
+      // Reset fakeStopwatch for resume
+      fakeStopwatch.customElapsed = Duration.zero;
+
+      // Resume countdown
+      await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Remaining should still start from 3s, not clamped back to 5s
+      expect(find.text('00:03'), findsOneWidget);
+
+      // Advance 1s so remaining is 2s
+      fakeStopwatch.customElapsed = const Duration(seconds: 1);
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(find.text('00:02'), findsOneWidget);
     });
   });
 }

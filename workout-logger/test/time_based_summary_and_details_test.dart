@@ -161,5 +161,43 @@ void main() {
       expect(find.text('Total Hold '), findsOneWidget);
       expect(find.text('1m · 600 kg'), findsOneWidget);
     });
+
+    testWidgets('per-set volume converts to display unit (e.g. lbs) matching total row', (tester) async {
+      await settingsProvider.setWeightUnit(WeightUnit.lbs);
+
+      final session = WorkoutSession(
+        id: 's_lbs_details',
+        date: DateTime.now(),
+        duration: 30,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'weighted_plank',
+            sets: [
+              WorkoutSet(weight: 10, reps: 0, timeTaken: 60),
+            ],
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(TestHarness.wrap(
+        Scaffold(
+          body: SessionDetailsSheet(
+            session: session,
+            provider: workoutProvider,
+            scrollController: ScrollController(),
+            onEdit: () {},
+            onDelete: () {},
+          ),
+        ),
+        storage: mockStorage,
+        workoutProvider: workoutProvider,
+        settingsProvider: settingsProvider,
+      ));
+      await tester.pumpAndSettle();
+
+      final expectedVol = settingsProvider.toDisplay(600).toStringAsFixed(0);
+      expect(find.text('1m · $expectedVol lbs'), findsOneWidget);
+      expect(find.text('$expectedVol lbs'), findsOneWidget);
+    });
   });
 }

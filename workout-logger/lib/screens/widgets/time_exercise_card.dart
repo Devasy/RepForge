@@ -158,14 +158,10 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
       widget.onDurationChanged(_timerInitialSeconds - _timerRemainingSeconds);
     } else {
       if (_timerRemainingSeconds <= 0) {
-        _timerRemainingSeconds = _timerInitialSeconds;
-      }
-      if (_timerRemainingSeconds < 5) {
-        _timerRemainingSeconds = 5;
         if (_timerInitialSeconds < 5) {
           _timerInitialSeconds = 5;
         }
-        widget.onDurationChanged(5);
+        _timerRemainingSeconds = _timerInitialSeconds;
       }
       _timerStartRemaining = _timerRemainingSeconds;
       setState(() => _isRunning = true);
