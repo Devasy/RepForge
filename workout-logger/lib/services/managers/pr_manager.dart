@@ -77,6 +77,7 @@ class PRManager extends ChangeNotifier {
     double newBestWeight = existing?.bestWeight ?? 0;
     int newBestReps = existing?.bestReps ?? 0;
     double newBestVolume = existing?.bestVolume ?? 0;
+    int? newBestDuration = existing?.bestDuration;
 
     for (final set in log.sets) {
       // effectiveWeight, not raw weight: for assisted-bodyweight sets, weight
@@ -85,15 +86,32 @@ class PRManager extends ChangeNotifier {
       if (set.effectiveWeight > newBestWeight) newBestWeight = set.effectiveWeight;
       if (set.reps > newBestReps) newBestReps = set.reps;
       if (set.volume > newBestVolume) newBestVolume = set.volume;
+      if (set.timeTaken != null && set.timeTaken! > (newBestDuration ?? 0)) {
+        newBestDuration = set.timeTaken!;
+      }
     }
+
+    final isTimeBased = log.sets.any((s) => s.isTimeBased);
 
     final broken = <String>{};
     if (existing == null) {
-      broken.addAll(['weight', 'reps', 'volume']);
+      if (isTimeBased) {
+        if (newBestDuration != null && newBestDuration > 0) broken.add('duration');
+        if (newBestWeight > 0) broken.add('weight');
+      } else {
+        broken.addAll(['weight', 'reps', 'volume']);
+      }
     } else {
-      if (newBestWeight > existing.bestWeight) broken.add('weight');
-      if (newBestReps > existing.bestReps) broken.add('reps');
-      if (newBestVolume > existing.bestVolume) broken.add('volume');
+      if (isTimeBased) {
+        if (newBestDuration != null && newBestDuration > (existing.bestDuration ?? 0)) {
+          broken.add('duration');
+        }
+        if (newBestWeight > existing.bestWeight) broken.add('weight');
+      } else {
+        if (newBestWeight > existing.bestWeight) broken.add('weight');
+        if (newBestReps > existing.bestReps) broken.add('reps');
+        if (newBestVolume > existing.bestVolume) broken.add('volume');
+      }
     }
 
     if (broken.isEmpty) return broken;
@@ -103,6 +121,7 @@ class PRManager extends ChangeNotifier {
       bestWeight: newBestWeight,
       bestReps: newBestReps,
       bestVolume: newBestVolume,
+      bestDuration: newBestDuration,
       achievedAt: date,
     );
     _cache[key] = updated;

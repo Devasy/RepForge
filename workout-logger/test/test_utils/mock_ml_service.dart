@@ -138,16 +138,24 @@ class MockMLService implements IMLService {
   }
 
   @override
-  List<SetRecommendation> getDefaultRecommendations(int setCount) {
+  List<SetRecommendation> getDefaultRecommendations(int setCount, {bool isTimeBased = false}) {
     return mockRecommendations ??
         List.generate(
           setCount,
-          (index) => SetRecommendation(
-            weight: 0,
-            reps: 10,
-            confidence: 'low',
-            reasoning: 'Default mock recommendation',
-          ),
+          (index) => isTimeBased
+              ? SetRecommendation(
+                  weight: 0,
+                  reps: 0,
+                  targetDuration: 30,
+                  confidence: 'low',
+                  reasoning: 'Default time-based mock recommendation',
+                )
+              : SetRecommendation(
+                  weight: 0,
+                  reps: 10,
+                  confidence: 'low',
+                  reasoning: 'Default mock recommendation',
+                ),
         );
   }
 

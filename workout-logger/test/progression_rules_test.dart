@@ -5,6 +5,10 @@ import 'package:repforge/services/strategies/progression_rules.dart';
 WorkoutSet _set({double weight = 60.0, int reps = 10}) =>
     WorkoutSet(weight: weight, reps: reps);
 
+/// A time-based [WorkoutSet] — timeTaken is the seconds held.
+WorkoutSet _timeSet({double weight = 0.0, int? timeTaken = 40}) =>
+    WorkoutSet(weight: weight, reps: 0, timeTaken: timeTaken);
+
 ProgressionContext _context({
   WorkoutSet? set,
   int minReps = 6,
@@ -53,6 +57,19 @@ void main() {
       expect(result.confidence, 'low');
       expect(result.reasoning, contains('40%'));
     });
+
+    test('holds hold duration with low confidence when time-based and under-recovered', () {
+      final result = rule.apply(_context(
+        set: _timeSet(timeTaken: 45),
+        isUnderRecovered: true,
+        recoveryPercent: 55,
+      ));
+      expect(result, isNotNull);
+      expect(result!.targetDuration, 45);
+      expect(result.reps, 0);
+      expect(result.confidence, 'low');
+      expect(result.reasoning, contains('55%'));
+    });
   });
 
   group('PostDeloadRecoveryRule', () {
@@ -70,6 +87,18 @@ void main() {
       expect(result, isNotNull);
       expect(result!.weight, 100);
       expect(result.reps, 6);
+      expect(result.confidence, 'high');
+      expect(result.reasoning, contains('deload'));
+    });
+
+    test('anchors time-based hold on pre-deload baseline when post-deload', () {
+      final result = rule.apply(_context(
+        set: _timeSet(timeTaken: 30),
+        isPostDeloadRecovery: true,
+      ));
+      expect(result, isNotNull);
+      expect(result!.targetDuration, 30);
+      expect(result.reps, 0);
       expect(result.confidence, 'high');
       expect(result.reasoning, contains('deload'));
     });
@@ -93,6 +122,18 @@ void main() {
       expect(result.confidence, 'low');
       expect(result.reasoning, contains('readiness'));
     });
+
+    test('holds hold duration with low confidence when time-based and low readiness', () {
+      final result = rule.apply(_context(
+        set: _timeSet(timeTaken: 60),
+        isLowReadiness: true,
+      ));
+      expect(result, isNotNull);
+      expect(result!.targetDuration, 60);
+      expect(result.reps, 0);
+      expect(result.confidence, 'low');
+      expect(result.reasoning, contains('readiness'));
+    });
   });
 
   group('SessionFatigueRule', () {
@@ -111,6 +152,18 @@ void main() {
       expect(result!.weight, 60);
       expect(result.reps, 10);
       expect(result.confidence, 'medium');
+    });
+
+    test('hard-holds time-based hold duration when session fatigue is 1.0', () {
+      final result = rule.apply(_context(
+        set: _timeSet(timeTaken: 50),
+        sessionFatigueFactor: 1.0,
+      ));
+      expect(result, isNotNull);
+      expect(result!.targetDuration, 50);
+      expect(result.reps, 0);
+      expect(result.confidence, 'medium');
+      expect(result.reasoning, contains('session'));
     });
   });
 
@@ -131,6 +184,28 @@ void main() {
       expect(result.reps, 8);
       expect(result.confidence, 'medium');
     });
+
+    test('deloads time-based hold by ~10% and floors at 15s when declining', () {
+      final result = rule.apply(_context(
+        set: _timeSet(timeTaken: 40),
+        isDeclining: true,
+      ));
+      expect(result, isNotNull);
+      // 40 * 0.9 = 36 → rounded to nearest 5 = 35
+      expect(result!.targetDuration, 35);
+      expect(result.reps, 0);
+      expect(result.confidence, 'medium');
+      expect(result.reasoning, contains('down'));
+    });
+
+    test('time-based deload floors at 15s for very short holds', () {
+      final result = rule.apply(_context(
+        set: _timeSet(timeTaken: 15),
+        isDeclining: true,
+      ));
+      // 15 * 0.9 = 13.5 → snapped to max(15, ...) floor → stays at 15
+      expect(result!.targetDuration, greaterThanOrEqualTo(15));
+    });
   });
 
   group('PlateauRule', () {
@@ -149,6 +224,18 @@ void main() {
       expect(result!.weight, 60);
       expect(result.reps, 10);
       expect(result.confidence, 'medium');
+    });
+
+    test('holds time-based hold duration with medium confidence on plateau', () {
+      final result = rule.apply(_context(
+        set: _timeSet(timeTaken: 55),
+        isPlateau: true,
+      ));
+      expect(result, isNotNull);
+      expect(result!.targetDuration, 55);
+      expect(result.reps, 0);
+      expect(result.confidence, 'medium');
+      expect(result.reasoning, contains('Plateau'));
     });
   });
 
@@ -188,8 +275,7 @@ void main() {
       expect(result.reasoning, contains('reduced'));
     });
 
-    test('heavy partial fatigue that rounds the increment to zero holds weight',
-        () {
+    test('heavy partial fatigue that rounds the increment to zero holds weight', () {
       // scaled = 5.0*(1-0.9) = 0.5 → rounds to 0 at the 2.5kg plate.
       final result = rule.apply(_context(
         set: _set(weight: 80, reps: 12),
@@ -202,8 +288,7 @@ void main() {
       expect(result.confidence, 'medium');
     });
 
-    test('zero fatigue factor (the default) is byte-identical to unscaled behavior',
-        () {
+    test('zero fatigue factor (the default) is byte-identical to unscaled behavior', () {
       final unscaled = rule.apply(
         _context(set: _set(weight: 80, reps: 12), minReps: 6, maxReps: 12),
       );
@@ -217,6 +302,45 @@ void main() {
       expect(explicitZero.reps, unscaled.reps);
       expect(explicitZero.confidence, unscaled.confidence);
       expect(explicitZero.reasoning, unscaled.reasoning);
+    });
+
+    // ── Time-based progression ────────────────────────────────────────────────
+
+    test('time-based: adds 5s when below ceiling', () {
+      final result = rule.apply(_context(set: _timeSet(timeTaken: 40)));
+      expect(result.targetDuration, 45);
+      expect(result.reps, 0);
+      expect(result.confidence, 'high');
+      expect(result.reasoning, contains('5s'));
+    });
+
+    test('time-based: at 60s ceiling steps up weight and resets to 30s', () {
+      final result = rule.apply(_context(set: _timeSet(weight: 0, timeTaken: 60)));
+      expect(result.weight, closeTo(2.5, 0.001));
+      expect(result.targetDuration, 30);
+      expect(result.reps, 0);
+      expect(result.confidence, 'high');
+      expect(result.reasoning, contains('ceiling'));
+    });
+
+    test('time-based: at 90s+ ceiling adds 5s (ceiling moves to 120s)', () {
+      // A hold of >=90 s sets the ceiling to 120 s; 90 s is below 120 s
+      // so the rule just adds 5 s rather than stepping up weight.
+      final result = rule.apply(_context(set: _timeSet(timeTaken: 90)));
+      expect(result.targetDuration, 95);
+      expect(result.reps, 0);
+    });
+
+    test('time-based: heavy fatigue at ceiling rounds increment to 0 and holds', () {
+      // base increment 2.5; factor 0.9 → scaled = 2.5*(1-0.9) = 0.25
+      // → (0.25/2.5).round() * 2.5 = 0.0 → holds at 60 s.
+      final result = rule.apply(_context(
+        set: _timeSet(weight: 0, timeTaken: 60),
+        sessionFatigueFactor: 0.9,
+      ));
+      expect(result.weight, closeTo(0, 0.001));
+      expect(result.targetDuration, 60);
+      expect(result.confidence, 'medium');
     });
   });
 

@@ -222,6 +222,50 @@ void main() {
       expect(results, isEmpty);
       expect(manager.getRecord('bench'), isNull);
     });
+
+    test('returns NewPRResult when duration PR is achieved or broken without bogus reps/volume', () async {
+      final initialResults = await manager.checkAndUpdatePRs(
+        _session(exercises: [
+          _log('plank', sets: [
+            WorkoutSet(weight: 0, reps: 0, timeTaken: 60),
+          ]),
+        ]),
+      );
+      expect(initialResults, hasLength(1));
+      expect(initialResults.first.types, contains('duration'));
+      expect(initialResults.first.types, isNot(contains('reps')));
+      expect(initialResults.first.types, isNot(contains('volume')));
+      expect(initialResults.first.types, isNot(contains('weight')));
+      expect(manager.getRecord('plank')?.bestDuration, 60);
+
+      final nextResults = await manager.checkAndUpdatePRs(
+        _session(
+          id: 's2',
+          exercises: [
+            _log('plank', sets: [
+              WorkoutSet(weight: 0, reps: 0, timeTaken: 90),
+            ]),
+          ],
+        ),
+      );
+      expect(nextResults, hasLength(1));
+      expect(nextResults.first.types, contains('duration'));
+      expect(manager.getRecord('plank')?.bestDuration, 90);
+    });
+
+    test('time-based exercise awards weight PR only when added load > 0', () async {
+      final results = await manager.checkAndUpdatePRs(
+        _session(exercises: [
+          _log('weighted_plank', sets: [
+            WorkoutSet(weight: 10, reps: 0, timeTaken: 45),
+          ]),
+        ]),
+      );
+      expect(results, hasLength(1));
+      expect(results.first.types, containsAll(['duration', 'weight']));
+      expect(results.first.types, isNot(contains('reps')));
+      expect(results.first.types, isNot(contains('volume')));
+    });
   });
 
   group('PRManager - getRecord', () {

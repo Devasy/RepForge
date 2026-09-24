@@ -370,14 +370,18 @@ class _ExerciseDetailCard extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                const Text(
-                  'Total ',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                Text(
+                  log.isTimeBased ? 'Total Hold ' : 'Total ',
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
                 Text(
-                  '${settings.toDisplay(log.totalVolume).toStringAsFixed(0)} ${settings.unitLabel}',
-                  style: const TextStyle(
-                    color: AppColors.success,
+                  log.isTimeBased
+                      ? (log.sets.any((s) => s.weight > 0)
+                          ? '${formatHoldDuration(log.totalHoldDuration)} · ${settings.toDisplay(log.totalVolume).toStringAsFixed(0)} ${settings.unitLabel}'
+                          : formatHoldDuration(log.totalHoldDuration))
+                      : '${settings.toDisplay(log.totalVolume).toStringAsFixed(0)} ${settings.unitLabel}',
+                  style: TextStyle(
+                    color: log.isTimeBased ? AppColors.cyan : AppColors.success,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -429,7 +433,11 @@ class _SetRow extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              '$wStr ${settings.unitLabel} × ${set.reps} reps',
+              set.isTimeBased
+                  ? (set.weight > 0
+                      ? '${formatHoldDuration(set.timeTaken ?? 0)} (+$wStr ${settings.unitLabel})'
+                      : formatHoldDuration(set.timeTaken ?? 0))
+                  : '$wStr ${settings.unitLabel} × ${set.reps} reps',
               style: const TextStyle(
                 color: AppColors.textSoft,
                 fontSize: 13,
@@ -454,13 +462,14 @@ class _SetRow extends StatelessWidget {
                 ),
               ),
             ),
-          Text(
-            '${set.volume.toStringAsFixed(0)} kg',
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 12,
+          if (!set.isTimeBased || set.weight > 0)
+            Text(
+              '${settings.toDisplay(set.volume).toStringAsFixed(0)} ${settings.unitLabel}',
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+              ),
             ),
-          ),
         ],
       ),
     );

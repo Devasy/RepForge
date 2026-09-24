@@ -4,9 +4,12 @@
 // drives the streaming tool-call loop via IAiService + CoachToolService, and
 // persists each turn through ConversationManager. Exposes immutable state.
 
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, TextPart, FunctionCall;
+    show Content, TextPart, Part, FunctionCall, DataPart;
 
 import '../models/models.dart';
 import '../services/interfaces/ai_service_interface.dart';
@@ -24,6 +27,8 @@ class AiCoachViewModel extends ChangeNotifier {
   bool _loading = false;
   String _streamingText = '';
   final List<String> _streamingToolCalls = [];
+  Uint8List? _pendingImageBytes;
+  String? _pendingImageMimeType;
 
   AiCoachViewModel({
     required IAiService ai,
@@ -54,6 +59,8 @@ class AiCoachViewModel extends ChangeNotifier {
   List<ChatMessage> get messages => _conversations.activeMessages;
   List<Conversation> get conversations => _conversations.conversations;
   String? get activeConversationId => _conversations.active?.id;
+  Uint8List? get pendingImageBytes => _pendingImageBytes;
+  bool get hasPendingImage => _pendingImageBytes != null;
 
   // ── Commands ───────────────────────────────────────────────────────────────
 
@@ -76,20 +83,107 @@ class AiCoachViewModel extends ChangeNotifier {
   Future<void> deleteConversation(String id) =>
       _conversations.deleteConversation(id);
 
+  static const int _maxImageBytes = 5 * 1024 * 1024; // 5 MB limit
+  static const Set<String> _supportedImageMimes = {
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+  };
+
+  /// Pick an image to attach to the next message.
+  Future<void> pickImage() async {
+    if (_loading) return;
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+
+      // Determine MIME type strictly from extension
+      final ext = (file.extension ?? '').toLowerCase().trim();
+      final String? mimeType = switch (ext) {
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        _ => null,
+      };
+
+      if (mimeType == null || !_supportedImageMimes.contains(mimeType)) {
+        debugPrint('Unsupported or missing image format: "$ext"');
+        return;
+      }
+
+      // Check file length before reading bytes
+      int? fileLength;
+      if (file.size > 0) {
+        fileLength = file.size;
+      } else if (file.path != null) {
+        final ioFile = File(file.path!);
+        if (await ioFile.exists()) {
+          fileLength = await ioFile.length();
+        }
+      }
+
+      if (fileLength == null || fileLength <= 0 || fileLength > _maxImageBytes) {
+        debugPrint('File size unavailable or exceeds limit ($fileLength bytes)');
+        return;
+      }
+
+      final Uint8List bytes = file.path != null
+          ? await File(file.path!).readAsBytes()
+          : await file.readAsBytes();
+      if (bytes.isEmpty) return;
+
+      _pendingImageBytes = bytes;
+      _pendingImageMimeType = mimeType;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
+  /// Clear the currently attached pending image.
+  void clearPendingImage() {
+    _pendingImageBytes = null;
+    _pendingImageMimeType = null;
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void setPendingImageForTesting(Uint8List? bytes, String? mimeType) {
+    _pendingImageBytes = bytes;
+    _pendingImageMimeType = mimeType;
+    notifyListeners();
+  }
+
   /// Send a user message and stream the coach's reply (running the tool-call
   /// loop). Both the user message and the final reply are persisted.
   Future<void> sendMessage(String text) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _loading) return;
+    if ((trimmed.isEmpty && _pendingImageBytes == null) || _loading) return;
 
     _loading = true;
     _streamingText = '';
     _streamingToolCalls.clear();
+
+    final imageBytes = _pendingImageBytes;
+    final imageMimeType = _pendingImageMimeType;
+    final imageBase64 = imageBytes != null ? base64Encode(imageBytes) : null;
+
+    _pendingImageBytes = null;
+    _pendingImageMimeType = null;
     notifyListeners();
 
     // Persist the user message first; history is derived from the store.
     await _conversations.appendMessage(
-      ChatMessage(role: 'user', text: trimmed),
+      ChatMessage(
+        role: 'user',
+        text: trimmed,
+        imageBytesBase64: imageBase64,
+        imageMimeType: imageMimeType,
+      ),
     );
 
     final systemPrompt = _buildSystemPrompt();
@@ -103,6 +197,8 @@ class AiCoachViewModel extends ChangeNotifier {
         history: history,
         tools: _coachTools.buildTools(),
         onToolCall: _recordAndDispatch,
+        imageBytesBase64: imageBase64,
+        imageMimeType: imageMimeType,
       )) {
         buffer.write(chunk);
         _streamingText = buffer.toString();
@@ -153,10 +249,28 @@ class AiCoachViewModel extends ChangeNotifier {
       );
 
   /// Prior turns (everything before the user message just appended).
+  /// Preserves attached images as data parts alongside text, while retaining
+  /// text fallback for image-only turns.
   List<Content> _buildHistory() {
     final msgs = _conversations.activeMessages;
     final prior =
         msgs.length > 1 ? msgs.sublist(0, msgs.length - 1) : <ChatMessage>[];
-    return prior.map((m) => Content(m.role, [TextPart(m.text)])).toList();
+    return prior.map((m) {
+      final parts = <Part>[];
+      if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
+        try {
+          final bytes = base64Decode(m.imageBytesBase64!);
+          parts.add(DataPart(m.imageMimeType ?? 'image/jpeg', bytes));
+        } catch (_) {}
+      }
+      if (m.text.isNotEmpty) {
+        parts.add(TextPart(m.text));
+      } else if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
+        parts.add(TextPart('[Attached image]'));
+      } else {
+        parts.add(TextPart(''));
+      }
+      return Content(m.role, parts);
+    }).toList();
   }
 }

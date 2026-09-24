@@ -507,4 +507,59 @@ void main() {
       expect(find.text('Recent'), findsOneWidget);
     });
   });
+
+  group('Time-based exercise progress view', () {
+    const plankId = 'custom_plank_id';
+
+    testWidgets('renders Hold Duration title, Hold toggle, and Best Hold card',
+        (tester) async {
+      storage.addMockCustomExercise(Exercise(
+        id: plankId,
+        name: 'Plank',
+        category: 'core',
+        isCustom: true,
+        exerciseType: ExerciseType.timeBased,
+        muscleActivations: [
+          MuscleActivation(muscleGroupId: 'abs', activationPercentage: 100),
+        ],
+      ));
+
+      storage.addMockSession(_session(
+        id: 's1',
+        date: DateTime.now().subtract(const Duration(days: 2)),
+        exerciseId: plankId,
+        sets: [
+          WorkoutSet(weight: 0, reps: 0, timeTaken: 60),
+          WorkoutSet(weight: 0, reps: 0, timeTaken: 45),
+        ],
+      ));
+
+      provider = await _makeProvider(storage);
+
+      await tester.pumpWidget(_wrap(
+        child: const ExerciseProgressView(),
+        provider: provider,
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Pick an exercise…'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Plank').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Best Hold'), findsOneWidget);
+      expect(find.text('1m'), findsWidgets);
+      expect(find.text('Hold Duration'), findsOneWidget);
+      expect(find.text('Hold'), findsOneWidget);
+      expect(find.text('Sets'), findsOneWidget);
+
+      // Switch to Sets mode
+      await tester.tap(find.text('Sets'));
+      await tester.pumpAndSettle();
+
+      // Mode toggle still has 'Hold' and legend in Sets mode now shows 'Hold' instead of 'Reps'
+      expect(find.text('Hold'), findsNWidgets(2));
+      expect(find.text('Reps'), findsNothing);
+    });
+  });
 }

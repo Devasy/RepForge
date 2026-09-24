@@ -306,7 +306,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   // ── Raw HTTP helpers ────────────────────────────────────────────────────────
 
   Map<String, dynamic> _makeBody({
-    required List<dynamic> contents,
+    required List<Object?> contents,
     String? system,
     List<Tool>? tools,
     bool jsonMode = false,
@@ -488,6 +488,8 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) =>
       streamCoachReply(
         userMessage: userMessage,
@@ -495,6 +497,8 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         history: history,
         tools: tools,
         onToolCall: onToolCall,
+        imageBytesBase64: imageBytesBase64,
+        imageMimeType: imageMimeType,
       );
 
   @override
@@ -504,16 +508,36 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) async* {
     if (!isConfigured) {
       yield 'Please add your Gemini API key in Profile → AI Features to get started.';
       return;
     }
     try {
+      final userParts = <Map<String, Object?>>[];
+      if (imageBytesBase64 != null && imageBytesBase64.isNotEmpty) {
+        userParts.add({
+          'inlineData': {
+            'mimeType': imageMimeType ?? 'image/jpeg',
+            'data': imageBytesBase64,
+          },
+        });
+      }
+      userParts.add({
+        'text': userMessage.trim().isNotEmpty
+            ? userMessage.trim()
+            : (imageBytesBase64 != null ? 'Please analyze this image.' : ''),
+      });
+
       // Build the mutable contents list; grows with each tool-call round.
-      final contents = <dynamic>[
+      final contents = <Object?>[
         ...history.map((c) => c.toJson()),
-        Content.text(userMessage).toJson(),
+        {
+          'role': 'user',
+          'parts': userParts,
+        },
       ];
 
       for (var round = 0; round < _maxToolRounds; round++) {

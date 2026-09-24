@@ -8,6 +8,7 @@ import '../../services/workout_provider.dart';
 import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../data/exercise_database.dart';
+import '../add_custom_exercise_screen.dart';
 import 'rf_widgets.dart';
 
 class ExerciseDetailsSheet extends StatelessWidget {
@@ -61,9 +62,11 @@ class ExerciseDetailsSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Icon(
-                  exercise.category == 'compound'
-                      ? Icons.fitness_center_rounded
-                      : Icons.accessibility_new_rounded,
+                  exercise.exerciseType == ExerciseType.timeBased
+                      ? Icons.timer_rounded
+                      : (exercise.category == 'compound'
+                          ? Icons.fitness_center_rounded
+                          : Icons.accessibility_new_rounded),
                   color: color,
                   size: 26,
                 ),
@@ -81,15 +84,22 @@ class ExerciseDetailsSheet extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    Row(
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
                       children: [
                         RFChip(
                           label: exercise.category,
                           small: true,
                           color: AppColors.primary,
                         ),
+                        RFChip(
+                          label: exercise.exerciseType.displayName,
+                          small: true,
+                          color: AppColors.cyan,
+                        ),
                         if (exercise.isCustom) ...[
-                          const SizedBox(width: 4),
                           const RFChip(
                             label: 'Custom',
                             small: true,
@@ -99,6 +109,31 @@ class ExerciseDetailsSheet extends StatelessWidget {
                       ],
                     ),
                   ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AddCustomExerciseScreen(
+                        initialExercise: exercise,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: const Icon(
+                    Icons.edit_outlined,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                 ),
               ),
               if (exercise.isCustom)
@@ -119,6 +154,41 @@ class ExerciseDetailsSheet extends StatelessWidget {
                 ),
             ],
           ),
+
+          // Available Attachments
+          if (exercise.availableHandles != null &&
+              exercise.availableHandles!.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            const RFSectionHeader('Available Attachments'),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: exercise.availableHandles!.map((h) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.cardHigh,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(color: AppColors.glassBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.link_rounded, size: 13, color: AppColors.cyan),
+                    const SizedBox(width: 4),
+                    Text(
+                      h,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )).toList(),
+            ),
+          ],
 
           const SizedBox(height: AppSpacing.lg),
 
@@ -197,7 +267,9 @@ class ExerciseDetailsSheet extends StatelessWidget {
                     border: Border.all(color: AppColors.glassBorder),
                   ),
                   child: Text(
-                    '${settings.toDisplay(s.weight).toStringAsFixed(settings.toDisplay(s.weight) == settings.toDisplay(s.weight).truncateToDouble() ? 0 : 1)}${settings.unitLabel} × ${s.reps}',
+                    (exercise.exerciseType == ExerciseType.timeBased && (s.timeTaken ?? 0) > 0)
+                        ? '${s.timeTaken}s${s.weight > 0 ? " (+${settings.toDisplay(s.weight).toStringAsFixed(0)}${settings.unitLabel})" : ""}'
+                        : '${settings.toDisplay(s.weight).toStringAsFixed(settings.toDisplay(s.weight) == settings.toDisplay(s.weight).truncateToDouble() ? 0 : 1)}${settings.unitLabel} × ${s.reps}',
                     style: const TextStyle(
                       color: AppColors.textSoft,
                       fontSize: 12,

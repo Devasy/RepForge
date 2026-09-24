@@ -453,6 +453,7 @@ class ExerciseDatabase {
         MuscleActivation(muscleGroupId: MuscleGroups.core, activationPercentage: 90),
       ],
       category: 'isolation',
+      exerciseType: ExerciseType.timeBased,
     ),
     Exercise(
       id: 'crunches',

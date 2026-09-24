@@ -120,7 +120,7 @@ abstract class IMLService {
   });
 
   /// Get default recommendations when no history exists.
-  List<SetRecommendation> getDefaultRecommendations(int setCount);
+  List<SetRecommendation> getDefaultRecommendations(int setCount, {bool isTimeBased = false});
 
   /// Predict when a target will be completed based on growth model.
   DateTime? predictTargetCompletion({

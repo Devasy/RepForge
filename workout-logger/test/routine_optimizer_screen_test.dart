@@ -44,6 +44,8 @@ class _ImmediateAi implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) async* {
     yield reply;
   }
@@ -67,6 +69,8 @@ class _ImmediateAi implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) =>
       streamCoachReply(
         userMessage: userMessage,
@@ -74,6 +78,8 @@ class _ImmediateAi implements IAiService {
         history: history,
         tools: tools,
         onToolCall: onToolCall,
+        imageBytesBase64: imageBytesBase64,
+        imageMimeType: imageMimeType,
       );
 
   @override
@@ -103,6 +109,8 @@ class _HangingAi implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) async* {
     await _done.future;
   }
@@ -126,6 +134,8 @@ class _HangingAi implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) =>
       streamCoachReply(
         userMessage: userMessage,
@@ -133,6 +143,8 @@ class _HangingAi implements IAiService {
         history: history,
         tools: tools,
         onToolCall: onToolCall,
+        imageBytesBase64: imageBytesBase64,
+        imageMimeType: imageMimeType,
       );
 
   @override
@@ -160,6 +172,8 @@ class _QuestionAi implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) async* {
     if (onToolCall != null) {
       await onToolCall(FunctionCall('ask_user_questions', {
@@ -194,6 +208,8 @@ class _QuestionAi implements IAiService {
     required List<Content> history,
     List<Tool>? tools,
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
+    String? imageBytesBase64,
+    String? imageMimeType,
   }) =>
       streamCoachReply(
         userMessage: userMessage,
@@ -201,6 +217,8 @@ class _QuestionAi implements IAiService {
         history: history,
         tools: tools,
         onToolCall: onToolCall,
+        imageBytesBase64: imageBytesBase64,
+        imageMimeType: imageMimeType,
       );
 
   @override

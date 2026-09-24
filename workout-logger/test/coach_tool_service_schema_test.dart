@@ -32,5 +32,7 @@ void main() {
     expect(decl.description, contains('health_samples'));
     expect(decl.description, contains('sleep_sessions'));
     expect(decl.description, contains('sleep_stage_intervals'));
+    expect(decl.description, contains('exercise_type'));
+    expect(decl.description, contains('default_handle'));
   });
 }
