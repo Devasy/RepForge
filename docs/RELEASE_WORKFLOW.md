@@ -69,11 +69,21 @@ Triggered on:
 - Manual execution via `workflow_dispatch`
 
 ### Release Steps:
-1. **Version Bumping**: On push to `main`, `scripts/bump_version.dart patch` automatically increments the patch version in `workout-logger/pubspec.yaml`, creates a commit, and pushes a new Git tag (`vX.Y.Z`).
-2. **Automated Build Numbering**: Uses `${{ github.run_number }}` with `flutter build appbundle --release --build-name=${{ steps.version.outputs.value }} --build-number=${{ github.run_number }}`. This ensures monotonically increasing `versionCode` for Google Play.
+1. **Release Version**: On push to `main`, `scripts/bump_version.dart patch` increments the patch version and base build number. The workflow raises the base to at least its run number to preserve upgrades from earlier APKs that used run numbers directly. It commits the resulting version and creates its `vX.Y.Z` tag. Tag builds require the tag to match the committed version. Release branches retain the current version until the main-branch release run bumps it.
+2. **Build Numbering**: GitHub release APKs use the committed `pubspec.yaml` base build number. Split APK version codes are `base * 10 + ABI`, where armeabi-v7a = 1, arm64-v8a = 2, and x86_64 = 3. The Play AAB retains `${{ github.run_number }}` as its separate version code. The workflow checks each APK's actual version code before publishing it.
 3. **Disposable Keystore Decoding**: Safely decodes `KEYSTORE_BASE64` to `${{ runner.temp }}/upload-keystore.jks` and cleans it up in a guaranteed `if: always()` step.
-4. **Google Play Closed Testing Deployment**: Automatically uploads the signed `.aab` to the **Closed Testing (Alpha) Track** via `r0adkll/upload-google-play@v1`.
+4. **Google Play Closed Testing Deployment**: Push-triggered releases automatically upload the signed `.aab` to the **Closed Testing (Alpha) Track** via `r0adkll/upload-google-play@v1`. Manual runs build validation artifacts without deploying to Google Play or publishing a GitHub release.
 5. **GitHub Release Publication**: Builds split release APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) and attaches both the APKs and `.aab` bundle to the GitHub release along with automatically generated release notes from merged pull requests.
+
+### Android SDK 37 and F-Droid builds
+
+The Android build pins AGP 9.1.1, Gradle 9.3.1, Java 17, and build tools 36.0.0. CI explicitly installs `platforms;android-37.0`. `android.newDsl=false` preserves Flutter's legacy variant integration and the ABI version-code overrides; AGP supplies built-in Kotlin. Flutter remains pinned in `pubspec.yaml`.
+
+Release dependency installation uses `flutter pub get --enforce-lockfile`, followed by builds with `--no-pub`. The JNI CMake linker patch and `LDFLAGS=-Wl,--build-id=none` match the F-Droid recipe's native build inputs.
+
+The `r2.1.4` branch retains `2.1.3+37`; CI bumps it to 2.1.4 after merge to main. The published 2.1.3 arm64 APK used code 582. To preserve upgrades while making F-Droid's version calculation reproducible, CI commits a base of at least its release run number before building. The final three APK codes are determined from that committed base, not hard-coded in advance.
+
+After the release exists, update all three entries in `fdroiddata/metadata/com.devasy.repforge.yml` to the release's full upstream commit hash, version name, and ABI version codes; set `CurrentVersionCode` to the x86_64 code. Build and verify each ABI in the Linux F-Droid environment against its corresponding signed GitHub APK. A Windows compilation check does not establish Linux reproducibility.
 
 ---
 

@@ -118,7 +118,7 @@ jobs:
 
   android_dry_run:
     name: Android Build Verification (Dry Run)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -132,6 +132,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -143,7 +146,7 @@ jobs:
       - name: Install dependencies
         working-directory: ./workout-logger
         run: |
-          flutter pub get
+          flutter pub get --enforce-lockfile
           : "${PUB_CACHE:?PUB_CACHE is not set}"
           mapfile -t targets < <(find "$PUB_CACHE" -type f -path '*/jni-*/src/CMakeLists.txt')
           for f in "${targets[@]}"; do
@@ -154,4 +157,4 @@ jobs:
 
       - name: Build Debug App Bundle (Dry Run)
         working-directory: ./workout-logger
-        run: flutter build appbundle --debug
+        run: flutter build appbundle --debug --no-pub

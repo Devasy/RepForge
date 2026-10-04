@@ -4,14 +4,14 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    // kotlin-android is injected automatically by Flutter's built-in Kotlin support.
-    // (android.builtInKotlin=true in gradle.properties)
+    // AGP 9 provides built-in Kotlin (android.builtInKotlin=true).
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.devasy.repforge"
     compileSdk = 37
+    buildToolsVersion = "36.0.0"
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
