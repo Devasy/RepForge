@@ -163,3 +163,8 @@ jobs:
       - name: Build Debug App Bundle (Dry Run)
         working-directory: ./workout-logger
         run: flutter build appbundle --debug --no-pub
+
+      - name: Verify release shrinking rules
+        if: github.event_name == 'pull_request'
+        working-directory: ./workout-logger
+        run: flutter build apk --release --split-per-abi --target-platform android-arm64 --no-pub

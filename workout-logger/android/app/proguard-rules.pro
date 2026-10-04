@@ -1,8 +1,7 @@
 # Suppress missing class warnings for Play Core deferred components in Flutter engine
 -dontwarn com.google.android.play.core.**
 
-# Flutter Wrapper Rules. RepForge does not use Play Store deferred components;
-# let R8 remove those wrappers and their otherwise unused Play Core references.
+# Flutter Wrapper Rules: remove unused Play Store deferred wrappers and their Play Core references.
 -keep class !io.flutter.app.FlutterPlayStoreSplitApplication,io.flutter.app.** { *; }
 -keep class io.flutter.plugin.** { *; }
 -keep class io.flutter.util.** { *; }
