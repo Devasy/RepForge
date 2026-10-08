@@ -185,14 +185,18 @@ class MLService implements IMLService {
         pastSessions?.expand((sets) => sets).firstOrNull;
     if (reference == null) return getDefaultRecommendations(3);
     if (reference.loadMode != WorkoutLoadMode.external &&
-        reference.loadEncodingVersion != 1) {
+        (reference.loadEncodingVersion != 1 ||
+            reference.bodyWeightAtLog == null)) {
       return getDefaultRecommendations(
         lastSession.length,
         isTimeBased: reference.isTimeBased,
       );
     }
     bool compatible(WorkoutSet set) =>
-        reference.hasComparableLoad(set) && reference.loadMode == set.loadMode;
+        reference.hasComparableLoad(set) &&
+        reference.loadMode == set.loadMode &&
+        (set.loadMode == WorkoutLoadMode.external ||
+            set.bodyWeightAtLog != null);
     final recent = pastSessions
         ?.map((sets) => sets.where(compatible).toList())
         .where((sets) => sets.isNotEmpty)
@@ -200,25 +204,8 @@ class MLService implements IMLService {
     final effective =
         reference.loadEncodingVersion == 1 &&
         reference.loadMode != WorkoutLoadMode.external;
-    WorkoutSet normalize(WorkoutSet set) => !effective
-        ? set
-        : set.copyWith(
-            weight: set.effectiveWeight,
-            assistWeight: null,
-            extraWeight: null,
-            bodyWeightAtLog: null,
-            loadMode: WorkoutLoadMode.external,
-            loadEncodingVersion: 0,
-            drops: set.drops
-                ?.map(
-                  (drop) => DropsetEntry(
-                    id: drop.id,
-                    weight: set.effectiveLoad(drop.weight),
-                    reps: drop.reps,
-                  ),
-                )
-                .toList(),
-          );
+    WorkoutSet normalize(WorkoutSet set) =>
+        !effective ? set : set.toEffectiveLoad();
     final recommendations = _recommendComparableSets(
       lastSession: lastSession.where(compatible).map(normalize).toList(),
       pastSessions: recent

@@ -504,9 +504,7 @@ class StorageService implements IStorageService {
         final map = _normalizeImportItem(item);
         if (map == null) continue;
         final record = PersonalRecord.fromJson(map);
-        if (!(await getAllPersonalRecords()).any(
-          (r) => r.storageKey == record.storageKey,
-        )) {
+        if (!_personalRecordsBoxInstance.containsKey(record.storageKey)) {
           await savePersonalRecord(record);
         }
       }

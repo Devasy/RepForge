@@ -302,32 +302,42 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
       final file = File(result.files.single.path!);
       final jsonString = await file.readAsString();
-      final data = jsonDecode(jsonString) as Map<String, dynamic>;
-      if (!data.containsKey('sessions') && !data.containsKey('routines')) {
-        if (mounted) _showSnack('Invalid backup file.', AppColors.error);
-        return;
-      }
+      final data = jsonDecode(jsonString);
       if (!mounted) return;
       final provider = context.read<WorkoutProvider>();
       final settings = context.read<SettingsProvider>();
       final prManager = context.read<PRManager?>();
       final conversations = context.read<ConversationManager?>();
       final gemini = context.read<GeminiAiService?>();
-      await provider.importData(jsonString);
-      await settings.init();
-      gemini?.init(
-        settings.geminiApiKey,
-        model: settings.geminiModel,
-        maxToolRounds: settings.geminiMaxToolRounds,
-        thinkingLevel: settings.geminiThinkingLevel,
-      );
-      await prManager?.load();
-      await conversations?.loadConversations();
+      await provider.importData(jsonString, refresh: false);
+      try {
+        await provider.refreshAfterImport();
+        await settings.init();
+        gemini?.init(
+          settings.geminiApiKey,
+          model: settings.geminiModel,
+          maxToolRounds: settings.geminiMaxToolRounds,
+          thinkingLevel: settings.geminiThinkingLevel,
+        );
+        await prManager?.load();
+        await conversations?.loadConversations();
+      } catch (error, stack) {
+        debugPrint('Post-import refresh failed: $error\n$stack');
+        if (mounted) {
+          _showSnack(
+            'Backup merged, but some data did not refresh. Restart the app.',
+            AppColors.warning,
+          );
+        }
+        return;
+      }
       if (!mounted) return;
-      final sessionCount = (data['sessions'] as List?)?.length ?? 0;
-      final routineCount = (data['routines'] as List?)?.length ?? 0;
-      final chatCount = (data['conversations'] as List?)?.length ?? 0;
-      final programCount = (data['trainingPrograms'] as List?)?.length ?? 0;
+      int count(String key) =>
+          data is Map && data[key] is List ? (data[key] as List).length : 0;
+      final sessionCount = count('sessions');
+      final routineCount = count('routines');
+      final chatCount = count('conversations');
+      final programCount = count('trainingPrograms');
       _showSnack(
         'Backup merged: $sessionCount sessions, $routineCount routines, $chatCount chats, $programCount programs in file. Existing IDs kept.',
         AppColors.success,

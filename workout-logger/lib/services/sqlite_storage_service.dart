@@ -1317,13 +1317,14 @@ class SqliteStorageService implements IStorageService {
     }
     final records = data['personalRecords'];
     if (records is List) {
+      final existingKeys = (await getAllPersonalRecords())
+          .map((record) => record.storageKey)
+          .toSet();
       for (final item in records) {
         final map = _normalizeImportItem(item);
         if (map == null) continue;
         final record = PersonalRecord.fromJson(map);
-        if (!(await getAllPersonalRecords()).any(
-          (r) => r.storageKey == record.storageKey,
-        )) {
+        if (existingKeys.add(record.storageKey)) {
           await savePersonalRecord(record);
         }
       }

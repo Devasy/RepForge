@@ -5,6 +5,40 @@ import 'package:http/testing.dart';
 import 'package:repforge/services/ai/gemini_model_catalog.dart';
 
 void main() {
+  test('skips malformed model rows without discarding valid entries', () async {
+    final catalog = GeminiModelCatalog(
+      client: MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            'models': [
+              null,
+              42,
+              'bad row',
+              {
+                'name': 'models/gemini-3.8-flash',
+                'supportedGenerationMethods': 'generateContent',
+              },
+              {
+                'name': 'models/gemini-3.8-flash',
+                'supportedGenerationMethods': ['generateContent'],
+                'displayName': 12,
+              },
+              {
+                'name': 'models/gemini-3.9-flash',
+                'supportedGenerationMethods': ['generateContent'],
+              },
+            ],
+          }),
+          200,
+        ),
+      ),
+    );
+    addTearDown(catalog.close);
+    expect(await catalog.discover('key'), [
+      ('gemini-3.9-flash', 'gemini-3.9-flash'),
+      ('gemini-3.8-flash', 'gemini-3.8-flash'),
+    ]);
+  });
   test(
     'regex parses stable chat IDs and captures numeric version and variant',
     () {

@@ -74,8 +74,11 @@ class ReleaseService {
         throw Exception('Release information is unavailable. Try again later.');
       }
       final rows = jsonDecode(response.body) as List;
-      for (final row in rows.cast<Map<String, dynamic>>()) {
-        final tag = row['tag_name'] as String;
+      for (final row in rows) {
+        if (row is! Map) continue;
+        final tag = row['tag_name'];
+        final url = row['html_url'];
+        if (tag is! String || url is! String) continue;
         if (row['draft'] == true ||
             row['prerelease'] == true ||
             compareAppVersions(tag, '0.0.0') == null) {
@@ -84,8 +87,8 @@ class ReleaseService {
         releases.add(
           AppRelease(
             tag.replaceFirst(RegExp(r'^v'), ''),
-            row['body'] as String? ?? '',
-            row['html_url'] as String,
+            row['body'] is String ? row['body'] as String : '',
+            url,
           ),
         );
       }

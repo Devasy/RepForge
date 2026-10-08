@@ -5,6 +5,41 @@ import 'package:http/testing.dart';
 import 'package:repforge/services/release_service.dart';
 
 void main() {
+  test('malformed release rows do not hide valid published updates', () async {
+    final service = ReleaseService(
+      client: MockClient(
+        (_) async => http.Response(
+          jsonEncode([
+            null,
+            42,
+            'bad row',
+            {'tag_name': null, 'html_url': null},
+            {'tag_name': 'v9.0.0', 'html_url': 42},
+            {
+              'tag_name': 'v8.0.0',
+              'html_url': 'https://github.com/Devasy/RepForge/releases',
+              'prerelease': true,
+            },
+            {
+              'tag_name': 'v7.0.0',
+              'html_url': 'https://github.com/Devasy/RepForge/releases',
+              'draft': true,
+            },
+            {
+              'tag_name': 'v2.1.6',
+              'html_url':
+                  'https://github.com/Devasy/RepForge/releases/tag/v2.1.6',
+              'body': 42,
+            },
+          ]),
+          200,
+        ),
+      ),
+    );
+    final release = await service.updateFor('2.1.5');
+    expect(release!.version, '2.1.6');
+    expect(release.notes, '');
+  });
   test('compares numeric versions and rejects preview tags', () {
     expect(compareAppVersions('v2.1.10', '2.1.9'), greaterThan(0));
     expect(compareAppVersions('2.1.5+63', '2.1.5'), 0);

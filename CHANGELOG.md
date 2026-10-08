@@ -14,6 +14,8 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 ### Fixes
 - Preserve training programs, personal records, coach and optimizer chats, and attachments in backups; reject malformed backups before importing.
 - Preserve workout effort in SQLite and imported data.
+- Accept settings-only backups and report refresh failures separately from failed imports.
+- Skip malformed model and release entries without hiding valid discovery results.
 - Keep legacy raw-load history separate from bodyweight-based trend and progression calculations (#67).
 - Progress assisted exercises by reducing assistance; preserve bodyweight at logging time (#68).
 - Preserve separate handle records with canonical exercise IDs across migrations and backups (#69).

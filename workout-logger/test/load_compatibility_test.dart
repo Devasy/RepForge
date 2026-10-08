@@ -30,6 +30,80 @@ WorkoutSession session(
 );
 
 void main() {
+  test(
+    'explicit assisted mode with a snapshot defaults to modern encoding',
+    () {
+      final set = WorkoutSet(
+        weight: 10,
+        reps: 5,
+        loadMode: WorkoutLoadMode.assisted,
+        bodyWeightAtLog: 70,
+      );
+      expect(set.loadEncodingVersion, 1);
+      expect(set.effectiveWeight, 60);
+      expect(
+        WorkoutSet(
+          weight: 10,
+          reps: 5,
+          loadMode: WorkoutLoadMode.external,
+          assistWeight: 10,
+          bodyWeightAtLog: 70,
+        ).loadEncodingVersion,
+        0,
+      );
+    },
+  );
+  test('missing version-1 bodyweight returns safe default recommendations', () {
+    for (final mode in [WorkoutLoadMode.assisted, WorkoutLoadMode.weighted]) {
+      final recommendations = MLService().recommendSets(
+        lastSession: [
+          WorkoutSet(
+            weight: 10,
+            reps: 12,
+            loadMode: mode,
+            loadEncodingVersion: 1,
+          ),
+        ],
+      );
+      expect(recommendations.single.weight, 0);
+      expect(recommendations.single.confidence, 'low');
+    }
+  });
+  test(
+    'progress charts normalize drop loads and clear bodyweight-only fields',
+    () async {
+      final raw = bodySet(WorkoutLoadMode.assisted, weight: 10, reps: 5)
+          .copyWith(
+            extraWeight: 5.0,
+            isDropset: true,
+            drops: [DropsetEntry(id: 'd', weight: 5, reps: 4)],
+          );
+      final storage = MockStorageService();
+      await storage.saveWorkoutSession(session('drops', 8, raw));
+      final provider = WorkoutProvider(
+        storage,
+        programManager: ProgramManager(storage),
+      );
+      await provider.init();
+      final normalized = provider
+          .getSetProgression('pull_ups')
+          .single
+          .sets
+          .single;
+      expect(normalized.weight, 65);
+      expect(normalized.drops!.single.weight, 70);
+      expect(normalized.assistWeight, isNull);
+      expect(normalized.extraWeight, isNull);
+      expect(normalized.bodyWeightAtLog, isNull);
+      expect(normalized.volume, raw.volume);
+      expect(
+        (await storage.getWorkoutSession(
+          'drops',
+        ))!.exercises.single.sets.single.drops!.single.weight,
+        5,
+      );
+    },
+  );
   test('push-ups use added load and assistance decreases effective load', () {
     expect(isAssistedBodyweightExercise('push_ups'), isFalse);
     expect(isBodyweightExercise('push_ups'), isTrue);
@@ -125,8 +199,11 @@ void main() {
       ]);
       expect(provider.getSetProgression('pull_ups'), hasLength(1));
       expect(provider.hasMixedLoadConventions('pull_ups'), isTrue);
-    expect(provider.getBestOneRM('pull_ups'), closeTo(80, 0.001));
-    expect(provider.getSetProgression('pull_ups').single.sets.single.weight, 60);
+      expect(provider.getBestOneRM('pull_ups'), closeTo(80, 0.001));
+      expect(
+        provider.getSetProgression('pull_ups').single.sets.single.weight,
+        60,
+      );
       expect(
         MLService().extractExerciseDataPoints('pull_ups', [old, modern]),
         hasLength(1),

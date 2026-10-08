@@ -51,19 +51,24 @@ class GeminiModelCatalog {
         );
       }
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      for (final model
-          in (data['models'] as List? ?? []).cast<Map<String, dynamic>>()) {
+      final rows = data['models'] ?? [];
+      if (rows is! List) {
+        throw const FormatException('Invalid Gemini model list.');
+      }
+      for (final model in rows) {
+        if (model is! Map) continue;
         final name = model['name'];
         final parsed = name is String ? GeminiChatModelName.parse(name) : null;
         // Stable general-purpose Flash variants only. Excludes Live, TTS,
         // image, preview and experimental models requiring different APIs.
+        final methods = model['supportedGenerationMethods'];
         if (parsed == null ||
-            !(model['supportedGenerationMethods'] as List? ?? []).contains(
-              'generateContent',
-            )) {
+            methods is! List ||
+            !methods.contains('generateContent')) {
           continue;
         }
-        models[parsed.id] = model['displayName'] as String? ?? parsed.id;
+        final displayName = model['displayName'];
+        models[parsed.id] = displayName is String ? displayName : parsed.id;
       }
       token = data['nextPageToken'] as String?;
     } while (token != null && token.isNotEmpty);

@@ -1474,11 +1474,7 @@ class WorkoutProvider extends ChangeNotifier {
             sets: log.sets
                 .map(
                   (set) => set.loadEncodingVersion == 1
-                      ? set.copyWith(
-                          weight: set.effectiveWeight,
-                          loadMode: WorkoutLoadMode.external,
-                          loadEncodingVersion: 0,
-                        )
+                      ? set.toEffectiveLoad()
                       : set,
                 )
                 .toList(),
@@ -1570,8 +1566,12 @@ class WorkoutProvider extends ChangeNotifier {
     return await _storage.exportAllData();
   }
 
-  Future<void> importData(String jsonData) async {
+  Future<void> importData(String jsonData, {bool refresh = true}) async {
     await _storage.importData(jsonData);
+    if (refresh) await refreshAfterImport();
+  }
+
+  Future<void> refreshAfterImport() async {
     await _historyManager?.loadSessions();
     await loadAllData();
     await _trainAllGrowthModels();

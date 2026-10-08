@@ -227,7 +227,11 @@ class WorkoutSet {
                : WorkoutLoadMode.assisted),
        loadEncodingVersion =
            loadEncodingVersion ??
-           ((loadMode == WorkoutLoadMode.weighted || assistWeight != null) &&
+           (((loadMode ??
+                           (assistWeight == null
+                               ? WorkoutLoadMode.external
+                               : WorkoutLoadMode.assisted)) !=
+                       WorkoutLoadMode.external) &&
                    bodyWeightAtLog != null
                ? 1
                : 0),
@@ -260,6 +264,25 @@ class WorkoutSet {
     }
     return max(0.0, bw - enteredWeight + (extraWeight ?? 0.0));
   }
+
+  /// Normalize main and drop loads together for analytics/recommendations.
+  WorkoutSet toEffectiveLoad() => copyWith(
+    weight: effectiveWeight,
+    assistWeight: null,
+    extraWeight: null,
+    bodyWeightAtLog: null,
+    loadMode: WorkoutLoadMode.external,
+    loadEncodingVersion: 0,
+    drops: drops
+        ?.map(
+          (drop) => DropsetEntry(
+            id: drop.id,
+            weight: effectiveLoad(drop.weight),
+            reps: drop.reps,
+          ),
+        )
+        .toList(),
+  );
 
   double calculateVolume({double? userBodyWeight, bool? isAssistedBW}) {
     // Explicit override is retained only for legacy callers. Stored modes win.
