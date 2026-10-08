@@ -2,6 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'ai/gemini_model_catalog.dart';
 import 'ai/gemini_ai_service.dart'
     show
         kDefaultMaxToolRounds,
@@ -103,8 +104,7 @@ class SettingsProvider extends ChangeNotifier {
 
   /// Whether [model] is one the model picker actually offers.
   static bool _isKnownGeminiModel(String? model) =>
-      model != null &&
-      RegExp(r'^gemini-\d+\.\d+-flash(?:-lite)?$').hasMatch(model);
+      model != null && GeminiChatModelName.parse(model)?.id == model;
 
   /// A valid bodyweight must be finite (not NaN/Infinity) and strictly positive.
   static bool _isValidBodyWeight(double? weight) =>
@@ -175,6 +175,13 @@ class SettingsProvider extends ChangeNotifier {
   /// failed write must leave the previously saved model active rather than a
   /// value that only exists in memory.
   Future<void> setGeminiModel(String model) async {
+    if (!_isKnownGeminiModel(model)) {
+      throw ArgumentError.value(
+        model,
+        'model',
+        'Unsupported Gemini chat model',
+      );
+    }
     final previousModel = _geminiModel;
     await _storage.saveSetting('geminiModel', model);
     final clamped = clampThinkingLevel(model, _geminiThinkingLevel);

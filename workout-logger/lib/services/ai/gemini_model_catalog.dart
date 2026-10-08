@@ -1,6 +1,31 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+/// Allowlist grammar for stable general-purpose chat models. Unknown suffixes
+/// are rejected, even if the API says the model supports generateContent.
+class GeminiChatModelName {
+  const GeminiChatModelName(this.id, this.major, this.minor, this.isLite);
+  final String id;
+  final int major;
+  final int minor;
+  final bool isLite;
+
+  static final _pattern = RegExp(
+    r'^(?:models/)?(gemini-([0-9]+)\.([0-9]+)-flash(-lite)?)$',
+  );
+
+  static GeminiChatModelName? parse(String name) {
+    final match = _pattern.firstMatch(name);
+    if (match == null || match.end != name.length) return null;
+    return GeminiChatModelName(
+      match.group(1)!,
+      int.parse(match.group(2)!),
+      int.parse(match.group(3)!),
+      match.group(4) != null,
+    );
+  }
+}
+
 /// Discovery populates the picker; it never silently changes a user's model.
 class GeminiModelCatalog {
   GeminiModelCatalog({http.Client? client}) : _client = client ?? http.Client();
@@ -28,16 +53,17 @@ class GeminiModelCatalog {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       for (final model
           in (data['models'] as List? ?? []).cast<Map<String, dynamic>>()) {
-        final id = (model['name'] as String).replaceFirst('models/', '');
+        final name = model['name'];
+        final parsed = name is String ? GeminiChatModelName.parse(name) : null;
         // Stable general-purpose Flash variants only. Excludes Live, TTS,
         // image, preview and experimental models requiring different APIs.
-        if (!RegExp(r'^gemini-\d+\.\d+-flash(?:-lite)?$').hasMatch(id) ||
+        if (parsed == null ||
             !(model['supportedGenerationMethods'] as List? ?? []).contains(
               'generateContent',
             )) {
           continue;
         }
-        models[id] = model['displayName'] as String? ?? id;
+        models[parsed.id] = model['displayName'] as String? ?? parsed.id;
       }
       token = data['nextPageToken'] as String?;
     } while (token != null && token.isNotEmpty);
@@ -45,12 +71,14 @@ class GeminiModelCatalog {
       for (final entry in models.entries) (entry.key, entry.value),
     ];
     result.sort((a, b) {
-      List<int> version(String id) => RegExp(
-        r'\d+',
-      ).allMatches(id).map((m) => int.parse(m.group(0)!)).take(2).toList();
-      final av = version(a.$1), bv = version(b.$1);
-      final major = bv[0].compareTo(av[0]);
-      return major != 0 ? major : bv[1].compareTo(av[1]);
+      final av = GeminiChatModelName.parse(a.$1)!;
+      final bv = GeminiChatModelName.parse(b.$1)!;
+      final major = bv.major.compareTo(av.major);
+      if (major != 0) return major;
+      final minor = bv.minor.compareTo(av.minor);
+      if (minor != 0) return minor;
+      // Prefer full Flash over Lite when both have the same version.
+      return (av.isLite ? 1 : 0).compareTo(bv.isLite ? 1 : 0);
     });
     return result;
   }

@@ -61,14 +61,17 @@ void main() {
       expect(provider.geminiModel, equals('gemini-3.6-flash'));
     });
 
-    test('init clamps a stored thinking level that the stored model no longer supports', () async {
-      await mockStorage.saveSetting('geminiModel', 'gemini-3.7-flash');
-      await mockStorage.saveSetting('geminiThinkingLevel', 'minimal');
+    test(
+      'init clamps a stored thinking level that the stored model no longer supports',
+      () async {
+        await mockStorage.saveSetting('geminiModel', 'gemini-3.7-flash');
+        await mockStorage.saveSetting('geminiThinkingLevel', 'minimal');
 
-      await provider.init();
+        await provider.init();
 
-      expect(provider.geminiThinkingLevel, equals('low'));
-    });
+        expect(provider.geminiThinkingLevel, equals('low'));
+      },
+    );
 
     test('setUserName updates state and notifies listeners', () async {
       bool notified = false;
@@ -81,21 +84,24 @@ void main() {
       expect(notified, isTrue);
     });
 
-    test('setWeightUnit updates weightUnit, default increment, and saves settings', () async {
-      await provider.setWeightUnit(WeightUnit.lbs);
+    test(
+      'setWeightUnit updates weightUnit, default increment, and saves settings',
+      () async {
+        await provider.setWeightUnit(WeightUnit.lbs);
 
-      expect(provider.weightUnit, equals(WeightUnit.lbs));
-      expect(provider.unitLabel, equals('lbs'));
-      expect(provider.weightIncrement, equals(5.0));
-      expect(mockStorage.settings['weightUnit'], equals('lbs'));
-      expect(mockStorage.settings['weightIncrement'], equals('5.0'));
+        expect(provider.weightUnit, equals(WeightUnit.lbs));
+        expect(provider.unitLabel, equals('lbs'));
+        expect(provider.weightIncrement, equals(5.0));
+        expect(mockStorage.settings['weightUnit'], equals('lbs'));
+        expect(mockStorage.settings['weightIncrement'], equals('5.0'));
 
-      await provider.setWeightUnit(WeightUnit.kg);
+        await provider.setWeightUnit(WeightUnit.kg);
 
-      expect(provider.weightUnit, equals(WeightUnit.kg));
-      expect(provider.unitLabel, equals('kg'));
-      expect(provider.weightIncrement, equals(2.5));
-    });
+        expect(provider.weightUnit, equals(WeightUnit.kg));
+        expect(provider.unitLabel, equals('kg'));
+        expect(provider.weightIncrement, equals(2.5));
+      },
+    );
 
     test('weight conversions and formatting for kg and lbs', () async {
       // In kg mode
@@ -112,43 +118,58 @@ void main() {
       expect(provider.formatWeight(100.0), equals('220.5 lbs'));
     });
 
-    test('setters for healthConnect, readiness, gemini, and advanced metrics', () async {
-      await provider.setHealthConnectEnabled(true);
-      expect(provider.healthConnectEnabled, isTrue);
-      expect(mockStorage.settings['healthConnectEnabled'], equals('true'));
+    test(
+      'setters for healthConnect, readiness, gemini, and advanced metrics',
+      () async {
+        await provider.setHealthConnectEnabled(true);
+        expect(provider.healthConnectEnabled, isTrue);
+        expect(mockStorage.settings['healthConnectEnabled'], equals('true'));
 
-      await provider.setReadinessEnabled(true);
-      expect(provider.readinessEnabled, isTrue);
-      expect(mockStorage.settings['readinessEnabled'], equals('true'));
+        await provider.setReadinessEnabled(true);
+        expect(provider.readinessEnabled, isTrue);
+        expect(mockStorage.settings['readinessEnabled'], equals('true'));
 
-      await provider.setGeminiApiKey('key123');
-      expect(provider.geminiApiKey, equals('key123'));
+        await provider.setGeminiApiKey('key123');
+        expect(provider.geminiApiKey, equals('key123'));
 
-      await provider.setGeminiModel('custom-model');
-      expect(provider.geminiModel, equals('custom-model'));
+        await provider.setGeminiModel('gemini-3.8-flash');
+        expect(provider.geminiModel, equals('gemini-3.8-flash'));
+        await expectLater(
+          provider.setGeminiModel('gemini-3.8-flash-transcribe'),
+          throwsArgumentError,
+        );
+        expect(provider.geminiModel, equals('gemini-3.8-flash'));
+        expect(mockStorage.settings['geminiModel'], 'gemini-3.8-flash');
 
-      await provider.setGeminiThinkingLevel('high');
-      expect(provider.geminiThinkingLevel, equals('high'));
-      expect(mockStorage.settings['geminiThinkingLevel'], equals('high'));
+        await provider.setGeminiThinkingLevel('high');
+        expect(provider.geminiThinkingLevel, equals('high'));
+        expect(mockStorage.settings['geminiThinkingLevel'], equals('high'));
 
-      await provider.setShowAdvancedMetrics(true);
-      expect(provider.showAdvancedMetrics, isTrue);
-    });
+        await provider.setShowAdvancedMetrics(true);
+        expect(provider.showAdvancedMetrics, isTrue);
+      },
+    );
 
-    test('setGeminiModel clamps an already-set thinking level the new model does not support', () async {
-      await provider.setGeminiThinkingLevel('minimal');
-      await provider.setGeminiModel('gemini-3.7-flash');
+    test(
+      'setGeminiModel clamps an already-set thinking level the new model does not support',
+      () async {
+        await provider.setGeminiThinkingLevel('minimal');
+        await provider.setGeminiModel('gemini-3.7-flash');
 
-      expect(provider.geminiThinkingLevel, equals('low'));
-      expect(mockStorage.settings['geminiThinkingLevel'], equals('low'));
-    });
+        expect(provider.geminiThinkingLevel, equals('low'));
+        expect(mockStorage.settings['geminiThinkingLevel'], equals('low'));
+      },
+    );
 
     test('saveWeeklyInsights updates insights string and date', () async {
       await provider.saveWeeklyInsights('Great progress this week!');
 
       expect(provider.weeklyInsights, equals('Great progress this week!'));
       expect(provider.weeklyInsightsDate, isNotNull);
-      expect(mockStorage.settings['weeklyInsights'], equals('Great progress this week!'));
+      expect(
+        mockStorage.settings['weeklyInsights'],
+        equals('Great progress this week!'),
+      );
     });
 
     test(
