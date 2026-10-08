@@ -41,7 +41,8 @@ Rules:
   before the first version. Keep previous version entries so skipped upgrades
   can display all intervening notes. List newest versions first for readability.
 - Keep published entries intact apart from corrections. Do not fabricate old
-  release history: only 2.1.6 is authored initially.
+  release history. Versions 2.0.1 through 2.1.5 are reconstructed from published
+  releases and tagged changes; see [the source map](changelog-history-sources.md).
 
 CI validates the complete file. The release workflow requires a valid entry for
 its exact target version **before committing a version bump, tagging or deploying**.
