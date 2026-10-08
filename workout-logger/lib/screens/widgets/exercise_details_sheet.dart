@@ -10,6 +10,7 @@ import '../../theme/app_theme.dart';
 import '../../data/exercise_database.dart';
 import '../add_custom_exercise_screen.dart';
 import 'rf_widgets.dart';
+import 'exercise_muscle_map.dart';
 
 class ExerciseDetailsSheet extends StatelessWidget {
   const ExerciseDetailsSheet({
@@ -190,6 +191,11 @@ class ExerciseDetailsSheet extends StatelessWidget {
             ),
           ],
 
+          const SizedBox(height: AppSpacing.lg),
+
+          const RFSectionHeader('Muscle movement'),
+          const SizedBox(height: AppSpacing.sm),
+          ExerciseMuscleMap(exercise: exercise),
           const SizedBox(height: AppSpacing.lg),
 
           // Muscle activations
