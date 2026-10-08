@@ -12,6 +12,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 - Choose assisted or weighted load for pull-ups, chin-ups and dips; log push-ups with added weight.
 
 ### Fixes
+- Debug installs can display release history and detect upgrades using the underlying app version.
 - AI failures now show plain-language guidance instead of provider diagnostics, with a safe Retry action in the coach.
 - Preserve training programs, personal records, coach and optimizer chats, and attachments in backups; reject malformed backups before importing.
 - Preserve workout effort in SQLite and imported data.

@@ -104,6 +104,8 @@ class ReleaseService {
     String? previous,
     String current,
   ) async {
+    current = normalizeInstalledVersion(current);
+    previous = previous == null ? null : normalizeInstalledVersion(previous);
     final all = await changelog();
     return all
         .where(
@@ -116,6 +118,7 @@ class ReleaseService {
   }
 
   Future<AppRelease?> updateFor(String current, {bool refresh = false}) async {
+    current = normalizeInstalledVersion(current);
     final all = await releases(refresh: refresh);
     return all
         .where(

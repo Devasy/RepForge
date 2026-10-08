@@ -104,8 +104,11 @@ class AiCoachViewModel extends ChangeNotifier {
   }
 
   /// Delete a conversation.
-  Future<void> deleteConversation(String id) =>
-      _conversations.deleteConversation(id);
+  Future<void> deleteConversation(String id) async {
+    if (_loading) return;
+    if (id == activeConversationId) _clearFailure();
+    await _conversations.deleteConversation(id);
+  }
 
   static const int _maxImageBytes = 5 * 1024 * 1024; // 5 MB limit
   static const Set<String> _supportedImageMimes = {
@@ -215,27 +218,30 @@ class AiCoachViewModel extends ChangeNotifier {
     }
     notifyListeners();
 
-    // Persist the user message first; history is derived from the store.
-    if (!retrying) {
-      await _conversations.appendMessage(
-        ChatMessage(
-          role: 'user',
-          text: trimmed,
-          imageBytesBase64: imageBase64,
-          imageMimeType: requestMime,
-        ),
-      );
-    }
-
-    final systemPrompt = _buildSystemPrompt();
-    final history = retrying ? _retryHistory! : _buildHistory();
-    _retryText = trimmed;
-    _retryImage = imageBase64;
-    _retryMime = requestMime;
-    _retryHistory = history;
-
-    final buffer = StringBuffer();
+    bool requestStarted = false;
+    bool responseComplete = false;
     try {
+      // Persist the user message first; history is derived from the store.
+      if (!retrying) {
+        await _conversations.appendMessage(
+          ChatMessage(
+            role: 'user',
+            text: trimmed,
+            imageBytesBase64: imageBase64,
+            imageMimeType: requestMime,
+          ),
+        );
+      }
+
+      final systemPrompt = _buildSystemPrompt();
+      final history = retrying ? _retryHistory! : _buildHistory();
+      _retryText = trimmed;
+      _retryImage = imageBase64;
+      _retryMime = requestMime;
+      _retryHistory = history;
+
+      final buffer = StringBuffer();
+      requestStarted = true;
       await for (final chunk in _ai.streamCoachReply(
         userMessage: trimmed,
         systemPrompt: systemPrompt,
@@ -249,6 +255,7 @@ class AiCoachViewModel extends ChangeNotifier {
         _streamingText = buffer.toString();
         notifyListeners();
       }
+      responseComplete = true;
       final reply = buffer.toString().trim();
       if (reply.isNotEmpty) {
         await _conversations.appendMessage(
@@ -263,7 +270,15 @@ class AiCoachViewModel extends ChangeNotifier {
       }
       _clearFailure();
     } catch (e) {
-      failure = e is AiFailure ? e : AiFailure.from(e);
+      if (!requestStarted || responseComplete) {
+        _clearFailure();
+        failure = const AiFailure(
+          'Your chat could not be saved. Check available storage and reopen the chat before continuing.',
+          canRetry: false,
+        );
+      } else {
+        failure = e is AiFailure ? e : AiFailure.from(e);
+      }
       // Tool calls can change workouts or programs. Replaying them is unsafe.
       if (_streamingToolCalls.isNotEmpty) {
         _retryText = null;

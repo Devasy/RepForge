@@ -2,6 +2,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/services/ai/ai_failure.dart';
 
 void main() {
+  test('explicit HTTP status takes precedence over unrelated access text', () {
+    expect(
+      AiFailure.from('api key 403', statusCode: 503).message,
+      contains('busy'),
+    );
+    expect(
+      AiFailure.from('api key 401', statusCode: 429).message,
+      contains('usage limit'),
+    );
+    expect(AiFailure.from('Gemini API key not configured').canRetry, isFalse);
+    expect(AiFailure.from('model is unavailable').canRetry, isFalse);
+  });
+
   test('access errors require settings rather than retry', () {
     final failure = AiFailure.from(
       'internal provider diagnostics',

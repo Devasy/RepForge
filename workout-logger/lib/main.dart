@@ -122,23 +122,36 @@ void main() async {
 class WorkoutLoggerApp extends StatelessWidget {
   // Singleton instances created once at app startup
   // This ensures the same instances are used throughout the app lifecycle
-  static final IStorageService _storageService = _resolvedStorageService ?? StorageService();
+  static final IStorageService _storageService =
+      _resolvedStorageService ?? StorageService();
   static final IMLService _mlService = MLService();
-  static final IHealthConnectService _healthConnectService = HealthConnectService();
+  static final IHealthConnectService _healthConnectService =
+      HealthConnectService();
   static final ProgramManager _programManager = ProgramManager(_storageService);
-  static final SettingsProvider _settingsProvider = SettingsProvider(_storageService);
+  static final SettingsProvider _settingsProvider = SettingsProvider(
+    _storageService,
+  );
+
   /// HealthSyncManager reads the in-memory settings flag; storage is used
   /// only for a one-time exercise-name lookup used in the Health Connect notes.
-  static final HealthSyncManager _healthSyncManager =
-      HealthSyncManager(_healthConnectService, _settingsProvider, storage: _storageService);
+  static final HealthSyncManager _healthSyncManager = HealthSyncManager(
+    _healthConnectService,
+    _settingsProvider,
+    storage: _storageService,
+  );
   // HistoryManager is the single owner of session history + HC sync trigger.
-  static final HistoryManager _historyManager =
-      HistoryManager(_storageService, healthSyncManager: _healthSyncManager);
+  static final HistoryManager _historyManager = HistoryManager(
+    _storageService,
+    healthSyncManager: _healthSyncManager,
+  );
   static final PRManager _prManager = PRManager(_storageService);
   // ReadinessManager reads HC sleep/heart data; gated by the in-memory
   // readiness setting so refresh() is a no-op until the user opts in.
-  static final ReadinessManager _readinessManager =
-      ReadinessManager(_healthConnectService, _storageService, _settingsProvider);
+  static final ReadinessManager _readinessManager = ReadinessManager(
+    _healthConnectService,
+    _storageService,
+    _settingsProvider,
+  );
   // Serves arbitrary-range sleep/HR data to the detail screens.
   static final HealthHistoryManager _healthHistoryManager =
       HealthHistoryManager(_healthConnectService, _storageService);
@@ -148,15 +161,17 @@ class WorkoutLoggerApp extends StatelessWidget {
   // sqlQuery ? ... : null guard used for CoachToolService below.
   static final HealthDataSyncService? _healthDataSyncService =
       _storageService is SqliteStorageService
-          ? HealthDataSyncService(
-              healthConnectService: _healthConnectService,
-              storage: _storageService as SqliteStorageService,
-            )
-          : null;
-  static final GeminiAiService _geminiService =
-      GeminiAiService(storage: _storageService);
-  static final ConversationManager _conversationManager =
-      ConversationManager(_storageService);
+      ? HealthDataSyncService(
+          healthConnectService: _healthConnectService,
+          storage: _storageService as SqliteStorageService,
+        )
+      : null;
+  static final GeminiAiService _geminiService = GeminiAiService(
+    storage: _storageService,
+  );
+  static final ConversationManager _conversationManager = ConversationManager(
+    _storageService,
+  );
 
   const WorkoutLoggerApp({super.key});
 
@@ -176,12 +191,16 @@ class WorkoutLoggerApp extends StatelessWidget {
         // ProgramManager passed to tree directly
         ChangeNotifierProvider<ProgramManager>.value(value: _programManager),
         // SettingsProvider for user preferences (weight unit, increments)
-        ChangeNotifierProvider<SettingsProvider>.value(value: _settingsProvider),
+        ChangeNotifierProvider<SettingsProvider>.value(
+          value: _settingsProvider,
+        ),
         // HistoryManager is the single source of truth for session history.
         // Provided as ChangeNotifier so HistoryScreen rebuilds on sync badge changes.
         ChangeNotifierProvider<HistoryManager>.value(value: _historyManager),
         ChangeNotifierProvider<PRManager>.value(value: _prManager),
-        ChangeNotifierProvider<ReadinessManager>.value(value: _readinessManager),
+        ChangeNotifierProvider<ReadinessManager>.value(
+          value: _readinessManager,
+        ),
         Provider<HealthHistoryManager>.value(value: _healthHistoryManager),
         Provider<HealthDataSyncService?>.value(value: _healthDataSyncService),
         // GeminiAiService is the single AI backend instance. It's a ChangeNotifier
@@ -211,7 +230,9 @@ class WorkoutLoggerApp extends StatelessWidget {
             prManager: ctx.read<PRManager>(),
             healthHistory: ctx.read<HealthHistoryManager>(),
             sqlQuery: _storageService is SqliteStorageService
-                ? SqlQueryService((_storageService as SqliteStorageService).databasePath)
+                ? SqlQueryService(
+                    (_storageService as SqliteStorageService).databasePath,
+                  )
                 : null,
           ),
         ),
@@ -280,9 +301,15 @@ class _AppInitializerState extends State<AppInitializer> {
 
       final version = await settings.getCurrentVersion();
       final needsName = settings.userName == null || settings.userName!.isEmpty;
-      final versionChanged = !needsName &&
+      final versionChanged =
+          !needsName &&
           settings.lastSeenVersion != null &&
-          (compareAppVersions(version, settings.lastSeenVersion!) ?? 0) > 0;
+          (compareAppVersions(
+                    normalizeInstalledVersion(version),
+                    normalizeInstalledVersion(settings.lastSeenVersion!),
+                  ) ??
+                  0) >
+              0;
 
       // Fire-and-forget readiness refresh — must run after settings.init()
       // so the opt-in flag is loaded; never blocks or fails app init.
@@ -311,7 +338,11 @@ class _AppInitializerState extends State<AppInitializer> {
       if (!needsName && versionChanged) {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!mounted) return;
-          await showVersionUpdateSheet(context, version, previousVersion: settings.lastSeenVersion);
+          await showVersionUpdateSheet(
+            context,
+            version,
+            previousVersion: settings.lastSeenVersion,
+          );
           if (mounted) await settings.markVersionSeen(version);
         });
       }

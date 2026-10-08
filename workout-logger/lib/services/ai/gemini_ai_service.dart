@@ -176,6 +176,32 @@ String _errorMessage(int code, String body) {
   return 'request failed (HTTP $code).';
 }
 
+/// Combines adjacent user turns after an interrupted reply, as Gemini expects.
+@visibleForTesting
+List<Object?> buildGeminiChatContents(
+  List<Content> history,
+  List<Map<String, Object?>> userParts,
+) {
+  final contents = <Object?>[];
+  for (final turn in [
+    ...history.map((c) => c.toJson()),
+    {'role': 'user', 'parts': userParts},
+  ]) {
+    final previous = contents.isEmpty ? null : contents.last;
+    if (previous is Map &&
+        previous['role'] == 'user' &&
+        turn['role'] == 'user') {
+      previous['parts'] = [
+        ...(previous['parts'] as List),
+        ...(turn['parts'] as List),
+      ];
+    } else {
+      contents.add(Map<String, Object?>.from(turn));
+    }
+  }
+  return contents;
+}
+
 class GeminiAiService extends ChangeNotifier implements IAiService {
   // Optional storage so cumulative token usage survives restarts.
   final IStorageService? _storage;
@@ -552,10 +578,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
       });
 
       // Build the mutable contents list; grows with each tool-call round.
-      final contents = <Object?>[
-        ...history.map((c) => c.toJson()),
-        {'role': 'user', 'parts': userParts},
-      ];
+      final contents = buildGeminiChatContents(history, userParts);
 
       for (var round = 0; round < _maxToolRounds; round++) {
         final body = _makeBody(
@@ -673,7 +696,8 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
       final map = jsonDecode(raw) as Map<String, dynamic>;
       return fromJson(map);
-    } on FormatException {
+    } on FormatException catch (e, st) {
+      debugPrint('Gemini structured response parsing failed: $e\n$st');
       throw const AiFailure(
         'Gemini returned an incomplete response. Please try again.',
       );

@@ -101,6 +101,12 @@ class _FakeAiService implements IAiService {
   }) => throw UnimplementedError();
 }
 
+class _FailingConversationStorage extends MockStorageService {
+  @override
+  Future<void> saveConversation(Conversation conversation) async =>
+      throw Exception('disk full');
+}
+
 void main() {
   group('AiCoachViewModel', () {
     late MockStorageService storage;
@@ -147,6 +153,27 @@ void main() {
       final stored = await storage.getAllConversations();
       expect(stored, hasLength(1));
       expect(stored.first.messages, hasLength(2));
+    });
+
+    test(
+      'saving failure clears loading and does not enable unsafe retry',
+      () async {
+        storage = _FailingConversationStorage();
+        final vm = await buildVm(_FakeAiService());
+        await vm.sendMessage('hello');
+        expect(vm.isLoading, isFalse);
+        expect(vm.canRetry, isFalse);
+        expect(vm.failure!.message, contains('could not be saved'));
+      },
+    );
+
+    test('deleting active failed chat clears retry state', () async {
+      final vm = await buildVm(_ThrowingAiService());
+      await vm.sendMessage('hello');
+      await vm.deleteConversation(vm.activeConversationId!);
+      expect(vm.failure, isNull);
+      expect(vm.canRetry, isFalse);
+      expect(vm.messages, isEmpty);
     });
 
     test('blank or whitespace messages are ignored', () async {

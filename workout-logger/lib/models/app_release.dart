@@ -1,3 +1,8 @@
+/// Android debug installs share release notes with their underlying version.
+/// Keep release-tag validation strict; normalize only installed/stored versions.
+String normalizeInstalledVersion(String version) =>
+    version.replaceFirst(RegExp(r'-debug(?=\+\d+$|$)'), '');
+
 /// Release tags use vMAJOR.MINOR.PATCH. Preview tags are deliberately excluded.
 int? compareAppVersions(String a, String b) {
   List<int>? parse(String value) {

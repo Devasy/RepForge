@@ -8,15 +8,20 @@ class AiFailure {
     final text = error.toString().toLowerCase();
     if (statusCode == 403 ||
         statusCode == 401 ||
-        RegExp(r'\b(401|403)\b').hasMatch(text) ||
-        text.contains('permission_denied') ||
-        text.contains('api key')) {
+        (statusCode == null &&
+            (text.contains('permission_denied') ||
+                text.contains('unauthenticated') ||
+                text.contains('api key not valid') ||
+                text.contains('api key not configured')))) {
       return const AiFailure(
         'Gemini cannot access your account. Check your API key and model access in Settings.',
         canRetry: false,
       );
     }
-    if (statusCode == 404) {
+    if (statusCode == 404 ||
+        (statusCode == null &&
+            (text.contains('model not found') ||
+                text.contains('model is unavailable')))) {
       return const AiFailure(
         'This Gemini model is no longer available. Choose another model in Settings.',
         canRetry: false,
@@ -31,8 +36,7 @@ class AiFailure {
     }
     if (statusCode == 503 ||
         text.contains('high demand') ||
-        text.contains('overloaded') ||
-        text.contains('unavailable')) {
+        text.contains('overloaded')) {
       return const AiFailure(
         'Gemini is busy right now. Please try again in a moment.',
       );

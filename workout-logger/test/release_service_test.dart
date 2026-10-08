@@ -5,6 +5,41 @@ import 'package:http/testing.dart';
 import 'package:repforge/services/release_service.dart';
 
 void main() {
+  test(
+    'debug installed versions can show release history and published updates',
+    () async {
+      final service = ReleaseService(
+        client: MockClient(
+          (request) async => request.url.host == 'raw.githubusercontent.com'
+              ? http.Response(
+                  '## [2.1.6]\n### Fixes\n- Fixed\n## [2.1.5]\n### Fixes\n- Older',
+                  200,
+                )
+              : http.Response(
+                  jsonEncode([
+                    {
+                      'tag_name': 'v2.1.7',
+                      'html_url': 'https://github.com/release',
+                    },
+                  ]),
+                  200,
+                ),
+        ),
+      );
+      expect(
+        (await service.changesSince(
+          '2.1.5-debug',
+          '2.1.6-debug',
+        )).single.version,
+        '2.1.6',
+      );
+      expect((await service.changesSince(null, '2.1.6-debug')), hasLength(2));
+      expect((await service.updateFor('2.1.6-debug'))!.version, '2.1.7');
+      expect(compareAppVersions('v2.1.6-debug', '2.1.5'), isNull);
+      expect(normalizeInstalledVersion('2.1.6-debug+42'), '2.1.6+42');
+    },
+  );
+
   test('malformed release rows do not hide valid published updates', () async {
     final service = ReleaseService(
       client: MockClient(
