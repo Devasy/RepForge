@@ -1,25 +1,26 @@
 # Dynamic release notes and model discovery
 
-Release notes use GitHub Releases as their public source. The release workflow
-publishes authored `docs/releases/<version>.md` when present; otherwise it groups
-merged PRs into features, fixes, changes, removed items and known limitations.
+Root `CHANGELOG.md` is the single authored source. See [the format contract](../changelog-format.md).
 
 ```mermaid
 flowchart LR
-  A[Authored notes or merged PRs] --> B[Release workflow]
-  B --> C[GitHub Release body]
-  C --> D[ReleaseService: paginate and cache]
-  D --> E[Previous version < release <= installed version]
+  A[Developer writes CHANGELOG.md] --> B[CI validates format]
+  B --> C[Commit to main]
+  C --> D[App fetches raw CHANGELOG.md]
+  D --> E[Parse and filter upgrade interval]
   E --> F[Upgrade dialog]
-  D --> G[Latest release > installed version]
-  G --> H[Profile update notice]
+  C --> G[Release workflow extracts exact version]
+  G --> H[GitHub Release notes and assets]
+  H --> I[App update badge]
 ```
 
-The app compares stable numeric versions with the previously seen version saved
-in settings. Skipped upgrades aggregate all releases in that interval. Draft and
-prerelease entries are ignored. ReleaseService shares in-flight requests and a
-six-hour in-memory cache. Failures show a retry action; this is not a persistent
-offline cache. Notices link to the release and do not install updates.
+The app compares numeric versions against the previously seen version saved in
+settings. Skipped upgrades aggregate every authored entry in that interval.
+Unreleased notes are ignored. Changelog requests share in-flight work and a
+six-hour in-memory cache; failures show Retry. Published-release discovery has
+its own cache and remains separate, preventing a drafted changelog version from
+triggering an update badge before binaries are released. Missing/malformed
+changelog entries fail release validation before version commits, tags or deployment.
 
 ```mermaid
 flowchart LR

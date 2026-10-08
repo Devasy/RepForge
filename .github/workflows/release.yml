@@ -23,7 +23,6 @@ jobs:
 
     permissions:
       contents: write      # Required to create releases and push commits
-      pull-requests: read  # Required to read merged PRs for release notes
 
     steps:
       - name: Checkout repository
@@ -98,6 +97,9 @@ jobs:
           echo "value=$VERSION" >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
 
+      - name: Validate and extract CHANGELOG.md release notes
+        run: python3 workout-logger/scripts/build_release_notes.py "${{ steps.version.outputs.value }}" > release-notes.md
+
       - name: Configure Git
         if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
         run: |
@@ -124,39 +126,6 @@ jobs:
         run: |
           git tag "v${{ steps.version.outputs.value }}"
           git push origin "v${{ steps.version.outputs.value }}"
-
-      - name: Get merged PRs for release notes
-        if: steps.commit_version.outputs.committed == 'true' || startsWith(github.ref, 'refs/tags/')
-        id: merged_prs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          NEW_TAG="v${{ steps.version.outputs.value }}"
-          PREV_TAG=$(git tag --sort=-version:refname | grep '^v' | grep -v "^${NEW_TAG}$" | head -1)
-
-          if [ -n "$PREV_TAG" ]; then
-            SINCE_DATE=$(git log -1 --format=%aI "$PREV_TAG")
-            PR_LIST=$(gh pr list \
-              --state merged \
-              --base main \
-              --limit 50 \
-              --search "merged:>=${SINCE_DATE}" \
-              --json number,title,labels)
-          else
-            PR_LIST=$(gh pr list \
-              --state merged \
-              --base main \
-              --limit 10 \
-              --json number,title,labels)
-          fi
-
-          PR_LIST=$(python workout-logger/scripts/build_release_notes.py "${{ steps.version.outputs.value }}" <<< "$PR_LIST")
-
-          {
-            echo "list<<EOF"
-            echo "$PR_LIST"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
 
       - name: Decode release keystore
         id: decode_keystore
@@ -253,19 +222,7 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.value }}
           name: RepForge v${{ steps.version.outputs.value }}
-          body: |
-            ## RepForge v${{ steps.version.outputs.value }}
-
-            ### 📱 Download
-            Download the APK file below to install on your Android device.
-
-            ${{ steps.merged_prs.outputs.list }}
-
-            ### 📊 Build Information
-            - **Version**: ${{ steps.version.outputs.value }}
-            - **APK Base Version Code**: ${{ steps.version.outputs.build_number }}
-            - **Play AAB Version Code**: ${{ github.run_number }}
-            - **Commit**: ${{ steps.commit_version.outputs.commit || github.sha }}
+          body_path: release-notes.md
           files: |
             workout-logger/build/app/outputs/flutter-apk/repforge-v${{ steps.version.outputs.value }}-*.apk
             workout-logger/build/app/outputs/bundle/release/app-release.aab

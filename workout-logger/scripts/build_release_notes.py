@@ -1,32 +1,79 @@
-"""Build user-facing release notes from labeled PRs or authored version notes."""
-import json
+"""Validate the CHANGELOG.md protocol and extract a release's authored notes."""
+import argparse
 import re
 import sys
 from pathlib import Path
 
+CATEGORIES = {'Features added', 'Fixes', 'Changes', 'Removed', 'Known limitations'}
+HEADING = re.compile(r'## \[(Unreleased|[0-9]+\.[0-9]+\.[0-9]+)\]')
 
-def build(prs, version):
-    authored = Path('docs/releases') / f'{version}.md'
-    if authored.is_file():
-        return authored.read_text().strip()
-    groups = {name: [] for name in ['Features added', 'Fixes', 'Changes', 'Removed', 'Known limitations']}
-    for pr in prs:
-        title = pr['title']
-        labels = {label['name'].lower() for label in pr.get('labels', [])}
-        prefix = title.lower()
-        if labels & {'known limitation', 'known-limitations'}:
-            category = 'Known limitations'
-        elif labels & {'removed', 'breaking-change'} or prefix.startswith(('remove:', 'removed:')):
-            category = 'Removed'
-        elif labels & {'bug', 'fix'} or re.match(r'^fix(?:\([^)]*\))?:', prefix):
-            category = 'Fixes'
-        elif labels & {'enhancement', 'feature'} or re.match(r'^feat(?:\([^)]*\))?:', prefix):
-            category = 'Features added'
+
+def parse_changelog(markdown):
+    entries = {}
+    version = None
+    category = None
+    sections = {}
+
+    def finish():
+        if version is None or version == 'Unreleased':
+            return
+        if not sections or any(not items for items in sections.values()):
+            raise ValueError(f'Changelog {version} must contain nonempty categories')
+        entries[version] = '\n\n'.join(
+            f'### {name}\n' + '\n'.join(items) for name, items in sections.items()
+        )
+
+    seen = set()
+    for line in markdown.splitlines():
+        if not line.strip():
+            continue
+        match = HEADING.fullmatch(line)
+        if match:
+            finish()
+            version = match[1]
+            if version in seen:
+                raise ValueError(f'Duplicate changelog version: {version}')
+            seen.add(version)
+            category = None
+            sections = {}
+        elif line.startswith('## '):
+            raise ValueError(f'Invalid changelog version heading: {line}')
+        elif version is None:
+            continue
+        elif line.startswith('### '):
+            category = line[4:]
+            if category not in CATEGORIES or category in sections:
+                raise ValueError(f'Invalid or duplicate changelog category: {category}')
+            sections[category] = []
+        elif line.startswith('- ') and line[2:].strip() and category is not None:
+            sections[category].append(line)
         else:
-            category = 'Changes'
-        groups[category].append(f"- {title} (#{pr['number']})")
-    return '\n\n'.join(f"### {category}\n" + '\n'.join(items) for category, items in groups.items() if items) or 'No user-facing release notes were published.'
+            raise ValueError(f'Expected a category or single-line bullet: {line}')
+    finish()
+    if not seen:
+        raise ValueError('No changelog entries found')
+    return entries
+
+
+def build(version, path=Path('CHANGELOG.md')):
+    entries = parse_changelog(path.read_text(encoding='utf-8'))
+    if version not in entries:
+        raise ValueError(f'CHANGELOG.md has no entry for {version}; author release notes before releasing')
+    return entries[version]
 
 
 if __name__ == '__main__':
-    print(build(json.load(sys.stdin), sys.argv[1]))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('version', nargs='?')
+    parser.add_argument('--check', action='store_true')
+    args = parser.parse_args()
+    try:
+        if args.check:
+            parse_changelog(Path('CHANGELOG.md').read_text(encoding='utf-8'))
+        elif args.version:
+            print(build(args.version))
+        else:
+            parser.error('provide a version or --check')
+    except (ValueError, OSError) as error:
+        print(f'Error: {error}', file=sys.stderr)
+        sys.exit(1)

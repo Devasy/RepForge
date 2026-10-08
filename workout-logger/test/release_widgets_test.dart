@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -14,17 +13,10 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final client = MockClient(
         (_) async => http.Response(
-          jsonEncode([
+          [
             for (final version in ['2.1.8', '2.1.7', '2.1.6', '2.1.5'])
-              {
-                'tag_name': 'v$version',
-                'html_url': 'https://github.com/Devasy/RepForge/releases',
-                'body': List.filled(
-                  20,
-                  'Features added, fixes and known limitations for $version.',
-                ).join('\n'),
-              },
-          ]),
+              '## [$version]\n### Features added\n${List.filled(20, '- Features, fixes and limitations for $version.').join('\n')}',
+          ].join('\n'),
           200,
         ),
       );

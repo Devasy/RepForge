@@ -38,7 +38,7 @@ class _ReleaseNotesState extends State<ReleaseNotes> {
         return Column(
           children: [
             const Text(
-              'Release notes could not be loaded. Connect to the internet and try again.',
+              'Release notes are temporarily unavailable. Try again later.',
             ),
             TextButton(
               onPressed: () => setState(() {
@@ -55,7 +55,7 @@ class _ReleaseNotesState extends State<ReleaseNotes> {
       final notes = snapshot.data ?? [];
       if (notes.isEmpty) {
         return const Text(
-          'No published release notes are available for this upgrade yet.',
+          'No changelog entries are available for this upgrade yet.',
         );
       }
       return Column(

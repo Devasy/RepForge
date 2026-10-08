@@ -1,34 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'changelog.dart';
 
-/// Release tags use vMAJOR.MINOR.PATCH. Preview tags are deliberately excluded.
-int? compareAppVersions(String a, String b) {
-  List<int>? parse(String value) {
-    final match = RegExp(
-      r'^v?(\d+)\.(\d+)\.(\d+)(?:\+\d+)?$',
-    ).firstMatch(value);
-    return match == null
-        ? null
-        : [for (var i = 1; i <= 3; i++) int.parse(match.group(i)!)];
-  }
+import '../models/app_release.dart';
+export '../models/app_release.dart';
 
-  final left = parse(a), right = parse(b);
-  if (left == null || right == null) return null;
-  for (var i = 0; i < 3; i++) {
-    final result = left[i].compareTo(right[i]);
-    if (result != 0) return result;
-  }
-  return 0;
-}
-
-class AppRelease {
-  const AppRelease(this.version, this.notes, this.url);
-  final String version;
-  final String notes;
-  final String url;
-}
-
-/// Shared cache keeps profile visits from repeatedly polling GitHub.
+/// Notes come from CHANGELOG.md; update availability uses published releases.
+/// Each source has its own in-flight request and six-hour memory cache.
 class ReleaseService {
   ReleaseService({http.Client? client}) : _client = client ?? http.Client();
   static final shared = ReleaseService();
@@ -36,6 +14,39 @@ class ReleaseService {
   List<AppRelease>? _cache;
   DateTime? _checkedAt;
   Future<List<AppRelease>>? _pending;
+  List<AppRelease>? _changelogCache;
+  DateTime? _changelogCheckedAt;
+  Future<List<AppRelease>>? _changelogPending;
+
+  Future<List<AppRelease>> changelog({bool refresh = false}) {
+    if (!refresh &&
+        _changelogCache != null &&
+        DateTime.now().difference(_changelogCheckedAt!) <
+            const Duration(hours: 6)) {
+      return Future.value(_changelogCache!);
+    }
+    return _changelogPending ??= _fetchChangelog().whenComplete(
+      () => _changelogPending = null,
+    );
+  }
+
+  Future<List<AppRelease>> _fetchChangelog() async {
+    final response = await _client
+        .get(
+          Uri.https(
+            'raw.githubusercontent.com',
+            '/Devasy/RepForge/main/CHANGELOG.md',
+          ),
+        )
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) {
+      throw Exception('Changelog is unavailable. Try again later.');
+    }
+    final parsed = parseChangelog(utf8.decode(response.bodyBytes));
+    _changelogCache = parsed;
+    _changelogCheckedAt = DateTime.now();
+    return parsed;
+  }
 
   Future<List<AppRelease>> releases({bool refresh = false}) {
     if (!refresh &&
@@ -90,7 +101,7 @@ class ReleaseService {
     String? previous,
     String current,
   ) async {
-    final all = await releases();
+    final all = await changelog();
     return all
         .where(
           (release) =>

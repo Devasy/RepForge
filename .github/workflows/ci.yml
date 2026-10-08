@@ -18,6 +18,14 @@ permissions:
   contents: read
 
 jobs:
+  changelog:
+    name: Changelog format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 workout-logger/scripts/build_release_notes.py --check
+      - run: python3 -m unittest discover -s workout-logger/scripts -p 'test_*.py'
+
   security_scan:
     name: Security & Secret Scan
     runs-on: ubuntu-latest
