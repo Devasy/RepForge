@@ -31,7 +31,10 @@ class _ExerciseProgressViewState extends State<ExerciseProgressView> {
   @override
   Widget build(BuildContext context) {
     final performed = context.select<WorkoutProvider, Set<String>>(
-      (p) => {for (final s in p.sessions) for (final e in s.exercises) e.exerciseId},
+      (p) => {
+        for (final s in p.sessions)
+          for (final e in s.exercises) e.exerciseId,
+      },
     );
     final provider = context.read<WorkoutProvider>();
 
@@ -56,6 +59,14 @@ class _ExerciseProgressViewState extends State<ExerciseProgressView> {
             _chartMode = _ChartMode.volume;
           }),
         ),
+        if (effectiveId != null &&
+            provider.hasMixedLoadConventions(effectiveId))
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text(
+              'Load tracking changed. Trends show the latest compatible convention; earlier sets remain in History.',
+            ),
+          ),
         if (effectiveId != null)
           Expanded(
             child: _ExerciseStats(
@@ -70,7 +81,8 @@ class _ExerciseProgressViewState extends State<ExerciseProgressView> {
             child: Center(
               child: Text(
                 'Select an exercise above',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textMuted,
                   fontSize: 14,
                 ),
@@ -106,8 +118,7 @@ class _ExerciseDropdown extends StatelessWidget {
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       builder: (_) => _ExercisePickerSheet(
         ids: sorted,
@@ -161,9 +172,7 @@ class _ExerciseDropdown extends StatelessWidget {
                 child: Icon(
                   Icons.fitness_center_rounded,
                   size: 15,
-                  color: hasSelection
-                      ? AppColors.primary
-                      : AppColors.textFaint,
+                  color: hasSelection ? AppColors.primary : AppColors.textFaint,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -172,7 +181,8 @@ class _ExerciseDropdown extends StatelessWidget {
                   hasSelection
                       ? getExerciseName(selected!)
                       : 'Pick an exercise…',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: hasSelection
                         ? AppColors.textPrimary
                         : AppColors.textMuted,
@@ -186,9 +196,7 @@ class _ExerciseDropdown extends StatelessWidget {
               Icon(
                 Icons.keyboard_arrow_down_rounded,
                 size: 20,
-                color: hasSelection
-                    ? AppColors.primary
-                    : AppColors.textFaint,
+                color: hasSelection ? AppColors.primary : AppColors.textFaint,
               ),
             ],
           ),
@@ -231,9 +239,10 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
       _filtered = q.isEmpty
           ? widget.ids
           : widget.ids
-              .where((id) =>
-                  widget.getExerciseName(id).toLowerCase().contains(q))
-              .toList();
+                .where(
+                  (id) => widget.getExerciseName(id).toLowerCase().contains(q),
+                )
+                .toList();
     });
   }
 
@@ -269,12 +278,17 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
           // Title + count
           Padding(
             padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 0),
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              0,
+            ),
             child: Row(
               children: [
                 Text(
                   'Select Exercise',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textPrimary,
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -283,7 +297,8 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                 const Spacer(),
                 Text(
                   '${widget.ids.length} logged',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textFaint,
                     fontSize: 12,
                   ),
@@ -294,7 +309,11 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
           // Search field
           Padding(
             padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.sm),
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.sm,
+            ),
             child: Container(
               decoration: BoxDecoration(
                 color: AppColors.card,
@@ -304,23 +323,31 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
               child: TextField(
                 controller: _search,
                 autofocus: true,
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textPrimary,
                   fontSize: 14,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Search…',
-                  hintStyle: TextStyle(fontFamily: 'Geist', 
+                  hintStyle: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textFaint,
                     fontSize: 14,
                   ),
-                  prefixIcon: const Icon(Icons.search_rounded,
-                      color: AppColors.textFaint, size: 18),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    color: AppColors.textFaint,
+                    size: 18,
+                  ),
                   suffixIcon: _search.text.isNotEmpty
                       ? GestureDetector(
                           onTap: () => _search.clear(),
-                          child: const Icon(Icons.close_rounded,
-                              color: AppColors.textFaint, size: 16),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: AppColors.textFaint,
+                            size: 16,
+                          ),
                         )
                       : null,
                   border: InputBorder.none,
@@ -334,17 +361,19 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
           ),
           // Divider
           Divider(
-              height: 1,
-              color: AppColors.glassBorder,
-              indent: AppSpacing.lg,
-              endIndent: AppSpacing.lg),
+            height: 1,
+            color: AppColors.glassBorder,
+            indent: AppSpacing.lg,
+            endIndent: AppSpacing.lg,
+          ),
           // List
           Expanded(
             child: _filtered.isEmpty
                 ? Center(
                     child: Text(
                       'No exercises match',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textMuted,
                         fontSize: 13,
                       ),
@@ -381,7 +410,8 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                               Expanded(
                                 child: Text(
                                   name,
-                                  style: TextStyle(fontFamily: 'Geist', 
+                                  style: TextStyle(
+                                    fontFamily: 'Geist',
                                     color: isSelected
                                         ? AppColors.primary
                                         : AppColors.textSoft,
@@ -393,8 +423,11 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                                 ),
                               ),
                               if (isSelected)
-                                const Icon(Icons.check_rounded,
-                                    color: AppColors.primary, size: 18),
+                                const Icon(
+                                  Icons.check_rounded,
+                                  color: AppColors.primary,
+                                  size: 18,
+                                ),
                             ],
                           ),
                         ),
@@ -426,7 +459,9 @@ class _ExerciseStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final exercise = provider.allExercises.where((e) => e.id == exerciseId).firstOrNull;
+    final exercise = provider.allExercises
+        .where((e) => e.id == exerciseId)
+        .firstOrNull;
     final isTimeBased = exercise?.exerciseType == ExerciseType.timeBased;
     final setProgression = provider.getSetProgression(exerciseId);
     final progression = isTimeBased
@@ -438,7 +473,7 @@ class _ExerciseStats extends StatelessWidget {
                   0.0,
                   (sum, s) => sum + (s.timeTaken ?? 0).toDouble(),
                 ),
-              )
+              ),
           ]
         : provider.getVolumeProgression(exerciseId);
     final growthModel = provider.getGrowthModel(exerciseId);
@@ -525,14 +560,16 @@ class _BestHoldCard extends StatelessWidget {
               children: [
                 Text(
                   'Best Hold',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
                 Text(
                   formatHoldDuration(seconds),
-                  style: TextStyle(fontFamily: 'GeistMono', 
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
                     color: AppColors.cyan,
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
@@ -547,14 +584,16 @@ class _BestHoldCard extends StatelessWidget {
             children: [
               Text(
                 'Personal Record',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textMuted,
                   fontSize: 10,
                 ),
               ),
               Text(
                 'Max duration hold',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textFaint,
                   fontSize: 10,
                 ),
@@ -600,14 +639,16 @@ class _OneRMCard extends StatelessWidget {
               children: [
                 Text(
                   'Estimated 1RM',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
                 Text(
                   settings.formatWeight(oneRM),
-                  style: TextStyle(fontFamily: 'GeistMono', 
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
                     color: AppColors.primary,
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
@@ -622,14 +663,16 @@ class _OneRMCard extends StatelessWidget {
             children: [
               Text(
                 'Epley formula',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textMuted,
                   fontSize: 10,
                 ),
               ),
               Text(
                 'Best across sets',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textMuted,
                   fontSize: 10,
                 ),
@@ -660,9 +703,7 @@ class _GrowthCard extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            isGrowing
-                ? Icons.trending_up_rounded
-                : Icons.trending_flat_rounded,
+            isGrowing ? Icons.trending_up_rounded : Icons.trending_flat_rounded,
             color: color,
             size: 38,
           ),
@@ -673,7 +714,8 @@ class _GrowthCard extends StatelessWidget {
               children: [
                 Text(
                   isGrowing ? 'Growing!' : 'Plateau',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: color,
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -683,7 +725,8 @@ class _GrowthCard extends StatelessWidget {
                   isGrowing
                       ? '+${settings.toDisplay(model.slope.abs() * 7).toStringAsFixed(1)} ${settings.unitLabel}/week'
                       : 'Volume trend is flat',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textSoft,
                     fontSize: 12,
                   ),
@@ -696,7 +739,8 @@ class _GrowthCard extends StatelessWidget {
             children: [
               Text(
                 'R² ${(model.r2 * 100).toStringAsFixed(0)}%',
-                style: TextStyle(fontFamily: 'GeistMono', 
+                style: TextStyle(
+                  fontFamily: 'GeistMono',
                   color: color,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -704,7 +748,8 @@ class _GrowthCard extends StatelessWidget {
               ),
               Text(
                 'model fit',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textMuted,
                   fontSize: 10,
                 ),
@@ -752,7 +797,8 @@ class _ChartSection extends StatelessWidget {
                   chartMode == _ChartMode.volume
                       ? (isTimeBased ? 'Hold Duration' : 'Volume Progression')
                       : 'Set Progression',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -811,7 +857,10 @@ class _ChartModeToggle extends StatelessWidget {
               onTap: () => onChanged(mode),
               child: AnimatedContainer(
                 duration: AppDurations.fast,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: mode == value ? AppColors.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(7),
@@ -820,7 +869,8 @@ class _ChartModeToggle extends StatelessWidget {
                   mode == _ChartMode.volume
                       ? (isTimeBased ? 'Hold' : 'Volume')
                       : 'Sets',
-                  style: TextStyle(fontFamily: 'GeistMono', 
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: mode == value ? Colors.white : AppColors.textMuted,
@@ -853,8 +903,7 @@ class _VolumeChart extends StatelessWidget {
 
     // Chart x is the session index, but the model is trained on days since
     // the first session — map each index to its day offset before predicting.
-    double dayAt(int i) => progression[i]
-        .date
+    double dayAt(int i) => progression[i].date
         .difference(progression.first.date)
         .inDays
         .toDouble();
@@ -872,15 +921,19 @@ class _VolumeChart extends StatelessWidget {
     final ci95 = settings.toDisplay(rse * 1.96);
     final bestVol = n > 0
         ? (isTimeBased
-            ? progression.map((e) => e.volume).reduce(max)
-            : settings.toDisplay(progression.map((e) => e.volume).reduce(max)))
+              ? progression.map((e) => e.volume).reduce(max)
+              : settings.toDisplay(
+                  progression.map((e) => e.volume).reduce(max),
+                ))
         : 0.0;
 
     final actualSpots = List<FlSpot>.generate(
       n,
       (i) => FlSpot(
         i.toDouble(),
-        isTimeBased ? progression[i].volume : settings.toDisplay(progression[i].volume),
+        isTimeBased
+            ? progression[i].volume
+            : settings.toDisplay(progression[i].volume),
       ),
     );
     final trendSpots = (!isTimeBased && growthModel != null && n >= 2)
@@ -888,9 +941,15 @@ class _VolumeChart extends StatelessWidget {
             n + 2,
             (i) => FlSpot(
               i.toDouble(),
-              settings.toDisplay(growthModel!
-                  .predict(i < n ? dayAt(i) : dayAt(n - 1) + avgGapDays * (i - n + 1))
-                  .clamp(0.0, double.infinity)),
+              settings.toDisplay(
+                growthModel!
+                    .predict(
+                      i < n
+                          ? dayAt(i)
+                          : dayAt(n - 1) + avgGapDays * (i - n + 1),
+                    )
+                    .clamp(0.0, double.infinity),
+              ),
             ),
           )
         : <FlSpot>[];
@@ -973,8 +1032,7 @@ class _VolumeChart extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.all(AppSpacing.lg),
         child: Center(
-          child: Text('No data',
-              style: TextStyle(color: AppColors.textMuted)),
+          child: Text('No data', style: TextStyle(color: AppColors.textMuted)),
         ),
       );
     }
@@ -999,15 +1057,16 @@ class _VolumeChart extends StatelessWidget {
                 final volStr = isTimeBased
                     ? formatHoldDuration(v.round())
                     : (v >= 1000
-                        ? '${(v / 1000).toStringAsFixed(1)}k'
-                        : v.toStringAsFixed(0));
+                          ? '${(v / 1000).toStringAsFixed(1)}k'
+                          : v.toStringAsFixed(0));
                 final i = spot.x.toInt();
                 final dateStr = (i >= 0 && i < n)
                     ? DateFormat('MMM d').format(progression[i].date)
                     : '';
                 return LineTooltipItem(
                   isTimeBased ? volStr : '$volStr ${settings.unitLabel}',
-                  TextStyle(fontFamily: 'GeistMono', 
+                  TextStyle(
+                    fontFamily: 'GeistMono',
                     color: AppColors.secondary,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1015,7 +1074,8 @@ class _VolumeChart extends StatelessWidget {
                   children: [
                     TextSpan(
                       text: '\n$dateStr',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textMuted,
                         fontSize: 10,
                         fontWeight: FontWeight.normal,
@@ -1027,12 +1087,15 @@ class _VolumeChart extends StatelessWidget {
             ),
           ),
           titlesData: FlTitlesData(
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            bottomTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            bottomTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
@@ -1041,11 +1104,12 @@ class _VolumeChart extends StatelessWidget {
                   final label = isTimeBased
                       ? '${v.toStringAsFixed(0)}s'
                       : (v >= 1000
-                          ? '${(v / 1000).toStringAsFixed(1)}k'
-                          : v.toStringAsFixed(0));
+                            ? '${(v / 1000).toStringAsFixed(1)}k'
+                            : v.toStringAsFixed(0));
                   return Text(
                     label,
-                    style: TextStyle(fontFamily: 'GeistMono', 
+                    style: TextStyle(
+                      fontFamily: 'GeistMono',
                       color: AppColors.textMuted,
                       fontSize: 9,
                     ),
@@ -1068,7 +1132,8 @@ class _VolumeChart extends StatelessWidget {
                     direction: LabelDirection.horizontal,
                     alignment: Alignment.topRight,
                     padding: const EdgeInsets.only(right: 4, bottom: 2),
-                    style: TextStyle(fontFamily: 'GeistMono', 
+                    style: TextStyle(
+                      fontFamily: 'GeistMono',
                       color: AppColors.warning,
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
@@ -1141,17 +1206,18 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
   }
 
   List<({DateTime date, List<WorkoutSet> sets})> _buildSessions(
-      SettingsProvider settings, int maxFit) {
+    SettingsProvider settings,
+    int maxFit,
+  ) {
     final raw = widget.setProgression;
 
     if (_mode == _SetViewMode.recent) {
       final slice = raw.length > maxFit
           ? raw.sublist(raw.length - maxFit)
           : raw;
-      return slice.map((e) => (
-            date: e.date,
-            sets: e.sets.take(_maxSets).toList(),
-          )).toList();
+      return slice
+          .map((e) => (date: e.date, sets: e.sets.take(_maxSets).toList()))
+          .toList();
     }
 
     // Weekly aggregation — one synthetic set (avg weight, avg reps/hold) per week.
@@ -1167,7 +1233,14 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
     return visible.map((e) {
       final sets = e.value;
       final avgW = sets.fold(0.0, (s, x) => s + x.weight) / sets.length;
-      final avgMetric = (sets.fold(0.0, (s, x) => s + (widget.isTimeBased ? (x.timeTaken ?? 0) : x.reps)) / sets.length).round();
+      final avgMetric =
+          (sets.fold(
+                    0.0,
+                    (s, x) =>
+                        s + (widget.isTimeBased ? (x.timeTaken ?? 0) : x.reps),
+                  ) /
+                  sets.length)
+              .round();
       return (
         date: e.key,
         sets: [
@@ -1195,37 +1268,46 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
           for (final set in sessions[si].sets) {
             final w = settings.toDisplay(set.weight);
             if (_showWeight) {
-              rods.add(BarChartRodData(
-                toY: w,
-                width: 6,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(3)),
-                gradient: LinearGradient(
-                  colors: [_wc, _wc.withValues(alpha: 0.55)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+              rods.add(
+                BarChartRodData(
+                  toY: w,
+                  width: 6,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(3),
+                  ),
+                  gradient: LinearGradient(
+                    colors: [_wc, _wc.withValues(alpha: 0.55)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
                 ),
-              ));
+              );
             }
             if (_showReps) {
-              final metricVal = widget.isTimeBased ? (set.timeTaken ?? 0) : set.reps;
-              rods.add(BarChartRodData(
-                toY: metricVal * scale,
-                width: 6,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(3)),
-                gradient: LinearGradient(
-                  colors: [_rc, _rc.withValues(alpha: 0.50)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+              final metricVal = widget.isTimeBased
+                  ? (set.timeTaken ?? 0)
+                  : set.reps;
+              rods.add(
+                BarChartRodData(
+                  toY: metricVal * scale,
+                  width: 6,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(3),
+                  ),
+                  gradient: LinearGradient(
+                    colors: [_rc, _rc.withValues(alpha: 0.50)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
                 ),
-              ));
+              );
             }
           }
           // Always emit at least an invisible rod so x-axis label stays.
           if (rods.isEmpty) {
-            rods.add(BarChartRodData(
-                toY: 0, width: 0, color: Colors.transparent));
+            rods.add(
+              BarChartRodData(toY: 0, width: 0, color: Colors.transparent),
+            );
           }
           return BarChartGroupData(x: si, barRods: rods, barsSpace: 2);
         }(),
@@ -1262,25 +1344,31 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
     final dateLabel = _mode == _SetViewMode.weekly
         ? 'wk of ${DateFormat('MMM d').format(session.date)}'
         : DateFormat('MMM d').format(session.date);
-    final setLabel =
-        _mode == _SetViewMode.weekly ? 'Avg' : 'Set ${setIndex + 1}';
+    final setLabel = _mode == _SetViewMode.weekly
+        ? 'Avg'
+        : 'Set ${setIndex + 1}';
 
     if (isWeight) {
       final w = settings.toDisplay(set.weight);
-      final wStr =
-          w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1);
+      final wStr = w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1);
       return BarTooltipItem(
         '$setLabel  $wStr ${settings.unitLabel}',
-        TextStyle(fontFamily: 'GeistMono', 
-            color: _wc, fontSize: 12, fontWeight: FontWeight.w700),
+        TextStyle(
+          fontFamily: 'GeistMono',
+          color: _wc,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
         children: [
           TextSpan(
             text: '\n$dateLabel',
-            style: TextStyle(fontFamily: 'Geist', 
-                color: AppColors.textFaint,
-                fontSize: 10,
-                fontWeight: FontWeight.normal),
-          )
+            style: TextStyle(
+              fontFamily: 'Geist',
+              color: AppColors.textFaint,
+              fontSize: 10,
+              fontWeight: FontWeight.normal,
+            ),
+          ),
         ],
       );
     } else {
@@ -1289,16 +1377,22 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
           : '${set.reps} reps';
       return BarTooltipItem(
         '$setLabel  $metricStr',
-        TextStyle(fontFamily: 'GeistMono', 
-            color: _rc, fontSize: 12, fontWeight: FontWeight.w700),
+        TextStyle(
+          fontFamily: 'GeistMono',
+          color: _rc,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
         children: [
           TextSpan(
             text: '\n$dateLabel',
-            style: TextStyle(fontFamily: 'Geist', 
-                color: AppColors.textFaint,
-                fontSize: 10,
-                fontWeight: FontWeight.normal),
-          )
+            style: TextStyle(
+              fontFamily: 'Geist',
+              color: AppColors.textFaint,
+              fontSize: 10,
+              fontWeight: FontWeight.normal,
+            ),
+          ),
         ],
       );
     }
@@ -1315,8 +1409,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
       return const Padding(
         padding: EdgeInsets.all(AppSpacing.lg),
         child: Center(
-          child:
-              Text('No data', style: TextStyle(color: AppColors.textMuted)),
+          child: Text('No data', style: TextStyle(color: AppColors.textMuted)),
         ),
       );
     }
@@ -1327,7 +1420,9 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
       for (final set in s.sets) {
         final w = settings.toDisplay(set.weight);
         if (w > maxW) maxW = w;
-        final m = widget.isTimeBased ? (set.timeTaken ?? 0).toDouble() : set.reps.toDouble();
+        final m = widget.isTimeBased
+            ? (set.timeTaken ?? 0).toDouble()
+            : set.reps.toDouble();
         if (m > maxR) maxR = m;
       }
     }
@@ -1336,143 +1431,162 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
     final scale = maxW / maxR;
     final chartMaxY = maxW * 1.15;
 
-    return LayoutBuilder(builder: (context, constraints) {
-      // Reserve left(36) + right(28) axis widths from total.
-      final chartWidth = (constraints.maxWidth - 64).clamp(60.0, double.infinity);
-      final maxFit = _maxFit(chartWidth);
-      final sessions = _buildSessions(settings, maxFit);
-      final barGroups = _buildGroups(sessions, settings, scale);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Reserve left(36) + right(28) axis widths from total.
+        final chartWidth = (constraints.maxWidth - 64).clamp(
+          60.0,
+          double.infinity,
+        );
+        final maxFit = _maxFit(chartWidth);
+        final sessions = _buildSessions(settings, maxFit);
+        final barGroups = _buildGroups(sessions, settings, scale);
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Controls row: tappable legend + mode toggle
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  _ToggleLegend(
-                    color: _wc,
-                    label: 'Weight',
-                    active: _showWeight,
-                    onTap: () => setState(() => _showWeight = !_showWeight),
-                  ),
-                  const SizedBox(width: 14),
-                  _ToggleLegend(
-                    color: _rc,
-                    label: widget.isTimeBased ? 'Hold' : 'Reps',
-                    active: _showReps,
-                    onTap: () => setState(() => _showReps = !_showReps),
-                  ),
-                ],
-              ),
-              _SetModeToggle(
-                value: _mode,
-                onChanged: (m) => setState(() => _mode = m),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 180,
-            child: BarChart(
-              BarChartData(
-                maxY: chartMaxY,
-                groupsSpace: 12,
-                backgroundColor: Colors.transparent,
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) =>
-                      FlLine(color: AppColors.glassBorder, strokeWidth: 1),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Controls row: tappable legend + mode toggle
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    _ToggleLegend(
+                      color: _wc,
+                      label: 'Weight',
+                      active: _showWeight,
+                      onTap: () => setState(() => _showWeight = !_showWeight),
+                    ),
+                    const SizedBox(width: 14),
+                    _ToggleLegend(
+                      color: _rc,
+                      label: widget.isTimeBased ? 'Hold' : 'Reps',
+                      active: _showReps,
+                      onTap: () => setState(() => _showReps = !_showReps),
+                    ),
+                  ],
                 ),
-                borderData: FlBorderData(show: false),
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => AppColors.cardHigh,
-                    getTooltipItem: (group, gi, rod, ri) =>
-                        _tooltip(gi, ri, sessions, settings),
-                  ),
+                _SetModeToggle(
+                  value: _mode,
+                  onChanged: (m) => setState(() => _mode = m),
                 ),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: AxisTitles(
-                    axisNameWidget: Text(
-                      settings.unitLabel,
-                      style: TextStyle(fontFamily: 'GeistMono', 
+              ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 180,
+              child: BarChart(
+                BarChartData(
+                  maxY: chartMaxY,
+                  groupsSpace: 12,
+                  backgroundColor: Colors.transparent,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    getDrawingHorizontalLine: (_) =>
+                        FlLine(color: AppColors.glassBorder, strokeWidth: 1),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => AppColors.cardHigh,
+                      getTooltipItem: (group, gi, rod, ri) =>
+                          _tooltip(gi, ri, sessions, settings),
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: AxisTitles(
+                      axisNameWidget: Text(
+                        settings.unitLabel,
+                        style: TextStyle(
+                          fontFamily: 'GeistMono',
                           color: _wc,
                           fontSize: 9,
-                          fontWeight: FontWeight.w700),
-                    ),
-                    axisNameSize: 16,
-                    sideTitles: SideTitles(
-                      showTitles: _showWeight,
-                      reservedSize: 36,
-                      getTitlesWidget: (v, _) => Text(
-                        v >= 1000
-                            ? '${(v / 1000).toStringAsFixed(1)}k'
-                            : v.toStringAsFixed(0),
-                        style: TextStyle(fontFamily: 'GeistMono', 
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      axisNameSize: 16,
+                      sideTitles: SideTitles(
+                        showTitles: _showWeight,
+                        reservedSize: 36,
+                        getTitlesWidget: (v, _) => Text(
+                          v >= 1000
+                              ? '${(v / 1000).toStringAsFixed(1)}k'
+                              : v.toStringAsFixed(0),
+                          style: TextStyle(
+                            fontFamily: 'GeistMono',
                             color: _wc.withValues(alpha: 0.7),
-                            fontSize: 9),
+                            fontSize: 9,
+                          ),
+                        ),
+                      ),
+                    ),
+                    rightTitles: AxisTitles(
+                      axisNameWidget: Text(
+                        widget.isTimeBased ? 'sec' : 'reps',
+                        style: TextStyle(
+                          fontFamily: 'GeistMono',
+                          color: _rc,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      axisNameSize: 16,
+                      sideTitles: SideTitles(
+                        showTitles: _showReps,
+                        reservedSize: 28,
+                        getTitlesWidget: (v, _) {
+                          final r = (v / scale).round();
+                          if (r <= 0) return const Text('');
+                          return Text(
+                            widget.isTimeBased ? '${r}s' : '$r',
+                            style: TextStyle(
+                              fontFamily: 'GeistMono',
+                              color: _rc.withValues(alpha: 0.7),
+                              fontSize: 9,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 22,
+                        getTitlesWidget: (v, _) {
+                          final i = v.toInt();
+                          if (i < 0 || i >= sessions.length) {
+                            return const Text('');
+                          }
+                          final label = _mode == _SetViewMode.weekly
+                              ? DateFormat('d/M').format(sessions[i].date)
+                              : DateFormat('d/M').format(sessions[i].date);
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                fontFamily: 'GeistMono',
+                                color: AppColors.textMuted,
+                                fontSize: 9,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
-                  rightTitles: AxisTitles(
-                    axisNameWidget: Text(
-                      widget.isTimeBased ? 'sec' : 'reps',
-                      style: TextStyle(fontFamily: 'GeistMono', 
-                          color: _rc,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700),
-                    ),
-                    axisNameSize: 16,
-                    sideTitles: SideTitles(
-                      showTitles: _showReps,
-                      reservedSize: 28,
-                      getTitlesWidget: (v, _) {
-                        final r = (v / scale).round();
-                        if (r <= 0) return const Text('');
-                        return Text(widget.isTimeBased ? '${r}s' : '$r',
-                            style: TextStyle(fontFamily: 'GeistMono', 
-                                color: _rc.withValues(alpha: 0.7),
-                                fontSize: 9));
-                      },
-                    ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 22,
-                      getTitlesWidget: (v, _) {
-                        final i = v.toInt();
-                        if (i < 0 || i >= sessions.length) {
-                          return const Text('');
-                        }
-                        final label = _mode == _SetViewMode.weekly
-                            ? DateFormat('d/M')
-                                .format(sessions[i].date)
-                            : DateFormat('d/M').format(sessions[i].date);
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(label,
-                              style: TextStyle(fontFamily: 'GeistMono', 
-                                  color: AppColors.textMuted,
-                                  fontSize: 9)),
-                        );
-                      },
-                    ),
-                  ),
+                  barGroups: barGroups,
                 ),
-                barGroups: barGroups,
               ),
             ),
-          ),
-        ],
-      );
-    });
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -1513,7 +1627,8 @@ class _ToggleLegend extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               label,
-              style: TextStyle(fontFamily: 'GeistMono', 
+              style: TextStyle(
+                fontFamily: 'GeistMono',
                 color: active ? AppColors.textSoft : AppColors.textFaint,
                 fontSize: 11,
               ),
@@ -1556,7 +1671,8 @@ class _SetModeToggle extends StatelessWidget {
                 ),
                 child: Text(
                   mode == _SetViewMode.recent ? 'Recent' : 'Weekly',
-                  style: TextStyle(fontFamily: 'GeistMono', 
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: mode == value ? Colors.white : AppColors.textMuted,
@@ -1594,7 +1710,8 @@ class _SessionHistory extends StatelessWidget {
         children: [
           Text(
             'Session History',
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -1613,14 +1730,16 @@ class _SessionHistory extends StatelessWidget {
                 children: [
                   Text(
                     DateFormat('MMM d, yyyy').format(entry.date),
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textSoft,
                       fontSize: 13,
                     ),
                   ),
                   Text(
                     textVal,
-                    style: TextStyle(fontFamily: 'GeistMono', 
+                    style: TextStyle(
+                      fontFamily: 'GeistMono',
                       color: AppColors.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -1665,9 +1784,7 @@ class _AskCoachButton extends StatelessWidget {
       fullWidth: true,
       onPressed: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => AiCoachScreen(seedPrompt: seed),
-        ),
+        MaterialPageRoute(builder: (_) => AiCoachScreen(seedPrompt: seed)),
       ),
     );
   }

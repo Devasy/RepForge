@@ -57,7 +57,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               children: [
                 Text(
                   'INSIGHTS',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textFaint,
@@ -67,7 +68,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 const SizedBox(height: 2),
                 Text(
                   'Analytics',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -117,7 +119,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   child: Text(
                     _tabs[i],
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: active ? Colors.white : AppColors.textMuted,
@@ -151,6 +154,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 // ── Records Tab ────────────────────────────────────────────────────────────────
 
 enum _RecordsFilter { all, thisMonth, byExercise }
+
 enum _RecordsSort { recent, heaviest }
 
 class _RecordsTab extends StatefulWidget {
@@ -175,12 +179,16 @@ class _RecordsTabState extends State<_RecordsTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.emoji_events_rounded,
-                size: 48, color: AppColors.textFaint),
+            const Icon(
+              Icons.emoji_events_rounded,
+              size: 48,
+              color: AppColors.textFaint,
+            ),
             const SizedBox(height: 12),
             Text(
               'No records yet',
-              style: TextStyle(fontFamily: 'Geist', 
+              style: TextStyle(
+                fontFamily: 'Geist',
                 color: AppColors.textMuted,
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -189,8 +197,11 @@ class _RecordsTabState extends State<_RecordsTab> {
             const SizedBox(height: 4),
             Text(
               'Finish a workout to set your first PRs',
-              style: TextStyle(fontFamily: 'Geist', 
-                  color: AppColors.textFaint, fontSize: 12),
+              style: TextStyle(
+                fontFamily: 'Geist',
+                color: AppColors.textFaint,
+                fontSize: 12,
+              ),
             ),
           ],
         ),
@@ -202,9 +213,8 @@ class _RecordsTabState extends State<_RecordsTab> {
     final startOfMonth = DateTime(now.year, now.month, 1);
     List<PersonalRecord> filtered = switch (_filter) {
       _RecordsFilter.all => [...allRecords],
-      _RecordsFilter.thisMonth => allRecords
-          .where((r) => !r.achievedAt.isBefore(startOfMonth))
-          .toList(),
+      _RecordsFilter.thisMonth =>
+        allRecords.where((r) => !r.achievedAt.isBefore(startOfMonth)).toList(),
       _RecordsFilter.byExercise => [...allRecords],
     };
 
@@ -222,9 +232,9 @@ class _RecordsTabState extends State<_RecordsTab> {
         .length;
     final newest = allRecords.isEmpty
         ? null
-        : ([...allRecords]
-              ..sort((a, b) => b.achievedAt.compareTo(a.achievedAt)))
-            .first;
+        : ([
+            ...allRecords,
+          ]..sort((a, b) => b.achievedAt.compareTo(a.achievedAt))).first;
 
     // Group by exercise if needed
     Map<String, List<PersonalRecord>>? grouped;
@@ -249,7 +259,8 @@ class _RecordsTabState extends State<_RecordsTab> {
                   children: [
                     Text(
                       '${allRecords.length} PRs',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -259,18 +270,20 @@ class _RecordsTabState extends State<_RecordsTab> {
                       const SizedBox(width: AppSpacing.sm),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.warning.withValues(alpha: 0.15),
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.full),
+                          borderRadius: BorderRadius.circular(AppRadius.full),
                           border: Border.all(
-                              color:
-                                  AppColors.warning.withValues(alpha: 0.4)),
+                            color: AppColors.warning.withValues(alpha: 0.4),
+                          ),
                         ),
                         child: Text(
                           '$thisMonthCount this month',
-                          style: TextStyle(fontFamily: 'GeistMono', 
+                          style: TextStyle(
+                            fontFamily: 'GeistMono',
                             color: AppColors.warning,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -287,7 +300,7 @@ class _RecordsTabState extends State<_RecordsTab> {
                   _NewestPRHero(
                     record: newest,
                     exerciseName:
-                        provider.getExerciseName(newest.exerciseId),
+                        '${provider.getExerciseName(newest.exerciseId)}${newest.handle == null ? '' : ' · ${newest.handle}'}',
                   ),
                 ],
 
@@ -302,26 +315,25 @@ class _RecordsTabState extends State<_RecordsTab> {
                           children: [
                             _FilterChip(
                               label: 'All',
-                              selected:
-                                  _filter == _RecordsFilter.all,
-                              onTap: () => setState(
-                                  () => _filter = _RecordsFilter.all),
+                              selected: _filter == _RecordsFilter.all,
+                              onTap: () =>
+                                  setState(() => _filter = _RecordsFilter.all),
                             ),
                             const SizedBox(width: 6),
                             _FilterChip(
                               label: 'This month',
-                              selected: _filter ==
-                                  _RecordsFilter.thisMonth,
-                              onTap: () => setState(() =>
-                                  _filter = _RecordsFilter.thisMonth),
+                              selected: _filter == _RecordsFilter.thisMonth,
+                              onTap: () => setState(
+                                () => _filter = _RecordsFilter.thisMonth,
+                              ),
                             ),
                             const SizedBox(width: 6),
                             _FilterChip(
                               label: 'By exercise',
-                              selected: _filter ==
-                                  _RecordsFilter.byExercise,
-                              onTap: () => setState(() =>
-                                  _filter = _RecordsFilter.byExercise),
+                              selected: _filter == _RecordsFilter.byExercise,
+                              onTap: () => setState(
+                                () => _filter = _RecordsFilter.byExercise,
+                              ),
                             ),
                           ],
                         ),
@@ -329,19 +341,20 @@ class _RecordsTabState extends State<_RecordsTab> {
                     ),
                     const SizedBox(width: 8),
                     GestureDetector(
-                      onTap: () => setState(() => _sort = _sort ==
-                              _RecordsSort.recent
-                          ? _RecordsSort.heaviest
-                          : _RecordsSort.recent),
+                      onTap: () => setState(
+                        () => _sort = _sort == _RecordsSort.recent
+                            ? _RecordsSort.heaviest
+                            : _RecordsSort.recent,
+                      ),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.glass2,
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.sm),
-                          border:
-                              Border.all(color: AppColors.glassBorder),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          border: Border.all(color: AppColors.glassBorder),
                         ),
                         child: Row(
                           children: [
@@ -357,7 +370,8 @@ class _RecordsTabState extends State<_RecordsTab> {
                               _sort == _RecordsSort.recent
                                   ? 'Recent'
                                   : 'Heaviest',
-                              style: TextStyle(fontFamily: 'GeistMono', 
+                              style: TextStyle(
+                                fontFamily: 'GeistMono',
                                 color: AppColors.textMuted,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -379,16 +393,13 @@ class _RecordsTabState extends State<_RecordsTab> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
             sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, i) {
-                  final entry = grouped!.entries.elementAt(i);
-                  return _ExercisePRGroup(
-                    exerciseName: provider.getExerciseName(entry.key),
-                    records: entry.value,
-                  );
-                },
-                childCount: grouped.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, i) {
+                final entry = grouped!.entries.elementAt(i);
+                return _ExercisePRGroup(
+                  exerciseName: provider.getExerciseName(entry.key),
+                  records: entry.value,
+                );
+              }, childCount: grouped.length),
             ),
           )
         else
@@ -398,8 +409,9 @@ class _RecordsTabState extends State<_RecordsTab> {
               delegate: SliverChildBuilderDelegate(
                 (context, i) => _PRCard(
                   record: filtered[i],
-                  exerciseName:
-                      provider.getExerciseName(filtered[i].exerciseId),
+                  exerciseName: provider.getExerciseName(
+                    filtered[i].exerciseId,
+                  ),
                 ),
                 childCount: filtered.length,
               ),
@@ -453,7 +465,8 @@ class _NewestPRHero extends StatelessWidget {
               children: [
                 Text(
                   'Latest PR',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: isTimeBased ? AppColors.cyan : AppColors.warning,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -462,7 +475,8 @@ class _NewestPRHero extends StatelessWidget {
                 ),
                 Text(
                   exerciseName,
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -470,7 +484,8 @@ class _NewestPRHero extends StatelessWidget {
                 ),
                 Text(
                   dateStr,
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textFaint,
                     fontSize: 11,
                   ),
@@ -485,7 +500,8 @@ class _NewestPRHero extends StatelessWidget {
                 isTimeBased
                     ? formatHoldDuration(record.bestDuration ?? 0)
                     : '${w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1)} ${settings.unitLabel}',
-                style: TextStyle(fontFamily: 'GeistMono', 
+                style: TextStyle(
+                  fontFamily: 'GeistMono',
                   color: isTimeBased ? AppColors.cyan : AppColors.warning,
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -495,10 +511,11 @@ class _NewestPRHero extends StatelessWidget {
               Text(
                 isTimeBased
                     ? (record.bestWeight > 0
-                        ? '+${w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1)} ${settings.unitLabel}'
-                        : 'Best Hold')
+                          ? '+${w % 1 == 0 ? w.toStringAsFixed(0) : w.toStringAsFixed(1)} ${settings.unitLabel}'
+                          : 'Best Hold')
                     : '${record.bestReps} reps',
-                style: TextStyle(fontFamily: 'GeistMono', 
+                style: TextStyle(
+                  fontFamily: 'GeistMono',
                   color: AppColors.textMuted,
                   fontSize: 11,
                 ),
@@ -512,8 +529,7 @@ class _NewestPRHero extends StatelessWidget {
 }
 
 class _ExercisePRGroup extends StatelessWidget {
-  const _ExercisePRGroup(
-      {required this.exerciseName, required this.records});
+  const _ExercisePRGroup({required this.exerciseName, required this.records});
   final String exerciseName;
   final List<PersonalRecord> records;
 
@@ -534,7 +550,8 @@ class _ExercisePRGroup extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 6, top: 4),
           child: Text(
             exerciseName,
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textSoft,
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -565,8 +582,7 @@ class _FilterChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: AppDurations.fast,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.18)
@@ -580,11 +596,11 @@ class _FilterChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(fontFamily: 'GeistMono', 
+          style: TextStyle(
+            fontFamily: 'GeistMono',
             color: selected ? AppColors.primary : AppColors.textMuted,
             fontSize: 11,
-            fontWeight:
-                selected ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
       ),
@@ -619,11 +635,14 @@ class _PRCard extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: (isTimeBased ? AppColors.cyan : AppColors.warning).withValues(alpha: 0.15),
+                  color: (isTimeBased ? AppColors.cyan : AppColors.warning)
+                      .withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  isTimeBased ? Icons.timer_rounded : Icons.emoji_events_rounded,
+                  isTimeBased
+                      ? Icons.timer_rounded
+                      : Icons.emoji_events_rounded,
                   color: isTimeBased ? AppColors.cyan : AppColors.warning,
                   size: 18,
                 ),
@@ -634,8 +653,9 @@ class _PRCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      exerciseName,
-                      style: TextStyle(fontFamily: 'Geist', 
+                      '$exerciseName${record.handle == null ? '' : ' · ${record.handle}'}${isBodyweightExercise(record.exerciseId) && record.loadEncodingVersion == 0 ? ' · Legacy load' : ''}',
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -643,8 +663,11 @@ class _PRCard extends StatelessWidget {
                     ),
                     Text(
                       dateStr,
-                      style: TextStyle(fontFamily: 'Geist', 
-                          color: AppColors.textFaint, fontSize: 11),
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        color: AppColors.textFaint,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -666,8 +689,8 @@ class _PRCard extends StatelessWidget {
                 label: isTimeBased ? 'Added Load' : 'Best Reps',
                 value: isTimeBased
                     ? (record.bestWeight > 0
-                        ? '${displayWeight.toStringAsFixed(displayWeight % 1 == 0 ? 0 : 1)} $unit'
-                        : 'BW')
+                          ? '${displayWeight.toStringAsFixed(displayWeight % 1 == 0 ? 0 : 1)} $unit'
+                          : 'BW')
                     : '${record.bestReps}',
                 color: AppColors.secondary,
               ),
@@ -688,10 +711,11 @@ class _PRCard extends StatelessWidget {
 }
 
 class _PRStat extends StatelessWidget {
-  const _PRStat(
-      {required this.label,
-      required this.value,
-      required this.color});
+  const _PRStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   final String label;
   final String value;
@@ -701,8 +725,7 @@ class _PRStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -711,15 +734,24 @@ class _PRStat extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label,
-                style: TextStyle(fontFamily: 'Geist', 
-                    color: AppColors.textFaint, fontSize: 10)),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Geist',
+                color: AppColors.textFaint,
+                fontSize: 10,
+              ),
+            ),
             const SizedBox(height: 2),
-            Text(value,
-                style: TextStyle(fontFamily: 'GeistMono', 
-                    color: color,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700)),
+            Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'GeistMono',
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
       ),

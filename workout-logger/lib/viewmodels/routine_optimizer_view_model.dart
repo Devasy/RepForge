@@ -6,6 +6,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import '../services/ai/ai_failure.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
     show Content, TextPart, FunctionCall, Tool, Part, DataPart;
@@ -34,10 +35,10 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
     required CoachToolService coachTools,
     required ConversationManager conversations,
     required SettingsProvider settings,
-  })  : _ai = ai,
-        _coachTools = coachTools,
-        _conversations = conversations,
-        _settings = settings {
+  }) : _ai = ai,
+       _coachTools = coachTools,
+       _conversations = conversations,
+       _settings = settings {
     _conversations.addListener(_notify);
   }
 
@@ -116,7 +117,9 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
     _streamingText = '';
     _notify();
 
-    await _conversations.appendMessage(ChatMessage(role: 'user', text: trimmed));
+    await _conversations.appendMessage(
+      ChatMessage(role: 'user', text: trimmed),
+    );
 
     final systemPrompt = GeminiContextBuilder.buildOptimizerSystemPrompt(
       userName: _settings.userName,
@@ -125,7 +128,9 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
     final history = _buildHistory();
     final tools = [
       ..._coachTools.buildTools(),
-      Tool(functionDeclarations: [CoachToolService.askUserQuestionsDeclaration]),
+      Tool(
+        functionDeclarations: [CoachToolService.askUserQuestionsDeclaration],
+      ),
     ];
 
     final buffer = StringBuffer();
@@ -151,7 +156,10 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
       // Swallow internal abort signals from dispose().
       if (e is! StateError || e.message != 'optimizer_aborted') {
         await _conversations.appendMessage(
-          ChatMessage(role: 'model', text: 'Error: $e'),
+          ChatMessage(
+            role: 'model',
+            text: (e is AiFailure ? e : AiFailure.from(e)).message,
+          ),
         );
       }
     } finally {
@@ -198,8 +206,9 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
 
   List<Content> _buildHistory() {
     final msgs = _conversations.activeMessages;
-    final prior =
-        msgs.length > 1 ? msgs.sublist(0, msgs.length - 1) : <ChatMessage>[];
+    final prior = msgs.length > 1
+        ? msgs.sublist(0, msgs.length - 1)
+        : <ChatMessage>[];
     return prior.map((m) {
       final parts = <Part>[];
       if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {

@@ -134,6 +134,20 @@ class _AiCoachViewState extends State<_AiCoachView> {
                     ? _buildChatArea(vm)
                     : _buildNoKeyState(context),
               ),
+              if (vm.failure != null)
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(vm.failure!.message)),
+                      if (vm.canRetry)
+                        TextButton(
+                          onPressed: vm.retry,
+                          child: const Text('Retry'),
+                        ),
+                    ],
+                  ),
+                ),
               if (vm.isConfigured) _buildInputBar(vm),
             ],
           ),
@@ -312,7 +326,9 @@ class _AiCoachViewState extends State<_AiCoachView> {
               decoration: BoxDecoration(
                 color: AppColors.glass2,
                 borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
@@ -352,7 +368,11 @@ class _AiCoachViewState extends State<_AiCoachView> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
                     tooltip: 'Remove image',
                     onPressed: () {
                       HapticFeedback.lightImpact();
@@ -728,18 +748,14 @@ class _MessageBubble extends StatelessWidget {
                         maxHeight: 200,
                       ),
                       decoration: BoxDecoration(
-                        border: Border.all(
-                          color: AppColors.glassBorderStrong,
-                        ),
+                        border: Border.all(color: AppColors.glassBorderStrong),
                         borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
-                      child: Image.memory(
-                        decodedImageBytes,
-                        fit: BoxFit.cover,
-                      ),
+                      child: Image.memory(decodedImageBytes, fit: BoxFit.cover),
                     ),
                   ),
-                  if (message.text.isNotEmpty) const SizedBox(height: AppSpacing.xs),
+                  if (message.text.isNotEmpty)
+                    const SizedBox(height: AppSpacing.xs),
                 ],
                 if (message.text.isNotEmpty)
                   Text(

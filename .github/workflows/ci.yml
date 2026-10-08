@@ -18,6 +18,14 @@ permissions:
   contents: read
 
 jobs:
+  changelog:
+    name: Changelog format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 workout-logger/scripts/build_release_notes.py --check
+      - run: python3 -m unittest discover -s workout-logger/scripts -p 'test_*.py'
+
   security_scan:
     name: Security & Secret Scan
     runs-on: ubuntu-latest
@@ -163,6 +171,25 @@ jobs:
       - name: Build Debug App Bundle (Dry Run)
         working-directory: ./workout-logger
         run: flutter build appbundle --debug --no-pub
+
+      - name: Build installable debug APK
+        working-directory: ./workout-logger
+        run: flutter build apk --debug --no-pub
+
+      - name: Verify separate debug app identity
+        run: |
+          APK=workout-logger/build/app/outputs/flutter-apk/app-debug.apk
+          BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
+          echo "$BADGING" | grep -F "package: name='com.devasy.repforge.debug'"
+          echo "$BADGING" | grep -F "application-label:'RepForge (Debug)'"
+
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: RepForge-Debug-${{ github.event.pull_request.head.sha || github.sha }}
+          path: workout-logger/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Verify release shrinking rules
         if: github.event_name == 'pull_request'

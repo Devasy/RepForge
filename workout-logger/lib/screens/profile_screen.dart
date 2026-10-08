@@ -14,6 +14,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
+import '../services/managers/pr_manager.dart';
+import '../services/managers/conversation_manager.dart';
+import '../services/ai/gemini_ai_service.dart';
 import '../services/interfaces/health_connect_service_interface.dart';
 import '../services/managers/readiness_manager.dart';
 import '../services/health_data_sync_service.dart';
@@ -178,7 +181,9 @@ class _ProfileScreenState extends State<ProfileScreen>
         unawaited(context.read<ReadinessManager>().refresh(force: true));
         _showSnack('Readiness insights enabled!', AppColors.success);
       } else {
-        debugPrint('[Readiness] still no granted types — showing manual instructions');
+        debugPrint(
+          '[Readiness] still no granted types — showing manual instructions',
+        );
         _showSnack(
           'Open Health Connect → App permissions → RepForge and allow Sleep and Heart rate.',
           AppColors.warning,
@@ -223,17 +228,18 @@ class _ProfileScreenState extends State<ProfileScreen>
       final file = File('${tempDir.path}/repforge_backup_$dateStr.json');
       await file.writeAsString(jsonString);
       // ignore: deprecated_member_use
-      final result = await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'RepForge Backup',
-      );
+      final result = await Share.shareXFiles([
+        XFile(file.path),
+      ], subject: 'RepForge Backup');
       if (!mounted) return;
       if (result.status == ShareResultStatus.success ||
           result.status == ShareResultStatus.dismissed) {
         _showSnack('Backup exported successfully!', AppColors.success);
       }
     } catch (e) {
-      if (mounted) _showSnack('Export failed. Please try again.', AppColors.error);
+      if (mounted) {
+        _showSnack('Export failed. Please try again.', AppColors.error);
+      }
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
@@ -249,7 +255,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
         title: Text(
           'Import Backup',
-          style: TextStyle(fontFamily: 'Geist', 
+          style: TextStyle(
+            fontFamily: 'Geist',
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w700,
           ),
@@ -272,7 +279,10 @@ class _ProfileScreenState extends State<ProfileScreen>
             style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             child: Text(
               'Choose File',
-              style: TextStyle(fontFamily: 'Geist', fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontFamily: 'Geist',
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -292,23 +302,50 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
       final file = File(result.files.single.path!);
       final jsonString = await file.readAsString();
-      final data = jsonDecode(jsonString) as Map<String, dynamic>;
-      if (!data.containsKey('sessions') && !data.containsKey('routines')) {
-        if (mounted) _showSnack('Invalid backup file.', AppColors.error);
+      final data = jsonDecode(jsonString);
+      if (!mounted) return;
+      final provider = context.read<WorkoutProvider>();
+      final settings = context.read<SettingsProvider>();
+      final prManager = context.read<PRManager?>();
+      final conversations = context.read<ConversationManager?>();
+      final gemini = context.read<GeminiAiService?>();
+      await provider.importData(jsonString, refresh: false);
+      try {
+        await provider.refreshAfterImport();
+        await settings.init();
+        gemini?.init(
+          settings.geminiApiKey,
+          model: settings.geminiModel,
+          maxToolRounds: settings.geminiMaxToolRounds,
+          thinkingLevel: settings.geminiThinkingLevel,
+        );
+        await prManager?.load();
+        await conversations?.loadConversations();
+      } catch (error, stack) {
+        debugPrint('Post-import refresh failed: $error\n$stack');
+        if (mounted) {
+          _showSnack(
+            'Backup merged, but some data did not refresh. Restart the app.',
+            AppColors.warning,
+          );
+        }
         return;
       }
       if (!mounted) return;
-      final provider = context.read<WorkoutProvider>();
-      await provider.importData(jsonString);
-      if (!mounted) return;
-      final sessionCount = (data['sessions'] as List?)?.length ?? 0;
-      final routineCount = (data['routines'] as List?)?.length ?? 0;
+      int count(String key) =>
+          data is Map && data[key] is List ? (data[key] as List).length : 0;
+      final sessionCount = count('sessions');
+      final routineCount = count('routines');
+      final chatCount = count('conversations');
+      final programCount = count('trainingPrograms');
       _showSnack(
-        'Import complete! $sessionCount sessions, $routineCount routines.',
+        'Backup merged: $sessionCount sessions, $routineCount routines, $chatCount chats, $programCount programs in file. Existing IDs kept.',
         AppColors.success,
       );
     } catch (e) {
-      if (mounted) _showSnack('Import failed. Invalid backup file.', AppColors.error);
+      if (mounted) {
+        _showSnack('Import failed. Invalid backup file.', AppColors.error);
+      }
     } finally {
       if (mounted) setState(() => _isImporting = false);
     }
@@ -373,7 +410,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                     }
                   },
                   isHealthSyncLoading: _isSyncingHealthData,
-                  onHealthSyncNow: _isSyncingHealthData ? null : _syncHealthDataNow,
+                  onHealthSyncNow: _isSyncingHealthData
+                      ? null
+                      : _syncHealthDataNow,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DataManagementSection(
@@ -479,7 +518,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                           child: Text(
                             'v$_appVersion',
-                            style: TextStyle(fontFamily: 'GeistMono', 
+                            style: TextStyle(
+                              fontFamily: 'GeistMono',
                               color: AppColors.textMuted,
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
@@ -491,7 +531,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                   const SizedBox(height: AppSpacing.md),
                   Text(
                     'RepForge',
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textPrimary,
                       fontSize: 30,
                       fontWeight: FontWeight.w800,
@@ -501,7 +542,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                   const SizedBox(height: 2),
                   Text(
                     'Settings & preferences',
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textMuted,
                       fontSize: 14,
                       fontWeight: FontWeight.w400,

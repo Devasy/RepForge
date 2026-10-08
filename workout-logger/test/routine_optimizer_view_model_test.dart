@@ -57,8 +57,7 @@ class _SimpleAi implements IAiService {
   Future<TrainingProgram> generateProgram({
     required String userPrompt,
     required List<Exercise> allExercises,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<String> generateWeeklyInsights(String contextText) async => '';
@@ -75,24 +74,22 @@ class _SimpleAi implements IAiService {
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
     String? imageBytesBase64,
     String? imageMimeType,
-  }) =>
-      streamCoachReply(
-        userMessage: userMessage,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: tools,
-        onToolCall: onToolCall,
-        imageBytesBase64: imageBytesBase64,
-        imageMimeType: imageMimeType,
-      );
+  }) => streamCoachReply(
+    userMessage: userMessage,
+    systemPrompt: systemPrompt,
+    history: history,
+    tools: tools,
+    onToolCall: onToolCall,
+    imageBytesBase64: imageBytesBase64,
+    imageMimeType: imageMimeType,
+  );
 
   @override
   Future<T> generateStructuredJson<T>({
     required String systemPrompt,
     required String userPrompt,
     required T Function(Map<String, dynamic> json) fromJson,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 }
 
 class _ThrowingAi implements IAiService {
@@ -118,8 +115,7 @@ class _ThrowingAi implements IAiService {
   Future<TrainingProgram> generateProgram({
     required String userPrompt,
     required List<Exercise> allExercises,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<String> generateWeeklyInsights(String contextText) =>
@@ -138,24 +134,22 @@ class _ThrowingAi implements IAiService {
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
     String? imageBytesBase64,
     String? imageMimeType,
-  }) =>
-      streamCoachReply(
-        userMessage: userMessage,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: tools,
-        onToolCall: onToolCall,
-        imageBytesBase64: imageBytesBase64,
-        imageMimeType: imageMimeType,
-      );
+  }) => streamCoachReply(
+    userMessage: userMessage,
+    systemPrompt: systemPrompt,
+    history: history,
+    tools: tools,
+    onToolCall: onToolCall,
+    imageBytesBase64: imageBytesBase64,
+    imageMimeType: imageMimeType,
+  );
 
   @override
   Future<T> generateStructuredJson<T>({
     required String systemPrompt,
     required String userPrompt,
     required T Function(Map<String, dynamic> json) fromJson,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 }
 
 // ── Helper ────────────────────────────────────────────────────────────────
@@ -243,7 +237,10 @@ void main() {
       bool questionsSeen = false;
       final questionCall = FunctionCall('ask_user_questions', {
         'questions': [
-          {'question': 'Goal?', 'options': ['Strength']},
+          {
+            'question': 'Goal?',
+            'options': ['Strength'],
+          },
         ],
       });
       final ai = _SimpleAi(chunks: ['Done.'], toolCall: questionCall);
@@ -270,13 +267,16 @@ void main() {
       expect(vm.isLoading, isFalse);
       expect(vm.pendingQuestions, isNull);
       final modelMsgs = vm.messages.where((m) => m.role == 'model').toList();
-      expect(modelMsgs.any((m) => m.text.contains('Error')), isTrue);
+      expect(modelMsgs.any((m) => m.text.contains('connection')), isTrue);
     });
 
     test('dispose completes pending Completer without leaking', () async {
       final questionCall = FunctionCall('ask_user_questions', {
         'questions': [
-          {'question': 'Goal?', 'options': ['Strength']},
+          {
+            'question': 'Goal?',
+            'options': ['Strength'],
+          },
         ],
       });
       final ai = _SimpleAi(chunks: ['Done.'], toolCall: questionCall);
@@ -295,41 +295,55 @@ void main() {
       expect(vm.pendingQuestions, isNull);
     });
 
-    test('_buildHistory preserves attached images with DataPart in routine optimizer', () async {
-      final ai = _SimpleAi();
-      final convManager = ConversationManager(storage, kind: 'optimizer');
-      await convManager.loadConversations();
-      await convManager.appendMessage(ChatMessage(
-        role: 'user',
-        text: 'Initial review',
-        imageBytesBase64: base64Encode([1, 2, 3]),
-        imageMimeType: 'image/png',
-      ));
-      await convManager.appendMessage(ChatMessage(role: 'model', text: 'Looks good!'));
+    test(
+      '_buildHistory preserves attached images with DataPart in routine optimizer',
+      () async {
+        final ai = _SimpleAi();
+        final convManager = ConversationManager(storage, kind: 'optimizer');
+        await convManager.loadConversations();
+        await convManager.appendMessage(
+          ChatMessage(
+            role: 'user',
+            text: 'Initial review',
+            imageBytesBase64: base64Encode([1, 2, 3]),
+            imageMimeType: 'image/png',
+          ),
+        );
+        await convManager.appendMessage(
+          ChatMessage(role: 'model', text: 'Looks good!'),
+        );
 
-      final vm = _buildVm(storage: storage, ai: ai, conversations: convManager);
-      await vm.sendMessage('Can we modify this?');
+        final vm = _buildVm(
+          storage: storage,
+          ai: ai,
+          conversations: convManager,
+        );
+        await vm.sendMessage('Can we modify this?');
 
-      expect(ai.lastHistory, isNotNull);
-      expect(ai.lastHistory, isNotEmpty);
-      final firstTurn = ai.lastHistory!.first;
-      final parts = firstTurn.parts.toList();
-      expect(parts.any((p) => p is DataPart), isTrue);
-      final dataPart = parts.firstWhere((p) => p is DataPart) as DataPart;
-      expect(dataPart.mimeType, 'image/png');
-      expect(dataPart.bytes, [1, 2, 3]);
-      expect(parts.any((p) => p is TextPart && p.text == 'Initial review'), isTrue);
+        expect(ai.lastHistory, isNotNull);
+        expect(ai.lastHistory, isNotEmpty);
+        final firstTurn = ai.lastHistory!.first;
+        final parts = firstTurn.parts.toList();
+        expect(parts.any((p) => p is DataPart), isTrue);
+        final dataPart = parts.firstWhere((p) => p is DataPart) as DataPart;
+        expect(dataPart.mimeType, 'image/png');
+        expect(dataPart.bytes, [1, 2, 3]);
+        expect(
+          parts.any((p) => p is TextPart && p.text == 'Initial review'),
+          isTrue,
+        );
 
-      final json = firstTurn.toJson();
-      expect(json['role'], 'user');
-      final serializedParts = json['parts'] as List;
-      expect(serializedParts[0], {
-        'inlineData': {
-          'mimeType': 'image/png',
-          'data': base64Encode([1, 2, 3]),
-        },
-      });
-      expect(serializedParts[1], {'text': 'Initial review'});
-    });
+        final json = firstTurn.toJson();
+        expect(json['role'], 'user');
+        final serializedParts = json['parts'] as List;
+        expect(serializedParts[0], {
+          'inlineData': {
+            'mimeType': 'image/png',
+            'data': base64Encode([1, 2, 3]),
+          },
+        });
+        expect(serializedParts[1], {'text': 'Initial review'});
+      },
+    );
   });
 }

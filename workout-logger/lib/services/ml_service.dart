@@ -4,9 +4,12 @@ import 'interfaces/ml_service_interface.dart';
 import 'strategies/growth_curve_fitter.dart';
 import 'strategies/progression_rules.dart';
 import 'utils/recovery_calculator.dart';
+import 'utils/exercise_history.dart';
 
-export 'interfaces/ml_service_interface.dart' show DataPoint, MuscleRecoveryStatus;
-export 'strategies/growth_curve_fitter.dart' show IGrowthCurveFitter, GrowthCurveFitter;
+export 'interfaces/ml_service_interface.dart'
+    show DataPoint, MuscleRecoveryStatus;
+export 'strategies/growth_curve_fitter.dart'
+    show IGrowthCurveFitter, GrowthCurveFitter;
 export 'strategies/progression_rules.dart'
     show ProgressionContext, ProgressionRule, ProgressionRuleFactory;
 export 'utils/recovery_calculator.dart' show RecoveryCalculator;
@@ -25,8 +28,8 @@ class MLService implements IMLService {
   MLService({
     IGrowthCurveFitter? curveFitter,
     RecoveryCalculator? recoveryCalculator,
-  })  : _curveFitter = curveFitter ?? GrowthCurveFitter(),
-        _recoveryCalculator = recoveryCalculator ?? const RecoveryCalculator();
+  }) : _curveFitter = curveFitter ?? GrowthCurveFitter(),
+       _recoveryCalculator = recoveryCalculator ?? const RecoveryCalculator();
 
   // ==================== GROWTH MODEL ====================
 
@@ -43,19 +46,16 @@ class MLService implements IMLService {
     List<WorkoutSession> sessions,
   ) {
     final dataPoints = <DataPoint>[];
-    final sorted = List<WorkoutSession>.from(sessions)
-      ..sort((a, b) => a.date.compareTo(b.date));
-
-    DateTime? firstDate;
-    for (final session in sorted) {
-      for (final log in session.exercises) {
-        if (log.exerciseId == exerciseId) {
-          firstDate ??= session.date;
-          final days = session.date.difference(firstDate).inDays.toDouble();
-          dataPoints.add(DataPoint(x: days, y: log.totalVolume));
-          break;
-        }
-      }
+    final logs = comparableExerciseLogs(exerciseId, sessions);
+    if (logs.isEmpty) return dataPoints;
+    final firstDate = logs.first.date;
+    for (final entry in logs) {
+      dataPoints.add(
+        DataPoint(
+          x: entry.date.difference(firstDate).inDays.toDouble(),
+          y: entry.log.totalVolume,
+        ),
+      );
     }
     return dataPoints;
   }
@@ -74,7 +74,21 @@ class MLService implements IMLService {
     final dataPoints = <DataPoint>[];
     DateTime? firstDate;
 
+    final references = latestLoadReferences(sessions);
     for (final session in sorted) {
+      final incompatible = session.exercises.any(
+        (log) =>
+            (exerciseMap[log.exerciseId]?.muscleActivations.any(
+                  (a) => a.muscleGroupId == muscleGroupId,
+                ) ??
+                false) &&
+            log.sets.any(
+              (set) =>
+                  !(references[log.exerciseId]?.hasComparableLoad(set) ?? true),
+            ),
+      );
+      if (incompatible) continue;
+
       final volumes = _recoveryCalculator.muscleVolumes(session, exerciseMap);
       final vol = volumes[muscleGroupId];
       if (vol == null || vol == 0) continue;
@@ -92,26 +106,23 @@ class MLService implements IMLService {
     List<WorkoutSession> sessions,
     Map<String, Exercise> exerciseMap, {
     DateTime? asOf,
-  }) =>
-      _recoveryCalculator.computeMuscleRecoveryScores(
-        sessions,
-        exerciseMap,
-        asOf: asOf,
-      );
+  }) => _recoveryCalculator.computeMuscleRecoveryScores(
+    sessions,
+    exerciseMap,
+    asOf: asOf,
+  );
 
   @override
   Map<String, DateTime> lastTrainedPerMuscle(
     List<WorkoutSession> sessions,
     Map<String, Exercise> exerciseMap,
-  ) =>
-      _recoveryCalculator.lastTrainedPerMuscle(sessions, exerciseMap);
+  ) => _recoveryCalculator.lastTrainedPerMuscle(sessions, exerciseMap);
 
   @override
   Map<String, MuscleRecoveryStatus> recoveryScoresFrom(
     Map<String, DateTime> lastTrained, {
     DateTime? asOf,
-  }) =>
-      _recoveryCalculator.recoveryScoresFrom(lastTrained, asOf: asOf);
+  }) => _recoveryCalculator.recoveryScoresFrom(lastTrained, asOf: asOf);
 
   // ==================== RECOMMENDATIONS ====================
 
@@ -168,6 +179,79 @@ class MLService implements IMLService {
     double sessionFatigueFactor = 0.0,
     DateTime? asOf,
   }) {
+    if (lastSession.isEmpty) return [];
+    final reference =
+        lastSession.lastOrNull ??
+        pastSessions?.expand((sets) => sets).firstOrNull;
+    if (reference == null) return getDefaultRecommendations(3);
+    if (reference.loadMode != WorkoutLoadMode.external &&
+        (reference.loadEncodingVersion != 1 ||
+            reference.bodyWeightAtLog == null)) {
+      return getDefaultRecommendations(
+        lastSession.length,
+        isTimeBased: reference.isTimeBased,
+      );
+    }
+    bool compatible(WorkoutSet set) =>
+        reference.hasComparableLoad(set) &&
+        reference.loadMode == set.loadMode &&
+        (set.loadMode == WorkoutLoadMode.external ||
+            set.bodyWeightAtLog != null);
+    final recent = pastSessions
+        ?.map((sets) => sets.where(compatible).toList())
+        .where((sets) => sets.isNotEmpty)
+        .toList();
+    final effective =
+        reference.loadEncodingVersion == 1 &&
+        reference.loadMode != WorkoutLoadMode.external;
+    WorkoutSet normalize(WorkoutSet set) =>
+        !effective ? set : set.toEffectiveLoad();
+    final recommendations = _recommendComparableSets(
+      lastSession: lastSession.where(compatible).map(normalize).toList(),
+      pastSessions: recent
+          ?.map((sets) => sets.map(normalize).toList())
+          .toList(),
+      growthModel: growthModel,
+      minReps: minReps,
+      maxReps: maxReps,
+      recoveryScores: recoveryScores,
+      primaryMuscleIds: primaryMuscleIds,
+      readinessBand: readinessBand,
+      sessionFatigueFactor: sessionFatigueFactor,
+      asOf: asOf,
+    );
+    if (!effective) return recommendations;
+    final bw = reference.bodyWeightAtLog!;
+    return recommendations
+        .map(
+          (rec) => SetRecommendation(
+            weight: max(
+              0.0,
+              reference.loadMode == WorkoutLoadMode.assisted
+                  ? bw + (reference.extraWeight ?? 0) - rec.weight
+                  : rec.weight - bw,
+            ),
+            reps: rec.reps,
+            targetDuration: rec.targetDuration,
+            confidence: rec.confidence,
+            reasoning: rec.reasoning,
+          ),
+        )
+        .toList();
+  }
+
+  List<SetRecommendation> _recommendComparableSets({
+    required List<WorkoutSet> lastSession,
+    List<List<WorkoutSet>>? pastSessions,
+    GrowthModel? growthModel,
+    int minReps = 6,
+    int maxReps = 12,
+    Map<String, MuscleRecoveryStatus>? recoveryScores,
+    List<String>? primaryMuscleIds,
+    ReadinessBand? readinessBand,
+    double sessionFatigueFactor = 0.0,
+    DateTime? asOf,
+  }) {
     final now = asOf ?? DateTime.now();
     if (lastSession.isEmpty && (pastSessions == null || pastSessions.isEmpty)) {
       return [];
@@ -177,10 +261,10 @@ class MLService implements IMLService {
     List<WorkoutSet> refSets = lastSession.isNotEmpty
         ? lastSession
         : pastSessions?.firstWhere(
-              (session) => session.isNotEmpty,
-              orElse: () => const <WorkoutSet>[],
-            ) ??
-            const <WorkoutSet>[];
+                (session) => session.isNotEmpty,
+                orElse: () => const <WorkoutSet>[],
+              ) ??
+              const <WorkoutSet>[];
     bool isPostDeloadRecovery = false;
 
     if (pastSessions != null && pastSessions.length >= 2) {
@@ -200,13 +284,17 @@ class MLService implements IMLService {
         // session (s0) is actually recent — otherwise an old, unrelated dip
         // between two stale sessions after a long break would be
         // misread as an active deload to recover from.
-        final mostRecentTimestamp =
-            s0.map((s) => s.timestamp).reduce((a, b) => a.isAfter(b) ? a : b);
+        final mostRecentTimestamp = s0
+            .map((s) => s.timestamp)
+            .reduce((a, b) => a.isAfter(b) ? a : b);
         // Compare the full duration, not Duration.inDays: inDays truncates, so
         // a session 21 days and 23 hours old would still read as 21 and stay
         // inside the window.
-        final isRecent = !now.isAfter(mostRecentTimestamp
-            .add(const Duration(days: _deloadRecencyWindowDays)));
+        final isRecent = !now.isAfter(
+          mostRecentTimestamp.add(
+            const Duration(days: _deloadRecencyWindowDays),
+          ),
+        );
 
         // If the last session (s0) was a deload relative to the one before it
         if (isRecent &&
@@ -223,27 +311,34 @@ class MLService implements IMLService {
 
     final trendIsTrustworthy =
         growthModel != null && growthModel.r2 > _minR2ForTrendSignal;
-    final weeklyPct = trendIsTrustworthy ? growthModel.weeklyGrowthPercent : null;
+    final weeklyPct = trendIsTrustworthy
+        ? growthModel.weeklyGrowthPercent
+        : null;
     final isDeclining = weeklyPct != null && weeklyPct < _declineWeeklyPct;
     final isPlateau =
         weeklyPct != null && !isDeclining && weeklyPct < _plateauWeeklyPct;
 
-    final isUnderRecovered = primaryMuscleIds != null &&
+    final isUnderRecovered =
+        primaryMuscleIds != null &&
         recoveryScores != null &&
-        primaryMuscleIds.any((m) => recoveryScores[m]?.isUnderRecovered ?? false);
+        primaryMuscleIds.any(
+          (m) => recoveryScores[m]?.isUnderRecovered ?? false,
+        );
 
     final worstRecovery = isUnderRecovered
         ? primaryMuscleIds
-            .map((m) => recoveryScores[m])
-            .whereType<MuscleRecoveryStatus>()
-            .map((s) => s.recoveryPercent)
-            .fold(100, (a, b) => a < b ? a : b)
+              .map((m) => recoveryScores[m])
+              .whereType<MuscleRecoveryStatus>()
+              .map((s) => s.recoveryPercent)
+              .fold(100, (a, b) => a < b ? a : b)
         : null;
 
     final isLowReadiness = readinessBand == ReadinessBand.low;
 
     return refSets
-        .map((set) => ProgressionRuleFactory.apply(ProgressionContext(
+        .map(
+          (set) => ProgressionRuleFactory.apply(
+            ProgressionContext(
               set: set,
               minReps: minReps,
               maxReps: maxReps,
@@ -254,13 +349,18 @@ class MLService implements IMLService {
               isPostDeloadRecovery: isPostDeloadRecovery,
               isLowReadiness: isLowReadiness,
               sessionFatigueFactor: sessionFatigueFactor,
-            )))
+            ),
+          ),
+        )
         .toList();
   }
 
   /// Fill in default recommendations when no history exists.
   @override
-  List<SetRecommendation> getDefaultRecommendations(int setCount, {bool isTimeBased = false}) {
+  List<SetRecommendation> getDefaultRecommendations(
+    int setCount, {
+    bool isTimeBased = false,
+  }) {
     return List.generate(
       setCount,
       (_) => isTimeBased
@@ -287,10 +387,9 @@ class MLService implements IMLService {
     required double currentValue,
     required double targetValue,
     required GrowthModel growthModel,
-  }) =>
-      _curveFitter.predictTargetCompletion(
-        currentValue: currentValue,
-        targetValue: targetValue,
-        growthModel: growthModel,
-      );
+  }) => _curveFitter.predictTargetCompletion(
+    currentValue: currentValue,
+    targetValue: targetValue,
+    growthModel: growthModel,
+  );
 }

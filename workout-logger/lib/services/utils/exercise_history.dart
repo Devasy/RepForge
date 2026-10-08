@@ -43,8 +43,11 @@ ExerciseLog? findMostRecentExerciseLog(
 /// caller already holds a cached one — callers on a per-frame path do, and
 /// it skips re-sorting and re-walking every session here. Omitting it
 /// computes the same thing from [sessions].
-({Map<String, MuscleRecoveryStatus>? recoveryScores, List<String>? primaryMuscleIds})
-    recoveryRecommendationInputs({
+({
+  Map<String, MuscleRecoveryStatus>? recoveryScores,
+  List<String>? primaryMuscleIds,
+})
+recoveryRecommendationInputs({
   required String exerciseId,
   required List<WorkoutSession> sessions,
   required Map<String, Exercise> exerciseMap,
@@ -61,4 +64,39 @@ ExerciseLog? findMostRecentExerciseLog(
         : mlService.computeMuscleRecoveryScores(sessions, exerciseMap),
     primaryMuscleIds: [exercise.primaryMuscle],
   );
+}
+
+/// Keep historical records intact, but never fit one trend across raw-load
+/// and snapshotted-bodyweight conventions. The latest logged set defines the
+/// active convention. Mixed-convention sessions are omitted from the trend.
+List<({DateTime date, ExerciseLog log})> comparableExerciseLogs(
+  String exerciseId,
+  List<WorkoutSession> sessions,
+) {
+  final logs = [
+    for (final session in sessions)
+      for (final log in session.exercises)
+        if (log.exerciseId == exerciseId && log.sets.isNotEmpty)
+          (date: session.date, log: log),
+  ]..sort((a, b) => b.date.compareTo(a.date));
+  if (logs.isEmpty) return [];
+  final reference = logs.first.log.sets.last;
+  return logs
+      .where((entry) => entry.log.sets.every(reference.hasComparableLoad))
+      .toList()
+      .reversed
+      .toList();
+}
+
+Map<String, WorkoutSet> latestLoadReferences(List<WorkoutSession> sessions) {
+  final sorted = [...sessions]..sort((a, b) => b.date.compareTo(a.date));
+  final references = <String, WorkoutSet>{};
+  for (final session in sorted) {
+    for (final log in session.exercises) {
+      if (log.sets.isNotEmpty) {
+        references.putIfAbsent(log.exerciseId, () => log.sets.last);
+      }
+    }
+  }
+  return references;
 }

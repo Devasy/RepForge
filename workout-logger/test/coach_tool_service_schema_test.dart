@@ -23,16 +23,23 @@ void main() {
       sqlQuery: SqlQueryService('unused.db'),
     );
 
-    final decl = tools
-        .buildTools()
-        .single
-        .functionDeclarations!
-        .firstWhere((d) => d.name == 'run_sql_query');
+    final decl = tools.buildTools().single.functionDeclarations!.firstWhere(
+      (d) => d.name == 'run_sql_query',
+    );
 
     expect(decl.description, contains('health_samples'));
     expect(decl.description, contains('sleep_sessions'));
     expect(decl.description, contains('sleep_stage_intervals'));
     expect(decl.description, contains('exercise_type'));
     expect(decl.description, contains('default_handle'));
+    expect(
+      decl.description,
+      contains('body_weight_at_log, load_mode, load_encoding_version'),
+    );
+    expect(
+      decl.description,
+      contains('personal_records(exercise_id, handle, load_encoding_version'),
+    );
+    expect(decl.description, contains('session_effort'));
   });
 }

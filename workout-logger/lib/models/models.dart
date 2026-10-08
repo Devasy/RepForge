@@ -1,6 +1,7 @@
 // Data Models for Workout Logger App
 
 import 'dart:math' show log, max;
+import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
 
@@ -71,11 +72,16 @@ const Set<String> _assistedBodyweightExerciseIds = {
   'pull_ups',
   'chin_ups',
   'dips',
-  'push_ups',
 };
 
 bool isAssistedBodyweightExercise(String? exerciseId) =>
     exerciseId != null && _assistedBodyweightExerciseIds.contains(exerciseId);
+
+/// Bodyweight movement IDs; push-ups default to added load, never assistance.
+bool isBodyweightExercise(String? id) =>
+    id == 'push_ups' || isAssistedBodyweightExercise(id);
+
+enum WorkoutLoadMode { external, assisted, weighted }
 
 enum ExerciseType {
   weightAndReps,
@@ -97,7 +103,8 @@ class Exercise {
   final List<MuscleActivation> muscleActivations;
   final String category; // 'compound' or 'isolation'
   final bool isCustom; // User-created exercise
-  final List<String>? availableHandles; // Attachment/handle options e.g. ['Rope', 'Bar']
+  final List<String>?
+  availableHandles; // Attachment/handle options e.g. ['Rope', 'Bar']
   final ExerciseType exerciseType;
 
   const Exercise({
@@ -118,16 +125,15 @@ class Exercise {
     bool? isCustom,
     List<String>? availableHandles,
     ExerciseType? exerciseType,
-  }) =>
-      Exercise(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        muscleActivations: muscleActivations ?? this.muscleActivations,
-        category: category ?? this.category,
-        isCustom: isCustom ?? this.isCustom,
-        availableHandles: availableHandles ?? this.availableHandles,
-        exerciseType: exerciseType ?? this.exerciseType,
-      );
+  }) => Exercise(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    muscleActivations: muscleActivations ?? this.muscleActivations,
+    category: category ?? this.category,
+    isCustom: isCustom ?? this.isCustom,
+    availableHandles: availableHandles ?? this.availableHandles,
+    exerciseType: exerciseType ?? this.exerciseType,
+  );
 
   String get primaryMuscle {
     if (muscleActivations.isEmpty) return 'Unknown';
@@ -152,9 +158,11 @@ class Exercise {
     final ExerciseType type;
     if (rawType == null) {
       type = ExerciseType.weightAndReps;
-    } else if (rawType == 'timeBased' || rawType == ExerciseType.timeBased.name) {
+    } else if (rawType == 'timeBased' ||
+        rawType == ExerciseType.timeBased.name) {
       type = ExerciseType.timeBased;
-    } else if (rawType == 'weightAndReps' || rawType == ExerciseType.weightAndReps.name) {
+    } else if (rawType == 'weightAndReps' ||
+        rawType == ExerciseType.weightAndReps.name) {
       type = ExerciseType.weightAndReps;
     } else {
       throw ArgumentError('Unsupported exerciseType: $rawType');
@@ -196,6 +204,8 @@ class WorkoutSet {
   final double? extraWeight;
   final String? handle;
   final double? bodyWeightAtLog;
+  final WorkoutLoadMode loadMode;
+  final int loadEncodingVersion;
 
   WorkoutSet({
     required this.weight,
@@ -208,7 +218,24 @@ class WorkoutSet {
     this.extraWeight,
     this.handle,
     this.bodyWeightAtLog,
-  }) : timestamp = timestamp ?? DateTime.now();
+    WorkoutLoadMode? loadMode,
+    int? loadEncodingVersion,
+  }) : loadMode =
+           loadMode ??
+           (assistWeight == null
+               ? WorkoutLoadMode.external
+               : WorkoutLoadMode.assisted),
+       loadEncodingVersion =
+           loadEncodingVersion ??
+           (((loadMode ??
+                           (assistWeight == null
+                               ? WorkoutLoadMode.external
+                               : WorkoutLoadMode.assisted)) !=
+                       WorkoutLoadMode.external) &&
+                   bodyWeightAtLog != null
+               ? 1
+               : 0),
+       timestamp = timestamp ?? DateTime.now();
 
   /// Per-rep effective load for the main (non-drop) entry of this set: for
   /// assisted-bodyweight sets (i.e. [assistWeight] is set) this is
@@ -218,28 +245,65 @@ class WorkoutSet {
   /// sets just use [weight]. Use this (not raw [weight]) wherever a
   /// "how heavy was this set" comparison needs to be consistent with
   /// [calculateVolume] for assisted-bodyweight exercises.
-  double get effectiveWeight {
-    final assist = assistWeight;
-    if (assist == null) return weight;
-    final bw = bodyWeightAtLog ?? 70.0;
-    return max(0.0, bw - assist + (extraWeight ?? 0.0));
+  double get effectiveWeight => effectiveLoad(
+    loadMode == WorkoutLoadMode.assisted ? (assistWeight ?? weight) : weight,
+  );
+
+  /// Version 0 preserves raw historical data. Version 1 uses a recorded BW.
+  /// Consumers must compare only matching conventions, never backfill BW.
+  String get loadConvention =>
+      '$loadEncodingVersion:${loadMode == WorkoutLoadMode.external ? 'external' : 'bodyweight'}';
+  bool hasComparableLoad(WorkoutSet other) =>
+      loadConvention == other.loadConvention;
+
+  double effectiveLoad(double enteredWeight, {double? userBodyWeight}) {
+    if (loadMode == WorkoutLoadMode.external) return enteredWeight;
+    final bw = bodyWeightAtLog ?? userBodyWeight ?? 70.0;
+    if (loadMode == WorkoutLoadMode.weighted) {
+      return max(0.0, bw + enteredWeight);
+    }
+    return max(0.0, bw - enteredWeight + (extraWeight ?? 0.0));
   }
 
+  /// Normalize main and drop loads together for analytics/recommendations.
+  WorkoutSet toEffectiveLoad() => copyWith(
+    weight: effectiveWeight,
+    assistWeight: null,
+    extraWeight: null,
+    bodyWeightAtLog: null,
+    loadMode: WorkoutLoadMode.external,
+    loadEncodingVersion: 0,
+    drops: drops
+        ?.map(
+          (drop) => DropsetEntry(
+            id: drop.id,
+            weight: effectiveLoad(drop.weight),
+            reps: drop.reps,
+          ),
+        )
+        .toList(),
+  );
+
   double calculateVolume({double? userBodyWeight, bool? isAssistedBW}) {
-    final assisted = isAssistedBW ?? (assistWeight != null);
-    final bw = bodyWeightAtLog ?? userBodyWeight ?? 70.0;
-    final effW = assisted
-        ? max(0.0, bw - (assistWeight ?? weight) + (extraWeight ?? 0.0))
-        : weight;
+    // Explicit override is retained only for legacy callers. Stored modes win.
+    double load(double value) =>
+        loadMode == WorkoutLoadMode.external && isAssistedBW == true
+        ? max(
+            0.0,
+            (bodyWeightAtLog ?? userBodyWeight ?? 70.0) -
+                value +
+                (extraWeight ?? 0.0),
+          )
+        : effectiveLoad(value, userBodyWeight: userBodyWeight);
+    final effW = load(
+      loadMode == WorkoutLoadMode.assisted ? (assistWeight ?? weight) : weight,
+    );
     double vol = reps == 0 && (timeTaken != null && timeTaken! > 0)
         ? (effW > 0 ? effW : 1.0) * timeTaken!
         : effW * reps;
     if (isDropset && drops != null) {
       for (final drop in drops!) {
-        final dropEff = assisted
-            ? max(0.0, bw - drop.weight + (extraWeight ?? 0.0))
-            : drop.weight;
-        vol += dropEff * drop.reps;
+        vol += load(drop.weight) * drop.reps;
       }
     }
     return vol;
@@ -264,6 +328,8 @@ class WorkoutSet {
     'extraWeight': extraWeight,
     'handle': handle,
     'bodyWeightAtLog': bodyWeightAtLog,
+    'loadMode': loadMode.name,
+    'loadEncodingVersion': loadEncodingVersion,
   };
 
   factory WorkoutSet.fromJson(Map<String, dynamic> json) => WorkoutSet(
@@ -279,6 +345,10 @@ class WorkoutSet {
     extraWeight: (json['extraWeight'] as num?)?.toDouble(),
     handle: json['handle'] as String?,
     bodyWeightAtLog: (json['bodyWeightAtLog'] as num?)?.toDouble(),
+    loadMode: json['loadMode'] == null
+        ? null
+        : WorkoutLoadMode.values.byName(json['loadMode'] as String),
+    loadEncodingVersion: json['loadEncodingVersion'] as int?,
   );
 
   WorkoutSet copyWith({
@@ -292,6 +362,8 @@ class WorkoutSet {
     Object? extraWeight = _sentinel,
     Object? handle = _sentinel,
     Object? bodyWeightAtLog = _sentinel,
+    WorkoutLoadMode? loadMode,
+    int? loadEncodingVersion,
   }) => WorkoutSet(
     weight: weight == _sentinel ? this.weight : weight as double,
     reps: reps == _sentinel ? this.reps : reps as int,
@@ -299,10 +371,18 @@ class WorkoutSet {
     drops: drops == _sentinel ? this.drops : drops as List<DropsetEntry>?,
     timeTaken: timeTaken == _sentinel ? this.timeTaken : timeTaken as int?,
     timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime?,
-    assistWeight: assistWeight == _sentinel ? this.assistWeight : assistWeight as double?,
-    extraWeight: extraWeight == _sentinel ? this.extraWeight : extraWeight as double?,
+    assistWeight: assistWeight == _sentinel
+        ? this.assistWeight
+        : assistWeight as double?,
+    extraWeight: extraWeight == _sentinel
+        ? this.extraWeight
+        : extraWeight as double?,
     handle: handle == _sentinel ? this.handle : handle as String?,
-    bodyWeightAtLog: bodyWeightAtLog == _sentinel ? this.bodyWeightAtLog : bodyWeightAtLog as double?,
+    bodyWeightAtLog: bodyWeightAtLog == _sentinel
+        ? this.bodyWeightAtLog
+        : bodyWeightAtLog as double?,
+    loadMode: loadMode ?? this.loadMode,
+    loadEncodingVersion: loadEncodingVersion ?? this.loadEncodingVersion,
   );
 }
 
@@ -312,7 +392,7 @@ class DropsetEntry {
   final int reps;
 
   DropsetEntry({String? id, required this.weight, required this.reps})
-      : id = id ?? _uuid.v4();
+    : id = id ?? _uuid.v4();
 
   Map<String, dynamic> toJson() => {'id': id, 'weight': weight, 'reps': reps};
 
@@ -339,7 +419,15 @@ class ExerciseLog {
   });
 
   double calculateTotalVolume({double? userBodyWeight, bool? isAssistedBW}) =>
-      sets.fold(0.0, (sum, set) => sum + set.calculateVolume(userBodyWeight: userBodyWeight, isAssistedBW: isAssistedBW));
+      sets.fold(
+        0.0,
+        (sum, set) =>
+            sum +
+            set.calculateVolume(
+              userBodyWeight: userBodyWeight,
+              isAssistedBW: isAssistedBW,
+            ),
+      );
 
   double get totalVolume => sets.fold(0.0, (sum, set) => sum + set.volume);
 
@@ -388,8 +476,10 @@ class WorkoutSession {
   final List<ExerciseLog> exercises;
   final int duration; // minutes
   final String? notes;
+
   /// Non-null when this session was successfully synced to Health Connect.
   final DateTime? hcSyncedAt;
+
   /// Optional once-per-workout subjective effort (1 = Easy, 2 = Solid,
   /// 3 = Brutal), captured on the post-workout summary screen. Used only to
   /// calibrate [EffortEstimator]'s per-set RPE anchor — never required.
@@ -509,8 +599,8 @@ class Routine {
     defaultHandles: identical(defaultHandles, _routineSentinel)
         ? this.defaultHandles
         : (defaultHandles is Map
-            ? defaultHandles.cast<String, String>()
-            : null),
+              ? defaultHandles.cast<String, String>()
+              : null),
   );
 }
 
@@ -570,7 +660,8 @@ class Target {
 class SetRecommendation {
   final double weight;
   final int reps;
-  final int? targetDuration; // Target hold duration in seconds for time-based exercises
+  final int?
+  targetDuration; // Target hold duration in seconds for time-based exercises
   final String confidence; // 'high', 'medium', 'low'
   final String reasoning;
 
@@ -675,39 +766,53 @@ class GrowthModel {
 
 class PersonalRecord {
   final String exerciseId;
-  final double bestWeight; // heaviest weight in any single set
-  final int bestReps;      // most reps in any single set
-  final double bestVolume; // highest single-set volume (weight × reps)
+  final String? handle;
+  final int loadEncodingVersion;
+  final double bestWeight;
+  final int bestReps;
+  final double bestVolume;
   final DateTime achievedAt;
-  final int? bestDuration; // longest duration in seconds for time-based holds
+  final int? bestDuration;
 
   PersonalRecord({
-    required this.exerciseId,
+    required String exerciseId,
+    String? handle,
+    this.loadEncodingVersion = 0,
     required this.bestWeight,
     required this.bestReps,
     required this.bestVolume,
     required this.achievedAt,
     this.bestDuration,
-  });
+  }) : exerciseId = handle == null && exerciseId.contains(':')
+           ? exerciseId.substring(0, exerciseId.indexOf(':'))
+           : exerciseId,
+       handle = handle == null && exerciseId.contains(':')
+           ? exerciseId.substring(exerciseId.indexOf(':') + 1)
+           : (handle?.isEmpty == true ? null : handle);
+
+  String get storageKey =>
+      jsonEncode([exerciseId, handle ?? '', loadEncodingVersion]);
 
   Map<String, dynamic> toJson() => {
     'exerciseId': exerciseId,
+    'handle': handle,
+    'loadEncodingVersion': loadEncodingVersion,
     'bestWeight': bestWeight,
     'bestReps': bestReps,
     'bestVolume': bestVolume,
     'achievedAt': achievedAt.toIso8601String(),
     'bestDuration': bestDuration,
   };
-
   factory PersonalRecord.fromJson(Map<String, dynamic> json) => PersonalRecord(
     exerciseId: json['exerciseId'] as String,
+    handle: json['handle'] as String?,
+    loadEncodingVersion: json['loadEncodingVersion'] as int? ?? 0,
     bestWeight: (json['bestWeight'] as num).toDouble(),
     bestReps: json['bestReps'] as int,
     bestVolume: (json['bestVolume'] as num).toDouble(),
     achievedAt: DateTime.parse(json['achievedAt'] as String),
     bestDuration: json['bestDuration'] as int?,
   );
-
   PersonalRecord copyWith({
     double? bestWeight,
     int? bestReps,
@@ -716,12 +821,37 @@ class PersonalRecord {
     int? bestDuration,
   }) => PersonalRecord(
     exerciseId: exerciseId,
+    handle: handle,
+    loadEncodingVersion: loadEncodingVersion,
     bestWeight: bestWeight ?? this.bestWeight,
     bestReps: bestReps ?? this.bestReps,
     bestVolume: bestVolume ?? this.bestVolume,
     achievedAt: achievedAt ?? this.achievedAt,
     bestDuration: bestDuration ?? this.bestDuration,
   );
+
+  /// Exercise-wide lookup combines only the latest measurement convention.
+  static PersonalRecord? aggregate(Iterable<PersonalRecord> records) {
+    final all = records.toList();
+    if (all.isEmpty) return null;
+    final version = all.map((r) => r.loadEncodingVersion).reduce(max);
+    final compatible = all
+        .where((r) => r.loadEncodingVersion == version)
+        .toList();
+    return PersonalRecord(
+      exerciseId: compatible.first.exerciseId,
+      loadEncodingVersion: version,
+      bestWeight: compatible.map((r) => r.bestWeight).reduce(max),
+      bestReps: compatible.map((r) => r.bestReps).reduce(max),
+      bestVolume: compatible.map((r) => r.bestVolume).reduce(max),
+      bestDuration: compatible.map((r) => r.bestDuration ?? 0).reduce(max) == 0
+          ? null
+          : compatible.map((r) => r.bestDuration ?? 0).reduce(max),
+      achievedAt: compatible
+          .map((r) => r.achievedAt)
+          .reduce((a, b) => a.isAfter(b) ? a : b),
+    );
+  }
 }
 
 // ==================== Training Program ====================
@@ -789,13 +919,15 @@ class ProgramExerciseSlot {
     Object? notes = _sentinel,
     Object? supersetGroupId = _sentinel,
   }) => ProgramExerciseSlot(
-    exerciseId:
-        exerciseId == _sentinel ? this.exerciseId : exerciseId as String,
+    exerciseId: exerciseId == _sentinel
+        ? this.exerciseId
+        : exerciseId as String,
     sets: sets == _sentinel ? this.sets : sets as int,
     minReps: minReps == _sentinel ? this.minReps : minReps as int,
     maxReps: maxReps == _sentinel ? this.maxReps : maxReps as int,
-    restSeconds:
-        restSeconds == _sentinel ? this.restSeconds : restSeconds as int,
+    restSeconds: restSeconds == _sentinel
+        ? this.restSeconds
+        : restSeconds as int,
     tempo: tempo == _sentinel ? this.tempo : tempo as String?,
     weightPercentage: weightPercentage == _sentinel
         ? this.weightPercentage
@@ -1019,8 +1151,7 @@ class TrainingProgram {
   }
 
   /// Number of training days across the entire program.
-  int get totalDays =>
-      weeks.fold(0, (sum, w) => sum + w.days.length);
+  int get totalDays => weeks.fold(0, (sum, w) => sum + w.days.length);
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -1066,15 +1197,15 @@ class TrainingProgram {
   }) => TrainingProgram(
     id: id == _sentinel ? this.id : id as String,
     name: name == _sentinel ? this.name : name as String,
-    description:
-        description == _sentinel ? this.description : description as String?,
+    description: description == _sentinel
+        ? this.description
+        : description as String?,
     totalWeeks: totalWeeks == _sentinel ? this.totalWeeks : totalWeeks as int,
     phases: phases == _sentinel ? this.phases : phases as List<TrainingPhase>,
     weeks: weeks == _sentinel ? this.weeks : weeks as List<ProgramWeek>,
     author: author == _sentinel ? this.author : author as String?,
     isImported: isImported == _sentinel ? this.isImported : isImported as bool,
-    createdAt:
-        createdAt == _sentinel ? this.createdAt : createdAt as DateTime,
+    createdAt: createdAt == _sentinel ? this.createdAt : createdAt as DateTime,
   );
 }
 
@@ -1100,8 +1231,8 @@ class ChatMessage {
     this.toolCalls,
     this.imageBytesBase64,
     this.imageMimeType,
-  })  : id = id ?? _uuid.v4(),
-        timestamp = timestamp ?? DateTime.now();
+  }) : id = id ?? _uuid.v4(),
+       timestamp = timestamp ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -1163,10 +1294,10 @@ class Conversation {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<ChatMessage>? messages,
-  })  : id = id ?? _uuid.v4(),
-        createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? createdAt ?? DateTime.now(),
-        messages = messages ?? const [];
+  }) : id = id ?? _uuid.v4(),
+       createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? createdAt ?? DateTime.now(),
+       messages = messages ?? const [];
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -1443,7 +1574,8 @@ class ReadinessSnapshot {
             ? ReadinessBand.values.byName(json['band'] as String)
             : null,
         sleepMinutes: json['sleepMinutes'] as int?,
-        sleepBaselineMinutes: (json['sleepBaselineMinutes'] as num?)?.toDouble(),
+        sleepBaselineMinutes: (json['sleepBaselineMinutes'] as num?)
+            ?.toDouble(),
         sleepScore: json['sleepScore'] as int?,
         restingHr: (json['restingHr'] as num?)?.toDouble(),
         rhrBaseline: (json['rhrBaseline'] as num?)?.toDouble(),

@@ -5,6 +5,7 @@
 // of NewPRResult describing which record types were broken so the UI can
 // display badges on the summary screen.
 
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../models/models.dart';
 import '../interfaces/storage_service_interface.dart';
@@ -28,11 +29,22 @@ class PRManager extends ChangeNotifier {
     final records = await _storage.getAllPersonalRecords();
     _cache.clear();
     for (final r in records) {
-      _cache[r.exerciseId] = r;
+      _cache[r.storageKey] = r;
     }
   }
 
-  List<PersonalRecord> get allRecords => List.unmodifiable(_cache.values.toList());
+  List<PersonalRecord> get allRecords => List.unmodifiable(
+    _cache.values
+        .where(
+          (record) => !_cache.values.any(
+            (other) =>
+                other.exerciseId == record.exerciseId &&
+                other.handle == record.handle &&
+                other.loadEncodingVersion > record.loadEncodingVersion,
+          ),
+        )
+        .toList(),
+  );
 
   /// Seed PRs from historical sessions when no stored records exist yet.
   ///
@@ -45,8 +57,15 @@ class PRManager extends ChangeNotifier {
   }
 
   PersonalRecord? getRecord(String exerciseId, {String? handle}) {
-    final key = (handle != null && handle.isNotEmpty) ? '$exerciseId:$handle' : exerciseId;
-    return _cache[key] ?? _cache[exerciseId];
+    final matching = allRecords.where(
+      (r) =>
+          r.exerciseId == exerciseId &&
+          (handle == null || handle.isEmpty || r.handle == handle),
+    );
+    if (handle == null || handle.isEmpty) {
+      return PersonalRecord.aggregate(matching);
+    }
+    return matching.firstOrNull;
   }
 
   /// Compare each exercise log in [session] against stored PRs.
@@ -59,7 +78,30 @@ class PRManager extends ChangeNotifier {
     for (final log in session.exercises) {
       if (log.sets.isEmpty) continue;
 
-      final broken = await _checkExercise(log, session.date);
+      // Separate legacy/raw PRs from snapshotted bodyweight PRs.
+      final groups = <String, List<WorkoutSet>>{};
+      for (final set in log.sets) {
+        final handle = set.handle ?? log.handle;
+        groups
+            .putIfAbsent(
+              jsonEncode([handle, set.loadEncodingVersion]),
+              () => [],
+            )
+            .add(set);
+      }
+      final broken = <String>{};
+      for (final sets in groups.values) {
+        broken.addAll(
+          await _checkExercise(
+            ExerciseLog(
+              exerciseId: log.exerciseId,
+              handle: sets.first.handle ?? log.handle,
+              sets: sets,
+            ),
+            session.date,
+          ),
+        );
+      }
       if (broken.isNotEmpty) {
         results.add(NewPRResult(exerciseId: log.exerciseId, types: broken));
       }
@@ -70,8 +112,11 @@ class PRManager extends ChangeNotifier {
   }
 
   Future<Set<String>> _checkExercise(ExerciseLog log, DateTime date) async {
-    final handle = log.handle ?? log.sets.where((s) => s.handle != null).firstOrNull?.handle;
-    final key = (handle != null && handle.isNotEmpty) ? '${log.exerciseId}:$handle' : log.exerciseId;
+    final handle =
+        log.handle ??
+        log.sets.where((s) => s.handle != null).firstOrNull?.handle;
+    final version = log.sets.first.loadEncodingVersion;
+    final key = jsonEncode([log.exerciseId, handle ?? '', version]);
     final existing = _cache[key];
 
     double newBestWeight = existing?.bestWeight ?? 0;
@@ -83,7 +128,9 @@ class PRManager extends ChangeNotifier {
       // effectiveWeight, not raw weight: for assisted-bodyweight sets, weight
       // stores the assist load, so a raw comparison would flag more assist
       // (an easier set) as a new weight PR.
-      if (set.effectiveWeight > newBestWeight) newBestWeight = set.effectiveWeight;
+      if (set.effectiveWeight > newBestWeight) {
+        newBestWeight = set.effectiveWeight;
+      }
       if (set.reps > newBestReps) newBestReps = set.reps;
       if (set.volume > newBestVolume) newBestVolume = set.volume;
       if (set.timeTaken != null && set.timeTaken! > (newBestDuration ?? 0)) {
@@ -96,14 +143,17 @@ class PRManager extends ChangeNotifier {
     final broken = <String>{};
     if (existing == null) {
       if (isTimeBased) {
-        if (newBestDuration != null && newBestDuration > 0) broken.add('duration');
+        if (newBestDuration != null && newBestDuration > 0) {
+          broken.add('duration');
+        }
         if (newBestWeight > 0) broken.add('weight');
       } else {
         broken.addAll(['weight', 'reps', 'volume']);
       }
     } else {
       if (isTimeBased) {
-        if (newBestDuration != null && newBestDuration > (existing.bestDuration ?? 0)) {
+        if (newBestDuration != null &&
+            newBestDuration > (existing.bestDuration ?? 0)) {
           broken.add('duration');
         }
         if (newBestWeight > existing.bestWeight) broken.add('weight');
@@ -117,7 +167,9 @@ class PRManager extends ChangeNotifier {
     if (broken.isEmpty) return broken;
 
     final updated = PersonalRecord(
-      exerciseId: key,
+      exerciseId: log.exerciseId,
+      handle: handle,
+      loadEncodingVersion: version,
       bestWeight: newBestWeight,
       bestReps: newBestReps,
       bestVolume: newBestVolume,

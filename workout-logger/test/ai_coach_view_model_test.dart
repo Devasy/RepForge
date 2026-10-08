@@ -20,11 +20,15 @@ import 'test_utils/mock_storage_service.dart';
 
 /// Scripted IAiService: yields fixed chunks; optionally invokes a tool first.
 class _FakeAiService implements IAiService {
-  _FakeAiService({this.chunks = const ['Hello ', 'world'], this.invokeTool = false});
+  _FakeAiService({
+    this.chunks = const ['Hello ', 'world'],
+    this.invokeTool = false,
+  });
 
   final List<String> chunks;
   final bool invokeTool;
   int toolCallsMade = 0;
+  bool fail = false;
   String? lastImageBytesBase64;
   String? lastImageMimeType;
   List<Content>? lastHistory;
@@ -52,6 +56,7 @@ class _FakeAiService implements IAiService {
       await onToolCall(FunctionCall('get_muscle_recovery', {}));
       toolCallsMade++;
     }
+    if (fail) throw Exception('software caused connection abort');
     for (final c in chunks) {
       yield c;
     }
@@ -61,8 +66,7 @@ class _FakeAiService implements IAiService {
   Future<TrainingProgram> generateProgram({
     required String userPrompt,
     required List<Exercise> allExercises,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<String> generateWeeklyInsights(String contextText) async => '';
@@ -79,24 +83,28 @@ class _FakeAiService implements IAiService {
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
     String? imageBytesBase64,
     String? imageMimeType,
-  }) =>
-      streamCoachReply(
-        userMessage: userMessage,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: tools,
-        onToolCall: onToolCall,
-        imageBytesBase64: imageBytesBase64,
-        imageMimeType: imageMimeType,
-      );
+  }) => streamCoachReply(
+    userMessage: userMessage,
+    systemPrompt: systemPrompt,
+    history: history,
+    tools: tools,
+    onToolCall: onToolCall,
+    imageBytesBase64: imageBytesBase64,
+    imageMimeType: imageMimeType,
+  );
 
   @override
   Future<T> generateStructuredJson<T>({
     required String systemPrompt,
     required String userPrompt,
     required T Function(Map<String, dynamic> json) fromJson,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
+}
+
+class _FailingConversationStorage extends MockStorageService {
+  @override
+  Future<void> saveConversation(Conversation conversation) async =>
+      throw Exception('disk full');
 }
 
 void main() {
@@ -147,6 +155,27 @@ void main() {
       expect(stored.first.messages, hasLength(2));
     });
 
+    test(
+      'saving failure clears loading and does not enable unsafe retry',
+      () async {
+        storage = _FailingConversationStorage();
+        final vm = await buildVm(_FakeAiService());
+        await vm.sendMessage('hello');
+        expect(vm.isLoading, isFalse);
+        expect(vm.canRetry, isFalse);
+        expect(vm.failure!.message, contains('could not be saved'));
+      },
+    );
+
+    test('deleting active failed chat clears retry state', () async {
+      final vm = await buildVm(_ThrowingAiService());
+      await vm.sendMessage('hello');
+      await vm.deleteConversation(vm.activeConversationId!);
+      expect(vm.failure, isNull);
+      expect(vm.canRetry, isFalse);
+      expect(vm.messages, isEmpty);
+    });
+
     test('blank or whitespace messages are ignored', () async {
       final vm = await buildVm(_FakeAiService());
       await vm.sendMessage('   ');
@@ -163,26 +192,28 @@ void main() {
       expect(vm.messages.last.text, 'done');
     });
 
-    test('newConversation then selectConversation swaps active state',
-        () async {
-      final vm = await buildVm(_FakeAiService());
+    test(
+      'newConversation then selectConversation swaps active state',
+      () async {
+        final vm = await buildVm(_FakeAiService());
 
-      await vm.sendMessage('first chat');
-      final firstId = vm.activeConversationId;
-      expect(firstId, isNotNull);
+        await vm.sendMessage('first chat');
+        final firstId = vm.activeConversationId;
+        expect(firstId, isNotNull);
 
-      vm.newConversation();
-      expect(vm.messages, isEmpty);
+        vm.newConversation();
+        expect(vm.messages, isEmpty);
 
-      await vm.sendMessage('second chat');
-      final secondId = vm.activeConversationId;
-      expect(secondId, isNot(firstId));
-      expect(vm.conversations, hasLength(2));
+        await vm.sendMessage('second chat');
+        final secondId = vm.activeConversationId;
+        expect(secondId, isNot(firstId));
+        expect(vm.conversations, hasLength(2));
 
-      vm.selectConversation(firstId!);
-      expect(vm.activeConversationId, firstId);
-      expect(vm.messages.first.text, 'first chat');
-    });
+        vm.selectConversation(firstId!);
+        expect(vm.activeConversationId, firstId);
+        expect(vm.messages.first.text, 'first chat');
+      },
+    );
 
     test('pending image state can be set and cleared', () async {
       final vm = await buildVm(_FakeAiService());
@@ -200,91 +231,144 @@ void main() {
       expect(vm.pendingImageBytes, isNull);
     });
 
-    test('sendMessage attaches pending image, passes to IAiService, and clears pending', () async {
-      final ai = _FakeAiService();
-      final vm = await buildVm(ai);
+    test(
+      'sendMessage attaches pending image, passes to IAiService, and clears pending',
+      () async {
+        final ai = _FakeAiService();
+        final vm = await buildVm(ai);
 
-      final testBytes = Uint8List.fromList([10, 20, 30, 40]);
-      vm.setPendingImageForTesting(testBytes, 'image/png');
+        final testBytes = Uint8List.fromList([10, 20, 30, 40]);
+        vm.setPendingImageForTesting(testBytes, 'image/png');
 
-      await vm.sendMessage('Check my form');
+        await vm.sendMessage('Check my form');
 
-      expect(ai.lastImageBytesBase64, base64Encode(testBytes));
-      expect(ai.lastImageMimeType, 'image/png');
-      expect(vm.hasPendingImage, isFalse);
-      expect(vm.pendingImageBytes, isNull);
+        expect(ai.lastImageBytesBase64, base64Encode(testBytes));
+        expect(ai.lastImageMimeType, 'image/png');
+        expect(vm.hasPendingImage, isFalse);
+        expect(vm.pendingImageBytes, isNull);
 
-      final userMsg = vm.messages.firstWhere((m) => m.role == 'user');
-      expect(userMsg.imageBytesBase64, base64Encode(testBytes));
-      expect(userMsg.imageMimeType, 'image/png');
-    });
+        final userMsg = vm.messages.firstWhere((m) => m.role == 'user');
+        expect(userMsg.imageBytesBase64, base64Encode(testBytes));
+        expect(userMsg.imageMimeType, 'image/png');
+      },
+    );
 
-    test('sendMessage with image only (no text) is accepted and sends image', () async {
-      final ai = _FakeAiService();
-      final vm = await buildVm(ai);
+    test(
+      'sendMessage with image only (no text) is accepted and sends image',
+      () async {
+        final ai = _FakeAiService();
+        final vm = await buildVm(ai);
 
-      final testBytes = Uint8List.fromList([5, 6, 7, 8]);
-      vm.setPendingImageForTesting(testBytes, 'image/jpeg');
+        final testBytes = Uint8List.fromList([5, 6, 7, 8]);
+        vm.setPendingImageForTesting(testBytes, 'image/jpeg');
 
-      // Empty text is allowed when there is a pending image
-      await vm.sendMessage('');
+        // Empty text is allowed when there is a pending image
+        await vm.sendMessage('');
 
-      expect(ai.lastImageBytesBase64, base64Encode(testBytes));
-      expect(vm.messages, hasLength(2)); // user + model
-      expect(vm.messages[0].imageBytesBase64, base64Encode(testBytes));
-      expect(vm.hasPendingImage, isFalse);
-    });
+        expect(ai.lastImageBytesBase64, base64Encode(testBytes));
+        expect(vm.messages, hasLength(2)); // user + model
+        expect(vm.messages[0].imageBytesBase64, base64Encode(testBytes));
+        expect(vm.hasPendingImage, isFalse);
+      },
+    );
 
-    test('sendMessage stores error message when IAiService throws', () async {
-      final throwingVm = await buildVm(_ThrowingAiService());
+    test(
+      'image-only retry preserves attachment and succeeds without duplicate turn',
+      () async {
+        final ai = _FakeAiService()..fail = true;
+        final retryVm = await buildVm(ai);
+        retryVm.setPendingImageForTesting(
+          Uint8List.fromList([1, 2]),
+          'image/png',
+        );
+        await retryVm.sendMessage('');
+        expect(retryVm.canRetry, isTrue);
+        ai.fail = false;
+        await retryVm.retry();
+        expect(retryVm.messages, hasLength(2));
+        expect(ai.lastImageBytesBase64, base64Encode([1, 2]));
+        expect(ai.lastHistory, isEmpty);
+        expect(retryVm.failure, isNull);
+      },
+    );
 
-      await throwingVm.sendMessage('cause error');
+    test(
+      'retry is disabled after a tool call to avoid repeating actions',
+      () async {
+        final ai = _FakeAiService(invokeTool: true)..fail = true;
+        final retryVm = await buildVm(ai);
+        await retryVm.sendMessage('check recovery');
+        expect(retryVm.canRetry, isFalse);
+        await retryVm.retry();
+        expect(ai.toolCallsMade, 1);
+      },
+    );
 
-      expect(throwingVm.messages, hasLength(2));
-      final errMsg = throwingVm.messages.last;
-      expect(errMsg.role, 'model');
-      expect(errMsg.text, contains('Error'));
-      expect(throwingVm.isLoading, isFalse);
-    });
+    test(
+      'sendMessage exposes friendly failure and retry does not duplicate user turn',
+      () async {
+        final throwingVm = await buildVm(_ThrowingAiService());
 
-    test('_buildHistory preserves attached images with DataPart and [Attached image] placeholder', () async {
-      final ai = _FakeAiService();
-      final vm = await buildVm(ai);
+        await throwingVm.sendMessage('cause error');
 
-      // Send a message with image — this gets stored and becomes part of history
-      // in the next turn.
-      final imgBytes = Uint8List.fromList([1, 2, 3]);
-      vm.setPendingImageForTesting(imgBytes, 'image/jpeg');
-      await vm.sendMessage(''); // image-only first message
+        expect(throwingVm.messages, hasLength(1));
+        expect(throwingVm.failure!.message, contains('could not finish'));
+        expect(throwingVm.canRetry, isTrue);
+        await throwingVm.retry();
+        expect(throwingVm.messages, hasLength(1));
+        throwingVm.newConversation();
+        expect(throwingVm.canRetry, isFalse);
+        expect(throwingVm.isLoading, isFalse);
+      },
+    );
 
-      // Second message triggers _buildHistory which must preserve the image bytes
-      // as a DataPart while retaining the text fallback.
-      await vm.sendMessage('follow up');
+    test(
+      '_buildHistory preserves attached images with DataPart and [Attached image] placeholder',
+      () async {
+        final ai = _FakeAiService();
+        final vm = await buildVm(ai);
 
-      expect(vm.messages.length, greaterThanOrEqualTo(4));
-      expect(ai.lastHistory, isNotNull);
-      expect(ai.lastHistory, isNotEmpty);
-      final historyContent = ai.lastHistory!.first;
-      final historyParts = historyContent.parts.toList();
-      expect(historyParts.any((p) => p is DataPart), isTrue);
-      final dataPart = historyParts.firstWhere((p) => p is DataPart) as DataPart;
-      expect(dataPart.mimeType, 'image/jpeg');
-      expect(dataPart.bytes, equals(imgBytes));
-      expect(historyParts.any((p) => p is TextPart && p.text == '[Attached image]'), isTrue);
+        // Send a message with image — this gets stored and becomes part of history
+        // in the next turn.
+        final imgBytes = Uint8List.fromList([1, 2, 3]);
+        vm.setPendingImageForTesting(imgBytes, 'image/jpeg');
+        await vm.sendMessage(''); // image-only first message
 
-      // Verify Content.toJson() serializes the DataPart and TextPart
-      final json = historyContent.toJson();
-      expect(json['role'], 'user');
-      final serializedParts = json['parts'] as List;
-      expect(serializedParts, hasLength(2));
-      expect(serializedParts[0], {
-        'inlineData': {
-          'mimeType': 'image/jpeg',
-          'data': base64Encode(imgBytes),
-        },
-      });
-      expect(serializedParts[1], {'text': '[Attached image]'});
-    });
+        // Second message triggers _buildHistory which must preserve the image bytes
+        // as a DataPart while retaining the text fallback.
+        await vm.sendMessage('follow up');
+
+        expect(vm.messages.length, greaterThanOrEqualTo(4));
+        expect(ai.lastHistory, isNotNull);
+        expect(ai.lastHistory, isNotEmpty);
+        final historyContent = ai.lastHistory!.first;
+        final historyParts = historyContent.parts.toList();
+        expect(historyParts.any((p) => p is DataPart), isTrue);
+        final dataPart =
+            historyParts.firstWhere((p) => p is DataPart) as DataPart;
+        expect(dataPart.mimeType, 'image/jpeg');
+        expect(dataPart.bytes, equals(imgBytes));
+        expect(
+          historyParts.any(
+            (p) => p is TextPart && p.text == '[Attached image]',
+          ),
+          isTrue,
+        );
+
+        // Verify Content.toJson() serializes the DataPart and TextPart
+        final json = historyContent.toJson();
+        expect(json['role'], 'user');
+        final serializedParts = json['parts'] as List;
+        expect(serializedParts, hasLength(2));
+        expect(serializedParts[0], {
+          'inlineData': {
+            'mimeType': 'image/jpeg',
+            'data': base64Encode(imgBytes),
+          },
+        });
+        expect(serializedParts[1], {'text': '[Attached image]'});
+      },
+    );
 
     test('deleteConversation removes it from the list', () async {
       final vm = await buildVm(_FakeAiService());
@@ -330,14 +414,14 @@ class _ThrowingAiService implements IAiService {
     String? imageBytesBase64,
     String? imageMimeType,
   }) => streamCoachReply(
-        userMessage: userMessage,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: tools,
-        onToolCall: onToolCall,
-        imageBytesBase64: imageBytesBase64,
-        imageMimeType: imageMimeType,
-      );
+    userMessage: userMessage,
+    systemPrompt: systemPrompt,
+    history: history,
+    tools: tools,
+    onToolCall: onToolCall,
+    imageBytesBase64: imageBytesBase64,
+    imageMimeType: imageMimeType,
+  );
 
   @override
   Future<TrainingProgram> generateProgram({

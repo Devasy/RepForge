@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/workout_flow_screen.dart';
+import 'package:repforge/screens/widgets/exercise_input_section.dart';
 import 'package:repforge/screens/workout_summary_screen.dart';
 import 'package:repforge/services/managers/pr_manager.dart';
 import 'package:repforge/services/managers/program_manager.dart';
@@ -49,6 +50,32 @@ void main() {
     await settingsProvider.init();
     await prManager.load();
   });
+
+  for (final exerciseId in ['pull_ups', 'push_ups']) {
+    testWidgets('$exerciseId logs weighted load with a bodyweight snapshot', (tester) async {
+      workoutProvider.startWorkout(exerciseIds: [exerciseId]);
+      await tester.pumpWidget(_buildTestApp(workoutProvider: workoutProvider, settingsProvider: settingsProvider, prManager: prManager, child: const WorkoutFlowScreen()));
+      await tester.pumpAndSettle();
+      if (exerciseId == 'pull_ups') {
+        await tester.tap(find.text('Weighted'));
+        await tester.pumpAndSettle();
+      } else {
+        expect(find.text('Assisted'), findsNothing);
+      }
+      final input = tester.widget<ExerciseInputSection>(find.byType(ExerciseInputSection));
+      input.onWeightChanged(10);
+      await tester.pump();
+      await tester.ensureVisible(find.text('Log set'));
+      await tester.tap(find.text('Log set'));
+      await tester.pump();
+      final set = workoutProvider.currentExerciseLog!.sets.single;
+      expect(set.loadMode, WorkoutLoadMode.weighted);
+      expect(set.loadEncodingVersion, 1);
+      expect(set.bodyWeightAtLog, isNotNull);
+      expect(set.effectiveWeight, set.bodyWeightAtLog! + 10);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   group('Userflow 1: Workout Logging & Rest Timer & Summary Screen Flow', () {
     testWidgets('User completes sets, interacts with RestTimerView, and views WorkoutSummaryScreen through production flow', (tester) async {

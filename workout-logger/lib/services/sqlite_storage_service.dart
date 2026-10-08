@@ -3,6 +3,7 @@
 // for the schema and migration design this implements.
 
 import 'dart:convert';
+import 'backup_codec.dart';
 import 'dart:io';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
@@ -12,11 +13,11 @@ import 'interfaces/storage_service_interface.dart';
 
 class SqliteStorageService implements IStorageService {
   SqliteStorageService({String? databasePathOverride})
-      : _databasePathOverride = databasePathOverride,
-        _instanceId = _nextInstanceId++;
+    : _databasePathOverride = databasePathOverride,
+      _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 4;
+  static const int _dbVersion = 6;
 
   /// Dropped and rebuilt by the v2 → v3 upgrade. The health tables are a cache
   /// of Health Connect, so rebuilding them costs one re-sync rather than user
@@ -70,6 +71,19 @@ class SqliteStorageService implements IStorageService {
     'CREATE INDEX IF NOT EXISTS idx_sleep_stage_session ON sleep_stage_intervals(sleep_session_id)',
   ];
 
+  static const String _personalRecordsSchema =
+      '''CREATE TABLE personal_records (
+    exercise_id TEXT NOT NULL,
+    handle TEXT NOT NULL DEFAULT '',
+    load_encoding_version INTEGER NOT NULL DEFAULT 0,
+    best_weight REAL NOT NULL,
+    best_reps INTEGER NOT NULL,
+    best_volume REAL NOT NULL,
+    achieved_at TEXT NOT NULL,
+    best_duration INTEGER,
+    PRIMARY KEY (exercise_id, handle, load_encoding_version)
+  )''';
+
   static const List<String> _schemaStatements = [
     '''CREATE TABLE exercises (
       id TEXT PRIMARY KEY,
@@ -107,7 +121,8 @@ class SqliteStorageService implements IStorageService {
       routine_id TEXT,
       duration_min INTEGER NOT NULL,
       notes TEXT,
-      hc_synced_at TEXT
+      hc_synced_at TEXT,
+      session_effort INTEGER
     )''',
     '''CREATE TABLE exercise_logs (
       id TEXT PRIMARY KEY,
@@ -128,7 +143,9 @@ class SqliteStorageService implements IStorageService {
       assist_weight REAL,
       extra_weight REAL,
       body_weight_at_log REAL,
-      handle TEXT
+      handle TEXT,
+      load_mode TEXT NOT NULL DEFAULT 'external',
+      load_encoding_version INTEGER NOT NULL DEFAULT 0
     )''',
     '''CREATE TABLE targets (
       id TEXT PRIMARY KEY,
@@ -140,14 +157,7 @@ class SqliteStorageService implements IStorageService {
       created_at TEXT NOT NULL,
       is_completed INTEGER NOT NULL DEFAULT 0
     )''',
-    '''CREATE TABLE personal_records (
-      exercise_id TEXT PRIMARY KEY,
-      best_weight REAL NOT NULL,
-      best_reps INTEGER NOT NULL,
-      best_volume REAL NOT NULL,
-      achieved_at TEXT NOT NULL,
-      best_duration INTEGER
-    )''',
+    _personalRecordsSchema,
     '''CREATE TABLE training_programs (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -211,13 +221,15 @@ class SqliteStorageService implements IStorageService {
       // Keep build-time fallback in environments without platform metadata.
     }
 
-    var dbPath = _databasePathOverride ?? '${await getDatabasesPath()}/$_dbName';
+    var dbPath =
+        _databasePathOverride ?? '${await getDatabasesPath()}/$_dbName';
 
     // For in-memory databases in tests, create unique isolated databases per instance
     // to support multiple concurrent test databases. Uses temp files because sqflite FFI's
     // shared-cache memory URIs don't support read-only secondary connections.
     if (dbPath == ':memory:') {
-      dbPath = '${Directory.systemTemp.path}${Platform.pathSeparator}repforge_test_${DateTime.now().microsecondsSinceEpoch}_$_instanceId.db';
+      dbPath =
+          '${Directory.systemTemp.path}${Platform.pathSeparator}repforge_test_${DateTime.now().microsecondsSinceEpoch}_$_instanceId.db';
     }
 
     _db = await openDatabase(
@@ -277,10 +289,60 @@ class SqliteStorageService implements IStorageService {
             );
           }
         }
+        if (oldVersion < 5) {
+          final hasSessions = (await db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sessions'",
+          )).isNotEmpty;
+          if (hasSessions) {
+            await db.execute(
+              'ALTER TABLE sessions ADD COLUMN session_effort INTEGER',
+            );
+          }
+        }
+        if (oldVersion < 6) {
+          final tables = (await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'table'",
+          )).map((r) => r['name'] as String).toSet();
+          if (tables.contains('sets')) {
+            await db.execute(
+              "ALTER TABLE sets ADD COLUMN load_mode TEXT NOT NULL DEFAULT 'external'",
+            );
+            await db.execute(
+              'ALTER TABLE sets ADD COLUMN load_encoding_version INTEGER NOT NULL DEFAULT 0',
+            );
+            await db.execute(
+              "UPDATE sets SET load_mode = 'assisted', load_encoding_version = CASE WHEN body_weight_at_log IS NOT NULL THEN 1 ELSE 0 END WHERE assist_weight IS NOT NULL",
+            );
+          }
+          if (tables.contains('personal_records')) {
+            final records = await db.query('personal_records');
+            await db.execute(
+              'ALTER TABLE personal_records RENAME TO legacy_personal_records',
+            );
+            await db.execute(_personalRecordsSchema);
+            for (final row in records) {
+              final record = PersonalRecord(
+                exerciseId: row['exercise_id'] as String,
+                bestWeight: (row['best_weight'] as num).toDouble(),
+                bestReps: row['best_reps'] as int,
+                bestVolume: (row['best_volume'] as num).toDouble(),
+                achievedAt: DateTime.parse(row['achieved_at'] as String),
+                bestDuration: row['best_duration'] as int?,
+              );
+              await db.insert(
+                'personal_records',
+                _prValues(record),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+            }
+            await db.execute('DROP TABLE legacy_personal_records');
+          }
+        }
       },
     );
 
-    final count = Sqflite.firstIntValue(
+    final count =
+        Sqflite.firstIntValue(
           await _db.rawQuery('SELECT COUNT(*) FROM muscle_groups'),
         ) ??
         0;
@@ -316,9 +378,17 @@ class SqliteStorageService implements IStorageService {
         whereArgs: [session.id],
       );
       for (final row in oldLogs) {
-        await txn.delete('sets', where: 'exercise_log_id = ?', whereArgs: [row['id']]);
+        await txn.delete(
+          'sets',
+          where: 'exercise_log_id = ?',
+          whereArgs: [row['id']],
+        );
       }
-      await txn.delete('exercise_logs', where: 'session_id = ?', whereArgs: [session.id]);
+      await txn.delete(
+        'exercise_logs',
+        where: 'session_id = ?',
+        whereArgs: [session.id],
+      );
       await txn.delete('sessions', where: 'id = ?', whereArgs: [session.id]);
 
       await txn.insert('sessions', {
@@ -328,6 +398,7 @@ class SqliteStorageService implements IStorageService {
         'duration_min': session.duration,
         'notes': session.notes,
         'hc_synced_at': session.hcSyncedAt?.toIso8601String(),
+        'session_effort': session.sessionEffort,
       });
 
       for (var i = 0; i < session.exercises.length; i++) {
@@ -357,14 +428,23 @@ class SqliteStorageService implements IStorageService {
             'extra_weight': set.extraWeight,
             'body_weight_at_log': set.bodyWeightAtLog,
             'handle': set.handle,
+            'load_mode': set.loadMode.name,
+            'load_encoding_version': set.loadEncodingVersion,
           });
         }
       }
     });
   }
 
-  Future<List<WorkoutSession>> _loadSessions({String? where, List<Object?>? whereArgs}) async {
-    final sessionRows = await _db.query('sessions', where: where, whereArgs: whereArgs);
+  Future<List<WorkoutSession>> _loadSessions({
+    String? where,
+    List<Object?>? whereArgs,
+  }) async {
+    final sessionRows = await _db.query(
+      'sessions',
+      where: where,
+      whereArgs: whereArgs,
+    );
     final sessions = <WorkoutSession>[];
     for (final row in sessionRows) {
       final sessionId = row['id'] as String;
@@ -389,41 +469,56 @@ class SqliteStorageService implements IStorageService {
           orderBy: 'rowid ASC',
         );
         final sets = setRows
-            .map((s) => WorkoutSet(
-                  weight: (s['weight'] as num).toDouble(),
-                  reps: s['reps'] as int,
-                  isDropset: (s['is_dropset'] as int) == 1,
-                  drops: s['drops_json'] == null
-                      ? null
-                      : (jsonDecode(s['drops_json'] as String) as List)
-                          .map((d) => DropsetEntry.fromJson(d as Map<String, dynamic>))
+            .map(
+              (s) => WorkoutSet(
+                weight: (s['weight'] as num).toDouble(),
+                reps: s['reps'] as int,
+                isDropset: (s['is_dropset'] as int) == 1,
+                drops: s['drops_json'] == null
+                    ? null
+                    : (jsonDecode(s['drops_json'] as String) as List)
+                          .map(
+                            (d) => DropsetEntry.fromJson(
+                              d as Map<String, dynamic>,
+                            ),
+                          )
                           .toList(),
-                  timeTaken: s['time_taken'] as int?,
-                  timestamp: DateTime.parse(s['timestamp'] as String),
-                  assistWeight: (s['assist_weight'] as num?)?.toDouble(),
-                  extraWeight: (s['extra_weight'] as num?)?.toDouble(),
-                  bodyWeightAtLog: (s['body_weight_at_log'] as num?)?.toDouble(),
-                  handle: s['handle'] as String?,
-                ))
+                timeTaken: s['time_taken'] as int?,
+                timestamp: DateTime.parse(s['timestamp'] as String),
+                assistWeight: (s['assist_weight'] as num?)?.toDouble(),
+                extraWeight: (s['extra_weight'] as num?)?.toDouble(),
+                bodyWeightAtLog: (s['body_weight_at_log'] as num?)?.toDouble(),
+                handle: s['handle'] as String?,
+                loadMode: WorkoutLoadMode.values.byName(
+                  s['load_mode'] as String,
+                ),
+                loadEncodingVersion: s['load_encoding_version'] as int,
+              ),
+            )
             .toList();
-        exerciseLogs.add(ExerciseLog(
-          exerciseId: logRow['exercise_id'] as String,
-          sets: sets,
-          notes: logRow['notes'] as String?,
-          handle: logRow['handle'] as String?,
-        ));
+        exerciseLogs.add(
+          ExerciseLog(
+            exerciseId: logRow['exercise_id'] as String,
+            sets: sets,
+            notes: logRow['notes'] as String?,
+            handle: logRow['handle'] as String?,
+          ),
+        );
       }
-      sessions.add(WorkoutSession(
-        id: sessionId,
-        date: DateTime.parse(row['date'] as String),
-        routineId: row['routine_id'] as String?,
-        exercises: exerciseLogs,
-        duration: row['duration_min'] as int,
-        notes: row['notes'] as String?,
-        hcSyncedAt: row['hc_synced_at'] == null
-            ? null
-            : DateTime.parse(row['hc_synced_at'] as String),
-      ));
+      sessions.add(
+        WorkoutSession(
+          id: sessionId,
+          date: DateTime.parse(row['date'] as String),
+          routineId: row['routine_id'] as String?,
+          exercises: exerciseLogs,
+          duration: row['duration_min'] as int,
+          notes: row['notes'] as String?,
+          sessionEffort: row['session_effort'] as int?,
+          hcSyncedAt: row['hc_synced_at'] == null
+              ? null
+              : DateTime.parse(row['hc_synced_at'] as String),
+        ),
+      );
     }
     sessions.sort((a, b) => b.date.compareTo(a.date));
     return sessions;
@@ -448,9 +543,17 @@ class SqliteStorageService implements IStorageService {
         whereArgs: [id],
       );
       for (final row in logRows) {
-        await txn.delete('sets', where: 'exercise_log_id = ?', whereArgs: [row['id']]);
+        await txn.delete(
+          'sets',
+          where: 'exercise_log_id = ?',
+          whereArgs: [row['id']],
+        );
       }
-      await txn.delete('exercise_logs', where: 'session_id = ?', whereArgs: [id]);
+      await txn.delete(
+        'exercise_logs',
+        where: 'session_id = ?',
+        whereArgs: [id],
+      );
       await txn.delete('sessions', where: 'id = ?', whereArgs: [id]);
     });
   }
@@ -458,15 +561,22 @@ class SqliteStorageService implements IStorageService {
   @override
   Future<List<WorkoutSession>> getSessionsForExercise(String exerciseId) async {
     final all = await getAllWorkoutSessions();
-    return all.where((s) => s.exercises.any((e) => e.exerciseId == exerciseId)).toList();
+    return all
+        .where((s) => s.exercises.any((e) => e.exerciseId == exerciseId))
+        .toList();
   }
 
   @override
-  Future<List<WorkoutSession>> getSessionsInDateRange(DateTime start, DateTime end) async {
+  Future<List<WorkoutSession>> getSessionsInDateRange(
+    DateTime start,
+    DateTime end,
+  ) async {
     final all = await getAllWorkoutSessions();
     final lo = start.isAfter(end) ? end : start;
     final hi = start.isAfter(end) ? start : end;
-    return all.where((s) => !s.date.isBefore(lo) && !s.date.isAfter(hi)).toList();
+    return all
+        .where((s) => !s.date.isBefore(lo) && !s.date.isAfter(hi))
+        .toList();
   }
 
   // ==================== ROUTINES ====================
@@ -474,16 +584,16 @@ class SqliteStorageService implements IStorageService {
   @override
   Future<void> saveRoutine(Routine routine) async {
     await _db.transaction((txn) async {
-      await txn.delete('routine_exercises', where: 'routine_id = ?', whereArgs: [routine.id]);
-      await txn.insert(
-        'routines',
-        {
-          'id': routine.id,
-          'name': routine.name,
-          'created_at': routine.createdAt.toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+      await txn.delete(
+        'routine_exercises',
+        where: 'routine_id = ?',
+        whereArgs: [routine.id],
       );
+      await txn.insert('routines', {
+        'id': routine.id,
+        'name': routine.name,
+        'created_at': routine.createdAt.toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       for (var i = 0; i < routine.exerciseIds.length; i++) {
         final exId = routine.exerciseIds[i];
         await txn.insert('routine_exercises', {
@@ -539,7 +649,11 @@ class SqliteStorageService implements IStorageService {
   @override
   Future<void> deleteRoutine(String id) async {
     await _db.transaction((txn) async {
-      await txn.delete('routine_exercises', where: 'routine_id = ?', whereArgs: [id]);
+      await txn.delete(
+        'routine_exercises',
+        where: 'routine_id = ?',
+        whereArgs: [id],
+      );
       await txn.delete('routines', where: 'id = ?', whereArgs: [id]);
     });
   }
@@ -548,34 +662,31 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<void> saveTarget(Target target) async {
-    await _db.insert(
-      'targets',
-      {
-        'id': target.id,
-        'exercise_id': target.exerciseId,
-        'target_type': target.targetType,
-        'target_value': target.targetValue,
-        'current_value': target.currentValue,
-        'estimated_completion_date': target.estimatedCompletionDate?.toIso8601String(),
-        'created_at': target.createdAt.toIso8601String(),
-        'is_completed': target.isCompleted ? 1 : 0,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await _db.insert('targets', {
+      'id': target.id,
+      'exercise_id': target.exerciseId,
+      'target_type': target.targetType,
+      'target_value': target.targetValue,
+      'current_value': target.currentValue,
+      'estimated_completion_date': target.estimatedCompletionDate
+          ?.toIso8601String(),
+      'created_at': target.createdAt.toIso8601String(),
+      'is_completed': target.isCompleted ? 1 : 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Target _targetFromRow(Map<String, Object?> row) => Target(
-        id: row['id'] as String,
-        exerciseId: row['exercise_id'] as String,
-        targetType: row['target_type'] as String,
-        targetValue: (row['target_value'] as num).toDouble(),
-        currentValue: (row['current_value'] as num).toDouble(),
-        estimatedCompletionDate: row['estimated_completion_date'] == null
-            ? null
-            : DateTime.parse(row['estimated_completion_date'] as String),
-        createdAt: DateTime.parse(row['created_at'] as String),
-        isCompleted: (row['is_completed'] as int) == 1,
-      );
+    id: row['id'] as String,
+    exerciseId: row['exercise_id'] as String,
+    targetType: row['target_type'] as String,
+    targetValue: (row['target_value'] as num).toDouble(),
+    currentValue: (row['current_value'] as num).toDouble(),
+    estimatedCompletionDate: row['estimated_completion_date'] == null
+        ? null
+        : DateTime.parse(row['estimated_completion_date'] as String),
+    createdAt: DateTime.parse(row['created_at'] as String),
+    isCompleted: (row['is_completed'] as int) == 1,
+  );
 
   @override
   Future<List<Target>> getAllTargets() async {
@@ -596,14 +707,21 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<List<Target>> getTargetsForExercise(String exerciseId) async {
-    final rows = await _db.query('targets', where: 'exercise_id = ?', whereArgs: [exerciseId]);
+    final rows = await _db.query(
+      'targets',
+      where: 'exercise_id = ?',
+      whereArgs: [exerciseId],
+    );
     return rows.map(_targetFromRow).toList();
   }
 
   // ==================== MUSCLE GROUPS ====================
 
   @override
-  Future<void> updateMuscleGroupGrowthRate(String muscleGroupId, double rate) async {
+  Future<void> updateMuscleGroupGrowthRate(
+    String muscleGroupId,
+    double rate,
+  ) async {
     await _db.update(
       'muscle_groups',
       {'growth_rate': rate, 'last_updated': DateTime.now().toIso8601String()},
@@ -613,11 +731,11 @@ class SqliteStorageService implements IStorageService {
   }
 
   MuscleGroup _muscleGroupFromRow(Map<String, Object?> row) => MuscleGroup(
-        id: row['id'] as String,
-        name: row['name'] as String,
-        growthRate: (row['growth_rate'] as num).toDouble(),
-        lastUpdated: DateTime.parse(row['last_updated'] as String),
-      );
+    id: row['id'] as String,
+    name: row['name'] as String,
+    growthRate: (row['growth_rate'] as num).toDouble(),
+    lastUpdated: DateTime.parse(row['last_updated'] as String),
+  );
 
   @override
   Future<List<MuscleGroup>> getAllMuscleGroups() async {
@@ -627,7 +745,11 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<MuscleGroup?> getMuscleGroup(String id) async {
-    final rows = await _db.query('muscle_groups', where: 'id = ?', whereArgs: [id]);
+    final rows = await _db.query(
+      'muscle_groups',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     return rows.isEmpty ? null : _muscleGroupFromRow(rows.first);
   }
 
@@ -636,20 +758,21 @@ class SqliteStorageService implements IStorageService {
   @override
   Future<void> saveCustomExercise(Exercise exercise) async {
     await _db.transaction((txn) async {
-      await txn.delete('exercise_muscle_activations', where: 'exercise_id = ?', whereArgs: [exercise.id]);
-      await txn.insert(
-        'exercises',
-        {
-          'id': exercise.id,
-          'name': exercise.name,
-          'category': exercise.category,
-          'is_custom': exercise.isCustom ? 1 : 0,
-          'available_handles':
-              exercise.availableHandles == null ? null : jsonEncode(exercise.availableHandles),
-          'exercise_type': exercise.exerciseType.name,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+      await txn.delete(
+        'exercise_muscle_activations',
+        where: 'exercise_id = ?',
+        whereArgs: [exercise.id],
       );
+      await txn.insert('exercises', {
+        'id': exercise.id,
+        'name': exercise.name,
+        'category': exercise.category,
+        'is_custom': exercise.isCustom ? 1 : 0,
+        'available_handles': exercise.availableHandles == null
+            ? null
+            : jsonEncode(exercise.availableHandles),
+        'exercise_type': exercise.exerciseType.name,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       for (final ma in exercise.muscleActivations) {
         await txn.insert('exercise_muscle_activations', {
           'exercise_id': exercise.id,
@@ -670,9 +793,11 @@ class SqliteStorageService implements IStorageService {
     final ExerciseType type;
     if (rawType == null) {
       type = ExerciseType.weightAndReps;
-    } else if (rawType == 'timeBased' || rawType == ExerciseType.timeBased.name) {
+    } else if (rawType == 'timeBased' ||
+        rawType == ExerciseType.timeBased.name) {
       type = ExerciseType.timeBased;
-    } else if (rawType == 'weightAndReps' || rawType == ExerciseType.weightAndReps.name) {
+    } else if (rawType == 'weightAndReps' ||
+        rawType == ExerciseType.weightAndReps.name) {
       type = ExerciseType.weightAndReps;
     } else {
       throw ArgumentError('Unsupported exerciseType: $rawType');
@@ -685,13 +810,16 @@ class SqliteStorageService implements IStorageService {
       isCustom: (row['is_custom'] as int?) == 1,
       availableHandles: row['available_handles'] == null
           ? null
-          : (jsonDecode(row['available_handles'] as String) as List).cast<String>(),
+          : (jsonDecode(row['available_handles'] as String) as List)
+                .cast<String>(),
       exerciseType: type,
       muscleActivations: activations
-          .map((a) => MuscleActivation(
-                muscleGroupId: a['muscle_group_id'] as String,
-                activationPercentage: a['activation_percentage'] as int,
-              ))
+          .map(
+            (a) => MuscleActivation(
+              muscleGroupId: a['muscle_group_id'] as String,
+              activationPercentage: a['activation_percentage'] as int,
+            ),
+          )
           .toList(),
     );
   }
@@ -719,7 +847,11 @@ class SqliteStorageService implements IStorageService {
   @override
   Future<void> deleteCustomExercise(String id) async {
     await _db.transaction((txn) async {
-      await txn.delete('exercise_muscle_activations', where: 'exercise_id = ?', whereArgs: [id]);
+      await txn.delete(
+        'exercise_muscle_activations',
+        where: 'exercise_id = ?',
+        whereArgs: [id],
+      );
       await txn.delete('exercises', where: 'id = ?', whereArgs: [id]);
     });
   }
@@ -732,8 +864,12 @@ class SqliteStorageService implements IStorageService {
       final ex = await _loadCustomExerciseRow(row);
       dbExercises[ex.id] = ex;
     }
-    final builtIn = ExerciseDatabase.getAll().map((e) => dbExercises[e.id] ?? e).toList();
-    final customOnly = dbExercises.values.where((e) => e.isCustom && ExerciseDatabase.getById(e.id) == null);
+    final builtIn = ExerciseDatabase.getAll()
+        .map((e) => dbExercises[e.id] ?? e)
+        .toList();
+    final customOnly = dbExercises.values.where(
+      (e) => e.isCustom && ExerciseDatabase.getById(e.id) == null,
+    );
     return [...builtIn, ...customOnly];
   }
 
@@ -750,13 +886,19 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<void> saveSetting(String key, String value) async {
-    await _db.insert('settings', {'key': key, 'value': value},
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _db.insert('settings', {
+      'key': key,
+      'value': value,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   @override
   Future<String?> getSetting(String key) async {
-    final rows = await _db.query('settings', where: 'key = ?', whereArgs: [key]);
+    final rows = await _db.query(
+      'settings',
+      where: 'key = ?',
+      whereArgs: [key],
+    );
     return rows.isEmpty ? null : rows.first['value'] as String?;
   }
 
@@ -764,48 +906,51 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<void> saveTrainingProgram(TrainingProgram program) async {
-    await _db.insert(
-      'training_programs',
-      {
-        'id': program.id,
-        'name': program.name,
-        'description': program.description,
-        'total_weeks': program.totalWeeks,
-        'author': program.author,
-        'is_imported': program.isImported ? 1 : 0,
-        'created_at': program.createdAt.toIso8601String(),
-        'phases_json': jsonEncode(program.phases.map((p) => p.toJson()).toList()),
-        'weeks_json': jsonEncode(program.weeks.map((w) => w.toJson()).toList()),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await _db.insert('training_programs', {
+      'id': program.id,
+      'name': program.name,
+      'description': program.description,
+      'total_weeks': program.totalWeeks,
+      'author': program.author,
+      'is_imported': program.isImported ? 1 : 0,
+      'created_at': program.createdAt.toIso8601String(),
+      'phases_json': jsonEncode(program.phases.map((p) => p.toJson()).toList()),
+      'weeks_json': jsonEncode(program.weeks.map((w) => w.toJson()).toList()),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   TrainingProgram _programFromRow(Map<String, Object?> row) => TrainingProgram(
-        id: row['id'] as String,
-        name: row['name'] as String,
-        description: row['description'] as String?,
-        totalWeeks: row['total_weeks'] as int,
-        phases: (jsonDecode(row['phases_json'] as String) as List)
-            .map((p) => TrainingPhase.fromJson(p as Map<String, dynamic>))
-            .toList(),
-        weeks: (jsonDecode(row['weeks_json'] as String) as List)
-            .map((w) => ProgramWeek.fromJson(w as Map<String, dynamic>))
-            .toList(),
-        author: row['author'] as String?,
-        isImported: (row['is_imported'] as int) == 1,
-        createdAt: DateTime.parse(row['created_at'] as String),
-      );
+    id: row['id'] as String,
+    name: row['name'] as String,
+    description: row['description'] as String?,
+    totalWeeks: row['total_weeks'] as int,
+    phases: (jsonDecode(row['phases_json'] as String) as List)
+        .map((p) => TrainingPhase.fromJson(p as Map<String, dynamic>))
+        .toList(),
+    weeks: (jsonDecode(row['weeks_json'] as String) as List)
+        .map((w) => ProgramWeek.fromJson(w as Map<String, dynamic>))
+        .toList(),
+    author: row['author'] as String?,
+    isImported: (row['is_imported'] as int) == 1,
+    createdAt: DateTime.parse(row['created_at'] as String),
+  );
 
   @override
   Future<List<TrainingProgram>> getAllTrainingPrograms() async {
-    final rows = await _db.query('training_programs', orderBy: 'created_at DESC');
+    final rows = await _db.query(
+      'training_programs',
+      orderBy: 'created_at DESC',
+    );
     return rows.map(_programFromRow).toList();
   }
 
   @override
   Future<TrainingProgram?> getTrainingProgram(String id) async {
-    final rows = await _db.query('training_programs', where: 'id = ?', whereArgs: [id]);
+    final rows = await _db.query(
+      'training_programs',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     return rows.isEmpty ? null : _programFromRow(rows.first);
   }
 
@@ -816,35 +961,55 @@ class SqliteStorageService implements IStorageService {
 
   // ==================== PERSONAL RECORDS ====================
 
+  static Map<String, Object?> _prValues(PersonalRecord record) => {
+    'exercise_id': record.exerciseId,
+    'handle': record.handle ?? '',
+    'load_encoding_version': record.loadEncodingVersion,
+    'best_weight': record.bestWeight,
+    'best_reps': record.bestReps,
+    'best_volume': record.bestVolume,
+    'achieved_at': record.achievedAt.toIso8601String(),
+    'best_duration': record.bestDuration,
+  };
+
   @override
   Future<void> savePersonalRecord(PersonalRecord record) async {
     await _db.insert(
       'personal_records',
-      {
-        'exercise_id': record.exerciseId,
-        'best_weight': record.bestWeight,
-        'best_reps': record.bestReps,
-        'best_volume': record.bestVolume,
-        'achieved_at': record.achievedAt.toIso8601String(),
-        'best_duration': record.bestDuration,
-      },
+      _prValues(record),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
   PersonalRecord _prFromRow(Map<String, Object?> row) => PersonalRecord(
-        exerciseId: row['exercise_id'] as String,
-        bestWeight: (row['best_weight'] as num).toDouble(),
-        bestReps: row['best_reps'] as int,
-        bestVolume: (row['best_volume'] as num).toDouble(),
-        achievedAt: DateTime.parse(row['achieved_at'] as String),
-        bestDuration: row['best_duration'] as int?,
-      );
+    exerciseId: row['exercise_id'] as String,
+    handle: row['handle'] as String?,
+    loadEncodingVersion: row['load_encoding_version'] as int? ?? 0,
+    bestWeight: (row['best_weight'] as num).toDouble(),
+    bestReps: row['best_reps'] as int,
+    bestVolume: (row['best_volume'] as num).toDouble(),
+    achievedAt: DateTime.parse(row['achieved_at'] as String),
+    bestDuration: row['best_duration'] as int?,
+  );
 
   @override
   Future<PersonalRecord?> getPersonalRecord(String exerciseId) async {
-    final rows = await _db.query('personal_records', where: 'exercise_id = ?', whereArgs: [exerciseId]);
-    return rows.isEmpty ? null : _prFromRow(rows.first);
+    final split = exerciseId.indexOf(':');
+    final id = split < 0 ? exerciseId : exerciseId.substring(0, split);
+    final handle = split < 0 ? null : exerciseId.substring(split + 1);
+    final rows = await _db.query(
+      'personal_records',
+      where: handle == null
+          ? 'exercise_id = ?'
+          : 'exercise_id = ? AND handle = ?',
+      whereArgs: [id, ?handle],
+      orderBy: 'load_encoding_version DESC',
+    );
+    return handle == null
+        ? PersonalRecord.aggregate(rows.map(_prFromRow))
+        : rows.isEmpty
+        ? null
+        : _prFromRow(rows.first);
   }
 
   @override
@@ -857,30 +1022,28 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<void> saveConversation(Conversation conversation) async {
-    await _db.insert(
-      'conversations',
-      {
-        'id': conversation.id,
-        'title': conversation.title,
-        'kind': conversation.kind,
-        'created_at': conversation.createdAt.toIso8601String(),
-        'updated_at': conversation.updatedAt.toIso8601String(),
-        'messages_json': jsonEncode(conversation.messages.map((m) => m.toJson()).toList()),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await _db.insert('conversations', {
+      'id': conversation.id,
+      'title': conversation.title,
+      'kind': conversation.kind,
+      'created_at': conversation.createdAt.toIso8601String(),
+      'updated_at': conversation.updatedAt.toIso8601String(),
+      'messages_json': jsonEncode(
+        conversation.messages.map((m) => m.toJson()).toList(),
+      ),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Conversation _conversationFromRow(Map<String, Object?> row) => Conversation(
-        id: row['id'] as String,
-        title: row['title'] as String,
-        kind: row['kind'] as String,
-        createdAt: DateTime.parse(row['created_at'] as String),
-        updatedAt: DateTime.parse(row['updated_at'] as String),
-        messages: (jsonDecode(row['messages_json'] as String) as List)
-            .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
-            .toList(),
-      );
+    id: row['id'] as String,
+    title: row['title'] as String,
+    kind: row['kind'] as String,
+    createdAt: DateTime.parse(row['created_at'] as String),
+    updatedAt: DateTime.parse(row['updated_at'] as String),
+    messages: (jsonDecode(row['messages_json'] as String) as List)
+        .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
+        .toList(),
+  );
 
   @override
   Future<List<Conversation>> getAllConversations() async {
@@ -890,7 +1053,11 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<Conversation?> getConversation(String id) async {
-    final rows = await _db.query('conversations', where: 'id = ?', whereArgs: [id]);
+    final rows = await _db.query(
+      'conversations',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     return rows.isEmpty ? null : _conversationFromRow(rows.first);
   }
 
@@ -906,7 +1073,9 @@ class SqliteStorageService implements IStorageService {
     final sessions = await getAllWorkoutSessions();
     final now = DateTime.now();
     final weekAgo = now.subtract(const Duration(days: 7));
-    final weekSessions = sessions.where((s) => s.date.isAfter(weekAgo)).toList();
+    final weekSessions = sessions
+        .where((s) => s.date.isAfter(weekAgo))
+        .toList();
 
     double weeklyVolume = 0;
     int exercisesCompleted = 0;
@@ -928,25 +1097,24 @@ class SqliteStorageService implements IStorageService {
   // consumed only via the coach's run_sql_query tool. See
   // docs/superpowers/specs/2026-08-11-health-data-sync-and-coach-sql-design.md.
 
-  Future<void> upsertHealthSamples(String type, List<HealthSample> samples) async {
+  Future<void> upsertHealthSamples(
+    String type,
+    List<HealthSample> samples,
+  ) async {
     if (samples.isEmpty) return;
     final batch = _db.batch();
     for (final s in samples) {
       final utcIso = s.time.toUtc().toIso8601String();
       final localIso = s.time.toLocal().toIso8601String();
       final id = '${type}_$utcIso';
-      batch.insert(
-        'health_samples',
-        {
-          'id': id,
-          'type': type,
-          'start_ts': localIso,
-          'end_ts': localIso,
-          'utc_ts': utcIso,
-          'value': s.value,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      batch.insert('health_samples', {
+        'id': id,
+        'type': type,
+        'start_ts': localIso,
+        'end_ts': localIso,
+        'utc_ts': utcIso,
+        'value': s.value,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
   }
@@ -963,19 +1131,15 @@ class SqliteStorageService implements IStorageService {
           where: 'sleep_session_id = ?',
           whereArgs: [id],
         );
-        await txn.insert(
-          'sleep_sessions',
-          {
-            'id': id,
-            'start_ts': p.start.toLocal().toIso8601String(),
-            'end_ts': p.end.toLocal().toIso8601String(),
-            'light_min': p.lightMinutes,
-            'deep_min': p.deepMinutes,
-            'rem_min': p.remMinutes,
-            'awake_min': p.awakeMinutes,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        await txn.insert('sleep_sessions', {
+          'id': id,
+          'start_ts': p.start.toLocal().toIso8601String(),
+          'end_ts': p.end.toLocal().toIso8601String(),
+          'light_min': p.lightMinutes,
+          'deep_min': p.deepMinutes,
+          'rem_min': p.remMinutes,
+          'awake_min': p.awakeMinutes,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
         for (final seg in p.stageTimeline) {
           await txn.insert('sleep_stage_intervals', {
             'sleep_session_id': id,
@@ -1019,7 +1183,13 @@ class SqliteStorageService implements IStorageService {
         if (row['value'] != null) row['key'] as String: row['value'] as String,
     };
 
+    final programs = await getAllTrainingPrograms();
+    final records = await getAllPersonalRecords();
+
     final data = {
+      'backupFormatVersion': 1,
+      'trainingPrograms': programs.map((p) => p.toJson()).toList(),
+      'personalRecords': records.map((r) => r.toJson()).toList(),
       'sessions': sessions.map((s) => s.toJson()).toList(),
       'routines': routines.map((r) => r.toJson()).toList(),
       'targets': targets.map((t) => t.toJson()).toList(),
@@ -1036,7 +1206,7 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<void> importData(String jsonData) async {
-    final data = jsonDecode(jsonData) as Map<String, dynamic>;
+    final data = decodeBackup(jsonData);
 
     final sessions = data['sessions'];
     if (sessions is List) {
@@ -1097,7 +1267,11 @@ class SqliteStorageService implements IStorageService {
         final map = _normalizeImportItem(item);
         if (map == null) continue;
         final exercise = Exercise.fromJson(map);
-        final rows = await _db.query('exercises', where: 'id = ?', whereArgs: [exercise.id]);
+        final rows = await _db.query(
+          'exercises',
+          where: 'id = ?',
+          whereArgs: [exercise.id],
+        );
         if (rows.isEmpty) {
           await saveCustomExercise(exercise);
         }
@@ -1110,7 +1284,11 @@ class SqliteStorageService implements IStorageService {
         final map = _normalizeImportItem(item);
         if (map == null) continue;
         final exercise = Exercise.fromJson(map);
-        final rows = await _db.query('exercises', where: 'id = ?', whereArgs: [exercise.id]);
+        final rows = await _db.query(
+          'exercises',
+          where: 'id = ?',
+          whereArgs: [exercise.id],
+        );
         if (rows.isEmpty) {
           await saveCustomExercise(exercise);
         }
@@ -1122,6 +1300,32 @@ class SqliteStorageService implements IStorageService {
       for (final entry in settings.entries) {
         if (await getSetting(entry.key) == null) {
           await saveSetting(entry.key, entry.value.toString());
+        }
+      }
+    }
+
+    final programs = data['trainingPrograms'];
+    if (programs is List) {
+      for (final item in programs) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final program = TrainingProgram.fromJson(map);
+        if (await getTrainingProgram(program.id) == null) {
+          await saveTrainingProgram(program);
+        }
+      }
+    }
+    final records = data['personalRecords'];
+    if (records is List) {
+      final existingKeys = (await getAllPersonalRecords())
+          .map((record) => record.storageKey)
+          .toSet();
+      for (final item in records) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final record = PersonalRecord.fromJson(map);
+        if (existingKeys.add(record.storageKey)) {
+          await savePersonalRecord(record);
         }
       }
     }
