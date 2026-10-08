@@ -10,6 +10,8 @@ import '../../services/ai/gemini_ai_service.dart';
 import '../../theme/app_theme.dart';
 import 'rf_dialogs.dart';
 import 'rf_widgets.dart';
+import 'gender_picker.dart';
+import '../../data/body_figure.dart';
 import 'release_widgets.dart';
 import '../onboarding_screen.dart';
 import '../../services/ai/gemini_model_catalog.dart';
@@ -116,6 +118,36 @@ class PreferencesSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          GenderPicker(value: settings.userGender, onChanged: (value) async {
+            try {
+              await settings.setUserGender(value);
+            } catch (_) {
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Could not save gender. Try again.')));
+            }
+          }),
+          const SizedBox(height: AppSpacing.md),
+          const _SectionLabel('BODY DIAGRAM'),
+          const SizedBox(height: AppSpacing.sm),
+          SegmentedButton<BodyFigure>(
+            segments: const [
+              ButtonSegment(value: BodyFigure.male, label: Text('Male')),
+              ButtonSegment(value: BodyFigure.female, label: Text('Female')),
+            ],
+            selected: {settings.bodyFigure},
+            onSelectionChanged: (value) async {
+              try {
+                await settings.setBodyFigure(value.single);
+              } catch (_) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not save body figure. Try again.')));
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+          const Text('Choose the figure you prefer. This only changes muscle diagrams.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          const SizedBox(height: AppSpacing.md),
           const _SectionLabel('WEIGHT UNIT'),
           const SizedBox(height: AppSpacing.sm),
           Row(
