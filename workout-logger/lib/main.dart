@@ -6,6 +6,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -91,6 +92,12 @@ Future<void> _resolveStorageBackend() async {
 void main() async {
   DebugLogBuffer.attach();
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(
+      ['MuscleMap body geometry'],
+      await rootBundle.loadString('THIRD_PARTY_NOTICES.md'),
+    );
+  });
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
