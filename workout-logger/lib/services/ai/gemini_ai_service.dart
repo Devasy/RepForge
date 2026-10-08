@@ -11,6 +11,7 @@
 // and their toJson() serialisers which are part of the public API.
 
 import 'dart:convert';
+import 'ai_failure.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
     show Content, FunctionCall, Tool;
@@ -416,7 +417,10 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         continue;
       }
       client.close();
-      throw Exception(_errorMessage(resp.statusCode, err));
+      throw AiFailure.from(
+        _errorMessage(resp.statusCode, err),
+        statusCode: resp.statusCode,
+      );
     }
 
     try {
@@ -484,7 +488,10 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         await Future.delayed(delay);
         continue;
       }
-      throw Exception(_errorMessage(response.statusCode, response.body));
+      throw AiFailure.from(
+        _errorMessage(response.statusCode, response.body),
+        statusCode: response.statusCode,
+      );
     }
   }
 
@@ -636,7 +643,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
       // Exhausted the tool-round budget without a final text answer.
       yield '\n\n_(Stopped after $_maxToolRounds tool steps — try rephrasing.)_';
     } catch (e) {
-      yield 'Error: $e';
+      throw e is AiFailure ? e : AiFailure.from(e);
     }
   }
 
@@ -666,10 +673,12 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
       final map = jsonDecode(raw) as Map<String, dynamic>;
       return fromJson(map);
-    } on FormatException catch (e) {
-      throw Exception('Could not parse JSON output: $e');
+    } on FormatException {
+      throw const AiFailure(
+        'Gemini returned an incomplete response. Please try again.',
+      );
     } catch (e) {
-      throw Exception('Gemini API error: $e');
+      throw e is AiFailure ? e : AiFailure.from(e);
     }
   }
 
@@ -772,7 +781,7 @@ Required JSON schema (follow exactly):
       final text = _textFromResponse(data).trim();
       return text.isNotEmpty ? text : 'No insights generated.';
     } catch (e) {
-      return 'Could not generate insights: $e';
+      return (e is AiFailure ? e : AiFailure.from(e)).message;
     }
   }
 
@@ -790,7 +799,7 @@ Required JSON schema (follow exactly):
       final text = _textFromResponse(data).trim();
       return text.isNotEmpty ? text : 'No insight generated.';
     } catch (e) {
-      return 'Could not generate insight: $e';
+      return (e is AiFailure ? e : AiFailure.from(e)).message;
     }
   }
 }
