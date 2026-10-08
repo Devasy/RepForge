@@ -37,6 +37,8 @@ class ExerciseInputSection extends StatelessWidget {
     this.programSlot,
     this.programWeek,
     this.exerciseId,
+    this.loadMode,
+    this.onLoadModeChanged,
     this.availableHandles,
     this.selectedHandle,
     this.onHandleChanged,
@@ -72,6 +74,8 @@ class ExerciseInputSection extends StatelessWidget {
   final ProgramExerciseSlot? programSlot;
   final ProgramWeek? programWeek;
   final String? exerciseId;
+  final WorkoutLoadMode? loadMode;
+  final ValueChanged<WorkoutLoadMode>? onLoadModeChanged;
   final List<String>? availableHandles;
   final String? selectedHandle;
   final ValueChanged<String?>? onHandleChanged;
@@ -82,8 +86,17 @@ class ExerciseInputSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isAssistedBW = isAssistedBodyweightExercise(exerciseId);
-    final effectiveWeight = (settings.userBodyWeight - currentWeight).clamp(0.0, 500.0);
+    final bodyweight = isBodyweightExercise(exerciseId);
+    final mode =
+        loadMode ??
+        (exerciseId == 'push_ups'
+            ? WorkoutLoadMode.weighted
+            : WorkoutLoadMode.assisted);
+    final isAssistedBW = bodyweight && mode == WorkoutLoadMode.assisted;
+    final effectiveWeight =
+        (settings.userBodyWeight +
+                (isAssistedBW ? -currentWeight : currentWeight))
+            .clamp(0.0, double.infinity);
     final effectiveWeightDisplay = settings.toDisplay(effectiveWeight);
     final bodyWeightDisplay = settings.toDisplay(settings.userBodyWeight);
     final currentWeightDisplay = settings.toDisplay(currentWeight);
@@ -109,12 +122,43 @@ class ExerciseInputSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
         ],
 
+        if (bodyweight) ...[
+          if (isAssistedBodyweightExercise(exerciseId))
+            SizedBox(
+              height: 48 + (MediaQuery.textScalerOf(context).scale(24) - 24).clamp(0.0, double.infinity),
+              child: SegmentedButton<WorkoutLoadMode>(
+              segments: const [
+                ButtonSegment(
+                  value: WorkoutLoadMode.assisted,
+                  label: Text('Assisted'),
+                ),
+                ButtonSegment(
+                  value: WorkoutLoadMode.weighted,
+                  label: Text('Weighted'),
+                ),
+              ],
+              selected: {mode},
+              onSelectionChanged: onLoadModeChanged == null
+                  ? null
+                  : (selection) => onLoadModeChanged!(selection.single),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Text(
+            isAssistedBW
+                ? 'Weight entries subtract assistance from bodyweight.'
+                : 'Weight entries add load to bodyweight; enter 0 for bodyweight only.',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+
         // AI suggestion
         if (recommendations.isNotEmpty)
           _RecommendationCard(
-            rec: recommendations[previousSets.length < recommendations.length
-                ? previousSets.length
-                : recommendations.length - 1],
+            rec:
+                recommendations[previousSets.length < recommendations.length
+                    ? previousSets.length
+                    : recommendations.length - 1],
             settings: settings,
             onApply: onApplyRecommendation,
           ),
@@ -140,27 +184,41 @@ class ExerciseInputSection extends StatelessWidget {
               currentReps: currentReps,
               settings: settings,
               isAssistedBW: isAssistedBW,
+              isWeightedBW: bodyweight && !isAssistedBW,
               onWeightChanged: onWeightChanged,
               onRepsChanged: onRepsChanged,
             ),
-            if (isAssistedBW) ...[
+            if (bodyweight) ...[
               const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppRadius.sm),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.fitness_center_rounded, size: 14, color: AppColors.primary),
+                    const Icon(
+                      Icons.fitness_center_rounded,
+                      size: 14,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 6),
                     // Long enough to wrap on a narrow phone, more so at a large text scale.
                     Expanded(
                       child: Text(
-                        'Effective Volume Load: ${effectiveWeightDisplay.toStringAsFixed(1)} ${settings.unitLabel} (${bodyWeightDisplay.toStringAsFixed(1)} BW − ${currentWeightDisplay.toStringAsFixed(1)} Assist) × $currentReps reps',
-                        style: const TextStyle(fontSize: 11, color: AppColors.textSoft, fontWeight: FontWeight.w500),
+                        'Effective Volume Load: ${effectiveWeightDisplay.toStringAsFixed(1)} ${settings.unitLabel} (${bodyWeightDisplay.toStringAsFixed(1)} BW ${isAssistedBW ? '−' : '+'} ${currentWeightDisplay.toStringAsFixed(1)} ${isAssistedBW ? 'Assist' : 'Added'}) × $currentReps reps',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSoft,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
@@ -272,13 +330,14 @@ class _RecommendationCard extends StatelessWidget {
     final confidenceColor = rec.confidence == 'high'
         ? AppColors.success
         : rec.confidence == 'medium'
-            ? AppColors.warning
-            : AppColors.textMuted;
+        ? AppColors.warning
+        : AppColors.textMuted;
 
     final String suggestionText;
     if (rec.targetDuration != null && rec.targetDuration! > 0) {
       if (rec.weight > 0) {
-        suggestionText = '$weightStr ${settings.unitLabel} × ${rec.targetDuration}s hold';
+        suggestionText =
+            '$weightStr ${settings.unitLabel} × ${rec.targetDuration}s hold';
       } else {
         suggestionText = '${rec.targetDuration}s hold';
       }
@@ -299,9 +358,7 @@ class _RecommendationCard extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -311,8 +368,11 @@ class _RecommendationCard extends StatelessWidget {
               color: AppColors.primary.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            child: const Icon(Icons.auto_awesome_rounded,
-                color: AppColors.primary, size: 18),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: AppColors.primary,
+              size: 18,
+            ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -400,6 +460,7 @@ class _InputRow extends StatelessWidget {
     required this.onWeightChanged,
     required this.onRepsChanged,
     this.isAssistedBW = false,
+    this.isWeightedBW = false,
   });
 
   final double contentWidth;
@@ -409,11 +470,15 @@ class _InputRow extends StatelessWidget {
   final ValueChanged<double> onWeightChanged;
   final ValueChanged<int> onRepsChanged;
   final bool isAssistedBW;
+  final bool isWeightedBW;
 
   @override
   Widget build(BuildContext context) {
-    final weightLabel =
-        isAssistedBW ? 'Assist (${settings.unitLabel})' : settings.unitLabel;
+    final weightLabel = isAssistedBW
+        ? 'Assist (${settings.unitLabel})'
+        : isWeightedBW
+        ? 'Added (${settings.unitLabel})'
+        : settings.unitLabel;
     final displayWeight = settings.toDisplay(currentWeight);
 
     // Once a large system font squeezes the value past legibility, stack rather than shrink the digits further.
@@ -493,15 +558,18 @@ class _NumberInputCard extends StatefulWidget {
       measureValue(context, '100.0', minValueFontSize);
 
   static TextStyle valueStyle(double fontSize) => TextStyle(
-        fontFamily: 'GeistMono',
-        color: AppColors.textPrimary,
-        fontSize: fontSize,
-        fontWeight: FontWeight.w700,
-      );
+    fontFamily: 'GeistMono',
+    color: AppColors.textPrimary,
+    fontSize: fontSize,
+    fontWeight: FontWeight.w700,
+  );
 
   /// Width [text] paints at, honouring the reader's text scale.
   static double measureValue(
-      BuildContext context, String text, double fontSize) {
+    BuildContext context,
+    String text,
+    double fontSize,
+  ) {
     final painter = TextPainter(
       text: TextSpan(text: text, style: valueStyle(fontSize)),
       textDirection: Directionality.of(context),
@@ -556,8 +624,10 @@ class _NumberInputCardState extends State<_NumberInputCard> {
     if (available <= 0) return _NumberInputCard.minValueFontSize;
     final natural = _NumberInputCard.measureValue(context, text, maxSize);
     if (natural <= available || natural <= 0) return maxSize;
-    return (maxSize * available / natural)
-        .clamp(_NumberInputCard.minValueFontSize, maxSize);
+    return (maxSize * available / natural).clamp(
+      _NumberInputCard.minValueFontSize,
+      maxSize,
+    );
   }
 
   @override
@@ -575,10 +645,7 @@ class _NumberInputCardState extends State<_NumberInputCard> {
       child: Column(
         children: [
           // Kept to one line so the two cards in a row stay the same height.
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: RFLabel(widget.label),
-          ),
+          FittedBox(fit: BoxFit.scaleDown, child: RFLabel(widget.label)),
           const SizedBox(height: AppSpacing.sm),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -761,28 +828,34 @@ class _DropsetSection extends StatelessWidget {
               unitLabel: settings.unitLabel,
               onWeightChanged: (v) {
                 final parsed = double.tryParse(v);
-                if (parsed != null) onDropWeightChanged(-1, settings.toStorage(parsed));
+                if (parsed != null) {
+                  onDropWeightChanged(-1, settings.toStorage(parsed));
+                }
               },
               onRepsChanged: (v) {
                 final parsed = int.tryParse(v);
                 if (parsed != null) onDropRepsChanged(-1, parsed);
               },
             ),
-            ...drops.asMap().entries.map((e) => _DropRow(
-              label: 'Drop ${e.key + 1}',
-              weightController: dropWeightControllers[e.key],
-              repsController: dropRepsControllers[e.key],
-              unitLabel: settings.unitLabel,
-              onWeightChanged: (v) {
-                final parsed = double.tryParse(v);
-                if (parsed != null) onDropWeightChanged(e.key, settings.toStorage(parsed));
-              },
-              onRepsChanged: (v) {
-                final parsed = int.tryParse(v);
-                if (parsed != null) onDropRepsChanged(e.key, parsed);
-              },
-              onDelete: () => onDropRemoved(e.key),
-            )),
+            ...drops.asMap().entries.map(
+              (e) => _DropRow(
+                label: 'Drop ${e.key + 1}',
+                weightController: dropWeightControllers[e.key],
+                repsController: dropRepsControllers[e.key],
+                unitLabel: settings.unitLabel,
+                onWeightChanged: (v) {
+                  final parsed = double.tryParse(v);
+                  if (parsed != null) {
+                    onDropWeightChanged(e.key, settings.toStorage(parsed));
+                  }
+                },
+                onRepsChanged: (v) {
+                  final parsed = int.tryParse(v);
+                  if (parsed != null) onDropRepsChanged(e.key, parsed);
+                },
+                onDelete: () => onDropRemoved(e.key),
+              ),
+            ),
             TextButton.icon(
               onPressed: onDropAdded,
               icon: const Icon(Icons.add_rounded, size: 16),
@@ -825,10 +898,7 @@ class _DropRow extends StatelessWidget {
             flex: 3,
             child: Text(
               label,
-              style: const TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
           ),
           Expanded(
@@ -843,13 +913,17 @@ class _DropRow extends StatelessWidget {
                 ),
                 isDense: true,
               ),
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
               ],
               onChanged: onWeightChanged,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+              ),
             ),
           ),
           const Padding(
@@ -871,7 +945,10 @@ class _DropRow extends StatelessWidget {
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: onRepsChanged,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+              ),
             ),
           ),
           if (onDelete != null)
@@ -937,8 +1014,8 @@ class _PreviousSetsSection extends StatelessWidget {
                   Text(
                     s.isTimeBased
                         ? (s.weight > 0
-                            ? '$wStr × ${s.timeTaken ?? 0}s'
-                            : '${s.timeTaken ?? 0}s')
+                              ? '$wStr × ${s.timeTaken ?? 0}s'
+                              : '${s.timeTaken ?? 0}s')
                         : '$wStr × ${s.reps}',
                     style: const TextStyle(
                       color: AppColors.success,
@@ -968,8 +1045,10 @@ class _PreviousSetsSection extends StatelessWidget {
                   ? ormDisplay.toStringAsFixed(0)
                   : ormDisplay.toStringAsFixed(1);
               final ormChip = Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppRadius.full),
@@ -999,7 +1078,10 @@ class _PreviousSetsSection extends StatelessWidget {
 
 // ── Last Session ──────────────────────────────────────────────────────────────
 class _LastSessionSection extends StatelessWidget {
-  const _LastSessionSection({required this.lastSession, required this.settings});
+  const _LastSessionSection({
+    required this.lastSession,
+    required this.settings,
+  });
 
   final ExerciseLog? lastSession;
   final SettingsProvider settings;
@@ -1016,8 +1098,11 @@ class _LastSessionSection extends StatelessWidget {
         ),
         child: const Row(
           children: [
-            Icon(Icons.star_outline_rounded,
-                color: AppColors.textMuted, size: 16),
+            Icon(
+              Icons.star_outline_rounded,
+              color: AppColors.textMuted,
+              size: 16,
+            ),
             SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -1047,8 +1132,8 @@ class _LastSessionSection extends StatelessWidget {
               label: Text(
                 s.isTimeBased
                     ? (s.weight > 0
-                        ? '$wStr × ${s.timeTaken ?? 0}s'
-                        : '${s.timeTaken ?? 0}s')
+                          ? '$wStr × ${s.timeTaken ?? 0}s'
+                          : '${s.timeTaken ?? 0}s')
                     : '$wStr × ${s.reps}',
                 style: const TextStyle(fontSize: 12, color: AppColors.textSoft),
               ),
@@ -1099,8 +1184,11 @@ class _ProgramMetaBanner extends StatelessWidget {
               if (week.isDeload)
                 const Padding(
                   padding: EdgeInsets.only(right: 4),
-                  child: Icon(Icons.battery_charging_full_rounded,
-                      size: 14, color: Colors.amber),
+                  child: Icon(
+                    Icons.battery_charging_full_rounded,
+                    size: 14,
+                    color: Colors.amber,
+                  ),
                 ),
               Flexible(
                 child: Text(
@@ -1125,9 +1213,17 @@ class _ProgramMetaBanner extends StatelessWidget {
                 color: AppColors.textSoft,
               ),
               if (slot.tempo != null)
-                _metaChip(icon: Icons.speed_rounded, label: 'Tempo ${slot.tempo}', color: AppColors.secondary),
+                _metaChip(
+                  icon: Icons.speed_rounded,
+                  label: 'Tempo ${slot.tempo}',
+                  color: AppColors.secondary,
+                ),
               if (slot.supersetGroupId != null)
-                _metaChip(icon: Icons.link_rounded, label: 'Superset', color: AppColors.secondary),
+                _metaChip(
+                  icon: Icons.link_rounded,
+                  label: 'Superset',
+                  color: AppColors.secondary,
+                ),
             ],
           ),
           if (slot.notes != null) ...[
@@ -1135,9 +1231,10 @@ class _ProgramMetaBanner extends StatelessWidget {
             Text(
               slot.notes!,
               style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textMuted,
-                  fontStyle: FontStyle.italic),
+                fontSize: 11,
+                color: AppColors.textMuted,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
         ],
@@ -1145,7 +1242,11 @@ class _ProgramMetaBanner extends StatelessWidget {
     );
   }
 
-  Widget _metaChip({required IconData icon, required String label, required Color color}) {
+  Widget _metaChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

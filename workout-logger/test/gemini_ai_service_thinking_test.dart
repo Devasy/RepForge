@@ -5,6 +5,10 @@ import 'package:repforge/services/ai/gemini_ai_service.dart';
 
 void main() {
   group('supportedThinkingLevels', () {
+    test('3.8 Flash clamps minimal and has a quota fallback', () {
+      expect(clampThinkingLevel('gemini-3.8-flash', 'minimal'), 'low');
+      expect(getFallbackModel('gemini-3.8-flash'), 'gemini-3.7-flash');
+    });
     test('gemini-3.7-flash does not support minimal', () {
       expect(supportedThinkingLevels('gemini-3.7-flash'), ['low', 'medium', 'high']);
     });

@@ -41,11 +41,46 @@ void main() {
     String sql, [
     List<Object?>? args,
   ]) async {
-    final db = await openReadOnlyDatabase(s.databasePath, singleInstance: false);
+    final db = await openReadOnlyDatabase(
+      s.databasePath,
+      singleInstance: false,
+    );
     final rows = await db.rawQuery(sql, args);
     await db.close();
     return rows;
   }
+
+  test('v5 migration preserves raw sets and splits legacy PR handle keys', () async {
+    final directory = await Directory.systemTemp.createTemp('repforge-v5-');
+    final path = '${directory.path}/legacy.db';
+    final old = await openDatabase(path, version: 5, onCreate: (db, _) async {
+      await db.execute('CREATE TABLE muscle_groups (id TEXT PRIMARY KEY, name TEXT, growth_rate REAL, last_updated TEXT)');
+      await db.execute('CREATE TABLE sets (id TEXT PRIMARY KEY, weight REAL, assist_weight REAL, body_weight_at_log REAL)');
+      await db.execute('CREATE TABLE personal_records (exercise_id TEXT PRIMARY KEY, best_weight REAL, best_reps INTEGER, best_volume REAL, achieved_at TEXT, best_duration INTEGER)');
+      await db.insert('sets', {'id': 'raw', 'weight': 20});
+      await db.insert('sets', {'id': 'assisted', 'weight': 10, 'assist_weight': 10, 'body_weight_at_log': 70});
+      for (final handle in ['Rope', 'Bar']) {
+        await db.insert('personal_records', {'exercise_id': 'cable_curl:$handle', 'best_weight': handle == 'Rope' ? 50 : 60, 'best_reps': 8, 'best_volume': 400, 'achieved_at': '2026-01-01'});
+      }
+    });
+    await old.close();
+    final migrated = SqliteStorageService(databasePathOverride: path);
+    try {
+      await migrated.init();
+      final records = await migrated.getAllPersonalRecords();
+      expect(records.map((r) => r.exerciseId).toSet(), {'cable_curl'});
+      expect(records.map((r) => r.handle).toSet(), {'Rope', 'Bar'});
+      expect((await migrated.getPersonalRecord('cable_curl'))!.bestWeight, 60);
+      final rows = await rawQuery(migrated, 'SELECT * FROM sets ORDER BY id');
+      expect(rows.first['load_mode'], 'assisted');
+      expect(rows.first['load_encoding_version'], 1);
+      expect(rows.last['weight'], 20);
+      expect(rows.last['load_encoding_version'], 0);
+    } finally {
+      await migrated.close();
+      await directory.delete(recursive: true);
+    }
+  });
 
   group('SqliteStorageService — health data', () {
     // A DST fall-back maps two distinct UTC instants onto the same local
@@ -53,7 +88,10 @@ void main() {
     // timestamp column — asserted here without depending on the machine's
     // timezone actually observing DST.
     test('two instants sharing a local wall-clock string both survive', () async {
-      final db = await openDatabase(storage.databasePath, singleInstance: false);
+      final db = await openDatabase(
+        storage.databasePath,
+        singleInstance: false,
+      );
       const localString = '2026-11-01T01:30:00.000';
       await db.insert('health_samples', {
         'id': 'heart_rate_2026-11-01T05:30:00.000Z',
@@ -81,116 +119,191 @@ void main() {
       expect(rows.map((r) => r['value']), [60.0, 65.0]);
     });
 
-    test('upsertHealthSamples records the exact UTC instant in utc_ts', () async {
-      final utcTime = DateTime.utc(2026, 8, 10, 21, 0);
-      await storage.upsertHealthSamples('heart_rate', [HealthSample(time: utcTime, value: 60)]);
+    test(
+      'upsertHealthSamples records the exact UTC instant in utc_ts',
+      () async {
+        final utcTime = DateTime.utc(2026, 8, 10, 21, 0);
+        await storage.upsertHealthSamples('heart_rate', [
+          HealthSample(time: utcTime, value: 60),
+        ]);
 
-      final rows = await rawQuery(
-        storage,
-        "SELECT utc_ts FROM health_samples WHERE type = 'heart_rate'",
-      );
-      final stored = rows.first['utc_ts'] as String;
-      expect(stored.endsWith('Z'), isTrue);
-      expect(DateTime.parse(stored).toUtc(), utcTime);
-    });
+        final rows = await rawQuery(
+          storage,
+          "SELECT utc_ts FROM health_samples WHERE type = 'heart_rate'",
+        );
+        final stored = rows.first['utc_ts'] as String;
+        expect(stored.endsWith('Z'), isTrue);
+        expect(DateTime.parse(stored).toUtc(), utcTime);
+      },
+    );
 
-    test('sleep session id is the UTC start instant, not the local one', () async {
-      final start = DateTime.utc(2026, 11, 1, 5, 30);
-      await storage.upsertSleepSessions([
-        SleepPeriod(
-          start: start,
-          end: start.add(const Duration(hours: 8)),
-          lightMinutes: 200,
-          deepMinutes: 60,
-          remMinutes: 100,
-          awakeMinutes: 10,
-          stageTimeline: const [],
-        ),
-      ]);
+    test(
+      'sleep session id is the UTC start instant, not the local one',
+      () async {
+        final start = DateTime.utc(2026, 11, 1, 5, 30);
+        await storage.upsertSleepSessions([
+          SleepPeriod(
+            start: start,
+            end: start.add(const Duration(hours: 8)),
+            lightMinutes: 200,
+            deepMinutes: 60,
+            remMinutes: 100,
+            awakeMinutes: 10,
+            stageTimeline: const [],
+          ),
+        ]);
 
-      final rows = await rawQuery(storage, 'SELECT id, start_ts FROM sleep_sessions');
-      expect(rows.length, 1);
-      final id = rows.first['id'] as String;
-      expect(id, start.toIso8601String());
-      expect(DateTime.parse(id).toUtc(), start);
-      // start_ts stays local so it joins cleanly against workout_sessions.date.
-      expect((rows.first['start_ts'] as String).endsWith('Z'), isFalse);
-    });
+        final rows = await rawQuery(
+          storage,
+          'SELECT id, start_ts FROM sleep_sessions',
+        );
+        expect(rows.length, 1);
+        final id = rows.first['id'] as String;
+        expect(id, start.toIso8601String());
+        expect(DateTime.parse(id).toUtc(), start);
+        // start_ts stays local so it joins cleanly against workout_sessions.date.
+        expect((rows.first['start_ts'] as String).endsWith('Z'), isFalse);
+      },
+    );
 
-    test('upsertHealthSamples replaces duplicates on (type, timestamp)', () async {
-      final t = DateTime(2026, 8, 10, 22, 30);
-      await storage.upsertHealthSamples('heart_rate', [HealthSample(time: t, value: 60)]);
-      await storage.upsertHealthSamples('heart_rate', [HealthSample(time: t, value: 65)]);
+    test(
+      'upsertHealthSamples replaces duplicates on (type, timestamp)',
+      () async {
+        final t = DateTime(2026, 8, 10, 22, 30);
+        await storage.upsertHealthSamples('heart_rate', [
+          HealthSample(time: t, value: 60),
+        ]);
+        await storage.upsertHealthSamples('heart_rate', [
+          HealthSample(time: t, value: 65),
+        ]);
 
-      final rows = await rawQuery(
-        storage,
-        "SELECT value FROM health_samples WHERE type = 'heart_rate'",
-      );
-      expect(rows.length, 1);
-      expect(rows.first['value'], 65.0);
-    });
+        final rows = await rawQuery(
+          storage,
+          "SELECT value FROM health_samples WHERE type = 'heart_rate'",
+        );
+        expect(rows.length, 1);
+        expect(rows.first['value'], 65.0);
+      },
+    );
 
-    test('upsertHealthSamples stores timestamps converted to local, not UTC', () async {
-      final utcTime = DateTime.utc(2026, 8, 10, 21, 0);
-      await storage.upsertHealthSamples('heart_rate', [HealthSample(time: utcTime, value: 60)]);
+    test(
+      'upsertHealthSamples stores timestamps converted to local, not UTC',
+      () async {
+        final utcTime = DateTime.utc(2026, 8, 10, 21, 0);
+        await storage.upsertHealthSamples('heart_rate', [
+          HealthSample(time: utcTime, value: 60),
+        ]);
 
-      final rows = await rawQuery(
-        storage,
-        "SELECT start_ts, end_ts FROM health_samples WHERE type = 'heart_rate'",
-      );
-      final stored = rows.first['start_ts'] as String;
-      expect(stored.contains('Z'), isFalse);
-      expect(stored, utcTime.toLocal().toIso8601String());
-      expect(rows.first['end_ts'], stored);
-    });
+        final rows = await rawQuery(
+          storage,
+          "SELECT start_ts, end_ts FROM health_samples WHERE type = 'heart_rate'",
+        );
+        final stored = rows.first['start_ts'] as String;
+        expect(stored.contains('Z'), isFalse);
+        expect(stored, utcTime.toLocal().toIso8601String());
+        expect(rows.first['end_ts'], stored);
+      },
+    );
 
-    test('upsertSleepSessions replaces stage intervals for a re-synced session', () async {
-      final start = DateTime(2026, 8, 10, 23);
-      final end = DateTime(2026, 8, 11, 7);
+    test(
+      'upsertSleepSessions replaces stage intervals for a re-synced session',
+      () async {
+        final start = DateTime(2026, 8, 10, 23);
+        final end = DateTime(2026, 8, 11, 7);
 
-      await storage.upsertSleepSessions([
-        SleepPeriod(
-          start: start,
-          end: end,
-          lightMinutes: 200,
-          deepMinutes: 60,
-          remMinutes: 100,
-          awakeMinutes: 10,
-          stageTimeline: [
-            SleepStageInterval(start: start, end: start.add(const Duration(hours: 1)), stage: 'light'),
-          ],
-        ),
-      ]);
+        await storage.upsertSleepSessions([
+          SleepPeriod(
+            start: start,
+            end: end,
+            lightMinutes: 200,
+            deepMinutes: 60,
+            remMinutes: 100,
+            awakeMinutes: 10,
+            stageTimeline: [
+              SleepStageInterval(
+                start: start,
+                end: start.add(const Duration(hours: 1)),
+                stage: 'light',
+              ),
+            ],
+          ),
+        ]);
 
-      await storage.upsertSleepSessions([
-        SleepPeriod(
-          start: start,
-          end: end,
-          lightMinutes: 190,
-          deepMinutes: 70,
-          remMinutes: 100,
-          awakeMinutes: 10,
-          stageTimeline: [
-            SleepStageInterval(start: start, end: start.add(const Duration(hours: 2)), stage: 'deep'),
-          ],
-        ),
-      ]);
+        await storage.upsertSleepSessions([
+          SleepPeriod(
+            start: start,
+            end: end,
+            lightMinutes: 190,
+            deepMinutes: 70,
+            remMinutes: 100,
+            awakeMinutes: 10,
+            stageTimeline: [
+              SleepStageInterval(
+                start: start,
+                end: start.add(const Duration(hours: 2)),
+                stage: 'deep',
+              ),
+            ],
+          ),
+        ]);
 
-      final sessions = await rawQuery(storage, 'SELECT id, deep_min FROM sleep_sessions');
-      expect(sessions.length, 1);
-      expect(sessions.first['deep_min'], 70);
+        final sessions = await rawQuery(
+          storage,
+          'SELECT id, deep_min FROM sleep_sessions',
+        );
+        expect(sessions.length, 1);
+        expect(sessions.first['deep_min'], 70);
 
-      final intervals = await rawQuery(
-        storage,
-        'SELECT stage FROM sleep_stage_intervals WHERE sleep_session_id = ?',
-        [sessions.first['id']],
-      );
-      expect(intervals.length, 1);
-      expect(intervals.first['stage'], 'deep');
-    });
+        final intervals = await rawQuery(
+          storage,
+          'SELECT stage FROM sleep_stage_intervals WHERE sleep_session_id = ?',
+          [sessions.first['id']],
+        );
+        expect(intervals.length, 1);
+        expect(intervals.first['stage'], 'deep');
+      },
+    );
   });
 
   group('SqliteStorageService — schema upgrade', () {
+    test(
+      'v4 upgrade preserves sessions and adds nullable session effort',
+      () async {
+        final path =
+            '${Directory.systemTemp.path}/sqlite_v4_upgrade_${DateTime.now().microsecondsSinceEpoch}.db';
+        final old = await openDatabase(
+          path,
+          version: 4,
+          onCreate: (db, version) async {
+            await db.execute(
+              'CREATE TABLE muscle_groups (id TEXT PRIMARY KEY, name TEXT, growth_rate REAL, last_updated TEXT)',
+            );
+            await db.execute(
+              'CREATE TABLE sessions (id TEXT PRIMARY KEY, date TEXT)',
+            );
+            await db.insert('sessions', {
+              'id': 'existing-session',
+              'date': '2026-01-01',
+            });
+          },
+        );
+        await old.close();
+        final upgraded = SqliteStorageService(databasePathOverride: path);
+        try {
+          await upgraded.init();
+          final rows = await rawQuery(
+            upgraded,
+            'SELECT id, session_effort FROM sessions',
+          );
+          expect(rows.single['id'], 'existing-session');
+          expect(rows.single['session_effort'], isNull);
+        } finally {
+          await upgraded.close();
+          await File(path).delete();
+        }
+      },
+    );
+
     test('onUpgrade adds health tables to a pre-existing v1 database', () async {
       final path =
           '${Directory.systemTemp.path}/sqlite_v1_upgrade_${DateTime.now().microsecondsSinceEpoch}.db';
@@ -216,7 +329,14 @@ void main() {
         "SELECT name FROM sqlite_master WHERE type = 'table'",
       );
       final names = tableRows.map((r) => r['name'] as String).toSet();
-      expect(names, containsAll(['health_samples', 'sleep_sessions', 'sleep_stage_intervals']));
+      expect(
+        names,
+        containsAll([
+          'health_samples',
+          'sleep_sessions',
+          'sleep_stage_intervals',
+        ]),
+      );
 
       await upgraded.close();
       await File(path).delete();
@@ -247,7 +367,8 @@ void main() {
             value REAL NOT NULL
           )''');
           await db.execute(
-              'CREATE UNIQUE INDEX idx_health_samples_unique ON health_samples(type, timestamp)');
+            'CREATE UNIQUE INDEX idx_health_samples_unique ON health_samples(type, timestamp)',
+          );
           await db.execute('''CREATE TABLE sleep_sessions (
             id TEXT PRIMARY KEY,
             start_ts TEXT NOT NULL,
@@ -268,8 +389,10 @@ void main() {
             'timestamp': '2026-08-10T22:30:00.000',
             'value': 60.0,
           });
-          await db.insert('settings',
-              {'key': 'health_sync.heart_rate', 'value': '2026-08-10T22:30:00.000Z'});
+          await db.insert('settings', {
+            'key': 'health_sync.heart_rate',
+            'value': '2026-08-10T22:30:00.000Z',
+          });
           await db.insert('settings', {'key': 'userName', 'value': 'Devasy'});
         },
       );
@@ -279,9 +402,15 @@ void main() {
       await upgraded.init();
 
       // The cache is rebuilt on the new shape...
-      final cols = await rawQuery(upgraded, 'PRAGMA table_info(health_samples)');
+      final cols = await rawQuery(
+        upgraded,
+        'PRAGMA table_info(health_samples)',
+      );
       expect(cols.map((c) => c['name']), contains('utc_ts'));
-      final samples = await rawQuery(upgraded, 'SELECT COUNT(*) AS n FROM health_samples');
+      final samples = await rawQuery(
+        upgraded,
+        'SELECT COUNT(*) AS n FROM health_samples',
+      );
       expect(samples.first['n'], 0);
 
       // ...the watermarks are cleared so the next sync re-pulls the window...
@@ -298,105 +427,123 @@ void main() {
       await File(path).delete();
     });
 
-    test('onUpgrade from v3 adds exercise_type, default_handle, and best_duration', () async {
-      final path =
-          '${Directory.systemTemp.path}/sqlite_v3_upgrade_${DateTime.now().microsecondsSinceEpoch}.db';
-      final v3 = await openDatabase(
-        path,
-        version: 3,
-        onCreate: (db, v) async {
-          await db.execute('''CREATE TABLE exercises (
+    test(
+      'onUpgrade from v3 adds exercise_type, default_handle, and best_duration',
+      () async {
+        final path =
+            '${Directory.systemTemp.path}/sqlite_v3_upgrade_${DateTime.now().microsecondsSinceEpoch}.db';
+        final v3 = await openDatabase(
+          path,
+          version: 3,
+          onCreate: (db, v) async {
+            await db.execute('''CREATE TABLE exercises (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             category TEXT NOT NULL,
             is_custom INTEGER NOT NULL DEFAULT 0,
             available_handles TEXT
           )''');
-          await db.execute('''CREATE TABLE routine_exercises (
+            await db.execute('''CREATE TABLE routine_exercises (
             routine_id TEXT NOT NULL,
             exercise_id TEXT NOT NULL,
             order_index INTEGER NOT NULL
           )''');
-          await db.execute('''CREATE TABLE personal_records (
+            await db.execute('''CREATE TABLE personal_records (
             exercise_id TEXT PRIMARY KEY,
             best_weight REAL NOT NULL,
             best_reps INTEGER NOT NULL,
             best_volume REAL NOT NULL,
             achieved_at TEXT NOT NULL
           )''');
-          await db.execute('''CREATE TABLE muscle_groups (
+            await db.execute('''CREATE TABLE muscle_groups (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             growth_rate REAL NOT NULL DEFAULT 0,
             last_updated TEXT NOT NULL
           )''');
-          await db.insert('exercises', {
-            'id': 'bench',
-            'name': 'Bench Press',
-            'category': 'Chest',
-            'is_custom': 0,
-          });
-          await db.insert('personal_records', {
-            'exercise_id': 'bench',
-            'best_weight': 100.0,
-            'best_reps': 5,
-            'best_volume': 500.0,
-            'achieved_at': '2026-01-01T00:00:00.000',
-          });
-        },
-      );
-      await v3.close();
+            await db.insert('exercises', {
+              'id': 'bench',
+              'name': 'Bench Press',
+              'category': 'Chest',
+              'is_custom': 0,
+            });
+            await db.insert('personal_records', {
+              'exercise_id': 'bench',
+              'best_weight': 100.0,
+              'best_reps': 5,
+              'best_volume': 500.0,
+              'achieved_at': '2026-01-01T00:00:00.000',
+            });
+          },
+        );
+        await v3.close();
 
-      final upgraded = SqliteStorageService(databasePathOverride: path);
-      await upgraded.init();
+        final upgraded = SqliteStorageService(databasePathOverride: path);
+        await upgraded.init();
 
-      final exCols = await rawQuery(upgraded, 'PRAGMA table_info(exercises)');
-      expect(exCols.map((c) => c['name']), contains('exercise_type'));
+        final exCols = await rawQuery(upgraded, 'PRAGMA table_info(exercises)');
+        expect(exCols.map((c) => c['name']), contains('exercise_type'));
 
-      final prCols = await rawQuery(upgraded, 'PRAGMA table_info(personal_records)');
-      expect(prCols.map((c) => c['name']), contains('best_duration'));
+        final prCols = await rawQuery(
+          upgraded,
+          'PRAGMA table_info(personal_records)',
+        );
+        expect(prCols.map((c) => c['name']), contains('best_duration'));
 
-      final reCols = await rawQuery(upgraded, 'PRAGMA table_info(routine_exercises)');
-      expect(reCols.map((c) => c['name']), contains('default_handle'));
+        final reCols = await rawQuery(
+          upgraded,
+          'PRAGMA table_info(routine_exercises)',
+        );
+        expect(reCols.map((c) => c['name']), contains('default_handle'));
 
-      // Existing data preserved with default
-      final exRow = await rawQuery(upgraded, "SELECT exercise_type FROM exercises WHERE id = 'bench'");
-      expect(exRow.first['exercise_type'], 'weightAndReps');
+        // Existing data preserved with default
+        final exRow = await rawQuery(
+          upgraded,
+          "SELECT exercise_type FROM exercises WHERE id = 'bench'",
+        );
+        expect(exRow.first['exercise_type'], 'weightAndReps');
 
-      await upgraded.close();
-      await File(path).delete();
-    });
+        await upgraded.close();
+        await File(path).delete();
+      },
+    );
   });
 
   group('SqliteStorageService — workout sessions', () {
-    test('saveWorkoutSession + getWorkoutSession round-trips nested sets', () async {
-      final session = WorkoutSession(
-        id: 's1',
-        date: DateTime(2026, 7, 10),
-        duration: 45,
-        exercises: [
-          ExerciseLog(
-            exerciseId: 'bench_press',
-            sets: [
-              WorkoutSet(weight: 60, reps: 8),
-              WorkoutSet(weight: 65, reps: 6, isDropset: true, drops: [
-                DropsetEntry(weight: 50, reps: 10),
-              ]),
-            ],
-          ),
-        ],
-      );
+    test(
+      'saveWorkoutSession + getWorkoutSession round-trips nested sets',
+      () async {
+        final session = WorkoutSession(
+          id: 's1',
+          date: DateTime(2026, 7, 10),
+          duration: 45,
+          exercises: [
+            ExerciseLog(
+              exerciseId: 'bench_press',
+              sets: [
+                WorkoutSet(weight: 60, reps: 8),
+                WorkoutSet(
+                  weight: 65,
+                  reps: 6,
+                  isDropset: true,
+                  drops: [DropsetEntry(weight: 50, reps: 10)],
+                ),
+              ],
+            ),
+          ],
+        );
 
-      await storage.saveWorkoutSession(session);
-      final fetched = await storage.getWorkoutSession('s1');
+        await storage.saveWorkoutSession(session);
+        final fetched = await storage.getWorkoutSession('s1');
 
-      expect(fetched, isNotNull);
-      expect(fetched!.duration, 45);
-      expect(fetched.exercises.single.sets.length, 2);
-      expect(fetched.exercises.single.sets.first.weight, 60);
-      expect(fetched.exercises.single.sets[1].isDropset, isTrue);
-      expect(fetched.exercises.single.sets[1].drops!.single.weight, 50);
-    });
+        expect(fetched, isNotNull);
+        expect(fetched!.duration, 45);
+        expect(fetched.exercises.single.sets.length, 2);
+        expect(fetched.exercises.single.sets.first.weight, 60);
+        expect(fetched.exercises.single.sets[1].isDropset, isTrue);
+        expect(fetched.exercises.single.sets[1].drops!.single.weight, 50);
+      },
+    );
 
     test('preserves set order with 11+ sets (regression: synthetic ids like '
         '"_10" sort before "_2" lexicographically, so ordering must use '
@@ -423,29 +570,30 @@ void main() {
       );
     });
 
-    test('preserves exercise-log order with 11+ exercises in one session',
-        () async {
-      final session = WorkoutSession(
-        id: 's_order_logs',
-        date: DateTime(2026, 7, 16),
-        duration: 90,
-        exercises: [
-          for (var i = 0; i < 11; i++)
-            ExerciseLog(
-              exerciseId: 'exercise_$i',
-              sets: [WorkoutSet(weight: 10.0 + i, reps: 5)],
-            ),
-        ],
-      );
+    test(
+      'preserves exercise-log order with 11+ exercises in one session',
+      () async {
+        final session = WorkoutSession(
+          id: 's_order_logs',
+          date: DateTime(2026, 7, 16),
+          duration: 90,
+          exercises: [
+            for (var i = 0; i < 11; i++)
+              ExerciseLog(
+                exerciseId: 'exercise_$i',
+                sets: [WorkoutSet(weight: 10.0 + i, reps: 5)],
+              ),
+          ],
+        );
 
-      await storage.saveWorkoutSession(session);
-      final fetched = await storage.getWorkoutSession('s_order_logs');
+        await storage.saveWorkoutSession(session);
+        final fetched = await storage.getWorkoutSession('s_order_logs');
 
-      expect(
-        fetched!.exercises.map((e) => e.exerciseId).toList(),
-        [for (var i = 0; i < 11; i++) 'exercise_$i'],
-      );
-    });
+        expect(fetched!.exercises.map((e) => e.exerciseId).toList(), [
+          for (var i = 0; i < 11; i++) 'exercise_$i',
+        ]);
+      },
+    );
 
     test('saveWorkoutSession overwrites previous sets on re-save', () async {
       final session = WorkoutSession(
@@ -453,14 +601,20 @@ void main() {
         date: DateTime(2026, 7, 1),
         duration: 30,
         exercises: [
-          ExerciseLog(exerciseId: 'squat', sets: [WorkoutSet(weight: 100, reps: 5)]),
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [WorkoutSet(weight: 100, reps: 5)],
+          ),
         ],
       );
       await storage.saveWorkoutSession(session);
 
       final updated = session.copyWith(
         exercises: [
-          ExerciseLog(exerciseId: 'squat', sets: [WorkoutSet(weight: 110, reps: 3)]),
+          ExerciseLog(
+            exerciseId: 'squat',
+            sets: [WorkoutSet(weight: 110, reps: 3)],
+          ),
         ],
       );
       await storage.saveWorkoutSession(updated);
@@ -475,7 +629,12 @@ void main() {
         id: 's3',
         date: DateTime.now(),
         duration: 20,
-        exercises: [ExerciseLog(exerciseId: 'row', sets: [WorkoutSet(weight: 40, reps: 10)])],
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'row',
+            sets: [WorkoutSet(weight: 40, reps: 10)],
+          ),
+        ],
       );
       await storage.saveWorkoutSession(session);
       await storage.deleteWorkoutSession('s3');
@@ -484,10 +643,20 @@ void main() {
 
     test('getAllWorkoutSessions returns most-recent first', () async {
       await storage.saveWorkoutSession(
-        WorkoutSession(id: 'old', date: DateTime(2026, 1, 1), duration: 10, exercises: []),
+        WorkoutSession(
+          id: 'old',
+          date: DateTime(2026, 1, 1),
+          duration: 10,
+          exercises: [],
+        ),
       );
       await storage.saveWorkoutSession(
-        WorkoutSession(id: 'new', date: DateTime(2026, 6, 1), duration: 10, exercises: []),
+        WorkoutSession(
+          id: 'new',
+          date: DateTime(2026, 6, 1),
+          duration: 10,
+          exercises: [],
+        ),
       );
       final all = await storage.getAllWorkoutSessions();
       expect(all.first.id, 'new');
@@ -495,67 +664,113 @@ void main() {
 
     test('getSessionsInDateRange filters by date', () async {
       await storage.saveWorkoutSession(
-        WorkoutSession(id: 'a', date: DateTime(2026, 1, 1), duration: 10, exercises: []),
+        WorkoutSession(
+          id: 'a',
+          date: DateTime(2026, 1, 1),
+          duration: 10,
+          exercises: [],
+        ),
       );
       await storage.saveWorkoutSession(
-        WorkoutSession(id: 'b', date: DateTime(2026, 6, 1), duration: 10, exercises: []),
+        WorkoutSession(
+          id: 'b',
+          date: DateTime(2026, 6, 1),
+          duration: 10,
+          exercises: [],
+        ),
       );
-      final result = await storage.getSessionsInDateRange(DateTime(2026, 5, 1), DateTime(2026, 7, 1));
+      final result = await storage.getSessionsInDateRange(
+        DateTime(2026, 5, 1),
+        DateTime(2026, 7, 1),
+      );
       expect(result.map((s) => s.id), ['b']);
     });
 
     test('getSessionsForExercise filters by exercise id', () async {
-      await storage.saveWorkoutSession(WorkoutSession(
-        id: 'c1', date: DateTime.now(), duration: 10,
-        exercises: [ExerciseLog(exerciseId: 'deadlift', sets: [WorkoutSet(weight: 120, reps: 5)])],
-      ));
-      await storage.saveWorkoutSession(WorkoutSession(
-        id: 'c2', date: DateTime.now(), duration: 10,
-        exercises: [ExerciseLog(exerciseId: 'squat', sets: [WorkoutSet(weight: 100, reps: 5)])],
-      ));
+      await storage.saveWorkoutSession(
+        WorkoutSession(
+          id: 'c1',
+          date: DateTime.now(),
+          duration: 10,
+          exercises: [
+            ExerciseLog(
+              exerciseId: 'deadlift',
+              sets: [WorkoutSet(weight: 120, reps: 5)],
+            ),
+          ],
+        ),
+      );
+      await storage.saveWorkoutSession(
+        WorkoutSession(
+          id: 'c2',
+          date: DateTime.now(),
+          duration: 10,
+          exercises: [
+            ExerciseLog(
+              exerciseId: 'squat',
+              sets: [WorkoutSet(weight: 100, reps: 5)],
+            ),
+          ],
+        ),
+      );
       final result = await storage.getSessionsForExercise('deadlift');
       expect(result.map((s) => s.id), ['c1']);
     });
 
-    test('saveWorkoutSession + getWorkoutSession round-trips bodyWeightAtLog', () async {
-      final session = WorkoutSession(
-        id: 's4',
-        date: DateTime(2026, 7, 5),
-        duration: 25,
-        exercises: [
-          ExerciseLog(
-            exerciseId: 'assisted_pullup',
-            sets: [WorkoutSet(weight: 20, reps: 8, bodyWeightAtLog: 75.5)],
-          ),
-        ],
-      );
-      await storage.saveWorkoutSession(session);
-      final fetched = await storage.getWorkoutSession('s4');
-      expect(fetched!.exercises.single.sets.single.bodyWeightAtLog, 75.5);
-    });
+    test(
+      'saveWorkoutSession + getWorkoutSession round-trips bodyWeightAtLog',
+      () async {
+        final session = WorkoutSession(
+          id: 's4',
+          date: DateTime(2026, 7, 5),
+          duration: 25,
+          exercises: [
+            ExerciseLog(
+              exerciseId: 'assisted_pullup',
+              sets: [WorkoutSet(weight: 20, reps: 8, bodyWeightAtLog: 75.5)],
+            ),
+          ],
+        );
+        await storage.saveWorkoutSession(session);
+        final fetched = await storage.getWorkoutSession('s4');
+        expect(fetched!.exercises.single.sets.single.bodyWeightAtLog, 75.5);
+      },
+    );
   });
 
   group('SqliteStorageService — routines', () {
     test('saveRoutine + getRoutine round-trips ordered exercise ids', () async {
-      await storage.saveRoutine(Routine(
-        id: 'r1',
-        name: 'Push Day',
-        exerciseIds: ['bench_press', 'shoulder_press', 'triceps_pushdown'],
-      ));
+      await storage.saveRoutine(
+        Routine(
+          id: 'r1',
+          name: 'Push Day',
+          exerciseIds: ['bench_press', 'shoulder_press', 'triceps_pushdown'],
+        ),
+      );
       final fetched = await storage.getRoutine('r1');
       expect(fetched!.name, 'Push Day');
-      expect(fetched.exerciseIds, ['bench_press', 'shoulder_press', 'triceps_pushdown']);
+      expect(fetched.exerciseIds, [
+        'bench_press',
+        'shoulder_press',
+        'triceps_pushdown',
+      ]);
     });
 
     test('saveRoutine overwrites exercise order on re-save', () async {
-      await storage.saveRoutine(Routine(id: 'r2', name: 'Pull Day', exerciseIds: ['a', 'b']));
-      await storage.saveRoutine(Routine(id: 'r2', name: 'Pull Day', exerciseIds: ['b', 'a', 'c']));
+      await storage.saveRoutine(
+        Routine(id: 'r2', name: 'Pull Day', exerciseIds: ['a', 'b']),
+      );
+      await storage.saveRoutine(
+        Routine(id: 'r2', name: 'Pull Day', exerciseIds: ['b', 'a', 'c']),
+      );
       final fetched = await storage.getRoutine('r2');
       expect(fetched!.exerciseIds, ['b', 'a', 'c']);
     });
 
     test('deleteRoutine removes it', () async {
-      await storage.saveRoutine(Routine(id: 'r3', name: 'Legs', exerciseIds: ['squat']));
+      await storage.saveRoutine(
+        Routine(id: 'r3', name: 'Legs', exerciseIds: ['squat']),
+      );
       await storage.deleteRoutine('r3');
       expect(await storage.getRoutine('r3'), isNull);
     });
@@ -570,27 +785,50 @@ void main() {
 
   group('SqliteStorageService — targets', () {
     test('saveTarget + getTarget round-trips', () async {
-      await storage.saveTarget(Target(
-        id: 't1',
-        exerciseId: 'bench_press',
-        targetType: 'weight',
-        targetValue: 100,
-        currentValue: 70,
-      ));
+      await storage.saveTarget(
+        Target(
+          id: 't1',
+          exerciseId: 'bench_press',
+          targetType: 'weight',
+          targetValue: 100,
+          currentValue: 70,
+        ),
+      );
       final fetched = await storage.getTarget('t1');
       expect(fetched!.targetValue, 100);
       expect(fetched.currentValue, 70);
     });
 
     test('deleteTarget removes it', () async {
-      await storage.saveTarget(Target(id: 't2', exerciseId: 'squat', targetType: 'weight', targetValue: 150));
+      await storage.saveTarget(
+        Target(
+          id: 't2',
+          exerciseId: 'squat',
+          targetType: 'weight',
+          targetValue: 150,
+        ),
+      );
       await storage.deleteTarget('t2');
       expect(await storage.getTarget('t2'), isNull);
     });
 
     test('getTargetsForExercise filters by exercise id', () async {
-      await storage.saveTarget(Target(id: 't3', exerciseId: 'squat', targetType: 'weight', targetValue: 150));
-      await storage.saveTarget(Target(id: 't4', exerciseId: 'deadlift', targetType: 'weight', targetValue: 180));
+      await storage.saveTarget(
+        Target(
+          id: 't3',
+          exerciseId: 'squat',
+          targetType: 'weight',
+          targetValue: 150,
+        ),
+      );
+      await storage.saveTarget(
+        Target(
+          id: 't4',
+          exerciseId: 'deadlift',
+          targetType: 'weight',
+          targetValue: 180,
+        ),
+      );
       final result = await storage.getTargetsForExercise('squat');
       expect(result.map((t) => t.id), ['t3']);
     });
@@ -607,25 +845,31 @@ void main() {
   });
 
   group('SqliteStorageService — custom exercises', () {
-    test('saveCustomExercise + getExercise round-trips muscle activations', () async {
-      final exercise = Exercise(
-        id: 'custom1',
-        name: 'Cable Crossover',
-        category: 'isolation',
-        isCustom: true,
-        muscleActivations: [
-          MuscleActivation(muscleGroupId: 'chest', activationPercentage: 80),
-          MuscleActivation(muscleGroupId: 'triceps', activationPercentage: 20),
-        ],
-      );
-      await storage.saveCustomExercise(exercise);
+    test(
+      'saveCustomExercise + getExercise round-trips muscle activations',
+      () async {
+        final exercise = Exercise(
+          id: 'custom1',
+          name: 'Cable Crossover',
+          category: 'isolation',
+          isCustom: true,
+          muscleActivations: [
+            MuscleActivation(muscleGroupId: 'chest', activationPercentage: 80),
+            MuscleActivation(
+              muscleGroupId: 'triceps',
+              activationPercentage: 20,
+            ),
+          ],
+        );
+        await storage.saveCustomExercise(exercise);
 
-      final fetched = await storage.getExercise('custom1');
-      expect(fetched, isNotNull);
-      expect(fetched!.name, 'Cable Crossover');
-      expect(fetched.muscleActivations.length, 2);
-      expect(fetched.primaryMuscle, 'chest');
-    });
+        final fetched = await storage.getExercise('custom1');
+        expect(fetched, isNotNull);
+        expect(fetched!.name, 'Cable Crossover');
+        expect(fetched.muscleActivations.length, 2);
+        expect(fetched.primaryMuscle, 'chest');
+      },
+    );
 
     test('getExercise falls back to built-in exercises', () async {
       final builtIns = ExerciseDatabase.getAll();
@@ -635,53 +879,73 @@ void main() {
     });
 
     test('getAllExercises merges built-in and custom', () async {
-      await storage.saveCustomExercise(Exercise(
-        id: 'custom2',
-        name: 'My Exercise',
-        category: 'compound',
-        isCustom: true,
-        muscleActivations: [MuscleActivation(muscleGroupId: 'back', activationPercentage: 100)],
-      ));
+      await storage.saveCustomExercise(
+        Exercise(
+          id: 'custom2',
+          name: 'My Exercise',
+          category: 'compound',
+          isCustom: true,
+          muscleActivations: [
+            MuscleActivation(muscleGroupId: 'back', activationPercentage: 100),
+          ],
+        ),
+      );
       final all = await storage.getAllExercises();
       expect(all.any((e) => e.id == 'custom2'), isTrue);
       expect(all.length, greaterThan(1));
     });
 
     test('deleteCustomExercise removes it and its activations', () async {
-      await storage.saveCustomExercise(Exercise(
-        id: 'custom3',
-        name: 'Temp',
-        category: 'isolation',
-        isCustom: true,
-        muscleActivations: [MuscleActivation(muscleGroupId: 'biceps', activationPercentage: 100)],
-      ));
+      await storage.saveCustomExercise(
+        Exercise(
+          id: 'custom3',
+          name: 'Temp',
+          category: 'isolation',
+          isCustom: true,
+          muscleActivations: [
+            MuscleActivation(
+              muscleGroupId: 'biceps',
+              activationPercentage: 100,
+            ),
+          ],
+        ),
+      );
       await storage.deleteCustomExercise('custom3');
       expect(await storage.getExercise('custom3'), isNull);
       final custom = await storage.getCustomExercises();
       expect(custom.any((e) => e.id == 'custom3'), isFalse);
     });
 
-    test('getExercise throws ArgumentError on unsupported non-null exercise_type', () async {
-      final db = await openDatabase(storage.databasePath, singleInstance: false);
-      await db.insert('exercises', {
-        'id': 'invalid_type_ex',
-        'name': 'Invalid Type',
-        'category': 'isolation',
-        'is_custom': 1,
-        'exercise_type': 'unsupported_type',
-      });
-      await db.close();
-      expect(storage.getExercise('invalid_type_ex'), throwsArgumentError);
-    });
+    test(
+      'getExercise throws ArgumentError on unsupported non-null exercise_type',
+      () async {
+        final db = await openDatabase(
+          storage.databasePath,
+          singleInstance: false,
+        );
+        await db.insert('exercises', {
+          'id': 'invalid_type_ex',
+          'name': 'Invalid Type',
+          'category': 'isolation',
+          'is_custom': 1,
+          'exercise_type': 'unsupported_type',
+        });
+        await db.close();
+        expect(storage.getExercise('invalid_type_ex'), throwsArgumentError);
+      },
+    );
   });
 
   group('SqliteStorageService — settings', () {
-    test('saveSetting + getSetting round-trips, overwrite replaces value', () async {
-      await storage.saveSetting('user_name', 'Alex');
-      expect(await storage.getSetting('user_name'), 'Alex');
-      await storage.saveSetting('user_name', 'Sam');
-      expect(await storage.getSetting('user_name'), 'Sam');
-    });
+    test(
+      'saveSetting + getSetting round-trips, overwrite replaces value',
+      () async {
+        await storage.saveSetting('user_name', 'Alex');
+        expect(await storage.getSetting('user_name'), 'Alex');
+        await storage.saveSetting('user_name', 'Sam');
+        expect(await storage.getSetting('user_name'), 'Sam');
+      },
+    );
 
     test('getSetting returns null for unknown key', () async {
       expect(await storage.getSetting('does_not_exist'), isNull);
@@ -690,43 +954,62 @@ void main() {
 
   group('SqliteStorageService — personal records', () {
     test('savePersonalRecord + getPersonalRecord round-trips', () async {
-      await storage.savePersonalRecord(PersonalRecord(
-        exerciseId: 'bench_press',
-        bestWeight: 90,
-        bestReps: 5,
-        bestVolume: 450,
-        achievedAt: DateTime(2026, 4, 1),
-      ));
+      await storage.savePersonalRecord(
+        PersonalRecord(
+          exerciseId: 'bench_press',
+          bestWeight: 90,
+          bestReps: 5,
+          bestVolume: 450,
+          achievedAt: DateTime(2026, 4, 1),
+        ),
+      );
       final pr = await storage.getPersonalRecord('bench_press');
       expect(pr!.bestWeight, 90);
     });
 
     test('getAllPersonalRecords returns everything saved', () async {
-      await storage.savePersonalRecord(PersonalRecord(
-        exerciseId: 'squat', bestWeight: 150, bestReps: 3, bestVolume: 450, achievedAt: DateTime(2026, 3, 1),
-      ));
+      await storage.savePersonalRecord(
+        PersonalRecord(
+          exerciseId: 'squat',
+          bestWeight: 150,
+          bestReps: 3,
+          bestVolume: 450,
+          achievedAt: DateTime(2026, 3, 1),
+        ),
+      );
       final all = await storage.getAllPersonalRecords();
       expect(all.any((r) => r.exerciseId == 'squat'), isTrue);
     });
   });
 
   group('SqliteStorageService — training programs', () {
-    test('saveTrainingProgram + getTrainingProgram round-trips phases/weeks', () async {
-      final program = TrainingProgram(
-        id: 'p1',
-        name: '12-Week Strength',
-        totalWeeks: 12,
-        phases: [],
-        weeks: [],
-      );
-      await storage.saveTrainingProgram(program);
-      final fetched = await storage.getTrainingProgram('p1');
-      expect(fetched!.name, '12-Week Strength');
-      expect(fetched.totalWeeks, 12);
-    });
+    test(
+      'saveTrainingProgram + getTrainingProgram round-trips phases/weeks',
+      () async {
+        final program = TrainingProgram(
+          id: 'p1',
+          name: '12-Week Strength',
+          totalWeeks: 12,
+          phases: [],
+          weeks: [],
+        );
+        await storage.saveTrainingProgram(program);
+        final fetched = await storage.getTrainingProgram('p1');
+        expect(fetched!.name, '12-Week Strength');
+        expect(fetched.totalWeeks, 12);
+      },
+    );
 
     test('deleteTrainingProgram removes it', () async {
-      await storage.saveTrainingProgram(TrainingProgram(id: 'p2', name: 'X', totalWeeks: 4, phases: [], weeks: []));
+      await storage.saveTrainingProgram(
+        TrainingProgram(
+          id: 'p2',
+          name: 'X',
+          totalWeeks: 4,
+          phases: [],
+          weeks: [],
+        ),
+      );
       await storage.deleteTrainingProgram('p2');
       expect(await storage.getTrainingProgram('p2'), isNull);
     });
@@ -745,18 +1028,30 @@ void main() {
     });
 
     test('getAllConversations returns most-recently-updated first', () async {
-      await storage.saveConversation(Conversation(
-        id: 'c2', title: 'Old', updatedAt: DateTime(2026, 1, 1), messages: [],
-      ));
-      await storage.saveConversation(Conversation(
-        id: 'c3', title: 'New', updatedAt: DateTime(2026, 6, 1), messages: [],
-      ));
+      await storage.saveConversation(
+        Conversation(
+          id: 'c2',
+          title: 'Old',
+          updatedAt: DateTime(2026, 1, 1),
+          messages: [],
+        ),
+      );
+      await storage.saveConversation(
+        Conversation(
+          id: 'c3',
+          title: 'New',
+          updatedAt: DateTime(2026, 6, 1),
+          messages: [],
+        ),
+      );
       final all = await storage.getAllConversations();
       expect(all.first.id, 'c3');
     });
 
     test('deleteConversation removes it', () async {
-      await storage.saveConversation(Conversation(id: 'c4', title: 'Temp', messages: []));
+      await storage.saveConversation(
+        Conversation(id: 'c4', title: 'Temp', messages: []),
+      );
       await storage.deleteConversation('c4');
       expect(await storage.getConversation('c4'), isNull);
     });
@@ -764,12 +1059,19 @@ void main() {
 
   group('SqliteStorageService — quick stats', () {
     test('getQuickStats aggregates the last 7 days', () async {
-      await storage.saveWorkoutSession(WorkoutSession(
-        id: 'stat1',
-        date: DateTime.now(),
-        duration: 30,
-        exercises: [ExerciseLog(exerciseId: 'bench_press', sets: [WorkoutSet(weight: 60, reps: 10)])],
-      ));
+      await storage.saveWorkoutSession(
+        WorkoutSession(
+          id: 'stat1',
+          date: DateTime.now(),
+          duration: 30,
+          exercises: [
+            ExerciseLog(
+              exerciseId: 'bench_press',
+              sets: [WorkoutSet(weight: 60, reps: 10)],
+            ),
+          ],
+        ),
+      );
       final stats = await storage.getQuickStats();
       expect(stats['totalWorkouts'], greaterThanOrEqualTo(1));
       expect(stats['weeklyWorkouts'], greaterThanOrEqualTo(1));
@@ -777,27 +1079,288 @@ void main() {
   });
 
   group('SqliteStorageService — export/import', () {
+    test(
+      'backup restores each PR handle and measurement convention independently',
+      () async {
+        final id = 'backup-variant-exercise';
+        for (final handle in ['Rope', 'Bar']) {
+          for (final version in [0, 1]) {
+            await storage.savePersonalRecord(
+              PersonalRecord(
+                exerciseId: id,
+                handle: handle,
+                loadEncodingVersion: version,
+                bestWeight: 50 + version.toDouble(),
+                bestReps: 8,
+                bestVolume: 400,
+                achievedAt: DateTime(2026, 1, 1),
+              ),
+            );
+          }
+        }
+        final backup =
+            jsonDecode(await storage.exportAllData()) as Map<String, dynamic>;
+        final records = (backup['personalRecords'] as List)
+            .where((r) => r['exerciseId'] == id)
+            .toList();
+        expect(records, hasLength(4));
+        for (final record in records) {
+          record['exerciseId'] = 'restored-variant-exercise';
+        }
+        final weighted = WorkoutSet(
+          weight: 10,
+          reps: 5,
+          loadMode: WorkoutLoadMode.weighted,
+          bodyWeightAtLog: 70,
+        );
+        await storage.importData(
+          jsonEncode({
+            'personalRecords': records,
+            'sessions': [
+              WorkoutSession(
+                id: 'weighted-import',
+                date: DateTime(2026, 1, 1),
+                duration: 20,
+                exercises: [
+                  ExerciseLog(exerciseId: 'push_ups', sets: [weighted]),
+                ],
+              ).toJson(),
+            ],
+          }),
+        );
+        await storage.importData(jsonEncode({'personalRecords': records}));
+        expect(
+          (await storage.getAllPersonalRecords()).where(
+            (r) => r.exerciseId == 'restored-variant-exercise',
+          ),
+          hasLength(4),
+        );
+        final restored = (await storage.getWorkoutSession(
+          'weighted-import',
+        ))!.exercises.single.sets.single;
+        expect(restored.loadMode, WorkoutLoadMode.weighted);
+        expect(restored.loadEncodingVersion, 1);
+        expect(restored.volume, 400);
+      },
+    );
+
+    test('backup preserves session effort and modern set fields', () async {
+      final session = WorkoutSession(
+        id: 'backup-modern-session',
+        date: DateTime(2026, 1, 1),
+        duration: 30,
+        sessionEffort: 2,
+        exercises: [
+          ExerciseLog(
+            exerciseId: 'pull_ups',
+            handle: 'Rope',
+            sets: [
+              WorkoutSet(
+                weight: 10,
+                reps: 5,
+                assistWeight: 10,
+                extraWeight: 2,
+                bodyWeightAtLog: 70,
+                handle: 'Rope',
+                timeTaken: 30,
+                isDropset: true,
+                drops: [DropsetEntry(id: 'drop', weight: 5, reps: 3)],
+              ),
+            ],
+          ),
+        ],
+      );
+      await storage.saveWorkoutSession(session);
+      final exported =
+          jsonDecode(await storage.exportAllData()) as Map<String, dynamic>;
+      final row = (exported['sessions'] as List).firstWhere(
+        (s) => s['id'] == session.id,
+      );
+      expect(row['sessionEffort'], 2);
+      row['id'] = 'restored-modern-session';
+      await storage.importData(
+        jsonEncode({
+          'sessions': [row],
+        }),
+      );
+      final restored = (await storage.getWorkoutSession(
+        'restored-modern-session',
+      ))!.toJson();
+      final expected = session.toJson()..['id'] = 'restored-modern-session';
+      expect(restored, expected);
+    });
+
+    test(
+      'invalid later records are rejected before any merge writes',
+      () async {
+        await expectLater(
+          storage.importData(
+            jsonEncode({
+              'sessions': [
+                {
+                  'id': 'must-not-import',
+                  'date': '2026-01-01T00:00:00.000',
+                  'duration': 10,
+                  'exercises': [],
+                },
+              ],
+              'conversations': [{}],
+            }),
+          ),
+          throwsA(isA<Error>()),
+        );
+        expect(await storage.getWorkoutSession('must-not-import'), isNull);
+      },
+    );
+    test(
+      'legacy JSON-string rows import and future formats are rejected',
+      () async {
+        await storage.importData(
+          jsonEncode({
+            'sessions': [
+              jsonEncode({
+                'id': 'legacy-backup',
+                'date': '2026-01-01T00:00:00.000',
+                'duration': 10,
+                'exercises': [],
+              }),
+            ],
+          }),
+        );
+        expect(await storage.getWorkoutSession('legacy-backup'), isNotNull);
+        await expectLater(
+          storage.importData(
+            jsonEncode({'backupFormatVersion': 2, 'sessions': []}),
+          ),
+          throwsFormatException,
+        );
+      },
+    );
+
+    test(
+      'backup restores programs, records and both chat kinds with attachments',
+      () async {
+        final program = TrainingProgram(
+          id: 'backup-program',
+          name: 'Strength',
+          totalWeeks: 4,
+          phases: [],
+          weeks: [],
+        );
+        final record = PersonalRecord(
+          exerciseId: 'backup-exercise',
+          bestWeight: 90,
+          bestReps: 5,
+          bestVolume: 450,
+          achievedAt: DateTime(2026, 1, 1),
+        );
+        final conversations = [
+          for (final kind in ['coach', 'optimizer'])
+            Conversation(
+              id: 'backup-$kind',
+              title: kind,
+              kind: kind,
+              messages: [
+                ChatMessage(
+                  role: 'model',
+                  text:
+                      '{"component":"StatCard","props":{"title":"Volume","value":"12k"}}',
+                  toolCalls: ['get_personal_records'],
+                  imageBytesBase64: 'aGVsbG8=',
+                  imageMimeType: 'image/png',
+                ),
+              ],
+            ),
+        ];
+        await storage.saveTrainingProgram(program);
+        await storage.savePersonalRecord(record);
+        for (final conversation in conversations) {
+          await storage.saveConversation(conversation);
+        }
+        final exported =
+            jsonDecode(await storage.exportAllData()) as Map<String, dynamic>;
+        expect(exported['backupFormatVersion'], 1);
+        // Use fresh identifiers so the merge actually restores data.
+        (exported['trainingPrograms'] as List).first['id'] = 'restored-program';
+        (exported['personalRecords'] as List).first['exerciseId'] =
+            'restored-exercise';
+        for (final chat in exported['conversations'] as List) {
+          chat['id'] = 'restored-${chat['id']}';
+        }
+        await storage.importData(jsonEncode(exported));
+        expect(
+          (await storage.getTrainingProgram('restored-program'))!.name,
+          program.name,
+        );
+        expect(
+          (await storage.getPersonalRecord('restored-exercise'))!.bestWeight,
+          90,
+        );
+        for (final original in conversations) {
+          final restored = await storage.getConversation(
+            'restored-${original.id}',
+          );
+          expect(restored!.kind, original.kind);
+          expect(
+            restored.messages.single.toJson(),
+            original.messages.single.toJson(),
+          );
+        }
+        // Reimport preserves existing records and does not duplicate chats.
+        await storage.importData(jsonEncode(exported));
+        expect(
+          (await storage.getAllConversations())
+              .where((c) => c.id.startsWith('restored-'))
+              .length,
+          2,
+        );
+      },
+    );
+
     test('exportAllData includes sessions, routines, settings', () async {
-      await storage.saveWorkoutSession(WorkoutSession(
-        id: 'exp1', date: DateTime(2026, 5, 1), duration: 20,
-        exercises: [ExerciseLog(exerciseId: 'row', sets: [WorkoutSet(weight: 40, reps: 10)])],
-      ));
-      await storage.saveRoutine(Routine(id: 'exp_r1', name: 'Export Routine', exerciseIds: ['row']));
+      await storage.saveWorkoutSession(
+        WorkoutSession(
+          id: 'exp1',
+          date: DateTime(2026, 5, 1),
+          duration: 20,
+          exercises: [
+            ExerciseLog(
+              exerciseId: 'row',
+              sets: [WorkoutSet(weight: 40, reps: 10)],
+            ),
+          ],
+        ),
+      );
+      await storage.saveRoutine(
+        Routine(id: 'exp_r1', name: 'Export Routine', exerciseIds: ['row']),
+      );
       await storage.saveSetting('unit', 'kg');
 
       final json = await storage.exportAllData();
       final data = jsonDecode(json) as Map<String, dynamic>;
 
       expect((data['sessions'] as List).any((s) => s['id'] == 'exp1'), isTrue);
-      expect((data['routines'] as List).any((r) => r['id'] == 'exp_r1'), isTrue);
+      expect(
+        (data['routines'] as List).any((r) => r['id'] == 'exp_r1'),
+        isTrue,
+      );
       expect((data['settings'] as Map)['unit'], 'kg');
     });
 
     test('importData merges without overwriting existing ids', () async {
-      await storage.saveWorkoutSession(WorkoutSession(
-        id: 'imp1', date: DateTime(2026, 1, 1), duration: 15,
-        exercises: [ExerciseLog(exerciseId: 'row', sets: [WorkoutSet(weight: 30, reps: 12)])],
-      ));
+      await storage.saveWorkoutSession(
+        WorkoutSession(
+          id: 'imp1',
+          date: DateTime(2026, 1, 1),
+          duration: 15,
+          exercises: [
+            ExerciseLog(
+              exerciseId: 'row',
+              sets: [WorkoutSet(weight: 30, reps: 12)],
+            ),
+          ],
+        ),
+      );
 
       final payload = jsonEncode({
         'sessions': [

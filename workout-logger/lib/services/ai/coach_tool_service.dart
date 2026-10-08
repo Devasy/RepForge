@@ -33,480 +33,490 @@ class CoachToolService {
     required PRManager prManager,
     HealthHistoryManager? healthHistory,
     SqlQueryService? sqlQuery,
-  })  : _wp = workoutProvider,
-        _pr = prManager,
-        _hh = healthHistory,
-        _sql = sqlQuery;
+  }) : _wp = workoutProvider,
+       _pr = prManager,
+       _hh = healthHistory,
+       _sql = sqlQuery;
 
   /// Tool declaration for the optimizer screen's `ask_user_questions` flow.
   /// NOT included in the coach's tool list — only the optimizer adds it.
-  static FunctionDeclaration get askUserQuestionsDeclaration =>
-      FunctionDeclaration(
-        'ask_user_questions',
-        'Ask the user 1–3 clarifying questions before proceeding. '
-            'Provide an optional preamble (short context sentence shown above the '
-            'questions). Each question has 3–4 option chips; set multiSelect:true '
-            'when the user should be able to pick multiple options. '
-            'allowCustom is always treated as true.',
-        Schema.object(
-          properties: {
-            'preamble': Schema.string(
-              description:
-                  'Optional. A short sentence shown above the questions, '
-                  'e.g. "Before I analyse your routine, I have a few quick '
-                  'questions."',
-              nullable: true,
-            ),
-            'questions': Schema.array(
-              items: Schema.object(
-                properties: {
-                  'question': Schema.string(
-                    description: 'The question text, e.g. "What is your primary goal?"',
-                  ),
-                  'options': Schema.array(
-                    items: Schema.string(),
-                    description: '3–4 answer chips, e.g. ["Strength","Hypertrophy","Fat loss","Endurance"].',
-                  ),
-                  'multiSelect': Schema.boolean(
-                    description:
-                        'If true the user can select multiple chips. '
-                        'Use for confirmation questions (e.g. "Which changes should I apply?").',
-                    nullable: true,
-                  ),
-                },
-                requiredProperties: ['question', 'options'],
-              ),
-              description: '1–3 questions to display.',
-            ),
-          },
-          requiredProperties: ['questions'],
+  static FunctionDeclaration
+  get askUserQuestionsDeclaration => FunctionDeclaration(
+    'ask_user_questions',
+    'Ask the user 1–3 clarifying questions before proceeding. '
+        'Provide an optional preamble (short context sentence shown above the '
+        'questions). Each question has 3–4 option chips; set multiSelect:true '
+        'when the user should be able to pick multiple options. '
+        'allowCustom is always treated as true.',
+    Schema.object(
+      properties: {
+        'preamble': Schema.string(
+          description:
+              'Optional. A short sentence shown above the questions, '
+              'e.g. "Before I analyse your routine, I have a few quick '
+              'questions."',
+          nullable: true,
         ),
-      );
+        'questions': Schema.array(
+          items: Schema.object(
+            properties: {
+              'question': Schema.string(
+                description:
+                    'The question text, e.g. "What is your primary goal?"',
+              ),
+              'options': Schema.array(
+                items: Schema.string(),
+                description:
+                    '3–4 answer chips, e.g. ["Strength","Hypertrophy","Fat loss","Endurance"].',
+              ),
+              'multiSelect': Schema.boolean(
+                description:
+                    'If true the user can select multiple chips. '
+                    'Use for confirmation questions (e.g. "Which changes should I apply?").',
+                nullable: true,
+              ),
+            },
+            requiredProperties: ['question', 'options'],
+          ),
+          description: '1–3 questions to display.',
+        ),
+      },
+      requiredProperties: ['questions'],
+    ),
+  );
 
   /// Tool declarations advertised to the model.
   List<Tool> buildTools() => [
-        Tool(functionDeclarations: [
-          FunctionDeclaration(
-            'get_muscle_group_volume',
-            'Get volume history over time for one or multiple muscle groups '
-                '(e.g. ["Biceps", "Triceps"] or ["Chest", "Back"]). Returns dates, '
-                'per-muscle volume series over time, and totals. Use for muscle '
-                'comparisons (like "biceps vs triceps graph") or muscle volume '
-                'distribution breakdown.',
-            Schema.object(
-              properties: {
-                'muscle_groups': Schema.array(
-                  items: Schema.string(),
-                  description:
-                      'List of muscle group names, e.g. ["Biceps", "Triceps"] or '
-                      '["Chest", "Back", "Legs"].',
-                ),
-                'days': Schema.integer(
-                  description:
-                      'Optional. Number of days to look back (defaults to 60).',
-                  nullable: true,
-                ),
-              },
-              requiredProperties: ['muscle_groups'],
-            ),
+    Tool(
+      functionDeclarations: [
+        FunctionDeclaration(
+          'get_muscle_group_volume',
+          'Get volume history over time for one or multiple muscle groups '
+              '(e.g. ["Biceps", "Triceps"] or ["Chest", "Back"]). Returns dates, '
+              'per-muscle volume series over time, and totals. Use for muscle '
+              'comparisons (like "biceps vs triceps graph") or muscle volume '
+              'distribution breakdown.',
+          Schema.object(
+            properties: {
+              'muscle_groups': Schema.array(
+                items: Schema.string(),
+                description:
+                    'List of muscle group names, e.g. ["Biceps", "Triceps"] or '
+                    '["Chest", "Back", "Legs"].',
+              ),
+              'days': Schema.integer(
+                description:
+                    'Optional. Number of days to look back (defaults to 60).',
+                nullable: true,
+              ),
+            },
+            requiredProperties: ['muscle_groups'],
           ),
-          FunctionDeclaration(
-            'get_exercise_performance',
-            'Get how a specific exercise has progressed: per-session volume '
-                'trend, the full per-session weight×reps and duration set history, growth '
-                'slope, best estimated 1RM, last logged sets, and personal '
-                'record (including best duration). Use for questions like "how is my bench press '
-                'progressing" or "what weight and reps did I do for squats '
-                'last month".',
-            Schema.object(
-              properties: {
-                'exercise_name': Schema.string(
-                  description:
-                      'Name of the exercise, e.g. "Bench Press" or "Squat".',
-                ),
-                'days': Schema.integer(
-                  description:
-                      'Optional. Only consider sessions from the last N days.',
-                  nullable: true,
-                ),
-                'limit': Schema.integer(
-                  description:
-                      'Optional. Max number of most-recent sessions to return '
-                      'in set_history and volume_trend. Use a small value (e.g. '
-                      '1–5) when you only need recent sessions, to save tokens. '
-                      'Defaults to 20; capped at 40.',
-                  nullable: true,
-                ),
-              },
-              requiredProperties: ['exercise_name'],
-            ),
+        ),
+        FunctionDeclaration(
+          'get_exercise_performance',
+          'Get how a specific exercise has progressed: per-session volume '
+              'trend, the full per-session weight×reps and duration set history, growth '
+              'slope, best estimated 1RM, last logged sets, and personal '
+              'record (including best duration). Use for questions like "how is my bench press '
+              'progressing" or "what weight and reps did I do for squats '
+              'last month".',
+          Schema.object(
+            properties: {
+              'exercise_name': Schema.string(
+                description:
+                    'Name of the exercise, e.g. "Bench Press" or "Squat".',
+              ),
+              'days': Schema.integer(
+                description:
+                    'Optional. Only consider sessions from the last N days.',
+                nullable: true,
+              ),
+              'limit': Schema.integer(
+                description:
+                    'Optional. Max number of most-recent sessions to return '
+                    'in set_history and volume_trend. Use a small value (e.g. '
+                    '1–5) when you only need recent sessions, to save tokens. '
+                    'Defaults to 20; capped at 40.',
+                nullable: true,
+              ),
+            },
+            requiredProperties: ['exercise_name'],
           ),
-          FunctionDeclaration(
-            'get_workouts_in_range',
-            'Summarize workouts in a date range: session count, total volume, '
-                'and a per-session breakdown. Use for "what did I do last week" '
-                'or "how many workouts in the last 3 months".',
-            Schema.object(
-              properties: {
-                'start_date': Schema.string(
-                  description: 'Optional ISO date (YYYY-MM-DD) range start.',
-                  nullable: true,
-                ),
-                'end_date': Schema.string(
-                  description: 'Optional ISO date (YYYY-MM-DD) range end.',
-                  nullable: true,
-                ),
-                'days': Schema.integer(
-                  description:
-                      'Optional. Last N days; overrides start/end when set. '
-                      'Defaults to 30 if no dates are provided.',
-                  nullable: true,
-                ),
-                'limit': Schema.integer(
-                  description:
-                      'Optional. Max number of most-recent sessions to include '
-                      'in the per-session breakdown. The session_count and '
-                      'total_volume totals always cover the full range. Use a '
-                      'small value to save tokens. Defaults to 40; capped at 40.',
-                  nullable: true,
-                ),
-              },
-            ),
+        ),
+        FunctionDeclaration(
+          'get_workouts_in_range',
+          'Summarize workouts in a date range: session count, total volume, '
+              'and a per-session breakdown. Use for "what did I do last week" '
+              'or "how many workouts in the last 3 months".',
+          Schema.object(
+            properties: {
+              'start_date': Schema.string(
+                description: 'Optional ISO date (YYYY-MM-DD) range start.',
+                nullable: true,
+              ),
+              'end_date': Schema.string(
+                description: 'Optional ISO date (YYYY-MM-DD) range end.',
+                nullable: true,
+              ),
+              'days': Schema.integer(
+                description:
+                    'Optional. Last N days; overrides start/end when set. '
+                    'Defaults to 30 if no dates are provided.',
+                nullable: true,
+              ),
+              'limit': Schema.integer(
+                description:
+                    'Optional. Max number of most-recent sessions to include '
+                    'in the per-session breakdown. The session_count and '
+                    'total_volume totals always cover the full range. Use a '
+                    'small value to save tokens. Defaults to 40; capped at 40.',
+                nullable: true,
+              ),
+            },
           ),
-          FunctionDeclaration(
-            'get_routine_performance',
-            'Get how a named routine is performing: number of sessions logged '
-                'against it, total volume, volume trend over time, and the '
-                'exercises it contains.',
-            Schema.object(
-              properties: {
-                'routine_name': Schema.string(
-                  description: 'Name of the routine, e.g. "Push Day".',
-                ),
-                'days': Schema.integer(
-                  description:
-                      'Optional. Only consider sessions from the last N days.',
-                  nullable: true,
-                ),
-                'limit': Schema.integer(
-                  description:
-                      'Optional. Max number of most-recent points to include in '
-                      'volume_over_time. session_count and total_volume always '
-                      'cover all matching sessions. Defaults to 40; capped at 40.',
-                  nullable: true,
-                ),
-              },
-              requiredProperties: ['routine_name'],
-            ),
+        ),
+        FunctionDeclaration(
+          'get_routine_performance',
+          'Get how a named routine is performing: number of sessions logged '
+              'against it, total volume, volume trend over time, and the '
+              'exercises it contains.',
+          Schema.object(
+            properties: {
+              'routine_name': Schema.string(
+                description: 'Name of the routine, e.g. "Push Day".',
+              ),
+              'days': Schema.integer(
+                description:
+                    'Optional. Only consider sessions from the last N days.',
+                nullable: true,
+              ),
+              'limit': Schema.integer(
+                description:
+                    'Optional. Max number of most-recent points to include in '
+                    'volume_over_time. session_count and total_volume always '
+                    'cover all matching sessions. Defaults to 40; capped at 40.',
+                nullable: true,
+              ),
+            },
+            requiredProperties: ['routine_name'],
           ),
-          FunctionDeclaration(
-            'get_personal_records',
-            'Get personal records (best weight, reps, single-set volume, and duration for time-based exercises). '
-                'Pass an exercise name for one exercise, or omit for all PRs.',
-            Schema.object(
-              properties: {
-                'exercise_name': Schema.string(
-                  description: 'Optional exercise name to filter to.',
-                  nullable: true,
-                ),
-              },
-            ),
+        ),
+        FunctionDeclaration(
+          'get_personal_records',
+          'Get personal records (best weight, reps, single-set volume, and duration for time-based exercises). '
+              'Pass an exercise name for one exercise, or omit for all PRs.',
+          Schema.object(
+            properties: {
+              'exercise_name': Schema.string(
+                description: 'Optional exercise name to filter to.',
+                nullable: true,
+              ),
+            },
           ),
-          FunctionDeclaration(
-            'get_goal_progress',
-            'Get progress toward training goals/targets: current vs target '
-                'value, percent complete, and estimated completion date.',
-            Schema.object(
-              properties: {
-                'exercise_name': Schema.string(
-                  description: 'Optional exercise name to filter goals to.',
-                  nullable: true,
-                ),
-              },
-            ),
+        ),
+        FunctionDeclaration(
+          'get_goal_progress',
+          'Get progress toward training goals/targets: current vs target '
+              'value, percent complete, and estimated completion date.',
+          Schema.object(
+            properties: {
+              'exercise_name': Schema.string(
+                description: 'Optional exercise name to filter goals to.',
+                nullable: true,
+              ),
+            },
           ),
-          FunctionDeclaration(
-            'get_muscle_recovery',
-            'Get current per-muscle-group recovery status (percent recovered '
-                'and whether each is ready, recovering, or fatigued). Use for '
-                '"what can I train today".',
-            Schema.object(properties: {}),
+        ),
+        FunctionDeclaration(
+          'get_muscle_recovery',
+          'Get current per-muscle-group recovery status (percent recovered '
+              'and whether each is ready, recovering, or fatigued). Use for '
+              '"what can I train today".',
+          Schema.object(properties: {}),
+        ),
+        FunctionDeclaration(
+          'get_all_routines',
+          'List all saved routines with their exercise names and count. '
+              'Use when the user asks what routines they have or wants to '
+              'pick one to view or modify.',
+          Schema.object(properties: {}),
+        ),
+        FunctionDeclaration(
+          'create_routine',
+          'Create a new workout routine with a name and an ordered list of '
+              'exercises. Exercises are matched by name from the catalogue. '
+              'Optionally provide default attachment handles for exercises in this routine.',
+          Schema.object(
+            properties: {
+              'name': Schema.string(
+                description: 'Name for the new routine, e.g. "Push Day".',
+              ),
+              'exercise_names': Schema.array(
+                items: Schema.string(),
+                description:
+                    'Ordered list of exercise names to include in the routine.',
+              ),
+              'exercise_handles': Schema.array(
+                items: Schema.object(
+                  properties: {
+                    'exercise_name': Schema.string(
+                      description: 'Name of the exercise.',
+                    ),
+                    'handle': Schema.string(
+                      description:
+                          'Attachment or handle name, or empty string to clear.',
+                    ),
+                  },
+                  requiredProperties: ['exercise_name', 'handle'],
+                ),
+                description:
+                    'Optional. List of exercise-to-handle mappings, e.g. [{"exercise_name": "Cable Row", "handle": "V-Bar"}, {"exercise_name": "Triceps Pushdown", "handle": "Rope"}].',
+                nullable: true,
+              ),
+            },
+            requiredProperties: ['name', 'exercise_names'],
           ),
-          FunctionDeclaration(
-            'get_all_routines',
-            'List all saved routines with their exercise names and count. '
-                'Use when the user asks what routines they have or wants to '
-                'pick one to view or modify.',
-            Schema.object(properties: {}),
+        ),
+        FunctionDeclaration(
+          'update_routine',
+          'Modify an existing routine: add exercises, remove exercises, reorder them, '
+              'or set default attachment handles. Specify the routine by name. '
+              'Exercises are matched by name from the catalogue.',
+          Schema.object(
+            properties: {
+              'routine_name': Schema.string(
+                description: 'Name of the routine to update.',
+              ),
+              'add_exercise_names': Schema.array(
+                items: Schema.string(),
+                description: 'Optional. Exercise names to add.',
+                nullable: true,
+              ),
+              'remove_exercise_names': Schema.array(
+                items: Schema.string(),
+                description: 'Optional. Exercise names to remove.',
+                nullable: true,
+              ),
+              'reorder_exercise_names': Schema.array(
+                items: Schema.string(),
+                description:
+                    'Optional. Full new ordering of all exercise names in '
+                    'the routine. Must include every exercise you want to keep.',
+                nullable: true,
+              ),
+              'exercise_handles': Schema.array(
+                items: Schema.object(
+                  properties: {
+                    'exercise_name': Schema.string(
+                      description: 'Name of the exercise.',
+                    ),
+                    'handle': Schema.string(
+                      description:
+                          'Attachment or handle name, or empty string to clear.',
+                    ),
+                  },
+                  requiredProperties: ['exercise_name', 'handle'],
+                ),
+                description:
+                    'Optional. List of exercise-to-handle mappings, e.g. [{"exercise_name": "Cable Row", "handle": "V-Bar"}]. Set handle to empty string to clear.',
+                nullable: true,
+              ),
+            },
+            requiredProperties: ['routine_name'],
           ),
-          FunctionDeclaration(
-            'create_routine',
-            'Create a new workout routine with a name and an ordered list of '
-                'exercises. Exercises are matched by name from the catalogue. '
-                'Optionally provide default attachment handles for exercises in this routine.',
-            Schema.object(
-              properties: {
-                'name': Schema.string(
-                  description: 'Name for the new routine, e.g. "Push Day".',
-                ),
-                'exercise_names': Schema.array(
-                  items: Schema.string(),
-                  description:
-                      'Ordered list of exercise names to include in the routine.',
-                ),
-                'exercise_handles': Schema.array(
-                  items: Schema.object(
-                    properties: {
-                      'exercise_name': Schema.string(
-                        description: 'Name of the exercise.',
-                      ),
-                      'handle': Schema.string(
-                        description:
-                            'Attachment or handle name, or empty string to clear.',
-                      ),
-                    },
-                    requiredProperties: ['exercise_name', 'handle'],
-                  ),
-                  description:
-                      'Optional. List of exercise-to-handle mappings, e.g. [{"exercise_name": "Cable Row", "handle": "V-Bar"}, {"exercise_name": "Triceps Pushdown", "handle": "Rope"}].',
-                  nullable: true,
-                ),
-              },
-              requiredProperties: ['name', 'exercise_names'],
-            ),
+        ),
+        FunctionDeclaration(
+          'add_custom_exercise',
+          'Create a new custom exercise in the catalogue when the one the user '
+              'wants does not already exist. Match the muscle to an existing '
+              'muscle group (call get_muscle_recovery or list routines first '
+              'if unsure of the available muscle names). After creating it you '
+              'can reference it by name in create_routine / update_routine.',
+          Schema.object(
+            properties: {
+              'name': Schema.string(
+                description:
+                    'Name of the new exercise, e.g. "Cable Crossover".',
+              ),
+              'category': Schema.string(
+                description:
+                    'Either "compound" (multi-joint) or "isolation" (single-joint).',
+              ),
+              'primary_muscle': Schema.string(
+                description:
+                    'Primary muscle group this exercise targets, e.g. "Chest" '
+                    'or "Biceps". Must match an existing muscle group.',
+              ),
+              'exercise_type': Schema.string(
+                description:
+                    'Optional. Either "weightAndReps" (standard sets/reps) or "timeBased" (duration holds). Defaults to "weightAndReps".',
+                nullable: true,
+              ),
+              'available_handles': Schema.array(
+                items: Schema.string(),
+                description:
+                    'Optional. List of attachment/handle variations, e.g. ["Rope", "V-Bar"].',
+                nullable: true,
+              ),
+            },
+            requiredProperties: ['name', 'category', 'primary_muscle'],
           ),
-          FunctionDeclaration(
-            'update_routine',
-            'Modify an existing routine: add exercises, remove exercises, reorder them, '
-                'or set default attachment handles. Specify the routine by name. '
-                'Exercises are matched by name from the catalogue.',
-            Schema.object(
-              properties: {
-                'routine_name': Schema.string(
-                  description: 'Name of the routine to update.',
-                ),
-                'add_exercise_names': Schema.array(
-                  items: Schema.string(),
-                  description: 'Optional. Exercise names to add.',
-                  nullable: true,
-                ),
-                'remove_exercise_names': Schema.array(
-                  items: Schema.string(),
-                  description: 'Optional. Exercise names to remove.',
-                  nullable: true,
-                ),
-                'reorder_exercise_names': Schema.array(
-                  items: Schema.string(),
-                  description:
-                      'Optional. Full new ordering of all exercise names in '
-                      'the routine. Must include every exercise you want to keep.',
-                  nullable: true,
-                ),
-                'exercise_handles': Schema.array(
-                  items: Schema.object(
-                    properties: {
-                      'exercise_name': Schema.string(
-                        description: 'Name of the exercise.',
-                      ),
-                      'handle': Schema.string(
-                        description:
-                            'Attachment or handle name, or empty string to clear.',
-                      ),
-                    },
-                    requiredProperties: ['exercise_name', 'handle'],
-                  ),
-                  description:
-                      'Optional. List of exercise-to-handle mappings, e.g. [{"exercise_name": "Cable Row", "handle": "V-Bar"}]. Set handle to empty string to clear.',
-                  nullable: true,
-                ),
-              },
-              requiredProperties: ['routine_name'],
-            ),
+        ),
+        FunctionDeclaration(
+          'update_exercise',
+          'Modify an existing exercise in the catalogue (both custom exercises and '
+              'library exercises). You can update its name, exercise type '
+              '("weightAndReps" or "timeBased"), category ("compound" or "isolation"), '
+              'primary muscle group, or available attachments/handles '
+              '(e.g. ["Rope", "V-Bar", "D-Handles"]).',
+          Schema.object(
+            properties: {
+              'exercise_name': Schema.string(
+                description: 'Current name of the exercise to update.',
+              ),
+              'new_name': Schema.string(
+                description: 'Optional. New display name for the exercise.',
+                nullable: true,
+              ),
+              'exercise_type': Schema.string(
+                description: 'Optional. Either "weightAndReps" or "timeBased".',
+                nullable: true,
+              ),
+              'category': Schema.string(
+                description: 'Optional. Either "compound" or "isolation".',
+                nullable: true,
+              ),
+              'primary_muscle': Schema.string(
+                description:
+                    'Optional. Primary muscle group name (e.g. "Chest", "Biceps").',
+                nullable: true,
+              ),
+              'available_handles': Schema.array(
+                items: Schema.string(),
+                description:
+                    'Optional. List of allowed attachment/handle variations, e.g. ["Rope", "V-Bar"].',
+                nullable: true,
+              ),
+            },
+            requiredProperties: ['exercise_name'],
           ),
-          FunctionDeclaration(
-            'add_custom_exercise',
-            'Create a new custom exercise in the catalogue when the one the user '
-                'wants does not already exist. Match the muscle to an existing '
-                'muscle group (call get_muscle_recovery or list routines first '
-                'if unsure of the available muscle names). After creating it you '
-                'can reference it by name in create_routine / update_routine.',
-            Schema.object(
-              properties: {
-                'name': Schema.string(
-                  description: 'Name of the new exercise, e.g. "Cable Crossover".',
-                ),
-                'category': Schema.string(
-                  description:
-                      'Either "compound" (multi-joint) or "isolation" (single-joint).',
-                ),
-                'primary_muscle': Schema.string(
-                  description:
-                      'Primary muscle group this exercise targets, e.g. "Chest" '
-                      'or "Biceps". Must match an existing muscle group.',
-                ),
-                'exercise_type': Schema.string(
-                  description:
-                      'Optional. Either "weightAndReps" (standard sets/reps) or "timeBased" (duration holds). Defaults to "weightAndReps".',
-                  nullable: true,
-                ),
-                'available_handles': Schema.array(
-                  items: Schema.string(),
-                  description:
-                      'Optional. List of attachment/handle variations, e.g. ["Rope", "V-Bar"].',
-                  nullable: true,
-                ),
-              },
-              requiredProperties: ['name', 'category', 'primary_muscle'],
-            ),
+        ),
+        FunctionDeclaration(
+          'get_health_metrics',
+          'Fetch historical sleep sessions and sleep stage breakdown (deep, REM, '
+              'light, awake minutes) over the last N days. Use for sleep & '
+              'recovery queries.',
+          Schema.object(
+            properties: {
+              'days': Schema.integer(
+                description:
+                    'Optional. Number of days to look back (defaults to 30).',
+                nullable: true,
+              ),
+            },
           ),
-          FunctionDeclaration(
-            'update_exercise',
-            'Modify an existing exercise in the catalogue (both custom exercises and '
-                'library exercises). You can update its name, exercise type '
-                '("weightAndReps" or "timeBased"), category ("compound" or "isolation"), '
-                'primary muscle group, or available attachments/handles '
-                '(e.g. ["Rope", "V-Bar", "D-Handles"]).',
-            Schema.object(
-              properties: {
-                'exercise_name': Schema.string(
-                  description: 'Current name of the exercise to update.',
-                ),
-                'new_name': Schema.string(
-                  description: 'Optional. New display name for the exercise.',
-                  nullable: true,
-                ),
-                'exercise_type': Schema.string(
-                  description:
-                      'Optional. Either "weightAndReps" or "timeBased".',
-                  nullable: true,
-                ),
-                'category': Schema.string(
-                  description: 'Optional. Either "compound" or "isolation".',
-                  nullable: true,
-                ),
-                'primary_muscle': Schema.string(
-                  description:
-                      'Optional. Primary muscle group name (e.g. "Chest", "Biceps").',
-                  nullable: true,
-                ),
-                'available_handles': Schema.array(
-                  items: Schema.string(),
-                  description:
-                      'Optional. List of allowed attachment/handle variations, e.g. ["Rope", "V-Bar"].',
-                  nullable: true,
-                ),
-              },
-              requiredProperties: ['exercise_name'],
-            ),
+        ),
+        FunctionDeclaration(
+          'analyze_health_workout_correlation',
+          'Run an analytical statistical pipeline calculating Mean (µ), Standard Deviation (σ), '
+              'Pearson Correlation Coefficient (r), and linear regression (y = mx + b) between a health metric '
+              '(sleep_hours, deep_sleep_min) and a workout metric '
+              '(workout_volume, session_duration, exercise_max_weight). Returns analytical stats '
+              'and paired coordinates ready to visualize.',
+          Schema.object(
+            properties: {
+              'x_metric': Schema.string(
+                description:
+                    'Health metric, e.g. "sleep_hours", "deep_sleep_min".',
+              ),
+              'y_metric': Schema.string(
+                description:
+                    'Workout metric, e.g. "workout_volume", "session_duration", "exercise_max_weight".',
+              ),
+              'exercise_name': Schema.string(
+                description:
+                    'Optional. Specific exercise name if y_metric is "exercise_max_weight".',
+                nullable: true,
+              ),
+              'days': Schema.integer(
+                description:
+                    'Optional. Number of days to consider (defaults to 60).',
+                nullable: true,
+              ),
+            },
+            requiredProperties: ['x_metric', 'y_metric'],
           ),
-          FunctionDeclaration(
-            'get_health_metrics',
-            'Fetch historical sleep sessions and sleep stage breakdown (deep, REM, '
-                'light, awake minutes) over the last N days. Use for sleep & '
-                'recovery queries.',
-            Schema.object(
-              properties: {
-                'days': Schema.integer(
-                  description: 'Optional. Number of days to look back (defaults to 30).',
-                  nullable: true,
-                ),
-              },
-            ),
+        ),
+        FunctionDeclaration(
+          'get_sleeping_hr_analytics',
+          'Fetch and compute sleeping heart rate statistics over the past N days (e.g. 14 days). '
+              'Returns overnight p5 (5th percentile sleeping HR floor), p25, median, p75, p95, mean, min, max, '
+              'standard deviation (stdev), variance, linear trend (slope/direction), and nightly '
+              'time-series data as labels + series ready to chart. '
+              'Use whenever the user asks to analyze sleeping HR, overnight HR variation, or recovery trends.',
+          Schema.object(
+            properties: {
+              'days': Schema.integer(
+                description:
+                    'Optional. Number of days to analyze (defaults to 14).',
+                nullable: true,
+              ),
+            },
           ),
-          FunctionDeclaration(
-            'analyze_health_workout_correlation',
-            'Run an analytical statistical pipeline calculating Mean (µ), Standard Deviation (σ), '
-                'Pearson Correlation Coefficient (r), and linear regression (y = mx + b) between a health metric '
-                '(sleep_hours, deep_sleep_min) and a workout metric '
-                '(workout_volume, session_duration, exercise_max_weight). Returns analytical stats '
-                'and paired coordinates ready to visualize.',
-            Schema.object(
-              properties: {
-                'x_metric': Schema.string(
-                  description: 'Health metric, e.g. "sleep_hours", "deep_sleep_min".',
-                ),
-                'y_metric': Schema.string(
-                  description: 'Workout metric, e.g. "workout_volume", "session_duration", "exercise_max_weight".',
-                ),
-                'exercise_name': Schema.string(
-                  description: 'Optional. Specific exercise name if y_metric is "exercise_max_weight".',
-                  nullable: true,
-                ),
-                'days': Schema.integer(
-                  description: 'Optional. Number of days to consider (defaults to 60).',
-                  nullable: true,
-                ),
-              },
-              requiredProperties: ['x_metric', 'y_metric'],
-            ),
-          ),
-          FunctionDeclaration(
-            'get_sleeping_hr_analytics',
-            'Fetch and compute sleeping heart rate statistics over the past N days (e.g. 14 days). '
-                'Returns overnight p5 (5th percentile sleeping HR floor), p25, median, p75, p95, mean, min, max, '
-                'standard deviation (stdev), variance, linear trend (slope/direction), and nightly '
-                'time-series data as labels + series ready to chart. '
-                'Use whenever the user asks to analyze sleeping HR, overnight HR variation, or recovery trends.',
-            Schema.object(
-              properties: {
-                'days': Schema.integer(
-                  description: 'Optional. Number of days to analyze (defaults to 14).',
-                  nullable: true,
-                ),
-              },
-            ),
-          ),
-          if (_sql != null) _runSqlQueryDeclaration,
-        ]),
-      ];
+        ),
+        if (_sql != null) _runSqlQueryDeclaration,
+      ],
+    ),
+  ];
 
   /// Schema-aware declaration for run_sql_query — only included when a
   /// SqlQueryService is wired (i.e. the app has cut over to SQLite).
   FunctionDeclaration get _runSqlQueryDeclaration => FunctionDeclaration(
-        'run_sql_query',
-        'Run a read-only SQL SELECT query directly against the workout database '
-            'for questions the other tools cannot answer (custom joins, filters, '
-            'or aggregations). Tables:\n'
-            'sessions(id, date, routine_id, duration_min, notes, hc_synced_at)\n'
-            'exercise_logs(id, session_id, exercise_id, notes, handle)\n'
-            'sets(id, exercise_log_id, weight, reps, is_dropset, drops_json, '
-            'time_taken, timestamp, assist_weight, extra_weight, handle)\n'
-            'exercises(id, name, category, is_custom, available_handles, exercise_type) — custom '
-            'exercises and built-in overrides (is_custom=0 indicates an override of a built-in exercise)\n'
-            'muscle_groups(id, name, growth_rate, last_updated)\n'
-            'exercise_muscle_activations(exercise_id, muscle_group_id, activation_percentage)\n'
-            'routines(id, name, created_at)\n'
-            'routine_exercises(routine_id, exercise_id, position, default_handle)\n'
-            'targets(id, exercise_id, target_type, target_value, current_value, '
-            'estimated_completion_date, created_at, is_completed)\n'
-            'personal_records(exercise_id, best_weight, best_reps, best_volume, best_duration, achieved_at)\n'
-            'health_samples(id, type, start_ts, end_ts, utc_ts, value) — type is '
-            'heart_rate | resting_heart_rate | hrv_rmssd; one row per Health '
-            'Connect sample. Join on start_ts/end_ts (local wall-clock, same clock as '
-            'workout_sessions.date); utc_ts is the UTC instant, for ordering '
-            'and de-duplication only\n'
-            'sleep_sessions(id, start_ts, end_ts, light_min, deep_min, rem_min, '
-            'awake_min) — one row per night; start_ts/end_ts are local '
-            'wall-clock, id is the UTC start instant\n'
-            'sleep_stage_intervals(sleep_session_id, start_ts, end_ts, stage) — '
-            'stage is deep | rem | light | awake\n'
-            'When joining tables, select explicit columns with aliases (e.g. s.id AS '
-            'session_id, l.id AS log_id) instead of SELECT *, since duplicate column '
-            'names across joined tables will silently collide.\n'
-            'Only SELECT/WITH statements are allowed, one statement per call.',
-        Schema.object(
-          properties: {
-            'query': Schema.string(
-              description: 'A single read-only SQL SELECT statement.',
-            ),
-            'limit': Schema.integer(
-              description: 'Optional. Max rows to return (default 200, max 500).',
-              nullable: true,
-            ),
-          },
-          requiredProperties: ['query'],
+    'run_sql_query',
+    'Run a read-only SQL SELECT query directly against the workout database '
+        'for questions the other tools cannot answer (custom joins, filters, '
+        'or aggregations). Tables:\n'
+        'sessions(id, date, routine_id, duration_min, notes, hc_synced_at)\n'
+        'exercise_logs(id, session_id, exercise_id, notes, handle)\n'
+        'sets(id, exercise_log_id, weight, reps, is_dropset, drops_json, '
+        'time_taken, timestamp, assist_weight, extra_weight, handle)\n'
+        'exercises(id, name, category, is_custom, available_handles, exercise_type) — custom '
+        'exercises and built-in overrides (is_custom=0 indicates an override of a built-in exercise)\n'
+        'muscle_groups(id, name, growth_rate, last_updated)\n'
+        'exercise_muscle_activations(exercise_id, muscle_group_id, activation_percentage)\n'
+        'routines(id, name, created_at)\n'
+        'routine_exercises(routine_id, exercise_id, position, default_handle)\n'
+        'targets(id, exercise_id, target_type, target_value, current_value, '
+        'estimated_completion_date, created_at, is_completed)\n'
+        'personal_records(exercise_id, best_weight, best_reps, best_volume, best_duration, achieved_at)\n'
+        'health_samples(id, type, start_ts, end_ts, utc_ts, value) — type is '
+        'heart_rate | resting_heart_rate | hrv_rmssd; one row per Health '
+        'Connect sample. Join on start_ts/end_ts (local wall-clock, same clock as '
+        'workout_sessions.date); utc_ts is the UTC instant, for ordering '
+        'and de-duplication only\n'
+        'sleep_sessions(id, start_ts, end_ts, light_min, deep_min, rem_min, '
+        'awake_min) — one row per night; start_ts/end_ts are local '
+        'wall-clock, id is the UTC start instant\n'
+        'sleep_stage_intervals(sleep_session_id, start_ts, end_ts, stage) — '
+        'stage is deep | rem | light | awake\n'
+        'When joining tables, select explicit columns with aliases (e.g. s.id AS '
+        'session_id, l.id AS log_id) instead of SELECT *, since duplicate column '
+        'names across joined tables will silently collide.\n'
+        'Only SELECT/WITH statements are allowed, one statement per call.',
+    Schema.object(
+      properties: {
+        'query': Schema.string(
+          description: 'A single read-only SQL SELECT statement.',
         ),
-      );
+        'limit': Schema.integer(
+          description: 'Optional. Max rows to return (default 200, max 500).',
+          nullable: true,
+        ),
+      },
+      requiredProperties: ['query'],
+    ),
+  );
 
   /// Dispatch a model function call to the matching query and return a
   /// JSON-serializable result map.
@@ -557,12 +567,13 @@ class CoachToolService {
   // ── Tool implementations ───────────────────────────────────────────────────
 
   Future<Map<String, Object?>> _getSleepingHrAnalytics(
-      Map<String, Object?> args) async {
+    Map<String, Object?> args,
+  ) async {
     final hh = _hh;
     if (hh == null) {
       return {
         'error':
-            'Health Connect integration is not active or HealthHistoryManager unavailable.'
+            'Health Connect integration is not active or HealthHistoryManager unavailable.',
       };
     }
 
@@ -596,8 +607,10 @@ class CoachToolService {
           meanBpm = avgs.reduce((a, b) => a + b) / avgs.length;
           p25Bpm = avgs[(avgs.length * 0.25).floor().clamp(0, avgs.length - 1)];
 
-          final varSum =
-              avgs.fold(0.0, (sum, x) => sum + (x - meanBpm) * (x - meanBpm));
+          final varSum = avgs.fold(
+            0.0,
+            (sum, x) => sum + (x - meanBpm) * (x - meanBpm),
+          );
           varianceBpm = varSum / avgs.length;
           stdevBpm = math.sqrt(varianceBpm);
         } else {
@@ -624,13 +637,15 @@ class CoachToolService {
 
     if (p5List.isEmpty) {
       return {
-        'error': 'No sleeping heart rate records found in the last $days days.'
+        'error': 'No sleeping heart rate records found in the last $days days.',
       };
     }
 
     final p5Mean = p5List.reduce((a, b) => a + b) / p5List.length;
-    final p5VarSum =
-        p5List.fold(0.0, (sum, x) => sum + (x - p5Mean) * (x - p5Mean));
+    final p5VarSum = p5List.fold(
+      0.0,
+      (sum, x) => sum + (x - p5Mean) * (x - p5Mean),
+    );
     final p5Variance = p5VarSum / p5List.length;
     final p5Stdev = math.sqrt(p5Variance);
 
@@ -650,8 +665,9 @@ class CoachToolService {
       }
     }
 
-    final trendDirection =
-        slope < -0.1 ? 'improving' : (slope > 0.1 ? 'elevated' : 'stable');
+    final trendDirection = slope < -0.1
+        ? 'improving'
+        : (slope > 0.1 ? 'elevated' : 'stable');
 
     return {
       'days_analyzed': days,
@@ -678,20 +694,27 @@ class CoachToolService {
     };
   }
 
-  Future<Map<String, Object?>> _getHealthMetrics(Map<String, Object?> args) async {
+  Future<Map<String, Object?>> _getHealthMetrics(
+    Map<String, Object?> args,
+  ) async {
     final hh = _hh;
     if (hh == null) {
-      return {'error': 'Health Connect integration is not active or HealthHistoryManager unavailable.'};
+      return {
+        'error':
+            'Health Connect integration is not active or HealthHistoryManager unavailable.',
+      };
     }
     final days = _limitArg(args, 30, key: 'days', max: 31);
     final now = DateTime.now();
     // Week granularity only covers the last 7 days; anything wider needs the
     // month bucket. Both return per-night bars, so trim to the exact window.
-    final granularity =
-        days <= 7 ? HealthGranularity.week : HealthGranularity.month;
+    final granularity = days <= 7
+        ? HealthGranularity.week
+        : HealthGranularity.month;
     final allBars = await hh.sleepBars(now, granularity);
-    final bars =
-        allBars.length > days ? allBars.sublist(allBars.length - days) : allBars;
+    final bars = allBars.length > days
+        ? allBars.sublist(allBars.length - days)
+        : allBars;
 
     return {
       'days': days,
@@ -704,13 +727,14 @@ class CoachToolService {
             'rem_min': b.remMin,
             'light_min': b.lightMin,
             'awake_min': b.awakeMin,
-          }
+          },
       ],
     };
   }
 
   Future<Map<String, Object?>> _analyzeHealthWorkoutCorrelation(
-      Map<String, Object?> args) async {
+    Map<String, Object?> args,
+  ) async {
     final xMetric = (args['x_metric'] as String?)?.trim() ?? 'sleep_hours';
     final yMetric = (args['y_metric'] as String?)?.trim() ?? 'workout_volume';
     final exName = (args['exercise_name'] as String?)?.trim();
@@ -718,7 +742,9 @@ class CoachToolService {
 
     final now = DateTime.now();
     final cutoff = now.subtract(Duration(days: days));
-    final sessions = _wp.sessions.where((s) => !s.date.isBefore(cutoff)).toList();
+    final sessions = _wp.sessions
+        .where((s) => !s.date.isBefore(cutoff))
+        .toList();
 
     if (sessions.isEmpty) {
       return {'error': 'No workout sessions logged in the last $days days.'};
@@ -763,9 +789,11 @@ class CoachToolService {
       // returns 12 monthly averages, not one bar per night.
       final lastMonth = DateTime(now.year, now.month, 1);
       final bars = <SleepDayBar>[];
-      for (var m = DateTime(cutoff.year, cutoff.month, 1);
-          !m.isAfter(lastMonth);
-          m = DateTime(m.year, m.month + 1, 1)) {
+      for (
+        var m = DateTime(cutoff.year, cutoff.month, 1);
+        !m.isAfter(lastMonth);
+        m = DateTime(m.year, m.month + 1, 1)
+      ) {
         bars.addAll(await hh.sleepBars(m, HealthGranularity.month));
       }
       for (final b in bars) {
@@ -797,7 +825,9 @@ class CoachToolService {
 
     final n = xVals.length;
     if (n < 2) {
-      return {'error': 'Insufficient paired data points for correlation analysis.'};
+      return {
+        'error': 'Insufficient paired data points for correlation analysis.',
+      };
     }
 
     final xMean = xVals.reduce((a, b) => a + b) / n;
@@ -814,7 +844,9 @@ class CoachToolService {
 
     final xStd = n > 1 ? math.sqrt(xVarSum / (n - 1)) : 0.0;
     final yStd = n > 1 ? math.sqrt(yVarSum / (n - 1)) : 0.0;
-    final r = (xVarSum > 0 && yVarSum > 0) ? (covSum / math.sqrt(xVarSum * yVarSum)) : 0.0;
+    final r = (xVarSum > 0 && yVarSum > 0)
+        ? (covSum / math.sqrt(xVarSum * yVarSum))
+        : 0.0;
 
     final slope = xVarSum > 0 ? (covSum / xVarSum) : 0.0;
     final intercept = yMean - (slope * xMean);
@@ -843,10 +875,7 @@ class CoachToolService {
       'y_std_dev': _round(yStd),
       'pearson_r': _round(r),
       'correlation_type': corrType,
-      'trendline': {
-        'slope': _round(slope),
-        'intercept': _round(intercept),
-      },
+      'trendline': {'slope': _round(slope), 'intercept': _round(intercept)},
       'points': points,
     };
   }
@@ -857,10 +886,9 @@ class CoachToolService {
     final cutoff = DateTime.now().subtract(Duration(days: days));
 
     final allExercises = _wp.allExercises;
-    final allSessions = _wp.sessions
-        .where((s) => !s.date.isBefore(cutoff))
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final allSessions =
+        _wp.sessions.where((s) => !s.date.isBefore(cutoff)).toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
 
     final dateMap = <String, Map<String, double>>{};
     final muscleTotals = <String, double>{};
@@ -885,7 +913,9 @@ class CoachToolService {
       final targetId = resolvedGroup.id;
 
       final matchingExerciseIds = allExercises
-          .where((e) => e.muscleActivations.any((m) => m.muscleGroupId == targetId))
+          .where(
+            (e) => e.muscleActivations.any((m) => m.muscleGroupId == targetId),
+          )
           .map((e) => e.id)
           .toSet();
 
@@ -914,10 +944,7 @@ class CoachToolService {
       for (final d in dates) {
         values.add(_round(dateMap[d]?[groupName] ?? 0.0));
       }
-      series.add({
-        'name': groupName,
-        'values': values,
-      });
+      series.add({'name': groupName, 'values': values});
     }
 
     return {
@@ -940,7 +967,10 @@ class CoachToolService {
       final resolved = _resolveExercise(name);
       if (resolved == null) {
         // Fallback: check if the prompt queried a muscle group (e.g., "biceps", "triceps")
-        final muscleRes = _muscleGroupVolume({'muscle_groups': [name], 'days': days ?? 60});
+        final muscleRes = _muscleGroupVolume({
+          'muscle_groups': [name],
+          'days': days ?? 60,
+        });
         final series = (muscleRes['series'] as List?) ?? [];
         if (series.isNotEmpty && (series[0]['values'] as List).isNotEmpty) {
           return {
@@ -964,8 +994,9 @@ class CoachToolService {
       };
     }
 
-    final cutoff =
-        days != null ? DateTime.now().subtract(Duration(days: days)) : null;
+    final cutoff = days != null
+        ? DateTime.now().subtract(Duration(days: days))
+        : null;
 
     final progression = _wp
         .getVolumeProgression(exercise.id)
@@ -987,9 +1018,10 @@ class CoachToolService {
       'session_count': progression.length,
       'window_days': ?days,
       'volume_trend': [
-        for (final p in progression.length > trendCap
-            ? progression.sublist(progression.length - trendCap)
-            : progression)
+        for (final p
+            in progression.length > trendCap
+                ? progression.sublist(progression.length - trendCap)
+                : progression)
           {'date': _d(p.date), 'volume': _round(p.volume)},
       ],
       // Per-session weight×reps breakdown (most recent first), so the model can
@@ -1005,8 +1037,8 @@ class CoachToolService {
               'trend': growth.weeklyGrowthPercent > 0.5
                   ? 'improving'
                   : growth.weeklyGrowthPercent < -2
-                      ? 'declining'
-                      : 'plateauing',
+                  ? 'declining'
+                  : 'plateauing',
             },
       'best_estimated_1rm': _roundOrNull(_wp.getBestOneRM(exercise.id)),
       'last_session': lastLog == null
@@ -1023,6 +1055,8 @@ class CoachToolService {
       'personal_record': pr == null
           ? null
           : {
+              'handle': pr.handle,
+              'load_encoding_version': pr.loadEncodingVersion,
               'best_weight': _round(pr.bestWeight),
               'best_reps': pr.bestReps,
               'best_volume': _round(pr.bestVolume),
@@ -1051,13 +1085,16 @@ class CoachToolService {
       end = now;
     }
 
-    final sessions = _wp.sessions
-        .where((s) => !s.date.isBefore(start) && !s.date.isAfter(end))
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final sessions =
+        _wp.sessions
+            .where((s) => !s.date.isBefore(start) && !s.date.isAfter(end))
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
-    final totalVolume =
-        sessions.fold<double>(0, (sum, s) => sum + s.totalVolume);
+    final totalVolume = sessions.fold<double>(
+      0,
+      (sum, s) => sum + s.totalVolume,
+    );
 
     return {
       'start_date': _d(start),
@@ -1099,28 +1136,35 @@ class CoachToolService {
     }
 
     final days = (args['days'] as num?)?.toInt();
-    final cutoff =
-        days != null ? DateTime.now().subtract(Duration(days: days)) : null;
+    final cutoff = days != null
+        ? DateTime.now().subtract(Duration(days: days))
+        : null;
 
-    final sessions = _wp.sessions
-        .where((s) => s.routineId == routine.id)
-        .where((s) => cutoff == null || !s.date.isBefore(cutoff))
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final sessions =
+        _wp.sessions
+            .where((s) => s.routineId == routine.id)
+            .where((s) => cutoff == null || !s.date.isBefore(cutoff))
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
 
-    final totalVolume =
-        sessions.fold<double>(0, (sum, s) => sum + s.totalVolume);
+    final totalVolume = sessions.fold<double>(
+      0,
+      (sum, s) => sum + s.totalVolume,
+    );
 
     return {
       'routine': routine.name,
-      'exercises': [for (final id in routine.exerciseIds) _wp.getExerciseName(id)],
+      'exercises': [
+        for (final id in routine.exerciseIds) _wp.getExerciseName(id),
+      ],
       'session_count': sessions.length,
       'window_days': ?days,
       'total_volume': _round(totalVolume),
       'volume_over_time': [
-        for (final s in sessions.length > _limitArg(args, 40)
-            ? sessions.sublist(sessions.length - _limitArg(args, 40))
-            : sessions)
+        for (final s
+            in sessions.length > _limitArg(args, 40)
+                ? sessions.sublist(sessions.length - _limitArg(args, 40))
+                : sessions)
           {'date': _d(s.date), 'volume': _round(s.totalVolume)},
       ],
     };
@@ -1148,6 +1192,8 @@ class CoachToolService {
         'personal_record': pr == null
             ? null
             : {
+                'handle': pr.handle,
+                'load_encoding_version': pr.loadEncodingVersion,
                 'best_weight': _round(pr.bestWeight),
                 'best_reps': pr.bestReps,
                 'best_volume': _round(pr.bestVolume),
@@ -1162,6 +1208,8 @@ class CoachToolService {
         for (final pr in _pr.allRecords)
           {
             'exercise': _wp.getExerciseName(pr.exerciseId),
+            'handle': pr.handle,
+            'load_encoding_version': pr.loadEncodingVersion,
             'best_weight': _round(pr.bestWeight),
             'best_reps': pr.bestReps,
             'best_volume': _round(pr.bestVolume),
@@ -1213,7 +1261,9 @@ class CoachToolService {
   Map<String, Object?> _muscleRecovery() {
     final scores = _wp.getMuscleRecoveryScores();
     final entries = scores.entries.toList()
-      ..sort((a, b) => a.value.recoveryPercent.compareTo(b.value.recoveryPercent));
+      ..sort(
+        (a, b) => a.value.recoveryPercent.compareTo(b.value.recoveryPercent),
+      );
     return {
       'muscles': [
         for (final e in entries)
@@ -1223,8 +1273,8 @@ class CoachToolService {
             'status': e.value.isRecovered
                 ? 'ready'
                 : e.value.isUnderRecovered
-                    ? 'fatigued'
-                    : 'recovering',
+                ? 'fatigued'
+                : 'recovering',
           },
       ],
     };
@@ -1240,7 +1290,9 @@ class CoachToolService {
             'id': r.id,
             'name': r.name,
             'exercise_count': r.exerciseIds.length,
-            'exercises': [for (final id in r.exerciseIds) _wp.getExerciseName(id)],
+            'exercises': [
+              for (final id in r.exerciseIds) _wp.getExerciseName(id),
+            ],
           },
       ],
     };
@@ -1325,7 +1377,8 @@ class CoachToolService {
     var ids = List<String>.from(routine.exerciseIds);
 
     // Reorder (full replacement of order)
-    final reorderNames = (args['reorder_exercise_names'] as List?)?.cast<String>();
+    final reorderNames = (args['reorder_exercise_names'] as List?)
+        ?.cast<String>();
     if (reorderNames != null && reorderNames.isNotEmpty) {
       final reorderedIds = <String>[];
       for (final n in reorderNames) {
@@ -1340,7 +1393,8 @@ class CoachToolService {
     }
 
     // Remove exercises
-    final removeNames = (args['remove_exercise_names'] as List?)?.cast<String>();
+    final removeNames = (args['remove_exercise_names'] as List?)
+        ?.cast<String>();
     if (removeNames != null) {
       for (final n in removeNames) {
         try {
@@ -1366,7 +1420,9 @@ class CoachToolService {
     }
 
     final handlesArg = _parseExerciseHandles(args['exercise_handles']);
-    final defaultHandles = Map<String, String>.from(routine.defaultHandles ?? {});
+    final defaultHandles = Map<String, String>.from(
+      routine.defaultHandles ?? {},
+    );
     if (handlesArg != null) {
       for (final entry in handlesArg.entries) {
         final exName = entry.key.trim();
@@ -1400,7 +1456,8 @@ class CoachToolService {
   }
 
   Future<Map<String, Object?>> _addCustomExercise(
-      Map<String, Object?> args) async {
+    Map<String, Object?> args,
+  ) async {
     final name = (args['name'] as String?)?.trim() ?? '';
     if (name.isEmpty) return {'error': 'Exercise name cannot be empty.'};
 
@@ -1410,7 +1467,8 @@ class CoachToolService {
     );
     if (existing.isNotEmpty) {
       return {
-        'error': 'An exercise named "${existing.first.name}" already exists. '
+        'error':
+            'An exercise named "${existing.first.name}" already exists. '
             'Use it by name instead of creating a duplicate.',
       };
     }
@@ -1443,12 +1501,17 @@ class CoachToolService {
     ExerciseType exerciseType = ExerciseType.weightAndReps;
     if (args.containsKey('exercise_type')) {
       final typeStr = (args['exercise_type'] as String?)?.trim();
-      if (typeStr == null || typeStr.isEmpty || (typeStr != 'timeBased' && typeStr != 'weightAndReps')) {
+      if (typeStr == null ||
+          typeStr.isEmpty ||
+          (typeStr != 'timeBased' && typeStr != 'weightAndReps')) {
         return {
-          'error': 'Invalid exercise_type "$typeStr". Allowed values are "weightAndReps" or "timeBased".',
+          'error':
+              'Invalid exercise_type "$typeStr". Allowed values are "weightAndReps" or "timeBased".',
         };
       }
-      exerciseType = typeStr == 'timeBased' ? ExerciseType.timeBased : ExerciseType.weightAndReps;
+      exerciseType = typeStr == 'timeBased'
+          ? ExerciseType.timeBased
+          : ExerciseType.weightAndReps;
     }
 
     final handles = (args['available_handles'] as List?)
@@ -1479,7 +1542,8 @@ class CoachToolService {
   }
 
   Future<Map<String, Object?>> _updateExercise(
-      Map<String, Object?> args) async {
+    Map<String, Object?> args,
+  ) async {
     final name = (args['exercise_name'] as String?)?.trim() ?? '';
     if (name.isEmpty) return {'error': 'exercise_name cannot be empty.'};
 
@@ -1499,7 +1563,10 @@ class CoachToolService {
 
     final newName = (args['new_name'] as String?)?.trim();
     final category = (args['category'] as String?)?.trim().toLowerCase();
-    if (category != null && category.isNotEmpty && category != 'compound' && category != 'isolation') {
+    if (category != null &&
+        category.isNotEmpty &&
+        category != 'compound' &&
+        category != 'isolation') {
       return {
         'error': 'category must be "compound" or "isolation", got "$category".',
       };
@@ -1530,12 +1597,17 @@ class CoachToolService {
     ExerciseType? exerciseType;
     if (args.containsKey('exercise_type')) {
       final typeStr = (args['exercise_type'] as String?)?.trim();
-      if (typeStr == null || typeStr.isEmpty || (typeStr != 'timeBased' && typeStr != 'weightAndReps')) {
+      if (typeStr == null ||
+          typeStr.isEmpty ||
+          (typeStr != 'timeBased' && typeStr != 'weightAndReps')) {
         return {
-          'error': 'Invalid exercise_type "$typeStr". Allowed values are "weightAndReps" or "timeBased".',
+          'error':
+              'Invalid exercise_type "$typeStr". Allowed values are "weightAndReps" or "timeBased".',
         };
       }
-      exerciseType = typeStr == 'timeBased' ? ExerciseType.timeBased : ExerciseType.weightAndReps;
+      exerciseType = typeStr == 'timeBased'
+          ? ExerciseType.timeBased
+          : ExerciseType.weightAndReps;
     }
 
     List<String>? availableHandles;
@@ -1562,7 +1634,8 @@ class CoachToolService {
         'exercise_id': updated.id,
         'exercise_name': updated.name,
         'category': updated.category,
-        'primary_muscle': primaryMuscleName ?? _wp.getMuscleGroupName(updated.primaryMuscle),
+        'primary_muscle':
+            primaryMuscleName ?? _wp.getMuscleGroupName(updated.primaryMuscle),
         'exercise_type': updated.exerciseType.name,
         'available_handles': updated.availableHandles,
       };
@@ -1577,19 +1650,25 @@ class CoachToolService {
   /// Bounded to the most recent [limit] sessions (after the optional [cutoff])
   /// to keep the tool payload small.
   List<Map<String, Object?>> _setHistory(
-      String exerciseId, DateTime? cutoff, int limit) {
-    final sessions = _wp.sessions
-        .where((s) => cutoff == null || !s.date.isBefore(cutoff))
-        .where((s) => s.exercises.any((e) => e.exerciseId == exerciseId))
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    String exerciseId,
+    DateTime? cutoff,
+    int limit,
+  ) {
+    final sessions =
+        _wp.sessions
+            .where((s) => cutoff == null || !s.date.isBefore(cutoff))
+            .where((s) => s.exercises.any((e) => e.exerciseId == exerciseId))
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
     return [
       for (final s in sessions.take(limit))
         {
           'date': _d(s.date),
           'sets': [
-            for (final log in s.exercises.where((e) => e.exerciseId == exerciseId))
+            for (final log in s.exercises.where(
+              (e) => e.exerciseId == exerciseId,
+            ))
               for (final set in log.sets)
                 {
                   'weight': _round(set.weight),
@@ -1636,7 +1715,10 @@ class CoachToolService {
     for (final e in all) {
       if (e.name.toLowerCase() == q) return e;
     }
-    final partials = [for (final e in all) if (e.name.toLowerCase().contains(q)) e];
+    final partials = [
+      for (final e in all)
+        if (e.name.toLowerCase().contains(q)) e,
+    ];
     if (partials.isEmpty) return null;
     if (partials.length == 1) return partials.first;
     throw AmbiguousMatchException([for (final e in partials) e.name]);
@@ -1649,7 +1731,8 @@ class CoachToolService {
       if (r.name.toLowerCase() == q) return r;
     }
     final partials = [
-      for (final r in _wp.routines) if (r.name.toLowerCase().contains(q)) r
+      for (final r in _wp.routines)
+        if (r.name.toLowerCase().contains(q)) r,
     ];
     if (partials.isEmpty) return null;
     if (partials.length == 1) return partials.first;
@@ -1659,13 +1742,16 @@ class CoachToolService {
   MuscleGroup? _resolveMuscleGroup(String query) {
     final q = query.toLowerCase().trim();
     if (q.isEmpty) return null;
-    final groups = _wp.muscleGroups.isNotEmpty ? _wp.muscleGroups : MuscleGroups.getAll();
+    final groups = _wp.muscleGroups.isNotEmpty
+        ? _wp.muscleGroups
+        : MuscleGroups.getAll();
     for (final m in groups) {
       if (m.name.toLowerCase() == q || m.id.toLowerCase() == q) return m;
     }
     final partials = [
       for (final m in groups)
-        if (m.name.toLowerCase().contains(q) || m.id.toLowerCase().contains(q)) m
+        if (m.name.toLowerCase().contains(q) || m.id.toLowerCase().contains(q))
+          m,
     ];
     if (partials.isEmpty) return null;
     if (partials.length == 1) return partials.first;
@@ -1687,8 +1773,12 @@ class CoachToolService {
   /// Read an optional numeric arg (defaults to the `limit` key), clamped to
   /// [1, max]; [fallback] when absent. Reused by any tool that accepts a
   /// model-supplied bound (e.g. `limit`, `days`) to prevent runaway loops.
-  int _limitArg(Map<String, Object?> args, int fallback,
-      {String key = 'limit', int max = 40}) {
+  int _limitArg(
+    Map<String, Object?> args,
+    int fallback, {
+    String key = 'limit',
+    int max = 40,
+  }) {
     final n = (args[key] as num?)?.toInt();
     if (n == null) return fallback;
     return n.clamp(1, max);

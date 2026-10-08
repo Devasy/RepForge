@@ -25,6 +25,7 @@ import 'services/interfaces/ml_service_interface.dart';
 import 'services/interfaces/health_connect_service_interface.dart';
 import 'services/workout_provider.dart';
 import 'services/settings_provider.dart';
+import 'services/release_service.dart';
 import 'services/managers/program_manager.dart';
 import 'services/managers/history_manager.dart';
 import 'services/managers/health_sync_manager.dart';
@@ -281,7 +282,7 @@ class _AppInitializerState extends State<AppInitializer> {
       final needsName = settings.userName == null || settings.userName!.isEmpty;
       final versionChanged = !needsName &&
           settings.lastSeenVersion != null &&
-          settings.lastSeenVersion != version;
+          (compareAppVersions(version, settings.lastSeenVersion!) ?? 0) > 0;
 
       // Fire-and-forget readiness refresh — must run after settings.init()
       // so the opt-in flag is loaded; never blocks or fails app init.
@@ -304,10 +305,13 @@ class _AppInitializerState extends State<AppInitializer> {
         _needsNamePrompt = needsName;
       });
 
+      if (!needsName && settings.lastSeenVersion == null) {
+        await settings.markVersionSeen(version);
+      }
       if (!needsName && versionChanged) {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!mounted) return;
-          await showVersionUpdateSheet(context, version);
+          await showVersionUpdateSheet(context, version, previousVersion: settings.lastSeenVersion);
           if (mounted) await settings.markVersionSeen(version);
         });
       }

@@ -5,6 +5,7 @@
 // the IStorageService abstraction, not this concrete class.
 
 import 'dart:convert';
+import 'backup_codec.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../models/models.dart';
@@ -79,6 +80,18 @@ class StorageService implements IStorageService {
       _aiConversationsBox,
     );
 
+    // Replace legacy exerciseId:handle box keys with explicit identities.
+    for (final entry in _personalRecordsBoxInstance.toMap().entries) {
+      final record = PersonalRecord.fromJson(jsonDecode(entry.value));
+      if (entry.key != record.storageKey) {
+        await _personalRecordsBoxInstance.put(
+          record.storageKey,
+          jsonEncode(record.toJson()),
+        );
+        await _personalRecordsBoxInstance.delete(entry.key);
+      }
+    }
+
     // Initialize default muscle groups if empty
     if (_muscleGroupsBoxInstance.isEmpty) {
       await _initializeDefaultMuscleGroups();
@@ -145,8 +158,7 @@ class StorageService implements IStorageService {
     final hi = start.isAfter(end) ? start : end;
     return allSessions
         .where(
-          (session) =>
-              !session.date.isBefore(lo) && !session.date.isAfter(hi),
+          (session) => !session.date.isBefore(lo) && !session.date.isAfter(hi),
         )
         .toList();
   }
@@ -358,7 +370,13 @@ class StorageService implements IStorageService {
   Future<String> exportAllData() async {
     final settingsMap = await getAllSettingsForMigration();
 
+    final programs = await getAllTrainingPrograms();
+    final records = await getAllPersonalRecords();
+
     final data = {
+      'backupFormatVersion': 1,
+      'trainingPrograms': programs.map((p) => p.toJson()).toList(),
+      'personalRecords': records.map((r) => r.toJson()).toList(),
       'sessions': _sessionsBox.values
           .map(_normalizeExportValue)
           .toList(growable: false),
@@ -386,7 +404,7 @@ class StorageService implements IStorageService {
 
   @override
   Future<void> importData(String jsonData) async {
-    final data = jsonDecode(jsonData) as Map<String, dynamic>;
+    final data = decodeBackup(jsonData);
 
     // Import sessions (merge: skip if id already exists)
     final sessions = data['sessions'];
@@ -469,6 +487,31 @@ class StorageService implements IStorageService {
       }
     }
 
+    final programs = data['trainingPrograms'];
+    if (programs is List) {
+      for (final item in programs) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final program = TrainingProgram.fromJson(map);
+        if (await getTrainingProgram(program.id) == null) {
+          await saveTrainingProgram(program);
+        }
+      }
+    }
+    final records = data['personalRecords'];
+    if (records is List) {
+      for (final item in records) {
+        final map = _normalizeImportItem(item);
+        if (map == null) continue;
+        final record = PersonalRecord.fromJson(map);
+        if (!(await getAllPersonalRecords()).any(
+          (r) => r.storageKey == record.storageKey,
+        )) {
+          await savePersonalRecord(record);
+        }
+      }
+    }
+
     // Import AI conversations (merge: skip if id already exists)
     final conversations = data['conversations'];
     if (conversations is List) {
@@ -521,16 +564,23 @@ class StorageService implements IStorageService {
   @override
   Future<void> savePersonalRecord(PersonalRecord record) async {
     await _personalRecordsBoxInstance.put(
-      record.exerciseId,
+      record.storageKey,
       jsonEncode(record.toJson()),
     );
   }
 
   @override
   Future<PersonalRecord?> getPersonalRecord(String exerciseId) async {
-    final json = _personalRecordsBoxInstance.get(exerciseId);
-    if (json == null) return null;
-    return PersonalRecord.fromJson(jsonDecode(json));
+    final split = exerciseId.indexOf(':');
+    final id = split < 0 ? exerciseId : exerciseId.substring(0, split);
+    final handle = split < 0 ? null : exerciseId.substring(split + 1);
+    final matches = (await getAllPersonalRecords()).where(
+      (r) => r.exerciseId == id && (handle == null || r.handle == handle),
+    );
+    if (handle == null) return PersonalRecord.aggregate(matches);
+    final sorted = matches.toList()
+      ..sort((a, b) => b.loadEncodingVersion.compareTo(a.loadEncodingVersion));
+    return sorted.firstOrNull;
   }
 
   @override

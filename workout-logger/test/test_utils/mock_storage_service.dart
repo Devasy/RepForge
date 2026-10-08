@@ -280,12 +280,14 @@ class MockStorageService implements IStorageService {
 
   @override
   Future<void> savePersonalRecord(PersonalRecord record) async {
-    _personalRecords[record.exerciseId] = record;
+    _personalRecords[record.storageKey] = record;
   }
 
   @override
   Future<PersonalRecord?> getPersonalRecord(String exerciseId) async =>
-      _personalRecords[exerciseId];
+      PersonalRecord.aggregate(
+        _personalRecords.values.where((r) => r.exerciseId == exerciseId),
+      );
 
   @override
   Future<List<PersonalRecord>> getAllPersonalRecords() async =>

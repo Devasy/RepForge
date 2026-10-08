@@ -141,18 +141,16 @@ jobs:
               --base main \
               --limit 50 \
               --search "merged:>=${SINCE_DATE}" \
-              --json number,title,author \
-              --template '{{range .}}- #{{.number}} {{.title}} (@{{.author.login}}){{"\n"}}{{end}}' 2>/dev/null || echo "")
+              --json number,title,labels)
           else
             PR_LIST=$(gh pr list \
               --state merged \
               --base main \
               --limit 10 \
-              --json number,title,author \
-              --template '{{range .}}- #{{.number}} {{.title}} (@{{.author.login}}){{"\n"}}{{end}}' 2>/dev/null || echo "")
+              --json number,title,labels)
           fi
 
-          [ -z "$PR_LIST" ] && PR_LIST="_No merged pull requests found since the last release._"
+          PR_LIST=$(python workout-logger/scripts/build_release_notes.py "${{ steps.version.outputs.value }}" <<< "$PR_LIST")
 
           {
             echo "list<<EOF"
@@ -261,7 +259,6 @@ jobs:
             ### 📱 Download
             Download the APK file below to install on your Android device.
 
-            ### 🔀 Merged Pull Requests
             ${{ steps.merged_prs.outputs.list }}
 
             ### 📊 Build Information

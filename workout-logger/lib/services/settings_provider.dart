@@ -3,8 +3,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'ai/gemini_ai_service.dart'
-    show kDefaultMaxToolRounds, kMinMaxToolRounds, kMaxMaxToolRounds,
-        kDefaultThinkingLevel, kDefaultGeminiModel, kGeminiModels,
+    show
+        kDefaultMaxToolRounds,
+        kMinMaxToolRounds,
+        kMaxMaxToolRounds,
+        kDefaultThinkingLevel,
+        kDefaultGeminiModel,
         clampThinkingLevel;
 import 'interfaces/storage_service_interface.dart';
 
@@ -69,10 +73,8 @@ class SettingsProvider extends ChangeNotifier {
     _userName = await _storage.getSetting('userName');
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
-    // Normalize on read: the picker only offers kGeminiModels, and a value
-    // left behind by an older build (the list has churned across releases)
-    // would match none of its items and trip DropdownButtonFormField's
-    // "exactly one item per value" assertion.
+    // Retain stable Flash IDs discovered by newer builds. The picker includes
+    // the saved selection even when discovery is temporarily unavailable.
     final storedModel = await _storage.getSetting('geminiModel');
     _geminiModel = _isKnownGeminiModel(storedModel)
         ? storedModel!
@@ -82,21 +84,27 @@ class SettingsProvider extends ChangeNotifier {
     // a hand-edited settings row would otherwise bypass the bounds that
     // setGeminiMaxToolRounds enforces.
     final parsedMaxRounds = maxRounds != null ? int.tryParse(maxRounds) : null;
-    _geminiMaxToolRounds = (parsedMaxRounds ?? kDefaultMaxToolRounds)
-        .clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
+    _geminiMaxToolRounds = (parsedMaxRounds ?? kDefaultMaxToolRounds).clamp(
+      kMinMaxToolRounds,
+      kMaxMaxToolRounds,
+    );
     final thinkingLevel = await _storage.getSetting('geminiThinkingLevel');
-    _geminiThinkingLevel =
-        clampThinkingLevel(_geminiModel, thinkingLevel ?? kDefaultThinkingLevel);
+    _geminiThinkingLevel = clampThinkingLevel(
+      _geminiModel,
+      thinkingLevel ?? kDefaultThinkingLevel,
+    );
     _weeklyInsights = await _storage.getSetting('weeklyInsights') ?? '';
     final dateStr = await _storage.getSetting('weeklyInsightsDate');
     _weeklyInsightsDate = dateStr != null ? DateTime.tryParse(dateStr) : null;
     final advMetrics = await _storage.getSetting('showAdvancedMetrics');
     _showAdvancedMetrics = advMetrics == 'true';
+    notifyListeners();
   }
 
   /// Whether [model] is one the model picker actually offers.
   static bool _isKnownGeminiModel(String? model) =>
-      model != null && kGeminiModels.any((entry) => entry.$1 == model);
+      model != null &&
+      RegExp(r'^gemini-\d+\.\d+-flash(?:-lite)?$').hasMatch(model);
 
   /// A valid bodyweight must be finite (not NaN/Infinity) and strictly positive.
   static bool _isValidBodyWeight(double? weight) =>
@@ -136,7 +144,10 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setWeightUnit(WeightUnit unit) async {
     _weightUnit = unit;
     _weightIncrement = _defaultIncrement;
-    await _storage.saveSetting('weightUnit', unit == WeightUnit.kg ? 'kg' : 'lbs');
+    await _storage.saveSetting(
+      'weightUnit',
+      unit == WeightUnit.kg ? 'kg' : 'lbs',
+    );
     await _storage.saveSetting('weightIncrement', _weightIncrement.toString());
     notifyListeners();
   }
@@ -246,7 +257,9 @@ class SettingsProvider extends ChangeNotifier {
   /// Format a kg weight value with the correct unit label.
   String formatWeight(double kg) {
     final d = toDisplay(kg);
-    final str = d == d.truncateToDouble() ? d.toStringAsFixed(0) : d.toStringAsFixed(1);
+    final str = d == d.truncateToDouble()
+        ? d.toStringAsFixed(0)
+        : d.toStringAsFixed(1);
     return '$str $unitLabel';
   }
 

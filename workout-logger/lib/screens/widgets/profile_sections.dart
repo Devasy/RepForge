@@ -10,6 +10,9 @@ import '../../services/ai/gemini_ai_service.dart';
 import '../../theme/app_theme.dart';
 import 'rf_dialogs.dart';
 import 'rf_widgets.dart';
+import 'release_widgets.dart';
+import '../onboarding_screen.dart';
+import '../../services/ai/gemini_model_catalog.dart';
 
 const String _createdBy = 'Devasy Patel';
 
@@ -59,7 +62,8 @@ class _ProfileSection extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -68,7 +72,8 @@ class _ProfileSection extends StatelessWidget {
                     ),
                     Text(
                       subtitle,
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textMuted,
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
@@ -174,7 +179,8 @@ class PreferencesSection extends StatelessWidget {
                   ),
                   child: Text(
                     label,
-                    style: TextStyle(fontFamily: 'GeistMono', 
+                    style: TextStyle(
+                      fontFamily: 'GeistMono',
                       color: selected ? AppColors.primary : AppColors.textSoft,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
                       fontSize: 12,
@@ -197,7 +203,8 @@ class PreferencesSection extends StatelessWidget {
                   children: [
                     Text(
                       'Show estimated 1RM',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -206,7 +213,8 @@ class PreferencesSection extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Display 1-rep max badge on completed sets',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textMuted,
                         fontSize: 12,
                       ),
@@ -272,7 +280,8 @@ class HealthConnectSection extends StatelessWidget {
                   children: [
                     Text(
                       'Sync workouts after finishing',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -281,7 +290,8 @@ class HealthConnectSection extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Writes session + per-set reps to Health Connect',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textMuted,
                         fontSize: 12,
                       ),
@@ -303,11 +313,19 @@ class HealthConnectSection extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
-                const Icon(Icons.check_circle_outline, color: _hcColor, size: 15),
+                const Icon(
+                  Icons.check_circle_outline,
+                  color: _hcColor,
+                  size: 15,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Connected — syncing after each workout',
-                  style: TextStyle(fontFamily: 'Geist', color: _hcColor, fontSize: 12),
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    color: _hcColor,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -323,7 +341,8 @@ class HealthConnectSection extends StatelessWidget {
                   children: [
                     Text(
                       'Readiness insights',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -332,7 +351,8 @@ class HealthConnectSection extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Reads sleep & heart data to score daily recovery',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textMuted,
                         fontSize: 12,
                       ),
@@ -342,8 +362,9 @@ class HealthConnectSection extends StatelessWidget {
               ),
               Switch(
                 value: settings.readinessEnabled,
-                onChanged:
-                    isReadinessLoading ? null : (v) => onReadinessToggle(v),
+                onChanged: isReadinessLoading
+                    ? null
+                    : (v) => onReadinessToggle(v),
                 activeThumbColor: _hcColor,
                 activeTrackColor: _hcColor.withValues(alpha: 0.35),
               ),
@@ -357,7 +378,8 @@ class HealthConnectSection extends StatelessWidget {
               icon: Icons.sync_rounded,
               iconColor: _hcColor,
               title: 'Sync coach data now',
-              subtitle: "Pull recent sleep & heart rate into the coach's database",
+              subtitle:
+                  "Pull recent sleep & heart rate into the coach's database",
               loading: isHealthSyncLoading,
               onTap: isHealthSyncLoading ? null : onHealthSyncNow,
             ),
@@ -464,6 +486,14 @@ class _AboutSectionState extends State<AboutSection> {
               icon: Icons.tag_rounded,
             ),
           ),
+          if (widget.appVersion.isNotEmpty) ...[
+            UpdateNotice(current: widget.appVersion),
+            TextButton(
+              onPressed: () =>
+                  showVersionUpdateSheet(context, widget.appVersion),
+              child: const Text('Release history'),
+            ),
+          ],
           const _SectionDivider(),
           _InfoTile(
             label: 'Created by',
@@ -498,7 +528,8 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: TextStyle(fontFamily: 'GeistMono', 
+      style: TextStyle(
+        fontFamily: 'GeistMono',
         color: AppColors.textFaint,
         fontSize: 9,
         fontWeight: FontWeight.w600,
@@ -550,7 +581,8 @@ class _UnitToggleButton extends StatelessWidget {
         child: Center(
           child: Text(
             label,
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: selected ? AppColors.primary : AppColors.textSoft,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               fontSize: 14,
@@ -609,7 +641,8 @@ class _ActionTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -617,7 +650,8 @@ class _ActionTile extends StatelessWidget {
                   ),
                   Text(
                     subtitle,
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textMuted,
                       fontSize: 12,
                     ),
@@ -668,7 +702,8 @@ class _InfoTile extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             label,
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textMuted,
               fontSize: 13,
             ),
@@ -676,7 +711,8 @@ class _InfoTile extends StatelessWidget {
           const Spacer(),
           Text(
             value,
-            style: TextStyle(fontFamily: 'GeistMono', 
+            style: TextStyle(
+              fontFamily: 'GeistMono',
               color: AppColors.textSoft,
               fontSize: 12,
               fontWeight: FontWeight.w500,
@@ -693,11 +729,7 @@ class _SectionDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(
-      color: AppColors.glassBorder,
-      height: 1,
-      indent: 40,
-    );
+    return const Divider(color: AppColors.glassBorder, height: 1, indent: 40);
   }
 }
 
@@ -713,6 +745,8 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   late TextEditingController _ctrl;
   bool _obscure = true;
   bool _saving = false;
+  bool _discoveringModels = false;
+  List<(String, String)> _models = kGeminiModels;
 
   // Live value shown while dragging the slider; null when not dragging (in
   // which case the persisted settings value is shown instead).
@@ -725,12 +759,44 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     _ctrl = TextEditingController(
       text: context.read<SettingsProvider>().geminiApiKey,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && context.read<SettingsProvider>().geminiApiKey.isNotEmpty) {
+        _refreshModels();
+      }
+    });
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshModels() async {
+    setState(() => _discoveringModels = true);
+    final catalog = GeminiModelCatalog();
+    try {
+      final settings = context.read<SettingsProvider>();
+      final discovered = await catalog.discover(settings.geminiApiKey);
+      if (!mounted) return;
+      setState(
+        () => _models = [
+          ...discovered,
+          if (!discovered.any((entry) => entry.$1 == settings.geminiModel))
+            (settings.geminiModel, '${settings.geminiModel} (selected)'),
+        ],
+      );
+    } catch (_) {
+      if (mounted) {
+        context.showRFSnackBar(
+          'Could not refresh models. Check your API key and connection.',
+          type: RFSnackBarType.error,
+        );
+      }
+    } finally {
+      catalog.close();
+      if (mounted) setState(() => _discoveringModels = false);
+    }
   }
 
   /// Reports the outcome of a settings write. Success is only worth a toast
@@ -758,6 +824,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
       await settings.setGeminiApiKey(key);
       gemini.updateApiKey(key);
       _reportSaved(key.isEmpty ? 'API key cleared' : 'API key saved');
+      if (mounted && key.isNotEmpty) await _refreshModels();
     } catch (e, st) {
       debugPrint('Failed to save Gemini API key: $e\n$st');
       _reportSaveFailed('your API key');
@@ -842,11 +909,14 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
               decoration: BoxDecoration(
                 color: AppColors.success.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadius.full),
-                border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
+                border: Border.all(
+                  color: AppColors.success.withValues(alpha: 0.35),
+                ),
               ),
               child: Text(
                 'Active',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.success,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
@@ -874,13 +944,15 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                     enableSuggestions: false,
                     autocorrect: false,
                     keyboardType: TextInputType.visiblePassword,
-                    style: TextStyle(fontFamily: 'GeistMono', 
+                    style: TextStyle(
+                      fontFamily: 'GeistMono',
                       color: AppColors.textPrimary,
                       fontSize: 12,
                     ),
                     decoration: InputDecoration(
                       hintText: 'AIza…',
-                      hintStyle: TextStyle(fontFamily: 'GeistMono', 
+                      hintStyle: TextStyle(
+                        fontFamily: 'GeistMono',
                         color: AppColors.textFaint,
                         fontSize: 12,
                       ),
@@ -895,9 +967,13 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                 GestureDetector(
                   onTap: () => setState(() => _obscure = !_obscure),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                    ),
                     child: Icon(
-                      _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      _obscure
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
                       color: AppColors.textFaint,
                       size: 18,
                     ),
@@ -909,14 +985,25 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Get a free key at aistudio.google.com. Stored locally on-device.',
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textFaint,
               fontSize: 11,
               fontStyle: FontStyle.italic,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          const _SectionLabel('GEMINI MODEL'),
+          Row(
+            children: [
+              const Expanded(child: _SectionLabel('GEMINI MODEL')),
+              TextButton(
+                onPressed: _discoveringModels ? null : _refreshModels,
+                child: Text(
+                  _discoveringModels ? 'Refreshing…' : 'Refresh models',
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.sm),
           Container(
             decoration: BoxDecoration(
@@ -931,7 +1018,10 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                 isExpanded: true,
                 isDense: false,
                 dropdownColor: AppColors.card,
-                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textFaint),
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppColors.textFaint,
+                ),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(
@@ -939,14 +1029,22 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                     vertical: AppSpacing.sm,
                   ),
                 ),
-                style: TextStyle(fontFamily: 'GeistMono',
+                style: TextStyle(
+                  fontFamily: 'GeistMono',
                   color: AppColors.textPrimary,
                   fontSize: 13,
                 ),
-                items: kGeminiModels.map(((String, String) entry) {
-                  final (id, label) = entry;
-                  return DropdownMenuItem(value: id, child: Text(label));
-                }).toList(),
+                items:
+                    {
+                      ..._models,
+                      if (!_models.any(
+                        (entry) => entry.$1 == settings.geminiModel,
+                      ))
+                        (settings.geminiModel, settings.geminiModel),
+                    }.map(((String, String) entry) {
+                      final (id, label) = entry;
+                      return DropdownMenuItem(value: id, child: Text(label));
+                    }).toList(),
                 onChanged: (id) {
                   if (id != null) _selectModel(id);
                 },
@@ -959,25 +1057,111 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             const SizedBox(height: AppSpacing.sm),
             Text(
               'How much the model reasons before replying. Lower is faster and cheaper; higher is more capable on hard problems.',
-              style: TextStyle(fontFamily: 'Geist',
+              style: TextStyle(
+                fontFamily: 'Geist',
                 color: AppColors.textFaint,
                 fontSize: 11,
                 fontStyle: FontStyle.italic,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
-            Builder(builder: (context) {
-              final levels = supportedThinkingLevels(settings.geminiModel);
-              final currentIndex = levels.indexOf(settings.geminiThinkingLevel);
-              // Clamped because a drag in progress can outlive the level list
-              // it was started against: picking a model with fewer levels
-              // leaves _draggingThinkingLevelIndex past the new max, which
-              // Slider asserts on.
-              final liveIndex = (_draggingThinkingLevelIndex ??
-                      (currentIndex >= 0 ? currentIndex.toDouble() : 0.0))
-                  .clamp(0.0, (levels.length - 1).toDouble());
-              final liveLevel = levels[liveIndex.round().clamp(0, levels.length - 1)];
-              final liveLevelLabel = liveLevel[0].toUpperCase() + liveLevel.substring(1);
+            Builder(
+              builder: (context) {
+                final levels = supportedThinkingLevels(settings.geminiModel);
+                final currentIndex = levels.indexOf(
+                  settings.geminiThinkingLevel,
+                );
+                // Clamped because a drag in progress can outlive the level list
+                // it was started against: picking a model with fewer levels
+                // leaves _draggingThinkingLevelIndex past the new max, which
+                // Slider asserts on.
+                final liveIndex =
+                    (_draggingThinkingLevelIndex ??
+                            (currentIndex >= 0 ? currentIndex.toDouble() : 0.0))
+                        .clamp(0.0, (levels.length - 1).toDouble());
+                final liveLevel =
+                    levels[liveIndex.round().clamp(0, levels.length - 1)];
+                final liveLevelLabel =
+                    liveLevel[0].toUpperCase() + liveLevel.substring(1);
+                return Row(
+                  children: [
+                    Expanded(
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          activeTrackColor: AppColors.primary,
+                          inactiveTrackColor: AppColors.glassBorderStrong,
+                          thumbColor: AppColors.primary,
+                          overlayColor: AppColors.primary.withValues(
+                            alpha: 0.15,
+                          ),
+                          valueIndicatorColor: AppColors.primary,
+                          trackHeight: 3,
+                        ),
+                        child: Slider(
+                          value: liveIndex,
+                          min: 0,
+                          max: (levels.length - 1).toDouble(),
+                          divisions: levels.length > 1
+                              ? levels.length - 1
+                              : null,
+                          label: liveLevelLabel,
+                          onChanged: (v) {
+                            setState(() => _draggingThinkingLevelIndex = v);
+                            context.read<GeminiAiService>().updateThinkingLevel(
+                              levels[v.round().clamp(0, levels.length - 1)],
+                            );
+                          },
+                          onChangeEnd: (v) => _commitThinkingLevel(
+                            levels[v.round().clamp(0, levels.length - 1)],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Text(
+                        liveLevelLabel,
+                        style: TextStyle(
+                          fontFamily: 'GeistMono',
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          const _SectionLabel('MAX TOOL-CALL STEPS'),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'How many tool rounds the coach can take per message before it must reply. Raise this if it stops mid-task; lower it to limit token usage.',
+            style: TextStyle(
+              fontFamily: 'Geist',
+              color: AppColors.textFaint,
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Builder(
+            builder: (context) {
+              final liveValue =
+                  _draggingMaxToolRounds ??
+                  settings.geminiMaxToolRounds.toDouble();
               return Row(
                 children: [
                   Expanded(
@@ -991,33 +1175,37 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                         trackHeight: 3,
                       ),
                       child: Slider(
-                        value: liveIndex,
-                        min: 0,
-                        max: (levels.length - 1).toDouble(),
-                        divisions: levels.length > 1 ? levels.length - 1 : null,
-                        label: liveLevelLabel,
+                        value: liveValue,
+                        min: kMinMaxToolRounds.toDouble(),
+                        max: kMaxMaxToolRounds.toDouble(),
+                        divisions: kMaxMaxToolRounds - kMinMaxToolRounds,
+                        label: '${liveValue.round()}',
                         onChanged: (v) {
-                          setState(() => _draggingThinkingLevelIndex = v);
-                          context.read<GeminiAiService>().updateThinkingLevel(
-                            levels[v.round().clamp(0, levels.length - 1)],
+                          setState(() => _draggingMaxToolRounds = v);
+                          context.read<GeminiAiService>().updateMaxToolRounds(
+                            v.round(),
                           );
                         },
-                        onChangeEnd: (v) => _commitThinkingLevel(
-                          levels[v.round().clamp(0, levels.length - 1)],
-                        ),
+                        onChangeEnd: (v) => _commitMaxToolRounds(v.round()),
                       ),
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(AppRadius.sm),
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.35),
+                      ),
                     ),
                     child: Text(
-                      liveLevelLabel,
-                      style: TextStyle(fontFamily: 'GeistMono',
+                      '${liveValue.round()}',
+                      style: TextStyle(
+                        fontFamily: 'GeistMono',
                         color: AppColors.primary,
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
@@ -1026,68 +1214,8 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                   ),
                 ],
               );
-            }),
-          ],
-          const SizedBox(height: AppSpacing.md),
-          const _SectionLabel('MAX TOOL-CALL STEPS'),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'How many tool rounds the coach can take per message before it must reply. Raise this if it stops mid-task; lower it to limit token usage.',
-            style: TextStyle(fontFamily: 'Geist',
-              color: AppColors.textFaint,
-              fontSize: 11,
-              fontStyle: FontStyle.italic,
-            ),
+            },
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Builder(builder: (context) {
-            final liveValue =
-                _draggingMaxToolRounds ?? settings.geminiMaxToolRounds.toDouble();
-            return Row(
-              children: [
-                Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: AppColors.primary,
-                      inactiveTrackColor: AppColors.glassBorderStrong,
-                      thumbColor: AppColors.primary,
-                      overlayColor: AppColors.primary.withValues(alpha: 0.15),
-                      valueIndicatorColor: AppColors.primary,
-                      trackHeight: 3,
-                    ),
-                    child: Slider(
-                      value: liveValue,
-                      min: kMinMaxToolRounds.toDouble(),
-                      max: kMaxMaxToolRounds.toDouble(),
-                      divisions: kMaxMaxToolRounds - kMinMaxToolRounds,
-                      label: '${liveValue.round()}',
-                      onChanged: (v) {
-                        setState(() => _draggingMaxToolRounds = v);
-                        context.read<GeminiAiService>().updateMaxToolRounds(v.round());
-                      },
-                      onChangeEnd: (v) => _commitMaxToolRounds(v.round()),
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
-                  ),
-                  child: Text(
-                    '${liveValue.round()}',
-                    style: TextStyle(fontFamily: 'GeistMono',
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }),
           const SizedBox(height: AppSpacing.md),
           SizedBox(
             width: double.infinity,
@@ -1096,7 +1224,9 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadius.sm),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.35),
+                ),
               ),
               child: TextButton(
                 onPressed: _saving ? null : _save,
@@ -1117,7 +1247,8 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                       )
                     : Text(
                         'Save API Key',
-                        style: TextStyle(fontFamily: 'Geist', 
+                        style: TextStyle(
+                          fontFamily: 'Geist',
                           color: AppColors.primary,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -1136,7 +1267,8 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                   onTap: () => context.read<GeminiAiService>().resetUsage(),
                   child: Text(
                     'Reset',
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.accent,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -1155,20 +1287,33 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             ),
             child: Column(
               children: [
-                _UsageRow(label: 'Total tokens', value: _formatInt(gemini.totalTokensUsed)),
+                _UsageRow(
+                  label: 'Total tokens',
+                  value: _formatInt(gemini.totalTokensUsed),
+                ),
                 const SizedBox(height: 6),
-                _UsageRow(label: 'Input (prompt)', value: _formatInt(gemini.promptTokensUsed)),
+                _UsageRow(
+                  label: 'Input (prompt)',
+                  value: _formatInt(gemini.promptTokensUsed),
+                ),
                 const SizedBox(height: 6),
-                _UsageRow(label: 'Output (response)', value: _formatInt(gemini.responseTokensUsed)),
+                _UsageRow(
+                  label: 'Output (response)',
+                  value: _formatInt(gemini.responseTokensUsed),
+                ),
                 const SizedBox(height: 6),
-                _UsageRow(label: 'Requests', value: _formatInt(gemini.aiRequestCount)),
+                _UsageRow(
+                  label: 'Requests',
+                  value: _formatInt(gemini.aiRequestCount),
+                ),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Cumulative billable tokens across coach, program builder & insights.',
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textFaint,
               fontSize: 11,
               fontStyle: FontStyle.italic,
@@ -1193,11 +1338,16 @@ class _UsageRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 12),
+          style: TextStyle(
+            fontFamily: 'Geist',
+            color: AppColors.textMuted,
+            fontSize: 12,
+          ),
         ),
         Text(
           value,
-          style: TextStyle(fontFamily: 'GeistMono', 
+          style: TextStyle(
+            fontFamily: 'GeistMono',
             color: AppColors.textPrimary,
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -1234,12 +1384,18 @@ class _DebugLogSheet extends StatelessWidget {
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.sm, 0),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.sm,
+                0,
+              ),
               child: Row(
                 children: [
                   Text(
                     'Debug Logs',
-                    style: TextStyle(fontFamily: 'GeistMono', 
+                    style: TextStyle(
+                      fontFamily: 'GeistMono',
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
@@ -1250,7 +1406,8 @@ class _DebugLogSheet extends StatelessWidget {
                     onPressed: () => DebugLogBuffer.instance.clear(),
                     child: Text(
                       'Clear',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.accent,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -1258,7 +1415,11 @@ class _DebugLogSheet extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.textMuted, size: 18),
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppColors.textMuted,
+                      size: 18,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -1274,7 +1435,11 @@ class _DebugLogSheet extends StatelessWidget {
                     return Center(
                       child: Text(
                         'No logs yet',
-                        style: TextStyle(fontFamily: 'Geist', color: AppColors.textFaint, fontSize: 13),
+                        style: TextStyle(
+                          fontFamily: 'Geist',
+                          color: AppColors.textFaint,
+                          fontSize: 13,
+                        ),
                       ),
                     );
                   }
@@ -1290,13 +1455,17 @@ class _DebugLogSheet extends StatelessWidget {
                       final color = isHc
                           ? AppColors.secondary
                           : isReadiness
-                              ? AppColors.primary
-                              : AppColors.textSoft;
+                          ? AppColors.primary
+                          : AppColors.textSoft;
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 1),
                         child: Text(
                           line,
-                          style: TextStyle(fontFamily: 'GeistMono', fontSize: 10, color: color),
+                          style: TextStyle(
+                            fontFamily: 'GeistMono',
+                            fontSize: 10,
+                            color: color,
+                          ),
                         ),
                       );
                     },

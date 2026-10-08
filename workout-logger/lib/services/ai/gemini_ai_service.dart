@@ -23,12 +23,12 @@ import '../interfaces/storage_service_interface.dart';
 
 // Ordered list of available Gemini models shown in the picker.
 const kGeminiModels = [
-  ('gemini-2.5-flash',      'Gemini 2.5 Flash'),
+  ('gemini-2.5-flash', 'Gemini 2.5 Flash'),
   ('gemini-3.1-flash-lite', 'Gemini 3.1 Flash Lite'),
   ('gemini-3.5-flash-lite', 'Gemini 3.5 Flash Lite'),
-  ('gemini-3.5-flash',      'Gemini 3.5 Flash'),
-  ('gemini-3.6-flash',      'Gemini 3.6 Flash'),
-  ('gemini-3.7-flash',      'Gemini 3.7 Flash'),
+  ('gemini-3.5-flash', 'Gemini 3.5 Flash'),
+  ('gemini-3.6-flash', 'Gemini 3.6 Flash'),
+  ('gemini-3.7-flash', 'Gemini 3.7 Flash'),
 ];
 
 // Ordered fastest/cheapest → most thorough. Matches the Gemini API's own
@@ -45,7 +45,12 @@ const kDefaultThinkingLevel = 'minimal';
 /// that doesn't support 'minimal' — sending it returns an API error.
 List<String> supportedThinkingLevels(String model) {
   if (model.startsWith('gemini-2')) return const [];
-  if (model == 'gemini-3.7-flash') return const ['low', 'medium', 'high'];
+  final version = RegExp(r'^gemini-(\d+)\.(\d+)-flash$').firstMatch(model);
+  if (version != null &&
+      (int.parse(version.group(1)!) > 3 ||
+          (version.group(1) == '3' && int.parse(version.group(2)!) >= 7))) {
+    return const ['low', 'medium', 'high'];
+  }
   return kThinkingLevels;
 }
 
@@ -98,7 +103,9 @@ Duration? _extractRetryDelay(String body) {
       if (details is List) {
         for (final item in details) {
           if (item is Map && item['retryDelay'] is String) {
-            final delayStr = (item['retryDelay'] as String).replaceAll('s', '').trim();
+            final delayStr = (item['retryDelay'] as String)
+                .replaceAll('s', '')
+                .trim();
             final seconds = double.tryParse(delayStr);
             if (seconds != null && seconds > 0) {
               final ms = (seconds * 1000).ceil() + 350;
@@ -110,7 +117,10 @@ Duration? _extractRetryDelay(String body) {
       // 2. Regex match in error.message (e.g. "Please retry in 23.690750876s.")
       final message = errMap['message'];
       if (message is String) {
-        final match = RegExp(r'retry in\s+([\d.]+)\s*s', caseSensitive: false).firstMatch(message);
+        final match = RegExp(
+          r'retry in\s+([\d.]+)\s*s',
+          caseSensitive: false,
+        ).firstMatch(message);
         if (match != null) {
           final seconds = double.tryParse(match.group(1)!);
           if (seconds != null && seconds > 0) {
@@ -135,6 +145,8 @@ bool _isDailyQuotaExhausted(String body) {
 
 String? getFallbackModel(String currentModel) {
   switch (currentModel) {
+    case 'gemini-3.8-flash':
+      return 'gemini-3.7-flash';
     case 'gemini-3.7-flash':
       return 'gemini-3.6-flash';
     case 'gemini-3.6-flash':
@@ -207,7 +219,8 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   /// Number of AI requests recorded.
   int get aiRequestCount => _requestCount;
 
-  void init(String apiKey, {
+  void init(
+    String apiKey, {
     String model = kDefaultGeminiModel,
     int maxToolRounds = kDefaultMaxToolRounds,
     String thinkingLevel = kDefaultThinkingLevel,
@@ -310,21 +323,20 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     String? system,
     List<Tool>? tools,
     bool jsonMode = false,
-  }) =>
-      {
-        'contents': contents,
-        if (system != null)
-          'systemInstruction': {
-            'parts': [
-              {'text': system}
-            ]
-          },
-        if (tools != null) 'tools': tools.map((t) => t.toJson()).toList(),
-        'generationConfig': {
-          'thinkingConfig': _thinkingConfig,
-          if (jsonMode) 'responseMimeType': 'application/json',
-        },
-      };
+  }) => {
+    'contents': contents,
+    if (system != null)
+      'systemInstruction': {
+        'parts': [
+          {'text': system},
+        ],
+      },
+    if (tools != null) 'tools': tools.map((t) => t.toJson()).toList(),
+    'generationConfig': {
+      'thinkingConfig': _thinkingConfig,
+      if (jsonMode) 'responseMimeType': 'application/json',
+    },
+  };
 
   // Every gemini-2.x model predates the Gemini 3.x thinking-level enum and
   // only understands the older thinkingBudget (integer token budget) shape;
@@ -361,7 +373,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     // but a mid-stream failure is not retried (it would duplicate output).
     http.Client client = http.Client();
     http.StreamedResponse streamed;
-    for (var attempt = 0;; attempt++) {
+    for (var attempt = 0; ; attempt++) {
       final uri = Uri.parse(
         '$_apiBase/$_model:streamGenerateContent?alt=sse&key=$_apiKey',
       );
@@ -395,7 +407,8 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
       final customDelay = _extractRetryDelay(err);
       if (_isRetryableStatus(resp.statusCode) &&
-          (attempt < _kMaxRetries || (customDelay != null && attempt < _kMaxRetriesWithServerDelay))) {
+          (attempt < _kMaxRetries ||
+              (customDelay != null && attempt < _kMaxRetriesWithServerDelay))) {
         client.close();
         final delay = customDelay ?? _retryBackoff(attempt);
         await Future.delayed(delay);
@@ -438,7 +451,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
   // Single-shot (non-streaming) generateContent call, with retry on 5xx/429.
   Future<Map<String, dynamic>> _generate(Map<String, dynamic> body) async {
-    for (var attempt = 0;; attempt++) {
+    for (var attempt = 0; ; attempt++) {
       final uri = Uri.parse('$_apiBase/$_model:generateContent?key=$_apiKey');
       final response = await http.post(
         uri,
@@ -465,7 +478,8 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
 
       final customDelay = _extractRetryDelay(response.body);
       if (_isRetryableStatus(response.statusCode) &&
-          (attempt < _kMaxRetries || (customDelay != null && attempt < _kMaxRetriesWithServerDelay))) {
+          (attempt < _kMaxRetries ||
+              (customDelay != null && attempt < _kMaxRetriesWithServerDelay))) {
         final delay = customDelay ?? _retryBackoff(attempt);
         await Future.delayed(delay);
         continue;
@@ -490,16 +504,15 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
     String? imageBytesBase64,
     String? imageMimeType,
-  }) =>
-      streamCoachReply(
-        userMessage: userMessage,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: tools,
-        onToolCall: onToolCall,
-        imageBytesBase64: imageBytesBase64,
-        imageMimeType: imageMimeType,
-      );
+  }) => streamCoachReply(
+    userMessage: userMessage,
+    systemPrompt: systemPrompt,
+    history: history,
+    tools: tools,
+    onToolCall: onToolCall,
+    imageBytesBase64: imageBytesBase64,
+    imageMimeType: imageMimeType,
+  );
 
   @override
   Stream<String> streamCoachReply({
@@ -534,10 +547,7 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
       // Build the mutable contents list; grows with each tool-call round.
       final contents = <Object?>[
         ...history.map((c) => c.toJson()),
-        {
-          'role': 'user',
-          'parts': userParts,
-        },
+        {'role': 'user', 'parts': userParts},
       ];
 
       for (var round = 0; round < _maxToolRounds; round++) {
@@ -574,11 +584,13 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
               rawModelParts.add(part);
               if (part.containsKey('functionCall')) {
                 final fc = part['functionCall'] as Map<String, dynamic>;
-                calls.add(FunctionCall(
-                  fc['name'] as String,
-                  (fc['args'] as Map<String, dynamic>? ?? {})
-                      .cast<String, Object?>(),
-                ));
+                calls.add(
+                  FunctionCall(
+                    fc['name'] as String,
+                    (fc['args'] as Map<String, dynamic>? ?? {})
+                        .cast<String, Object?>(),
+                  ),
+                );
                 callIds.add(fc['id'] as String?);
               }
             }
@@ -607,15 +619,15 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
                 'name': call.name,
                 'id': ?id,
                 'response': result,
-              }
+              },
             });
           } catch (e) {
             responseParts.add({
               'functionResponse': {
                 'name': call.name,
                 'id': ?id,
-                'response': {'error': '$e'}
-              }
+                'response': {'error': '$e'},
+              },
             });
           }
         }
@@ -648,7 +660,9 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
       );
       _recordRawUsage(data['usageMetadata'] as Map<String, dynamic>?);
       final raw = _textFromResponse(data);
-      if (raw.isEmpty) throw const FormatException('Empty response from Gemini.');
+      if (raw.isEmpty) {
+        throw const FormatException('Empty response from Gemini.');
+      }
 
       final map = jsonDecode(raw) as Map<String, dynamic>;
       return fromJson(map);
@@ -669,7 +683,8 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
         .map((e) => '  "${e.id}": "${e.name} [${e.primaryMuscle}]"')
         .join('\n');
 
-    const systemPrompt = '''You are a certified strength and conditioning coach creating structured training programs for RepForge.
+    const systemPrompt =
+        '''You are a certified strength and conditioning coach creating structured training programs for RepForge.
 Return ONLY raw JSON — no markdown fences, no comments, no explanation text.
 Use ONLY exercise IDs from the provided list as exerciseId values.
 
@@ -769,10 +784,7 @@ Required JSON schema (follow exactly):
     }
     try {
       final data = await _generate(
-        _makeBody(
-          contents: [Content.text(context).toJson()],
-          system: system,
-        ),
+        _makeBody(contents: [Content.text(context).toJson()], system: system),
       );
       _recordRawUsage(data['usageMetadata'] as Map<String, dynamic>?);
       final text = _textFromResponse(data).trim();

@@ -31,18 +31,23 @@ class FakeStorageService implements IStorageService {
   }
 
   @override
-  Future<List<PersonalRecord>> getAllPersonalRecords() async => _prs.values.toList();
+  Future<List<PersonalRecord>> getAllPersonalRecords() async =>
+      _prs.values.toList();
 
   @override
-  Future<PersonalRecord?> getPersonalRecord(String exerciseId) async => _prs[exerciseId];
+  Future<PersonalRecord?> getPersonalRecord(String exerciseId) async =>
+      PersonalRecord.aggregate(
+        _prs.values.where((r) => r.exerciseId == exerciseId),
+      );
 
   @override
   Future<void> savePersonalRecord(PersonalRecord record) async {
-    _prs[record.exerciseId] = record;
+    _prs[record.storageKey] = record;
   }
 
   @override
-  Future<List<WorkoutSession>> getAllWorkoutSessions() async => List.from(sessions);
+  Future<List<WorkoutSession>> getAllWorkoutSessions() async =>
+      List.from(sessions);
 
   @override
   Future<List<Routine>> getAllRoutines() async => [];
@@ -108,17 +113,17 @@ class FakeHealthHistoryManager extends HealthHistoryManager {
 
 class FakeWorkoutProvider extends WorkoutProvider {
   FakeWorkoutProvider(super.storage)
-      : super(
-          mlService: MLService(),
-          programManager: ProgramManager(storage),
-        );
+    : super(mlService: MLService(), programManager: ProgramManager(storage));
 }
 
 void main() {
   group('Pullups Volume Calculation', () {
     test('standard exercise volume defaults to weight * reps', () {
       final set = WorkoutSet(weight: 80.0, reps: 8);
-      expect(set.calculateVolume(userBodyWeight: 75.0, isAssistedBW: false), 640.0);
+      expect(
+        set.calculateVolume(userBodyWeight: 75.0, isAssistedBW: false),
+        640.0,
+      );
     });
 
     test('assisted pullups volume uses (BW - assist + extra) * reps', () {
@@ -131,14 +136,25 @@ void main() {
       // (Using `weight` instead of `assistWeight` would instead give
       // max(0, 75 - 99) * 8 = 0 kg volume.)
       final set = WorkoutSet(weight: 99.0, reps: 8, assistWeight: 15.0);
-      expect(set.calculateVolume(userBodyWeight: 75.0, isAssistedBW: true), 480.0);
+      expect(
+        set.calculateVolume(userBodyWeight: 75.0, isAssistedBW: true),
+        480.0,
+      );
     });
 
     test('weighted pullups with assist=0 and extraWeight', () {
       // 75 kg bodyweight, 0 kg assist, +10 kg extra, 5 reps
       // Effective load = 75 - 0 + 10 = 85 kg -> 85 * 5 = 425 kg volume
-      final set = WorkoutSet(weight: 0.0, reps: 5, assistWeight: 0.0, extraWeight: 10.0);
-      expect(set.calculateVolume(userBodyWeight: 75.0, isAssistedBW: true), 425.0);
+      final set = WorkoutSet(
+        weight: 0.0,
+        reps: 5,
+        assistWeight: 0.0,
+        extraWeight: 10.0,
+      );
+      expect(
+        set.calculateVolume(userBodyWeight: 75.0, isAssistedBW: true),
+        425.0,
+      );
     });
   });
 
@@ -182,7 +198,7 @@ void main() {
             weight: 60.0,
             reps: 10,
             timestamp: deloadAt.subtract(const Duration(days: 3)),
-          )
+          ),
         ];
         final s0 = [WorkoutSet(weight: 40.0, reps: 8, timestamp: deloadAt)];
         return mlService.recommendSets(
@@ -272,31 +288,37 @@ void main() {
       hc = FakeHealthConnectService();
       hh = FakeHealthHistoryManager(hc, storage);
       pr = PRManager(storage);
-      coachToolService = CoachToolService(workoutProvider: wp, prManager: pr, healthHistory: hh);
+      coachToolService = CoachToolService(
+        workoutProvider: wp,
+        prManager: pr,
+        healthHistory: hh,
+      );
     });
 
-    test('get_sleeping_hr_analytics computes p5, p25, mean, stdev, variance and chart series',
-        () async {
-      final call = FunctionCall('get_sleeping_hr_analytics', {'days': 14});
-      final res = await coachToolService.handleCall(call);
+    test(
+      'get_sleeping_hr_analytics computes p5, p25, mean, stdev, variance and chart series',
+      () async {
+        final call = FunctionCall('get_sleeping_hr_analytics', {'days': 14});
+        final res = await coachToolService.handleCall(call);
 
-      expect(res.containsKey('error'), isFalse);
-      expect(res['days_analyzed'], 14);
-      expect(res['valid_nights_count'], 14);
+        expect(res.containsKey('error'), isFalse);
+        expect(res['days_analyzed'], 14);
+        expect(res['valid_nights_count'], 14);
 
-      final summary = res['overall_summary'] as Map<String, dynamic>;
-      expect(summary.containsKey('mean_p5_sleeping_hr'), isTrue);
-      expect(summary.containsKey('stdev_p5_sleeping_hr'), isTrue);
-      expect(summary.containsKey('variance_p5_sleeping_hr'), isTrue);
-      expect(summary.containsKey('trend_direction'), isTrue);
+        final summary = res['overall_summary'] as Map<String, dynamic>;
+        expect(summary.containsKey('mean_p5_sleeping_hr'), isTrue);
+        expect(summary.containsKey('stdev_p5_sleeping_hr'), isTrue);
+        expect(summary.containsKey('variance_p5_sleeping_hr'), isTrue);
+        expect(summary.containsKey('trend_direction'), isTrue);
 
-      expect(res['labels'], isA<List<String>>());
-      final series = res['series']! as List;
-      expect(series, hasLength(3)); // P5, P25, Mean
-      expect((series[0] as Map)['name'], 'P5 Sleeping HR');
-      expect((series[0] as Map)['values'], hasLength(14));
-      expect(res.containsKey('genui_chart_props'), isFalse);
-    });
+        expect(res['labels'], isA<List<String>>());
+        final series = res['series']! as List;
+        expect(series, hasLength(3)); // P5, P25, Mean
+        expect((series[0] as Map)['name'], 'P5 Sleeping HR');
+        expect((series[0] as Map)['values'], hasLength(14));
+        expect(res.containsKey('genui_chart_props'), isFalse);
+      },
+    );
   });
 
   group('CoachToolService - health/muscle-group tool correctness fixes', () {
@@ -312,7 +334,10 @@ void main() {
 
     test('get_health_metrics returns an error when no HealthHistoryManager '
         'is wired up (_hh == null), instead of throwing', () async {
-      final coachToolService = CoachToolService(workoutProvider: wp, prManager: pr); // no healthHistory
+      final coachToolService = CoachToolService(
+        workoutProvider: wp,
+        prManager: pr,
+      ); // no healthHistory
       final call = FunctionCall('get_health_metrics', {'days': 14});
       final res = await coachToolService.handleCall(call);
 
@@ -343,60 +368,70 @@ void main() {
       ];
       await wp.loadAllData();
 
-      final coachToolService = CoachToolService(workoutProvider: wp, prManager: pr); // no healthHistory
-      final call = FunctionCall(
-        'analyze_health_workout_correlation',
-        {'days': 60},
-      );
+      final coachToolService = CoachToolService(
+        workoutProvider: wp,
+        prManager: pr,
+      ); // no healthHistory
+      final call = FunctionCall('analyze_health_workout_correlation', {
+        'days': 60,
+      });
       final res = await coachToolService.handleCall(call);
 
       expect(res.containsKey('error'), isTrue);
       expect(res['error'], contains('Insufficient paired data'));
     });
 
-    test('get_muscle_group_volume resolves a multi-word display name '
-        '("Quadriceps") to its muscle-group id and aggregates real volume',
-        () async {
-      // Regression test: resolution used to compare the raw group name
-      // against Exercise.primaryMuscle (an id like "quads") via substring
-      // matching, which false-missed "Quadriceps". With ID-based resolution
-      // via _resolveMuscleGroup, a squat session's volume must actually show
-      // up under the "Quadriceps" total, not silently stay at zero.
-      storage.exercises = [
-        Exercise(
-          id: 'squat',
-          name: 'Squat',
-          category: 'compound',
-          muscleActivations: [
-            MuscleActivation(muscleGroupId: 'quads', activationPercentage: 100),
-          ],
-        ),
-      ];
-      storage.sessions = [
-        WorkoutSession(
-          id: 's1',
-          date: DateTime.now(),
-          exercises: [
-            ExerciseLog(
-              exerciseId: 'squat',
-              sets: [WorkoutSet(weight: 100.0, reps: 5)],
-            ),
-          ],
-          duration: 30,
-        ),
-      ];
-      await wp.loadAllData();
+    test(
+      'get_muscle_group_volume resolves a multi-word display name '
+      '("Quadriceps") to its muscle-group id and aggregates real volume',
+      () async {
+        // Regression test: resolution used to compare the raw group name
+        // against Exercise.primaryMuscle (an id like "quads") via substring
+        // matching, which false-missed "Quadriceps". With ID-based resolution
+        // via _resolveMuscleGroup, a squat session's volume must actually show
+        // up under the "Quadriceps" total, not silently stay at zero.
+        storage.exercises = [
+          Exercise(
+            id: 'squat',
+            name: 'Squat',
+            category: 'compound',
+            muscleActivations: [
+              MuscleActivation(
+                muscleGroupId: 'quads',
+                activationPercentage: 100,
+              ),
+            ],
+          ),
+        ];
+        storage.sessions = [
+          WorkoutSession(
+            id: 's1',
+            date: DateTime.now(),
+            exercises: [
+              ExerciseLog(
+                exerciseId: 'squat',
+                sets: [WorkoutSet(weight: 100.0, reps: 5)],
+              ),
+            ],
+            duration: 30,
+          ),
+        ];
+        await wp.loadAllData();
 
-      final coachToolService = CoachToolService(workoutProvider: wp, prManager: pr); // no healthHistory
-      final call = FunctionCall(
-        'get_muscle_group_volume',
-        {'muscle_groups': ['Quadriceps'], 'days': 60},
-      );
-      final res = await coachToolService.handleCall(call);
+        final coachToolService = CoachToolService(
+          workoutProvider: wp,
+          prManager: pr,
+        ); // no healthHistory
+        final call = FunctionCall('get_muscle_group_volume', {
+          'muscle_groups': ['Quadriceps'],
+          'days': 60,
+        });
+        final res = await coachToolService.handleCall(call);
 
-      expect(res.containsKey('error'), isFalse);
-      final totals = res['totals'] as Map;
-      expect(totals['Quadriceps'], 500.0); // 100kg * 5 reps
-    });
+        expect(res.containsKey('error'), isFalse);
+        final totals = res['totals'] as Map;
+        expect(totals['Quadriceps'], 500.0); // 100kg * 5 reps
+      },
+    );
   });
 }

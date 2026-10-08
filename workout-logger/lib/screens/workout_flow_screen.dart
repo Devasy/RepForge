@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-
 import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
@@ -52,6 +51,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   // Set entry state
   double _currentWeight = 20;
+  WorkoutLoadMode _loadMode = WorkoutLoadMode.external;
   int _currentReps = 10;
   int _currentDurationSeconds = 60;
   bool _isDropset = false;
@@ -102,8 +102,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
   int _supersetGroupStart(int from, String groupId, {WorkoutProvider? p}) {
     int start = from;
-    while (start > 0 &&
-        _slot(start - 1, p: p)?.supersetGroupId == groupId) {
+    while (start > 0 && _slot(start - 1, p: p)?.supersetGroupId == groupId) {
       start--;
     }
     return start;
@@ -179,10 +178,22 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       exercise.id,
       handle: currentHandle,
     );
-    if (last != null && last.sets.isNotEmpty) {
-      final lastSet = last.sets.last;
+    final lastSet =
+        provider.currentExerciseLog?.sets.lastOrNull ?? last?.sets.lastOrNull;
+    final bodyweight = isBodyweightExercise(exercise.id);
+    _loadMode = !bodyweight
+        ? WorkoutLoadMode.external
+        : exercise.id == 'push_ups'
+        ? WorkoutLoadMode.weighted
+        : lastSet?.loadMode != null &&
+              lastSet!.loadMode != WorkoutLoadMode.external
+        ? lastSet.loadMode
+        : WorkoutLoadMode.assisted;
+    if (lastSet != null) {
       setState(() {
-        _currentWeight = lastSet.weight;
+        _currentWeight = bodyweight && lastSet.loadMode != _loadMode
+            ? 0
+            : lastSet.weight;
         _currentReps = lastSet.reps;
         if (lastSet.timeTaken != null && lastSet.timeTaken! > 0) {
           _currentDurationSeconds = lastSet.timeTaken!;
@@ -193,7 +204,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
             : dw.toStringAsFixed(1);
         _mainRepsCtrl.text = _currentReps.toString();
       });
-    } else if (isTimeBased) {
+    } else if (isTimeBased || bodyweight) {
       setState(() {
         _currentWeight = 0;
         _currentDurationSeconds = 60;
@@ -223,7 +234,9 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: _isResting ? _buildRestView(provider) : _buildWorkoutView(provider),
+        body: _isResting
+            ? _buildRestView(provider)
+            : _buildWorkoutView(provider),
       ),
     );
   }
@@ -293,12 +306,16 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
         ? provider.getRecommendations(
             exercise.id,
             handle: selectedHandle,
+            loadMode: _loadMode,
             readinessBand: readinessBand,
           )
         : <SetRecommendation>[];
 
     final lastSession = exercise != null
-        ? provider.getLastSessionForExercise(exercise.id, handle: selectedHandle)
+        ? provider.getLastSessionForExercise(
+            exercise.id,
+            handle: selectedHandle,
+          )
         : null;
 
     return Column(
@@ -328,71 +345,97 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 ),
                 child: IntrinsicHeight(
                   child: ExerciseInputSection(
-              // The section cannot measure itself under IntrinsicHeight.
-              contentWidth: constraints.maxWidth - AppSpacing.md * 2,
-              currentWeight: _currentWeight,
-              currentReps: _currentReps,
-              isDropset: _isDropset,
-              drops: _drops,
-              mainWeightController: _mainWeightCtrl,
-              mainRepsController: _mainRepsCtrl,
-              dropWeightControllers: _dropWeightCtrls,
-              dropRepsControllers: _dropRepsCtrls,
-              recommendations: recommendations,
-              previousSets: log?.sets ?? [],
-              lastSession: lastSession,
-              settings: settings,
-              exerciseId: exercise?.id,
-              availableHandles: exercise?.availableHandles,
-              selectedHandle: selectedHandle,
-              onHandleChanged: (h) {
-                provider.setExerciseHandle(h);
-                _loadLastSessionData();
-              },
-              isTimeBased: exercise?.exerciseType == ExerciseType.timeBased,
-              durationSeconds: _currentDurationSeconds,
-              onDurationChanged: (s) => setState(() => _currentDurationSeconds = s),
-              onTimerFinished: _completeSet,
-              programSlot: _slot(idx, p: provider),
-              programWeek: _resolvedWeek(provider),
-              onWeightChanged: (v) => setState(() => _currentWeight = v),
-              onRepsChanged: (v) => setState(() => _currentReps = v),
-              onDropsetToggled: _toggleDropset,
-              onDropAdded: _addDrop,
-              onDropRemoved: _removeDrop,
-              onDropWeightChanged: (i, w) {
-                if (i == -1) {
-                  _currentWeight = w;
-                } else if (i < _drops.length) {
-                  _drops[i] = DropsetEntry(weight: w, reps: _drops[i].reps);
-                }
-              },
-              onDropRepsChanged: (i, r) {
-                if (i == -1) {
-                  _currentReps = r;
-                } else if (i < _drops.length) {
-                  _drops[i] = DropsetEntry(weight: _drops[i].weight, reps: r);
-                }
-              },
-              onApplyRecommendation: () {
-                if (recommendations.isEmpty) return;
-                final setIdx = (log?.sets.length ?? 0)
-                    .clamp(0, recommendations.length - 1);
-                final rec = recommendations[setIdx];
-                setState(() {
-                  _currentWeight = rec.weight;
-                  _currentReps = rec.reps;
-                  if (rec.targetDuration != null && rec.targetDuration! > 0) {
-                    _currentDurationSeconds = rec.targetDuration!;
-                  }
-                  final settings = context.read<SettingsProvider>();
-                  final dw = settings.toDisplay(rec.weight);
-                  _mainWeightCtrl.text = dw == dw.truncateToDouble()
-                      ? dw.toStringAsFixed(0)
-                      : dw.toStringAsFixed(1);
-                  _mainRepsCtrl.text = rec.reps.toString();
-                });
-              },
+                    // The section cannot measure itself under IntrinsicHeight.
+                    contentWidth: constraints.maxWidth - AppSpacing.md * 2,
+                    currentWeight: _currentWeight,
+                    currentReps: _currentReps,
+                    isDropset: _isDropset,
+                    drops: _drops,
+                    mainWeightController: _mainWeightCtrl,
+                    mainRepsController: _mainRepsCtrl,
+                    dropWeightControllers: _dropWeightCtrls,
+                    dropRepsControllers: _dropRepsCtrls,
+                    recommendations: recommendations,
+                    previousSets: log?.sets ?? [],
+                    lastSession: lastSession,
+                    settings: settings,
+                    exerciseId: exercise?.id,
+                    loadMode: _loadMode,
+                    onLoadModeChanged: (mode) => setState(() {
+                      _loadMode = mode;
+                      _currentWeight = 0;
+                      _mainWeightCtrl.text = '0';
+                      _drops.clear();
+                      for (final c in _dropWeightCtrls) {
+                        c.dispose();
+                      }
+                      for (final c in _dropRepsCtrls) {
+                        c.dispose();
+                      }
+                      _dropWeightCtrls.clear();
+                      _dropRepsCtrls.clear();
+                    }),
+                    availableHandles: exercise?.availableHandles,
+                    selectedHandle: selectedHandle,
+                    onHandleChanged: (h) {
+                      provider.setExerciseHandle(h);
+                      _loadLastSessionData();
+                    },
+                    isTimeBased:
+                        exercise?.exerciseType == ExerciseType.timeBased,
+                    durationSeconds: _currentDurationSeconds,
+                    onDurationChanged: (s) =>
+                        setState(() => _currentDurationSeconds = s),
+                    onTimerFinished: _completeSet,
+                    programSlot: _slot(idx, p: provider),
+                    programWeek: _resolvedWeek(provider),
+                    onWeightChanged: (v) => setState(() => _currentWeight = v),
+                    onRepsChanged: (v) => setState(() => _currentReps = v),
+                    onDropsetToggled: _toggleDropset,
+                    onDropAdded: _addDrop,
+                    onDropRemoved: _removeDrop,
+                    onDropWeightChanged: (i, w) {
+                      if (i == -1) {
+                        _currentWeight = w;
+                      } else if (i < _drops.length) {
+                        _drops[i] = DropsetEntry(
+                          weight: w,
+                          reps: _drops[i].reps,
+                        );
+                      }
+                    },
+                    onDropRepsChanged: (i, r) {
+                      if (i == -1) {
+                        _currentReps = r;
+                      } else if (i < _drops.length) {
+                        _drops[i] = DropsetEntry(
+                          weight: _drops[i].weight,
+                          reps: r,
+                        );
+                      }
+                    },
+                    onApplyRecommendation: () {
+                      if (recommendations.isEmpty) return;
+                      final setIdx = (log?.sets.length ?? 0).clamp(
+                        0,
+                        recommendations.length - 1,
+                      );
+                      final rec = recommendations[setIdx];
+                      setState(() {
+                        _currentWeight = rec.weight;
+                        _currentReps = rec.reps;
+                        if (rec.targetDuration != null &&
+                            rec.targetDuration! > 0) {
+                          _currentDurationSeconds = rec.targetDuration!;
+                        }
+                        final settings = context.read<SettingsProvider>();
+                        final dw = settings.toDisplay(rec.weight);
+                        _mainWeightCtrl.text = dw == dw.truncateToDouble()
+                            ? dw.toStringAsFixed(0)
+                            : dw.toStringAsFixed(1);
+                        _mainRepsCtrl.text = rec.reps.toString();
+                      });
+                    },
                   ),
                 ),
               ),
@@ -408,7 +451,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final idx = provider.currentExerciseIndex;
     final nextExercise = idx + 1 < provider.currentExerciseLogs.length
         ? provider.getExerciseName(
-            provider.currentExerciseLogs[idx + 1].exerciseId)
+            provider.currentExerciseLogs[idx + 1].exerciseId,
+          )
         : null;
 
     return RestTimerView(
@@ -500,9 +544,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           ? dw.toStringAsFixed(0)
           : dw.toStringAsFixed(1);
       _dropWeightCtrls.add(TextEditingController(text: dwStr));
-      _dropRepsCtrls.add(
-        TextEditingController(text: _currentReps.toString()),
-      );
+      _dropRepsCtrls.add(TextEditingController(text: _currentReps.toString()));
     });
   }
 
@@ -532,8 +574,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     // the assist weight and the bodyweight it was computed against so
     // historical volume stays correct even if the user's bodyweight later
     // changes in settings.
-    final isAssistedBW =
-        isAssistedBodyweightExercise(provider.currentExercise?.id);
+    final bodyweight = isBodyweightExercise(provider.currentExercise?.id);
+    final isAssistedBW = bodyweight && _loadMode == WorkoutLoadMode.assisted;
     final isTimeBased =
         provider.currentExercise?.exerciseType == ExerciseType.timeBased;
 
@@ -551,7 +593,12 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
             isDropset: _isDropset,
             drops: _isDropset ? List.from(_drops) : null,
             assistWeight: isAssistedBW ? _currentWeight : null,
-            bodyWeightAtLog: isAssistedBW ? settings.userBodyWeight : null,
+            bodyWeightAtLog: bodyweight ? settings.userBodyWeight : null,
+            loadMode: bodyweight ? _loadMode : WorkoutLoadMode.external,
+            loadEncodingVersion: bodyweight ? 1 : 0,
+            extraWeight: bodyweight && _loadMode == WorkoutLoadMode.weighted
+                ? _currentWeight
+                : null,
             handle: provider.currentExerciseLog?.handle,
           );
 
@@ -574,11 +621,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     });
 
     // Superset auto-advance
-    final isSupersetPair = currentSlot?.supersetGroupId != null &&
+    final isSupersetPair =
+        currentSlot?.supersetGroupId != null &&
         nextSlot?.supersetGroupId == currentSlot?.supersetGroupId;
 
-    if (isSupersetPair &&
-        _slotNeedsMoreSets(index: idx + 1, p: provider)) {
+    if (isSupersetPair && _slotNeedsMoreSets(index: idx + 1, p: provider)) {
       provider.nextExercise();
       _loadLastSessionData();
       final newSlot = _slot(provider.currentExerciseIndex, p: provider);
@@ -586,8 +633,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     } else {
       final groupId = currentSlot?.supersetGroupId;
       if (groupId != null) {
-        final groupStart =
-            _supersetGroupStart(idx, groupId, p: provider);
+        final groupStart = _supersetGroupStart(idx, groupId, p: provider);
         if (_supersetNeedsMoreSets(
           startIdx: groupStart,
           endIdx: idx,
@@ -675,9 +721,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
     final session = await context.read<WorkoutProvider>().finishWorkout();
     final newPRs = await prManager.checkAndUpdatePRs(session);
     if (!mounted) return;
-    nav.pushReplacement(MaterialPageRoute(
-      builder: (_) => WorkoutSummaryScreen(session: session, newPRs: newPRs),
-    ));
+    nav.pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => WorkoutSummaryScreen(session: session, newPRs: newPRs),
+      ),
+    );
   }
 
   Future<void> _handleBack() async {

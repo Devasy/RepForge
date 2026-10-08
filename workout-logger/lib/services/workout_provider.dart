@@ -72,17 +72,14 @@ class WorkoutProvider extends ChangeNotifier {
   void _invalidateHistoryCache() => _historyRevision++;
 
   ({Map<String, Exercise> exerciseMap, Map<String, DateTime> lastTrained})
-      _historyDerived() {
+  _historyDerived() {
     if (_recoveryCacheRevision != _historyRevision) {
       final map = {for (final e in _allExercises) e.id: e};
       _cachedExerciseMap = map;
       _cachedLastTrained = _mlService.lastTrainedPerMuscle(_sessions, map);
       _recoveryCacheRevision = _historyRevision;
     }
-    return (
-      exerciseMap: _cachedExerciseMap!,
-      lastTrained: _cachedLastTrained!,
-    );
+    return (exerciseMap: _cachedExerciseMap!, lastTrained: _cachedLastTrained!);
   }
 
   final ProgramManager programManager;
@@ -133,8 +130,8 @@ class WorkoutProvider extends ChangeNotifier {
     IMLService? mlService,
     HistoryManager? historyManager,
     required this.programManager,
-  })  : _mlService = mlService ?? MLService(),
-        _historyManager = historyManager;
+  }) : _mlService = mlService ?? MLService(),
+       _historyManager = historyManager;
 
   // ==================== INITIALIZATION ====================
 
@@ -560,11 +557,9 @@ class WorkoutProvider extends ChangeNotifier {
     final ids = routine?.exerciseIds ?? exerciseIds ?? [];
     for (var id in ids) {
       final defaultHandle = routine?.defaultHandles?[id];
-      _currentExerciseLogs.add(ExerciseLog(
-        exerciseId: id,
-        sets: [],
-        handle: defaultHandle,
-      ));
+      _currentExerciseLogs.add(
+        ExerciseLog(exerciseId: id, sets: [], handle: defaultHandle),
+      );
     }
 
     notifyListeners();
@@ -646,7 +641,9 @@ class WorkoutProvider extends ChangeNotifier {
   void addSet(WorkoutSet set) {
     if (_currentExerciseIndex < _currentExerciseLogs.length) {
       final currentLog = _currentExerciseLogs[_currentExerciseIndex];
-      final setWithHandle = set.copyWith(handle: set.handle ?? currentLog.handle);
+      final setWithHandle = set.copyWith(
+        handle: set.handle ?? currentLog.handle,
+      );
       _currentExerciseLogs[_currentExerciseIndex] = ExerciseLog(
         exerciseId: currentLog.exerciseId,
         sets: [...currentLog.sets, setWithHandle],
@@ -793,8 +790,27 @@ class WorkoutProvider extends ChangeNotifier {
     String exerciseId, {
     String? handle,
     ReadinessBand? readinessBand,
+    WorkoutLoadMode? loadMode,
   }) {
-    final recent = getRecentSessionsForExercise(exerciseId, handle: handle, limit: 3);
+    final history = getRecentSessionsForExercise(
+      exerciseId,
+      handle: handle,
+      limit: 100,
+    );
+    final recent = history
+        .map(
+          (sets) => sets
+              .where(
+                (s) =>
+                    (loadMode == null || s.loadMode == loadMode) &&
+                    (s.loadMode == WorkoutLoadMode.external ||
+                        s.loadEncodingVersion == 1),
+              )
+              .toList(),
+        )
+        .where((sets) => sets.isNotEmpty)
+        .take(3)
+        .toList();
     final derived = _historyDerived();
     final exercise = derived.exerciseMap[exerciseId];
     final isTimeBased = exercise?.exerciseType == ExerciseType.timeBased;
@@ -844,13 +860,16 @@ class WorkoutProvider extends ChangeNotifier {
     int limit = 3,
   }) {
     if (limit <= 0) return const <List<WorkoutSet>>[];
-    final sortedSessions = [..._sessions]..sort((a, b) => b.date.compareTo(a.date));
+    final sortedSessions = [..._sessions]
+      ..sort((a, b) => b.date.compareTo(a.date));
     final useHandle = handle != null && handle.isNotEmpty;
 
     List<List<WorkoutSet>> collect(bool Function(ExerciseLog) matches) {
       final results = <List<WorkoutSet>>[];
       for (final s in sortedSessions) {
-        for (final exLog in s.exercises.where((e) => e.exerciseId == exerciseId)) {
+        for (final exLog in s.exercises.where(
+          (e) => e.exerciseId == exerciseId,
+        )) {
           if (!matches(exLog)) continue;
           if (exLog.sets.isNotEmpty) {
             results.add(exLog.sets);
@@ -874,12 +893,15 @@ class WorkoutProvider extends ChangeNotifier {
   /// Same exact-match-first, legacy-fallback semantics as
   /// [getRecentSessionsForExercise] — see its doc for details.
   ExerciseLog? getLastSessionForExercise(String exerciseId, {String? handle}) {
-    final sortedSessions = [..._sessions]..sort((a, b) => b.date.compareTo(a.date));
+    final sortedSessions = [..._sessions]
+      ..sort((a, b) => b.date.compareTo(a.date));
     final useHandle = handle != null && handle.isNotEmpty;
 
     ExerciseLog? find(bool Function(ExerciseLog) matches) {
       for (final s in sortedSessions) {
-        for (final exLog in s.exercises.where((e) => e.exerciseId == exerciseId)) {
+        for (final exLog in s.exercises.where(
+          (e) => e.exerciseId == exerciseId,
+        )) {
           if (matches(exLog)) return exLog;
         }
       }
@@ -1027,7 +1049,8 @@ class WorkoutProvider extends ChangeNotifier {
     final previousOffset = _effortCalibrationOffset;
     final updated = previousSession.copyWith(sessionEffort: chipValue);
 
-    final nextSessions = List<WorkoutSession>.from(_sessions)..[index] = updated;
+    final nextSessions = List<WorkoutSession>.from(_sessions)
+      ..[index] = updated;
     final nextOffset = _recomputeEffortCalibrationOffset(nextSessions);
 
     // No transaction across boxes here, so on a partial failure put both the
@@ -1257,19 +1280,20 @@ class WorkoutProvider extends ChangeNotifier {
   List<({DateTime date, double volume})> getVolumeProgression(
     String exerciseId,
   ) {
-    final data = <({DateTime date, double volume})>[];
-
-    for (var session in _sessions.reversed) {
-      for (var log in session.exercises) {
-        if (log.exerciseId == exerciseId) {
-          data.add((date: session.date, volume: log.totalVolume));
-          break;
-        }
-      }
-    }
-
-    return data;
+    return comparableExerciseLogs(exerciseId, _sessions)
+        .map((entry) => (date: entry.date, volume: entry.log.totalVolume))
+        .toList();
   }
+
+  bool hasMixedLoadConventions(String exerciseId) =>
+      _sessions
+          .expand((session) => session.exercises)
+          .where((log) => log.exerciseId == exerciseId)
+          .expand((log) => log.sets)
+          .map((set) => set.loadConvention)
+          .toSet()
+          .length >
+      1;
 
   /// Get weekly volume by muscle group.
   ///
@@ -1322,7 +1346,11 @@ class WorkoutProvider extends ChangeNotifier {
     };
     final result = <String, GrowthModel>{};
     for (final id in muscleIds) {
-      final points = _mlService.extractMuscleDataPoints(id, _sessions, exerciseMap);
+      final points = _mlService.extractMuscleDataPoints(
+        id,
+        _sessions,
+        exerciseMap,
+      );
       if (points.length >= 2) {
         result[id] = _mlService.trainGrowthModel(points);
       }
@@ -1344,13 +1372,10 @@ class WorkoutProvider extends ChangeNotifier {
   /// Returns null if no sessions exist for the exercise.
   double? getBestOneRM(String exerciseId) {
     double? best;
-    for (final session in _sessions) {
-      for (final log in session.exercises) {
-        if (log.exerciseId != exerciseId) continue;
-        for (final set in log.sets) {
-          final orm = estimateOneRM(set.weight, set.reps);
-          if (best == null || orm > best) best = orm;
-        }
+    for (final entry in comparableExerciseLogs(exerciseId, _sessions)) {
+      for (final set in entry.log.sets) {
+        final orm = estimateOneRM(set.effectiveWeight, set.reps);
+        if (best == null || orm > best) best = orm;
       }
     }
     return best;
@@ -1364,7 +1389,8 @@ class WorkoutProvider extends ChangeNotifier {
       for (final log in session.exercises) {
         if (log.exerciseId != exerciseId) continue;
         for (final set in log.sets) {
-          if (set.timeTaken != null && (best == null || set.timeTaken! > best)) {
+          if (set.timeTaken != null &&
+              (best == null || set.timeTaken! > best)) {
             best = set.timeTaken!;
           }
         }
@@ -1379,7 +1405,7 @@ class WorkoutProvider extends ChangeNotifier {
   /// volume (desc). This is a pure, parameterized query intended to double as the
   /// implementation surface for a future Coach agent tool.
   List<({String exerciseId, String name, double volume, GrowthModel? growth})>
-      getMuscleExerciseBreakdown(
+  getMuscleExerciseBreakdown(
     String muscleId, {
     DateTime? start,
     DateTime? end,
@@ -1399,21 +1425,25 @@ class WorkoutProvider extends ChangeNotifier {
         if (exercise == null) continue;
         for (final activation in exercise.muscleActivations) {
           if (activation.muscleGroupId != muscleId) continue;
-          byExercise[log.exerciseId] = (byExercise[log.exerciseId] ?? 0) +
+          byExercise[log.exerciseId] =
+              (byExercise[log.exerciseId] ?? 0) +
               log.totalVolume * (activation.activationPercentage / 100);
         }
       }
     }
 
-    final result = byExercise.entries
-        .map((e) => (
-              exerciseId: e.key,
-              name: getExerciseName(e.key),
-              volume: e.value,
-              growth: _growthModels[e.key],
-            ))
-        .toList()
-      ..sort((a, b) => b.volume.compareTo(a.volume));
+    final result =
+        byExercise.entries
+            .map(
+              (e) => (
+                exerciseId: e.key,
+                name: getExerciseName(e.key),
+                volume: e.value,
+                growth: _growthModels[e.key],
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.volume.compareTo(a.volume));
     return result;
   }
 
@@ -1427,14 +1457,32 @@ class WorkoutProvider extends ChangeNotifier {
     DateTime? start,
     DateTime? end,
   }) {
+    final convention = latestLoadReferences(_sessions)[exerciseId];
     final result = <({DateTime date, List<WorkoutSet> sets})>[];
     // _sessions is maintained newest-first; reverse for oldest-first output.
     for (final session in _sessions.reversed) {
       if (start != null && session.date.isBefore(start)) continue;
       if (end != null && session.date.isAfter(end)) continue;
       for (final log in session.exercises) {
-        if (log.exerciseId == exerciseId && log.sets.isNotEmpty) {
-          result.add((date: session.date, sets: log.sets));
+        if (log.exerciseId == exerciseId &&
+            log.sets.isNotEmpty &&
+            log.sets.every(
+              (set) => convention?.hasComparableLoad(set) ?? true,
+            )) {
+          result.add((
+            date: session.date,
+            sets: log.sets
+                .map(
+                  (set) => set.loadEncodingVersion == 1
+                      ? set.copyWith(
+                          weight: set.effectiveWeight,
+                          loadMode: WorkoutLoadMode.external,
+                          loadEncodingVersion: 0,
+                        )
+                      : set,
+                )
+                .toList(),
+          ));
           break;
         }
       }
@@ -1444,11 +1492,12 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Last [limit] sessions where [muscleId] was trained (newest-first).
   List<({DateTime date, List<String> exerciseNames, double volume})>
-      getRecentMuscleSessionSummaries(String muscleId, {int limit = 6}) {
+  getRecentMuscleSessionSummaries(String muscleId, {int limit = 6}) {
     final exerciseMap = <String, Exercise>{
       for (final e in _allExercises) e.id: e,
     };
-    final result = <({DateTime date, List<String> exerciseNames, double volume})>[];
+    final result =
+        <({DateTime date, List<String> exerciseNames, double volume})>[];
     for (final session in _sessions) {
       if (result.length >= limit) break;
       final names = <String>[];
@@ -1491,7 +1540,8 @@ class WorkoutProvider extends ChangeNotifier {
         if (exercise == null) continue;
         for (final activation in exercise.muscleActivations) {
           if (activation.muscleGroupId != muscleId) continue;
-          buckets[weekIndex] = (buckets[weekIndex] ?? 0) +
+          buckets[weekIndex] =
+              (buckets[weekIndex] ?? 0) +
               log.totalVolume * (activation.activationPercentage / 100);
         }
       }
@@ -1499,10 +1549,12 @@ class WorkoutProvider extends ChangeNotifier {
 
     // weekIndex 0 = this week, weeks-1 = oldest; return oldest-first
     return List.generate(weeks, (i) => weeks - 1 - i)
-        .map((wi) => (
-              weekStart: now.subtract(Duration(days: (wi + 1) * 7)),
-              volume: buckets[wi] ?? 0,
-            ))
+        .map(
+          (wi) => (
+            weekStart: now.subtract(Duration(days: (wi + 1) * 7)),
+            volume: buckets[wi] ?? 0,
+          ),
+        )
         .toList();
   }
 
@@ -1520,6 +1572,7 @@ class WorkoutProvider extends ChangeNotifier {
 
   Future<void> importData(String jsonData) async {
     await _storage.importData(jsonData);
+    await _historyManager?.loadSessions();
     await loadAllData();
     await _trainAllGrowthModels();
   }
