@@ -11,6 +11,8 @@ import '../services/settings_provider.dart';
 import '../services/release_service.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
+import 'widgets/gender_picker.dart';
+import '../data/body_figure.dart';
 import 'widgets/release_widgets.dart';
 
 // ── Welcome page (first install) ──────────────────────────────────────────────
@@ -27,6 +29,7 @@ class WelcomePage extends StatefulWidget {
 class _WelcomePageState extends State<WelcomePage> {
   final _controller = TextEditingController();
   bool _saving = false;
+  UserGender _gender = UserGender.preferNotToSay;
 
   @override
   void dispose() {
@@ -42,10 +45,16 @@ class _WelcomePageState extends State<WelcomePage> {
     setState(() => _saving = true);
     try {
       final settings = context.read<SettingsProvider>();
+      await settings.setUserGender(_gender);
       await settings.setUserName(name);
       final version = await settings.getCurrentVersion();
       await settings.markVersionSeen(version);
       if (mounted) widget.onComplete();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save your profile. Try again.')));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -61,10 +70,10 @@ class _WelcomePageState extends State<WelcomePage> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Column(
+              child: SingleChildScrollView(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Spacer(flex: 2),
+                  const SizedBox(height: 36),
                   // Logo mark
                   Container(
                     width: 72,
@@ -115,7 +124,7 @@ class _WelcomePageState extends State<WelcomePage> {
                       height: 1.5,
                     ),
                   ),
-                  const Spacer(flex: 2),
+                  const SizedBox(height: 36),
                   Text(
                     'WHAT SHOULD WE CALL YOU?',
                     style: TextStyle(
@@ -168,6 +177,12 @@ class _WelcomePageState extends State<WelcomePage> {
                     onSubmitted: (_) => _submit(),
                   ),
                   const SizedBox(height: AppSpacing.md),
+                  GenderPicker(value: _gender, onChanged: _saving ? null :
+                    (value) => setState(() => _gender = value)),
+                  const SizedBox(height: 8),
+                  const Text('Used to choose your starting body diagram. You can change the diagram in Profile.',
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  const SizedBox(height: AppSpacing.md),
                   SizedBox(
                     width: double.infinity,
                     child: GlowButton(
@@ -176,9 +191,9 @@ class _WelcomePageState extends State<WelcomePage> {
                       onPressed: _saving ? null : _submit,
                     ),
                   ),
-                  const Spacer(flex: 1),
+                  const SizedBox(height: 24),
                 ],
-              ),
+              )),
             ),
           ),
         ],
