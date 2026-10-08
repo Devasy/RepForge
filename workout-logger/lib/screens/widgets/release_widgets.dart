@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/release_service.dart';
+import '../../theme/app_theme.dart';
+import 'rf_accordion.dart';
 
 class ReleaseNotes extends StatefulWidget {
   const ReleaseNotes({
@@ -58,31 +60,73 @@ class _ReleaseNotesState extends State<ReleaseNotes> {
           'No changelog entries are available for this upgrade yet.',
         );
       }
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final release in notes) ...[
-            Text(
-              'v${release.version}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            SelectableText(
-              release.notes.isEmpty
-                  ? 'No release notes were published for this version.'
-                  : release.notes,
-            ),
-            const SizedBox(height: 20),
-          ],
-        ],
-      );
+      return ReleaseNotesView(releases: notes);
     },
   );
 }
 
+/// One renderer for upgrade notes, release history and available-update notes.
+class ReleaseNotesView extends StatelessWidget {
+  const ReleaseNotesView({super.key, required this.releases});
+  final List<AppRelease> releases;
+
+  static String _countLabel(int count) =>
+      '$count ${count == 1 ? 'change' : 'changes'}';
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var index = 0; index < releases.length; index++)
+        RFAccordion(
+          key: ValueKey('release-${releases[index].version}'),
+          title: 'v${releases[index].version}',
+          subtitle: releases[index].changes.isEmpty
+              ? null
+              : _countLabel(releases[index].changeCount),
+          initiallyExpanded: index == 0,
+          children: [
+            for (final group in releases[index].changes)
+              RFAccordion(
+                key: ValueKey(
+                  'release-${releases[index].version}-${group.title}',
+                ),
+                title: group.title,
+                subtitle: _countLabel(group.items.length),
+                children: [
+                  for (var item = 0; item < group.items.length; item++)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.xs,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: SelectableText(
+                          '• ${group.items[item]}',
+                          key: ValueKey(
+                            'change-${releases[index].version}-${group.title}-$item',
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            if (releases[index].changes.isEmpty)
+              SelectableText(
+                releases[index].notes.isEmpty
+                    ? 'No release notes were published for this version.'
+                    : releases[index].notes,
+              ),
+          ],
+        ),
+    ],
+  );
+}
+
 class UpdateNotice extends StatefulWidget {
-  const UpdateNotice({super.key, required this.current});
+  const UpdateNotice({super.key, required this.current, this.service});
   final String current;
+  final ReleaseService? service;
   @override
   State<UpdateNotice> createState() => _UpdateNoticeState();
 }
@@ -96,7 +140,10 @@ class _UpdateNoticeState extends State<UpdateNotice> {
   }
 
   void _check({bool refresh = false}) {
-    _update = ReleaseService.shared.updateFor(widget.current, refresh: refresh);
+    _update = (widget.service ?? ReleaseService.shared).updateFor(
+      widget.current,
+      refresh: refresh,
+    );
   }
 
   @override
@@ -136,7 +183,11 @@ class _UpdateNoticeState extends State<UpdateNotice> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(release.notes),
+                    ReleaseNotes(
+                      current: release.version,
+                      previous: widget.current,
+                      service: widget.service,
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'Use the same store or signing source as your existing installation.',

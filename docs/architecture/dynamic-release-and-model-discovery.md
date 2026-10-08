@@ -22,6 +22,18 @@ its own cache and remains separate, preventing a drafted changelog version from
 triggering an update badge before binaries are released. Missing/malformed
 changelog entries fail release validation before version commits, tags or deployment.
 
+The upgrade sheet, Profile release history, and available-update dialog reuse
+`ReleaseNotes` for loading and `ReleaseNotesView` for display. The parser retains
+structured `ReleaseChangeGroup` objects alongside plain-text notes. Each release
+has a collapsible heading and total change count; each category has a nested
+collapsible heading and item count. The newest release opens initially; category
+bodies start collapsed. `RFAccordion` wraps Flutter's `ExpansionTile` using shared
+app colors and spacing, including keyboard accessibility and expansion semantics.
+Collapsed note bodies are removed from the widget tree. Expanded notes wrap and
+scroll within the existing dialog/sheet scroll view without truncation. The app
+still downloads and parses the full changelog file; this UI does not add server
+pagination or stream individual categories.
+
 ```mermaid
 flowchart LR
   A[AI settings open or Refresh] --> B[Gemini models API with user key]

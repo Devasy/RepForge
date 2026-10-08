@@ -33,6 +33,13 @@ List<AppRelease> parseChangelog(String markdown) {
             .map((entry) => '${entry.key}\n${entry.value.join('\n')}')
             .join('\n\n'),
         'https://github.com/Devasy/RepForge/releases/tag/v$version',
+        changes: List.unmodifiable([
+          for (final entry in sections.entries)
+            ReleaseChangeGroup(
+              entry.key,
+              List.unmodifiable(entry.value.map((line) => line.substring(2))),
+            ),
+        ]),
       ),
     );
   }

@@ -19,8 +19,22 @@ int? compareAppVersions(String a, String b) {
 }
 
 class AppRelease {
-  const AppRelease(this.version, this.notes, this.url);
+  const AppRelease(
+    this.version,
+    this.notes,
+    this.url, {
+    this.changes = const [],
+  });
   final String version;
   final String notes;
   final String url;
+  final List<ReleaseChangeGroup> changes;
+  int get changeCount =>
+      changes.fold(0, (count, group) => count + group.items.length);
+}
+
+class ReleaseChangeGroup {
+  const ReleaseChangeGroup(this.title, this.items);
+  final String title;
+  final List<String> items;
 }

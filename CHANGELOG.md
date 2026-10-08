@@ -8,7 +8,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ### Features added
 - Discover available stable Gemini Flash models from Google in AI settings.
-- Read upgrade notes from the repository CHANGELOG.md, including skipped releases, and show an update notice in Profile.
+- Read upgrade notes from the repository CHANGELOG.md, including skipped releases, with collapsible releases and change categories; show an update notice in Profile.
 - Choose assisted or weighted load for pull-ups, chin-ups and dips; log push-ups with added weight.
 
 ### Fixes

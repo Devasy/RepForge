@@ -21,6 +21,12 @@ Introductory prose.
     expect(entries.map((e) => e.version), ['2.1.10', '2.1.9']);
     expect(entries.first.notes, contains('Features added\n- New feature.'));
     expect(entries.first.notes, contains('Known limitations'));
+    expect(entries.first.changes.map((group) => group.title), [
+      'Features added',
+      'Known limitations',
+    ]);
+    expect(entries.first.changes.first.items, ['New feature.']);
+    expect(entries.first.changeCount, 2);
     expect(entries.any((e) => e.notes.contains('Not published')), isFalse);
   });
   for (final invalid in [
