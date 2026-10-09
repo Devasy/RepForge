@@ -50,7 +50,7 @@ const _pulldown = ExerciseMuscleMotion(
   'Pull down by bending your elbows and bringing your upper arms toward your torso.',
 );
 const _shoulderPress = ExerciseMuscleMotion(
-  ['front_delts', 'side_delts', 'triceps'],
+  ['shoulders', 'triceps'],
   'Lower the weight toward shoulder height with control.',
   'Press the weight overhead.',
 );
