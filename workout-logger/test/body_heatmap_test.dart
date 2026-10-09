@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:repforge/services/settings_provider.dart';
+import 'package:repforge/data/body_figure.dart';
+import 'test_utils/mock_storage_service.dart';
 import 'package:repforge/screens/widgets/body_heatmap.dart';
 
 void main() {
@@ -61,13 +65,18 @@ void main() {
     'detailed map fits a narrow phone and supports female view and exact groups',
     (tester) async {
       String? selected;
+      final settings = SettingsProvider(MockStorageService());
+      await settings.setUserGender(UserGender.female);
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: SizedBox(
-                width: 280,
-                child: MuscleBodyMap(onMuscleTap: (id) => selected = id),
+        ChangeNotifierProvider.value(
+          value: settings,
+          child: MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: SizedBox(
+                  width: 280,
+                  child: MuscleBodyMap(onMuscleTap: (id) => selected = id),
+                ),
               ),
             ),
           ),
@@ -75,8 +84,7 @@ void main() {
       );
       expect(find.text('Front'), findsOneWidget);
       expect(find.text('Back'), findsNWidgets(2));
-      await tester.tap(find.text('Female'));
-      await tester.pumpAndSettle();
+      expect(find.byType(SegmentedButton<BodyFigure>), findsNothing);
       expect(
         tester
             .widgetList<BodyHeatmapWidget>(find.byType(BodyHeatmapWidget))
