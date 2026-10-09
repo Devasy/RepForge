@@ -25,7 +25,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _readinessEnabled = false;
   String? _userName;
   UserGender _userGender = UserGender.preferNotToSay;
-  BodyFigure? _bodyFigure;
+  bool _hasSavedGender = false;
   String? _lastSeenVersion;
   String _geminiApiKey = '';
   String _geminiModel = kDefaultGeminiModel;
@@ -44,8 +44,9 @@ class SettingsProvider extends ChangeNotifier {
   bool get readinessEnabled => _readinessEnabled;
   String? get userName => _userName;
   UserGender get userGender => _userGender;
-  BodyFigure get bodyFigure => _bodyFigure ??
-      (_userGender == UserGender.female ? BodyFigure.female : BodyFigure.male);
+  bool get needsGenderSelection => !_hasSavedGender;
+  BodyFigure get bodyFigure =>
+      _userGender == UserGender.female ? BodyFigure.female : BodyFigure.male;
   String? get lastSeenVersion => _lastSeenVersion;
   String get geminiApiKey => _geminiApiKey;
   String get geminiModel => _geminiModel;
@@ -81,9 +82,7 @@ class SettingsProvider extends ChangeNotifier {
     final gender = await _storage.getSetting('userGender');
     _userGender = UserGender.values.firstWhere(
       (value) => value.name == gender, orElse: () => UserGender.preferNotToSay);
-    final figure = await _storage.getSetting('bodyFigure');
-    _bodyFigure = figure == 'female' ? BodyFigure.female :
-        figure == 'male' ? BodyFigure.male : null;
+    _hasSavedGender = UserGender.values.any((value) => value.name == gender);
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
     // Retain stable Flash IDs discovered by newer builds. The picker includes
@@ -132,12 +131,7 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setUserGender(UserGender gender) async {
     await _storage.saveSetting('userGender', gender.name);
     _userGender = gender;
-    notifyListeners();
-  }
-
-  Future<void> setBodyFigure(BodyFigure figure) async {
-    await _storage.saveSetting('bodyFigure', figure.name);
-    _bodyFigure = figure;
+    _hasSavedGender = true;
     notifyListeners();
   }
 
