@@ -121,8 +121,10 @@ class PreferencesSection extends StatelessWidget {
             try {
               await settings.setUserGender(value);
             } catch (_) {
-              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Could not save gender. Try again.')));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not save gender. Try again.')));
+              }
             }
           }),
           const SizedBox(height: AppSpacing.md),
