@@ -165,6 +165,7 @@ void main() {
             if (['shoulders', 'triceps'].contains(a.muscleGroupId))
               a.muscleGroupId: a.activationPercentage / 100,
         };
+        expect(expected.keys.toSet(), {'shoulders', 'triceps'});
         expect(
           tester
               .widget<MuscleBodyMap>(find.byType(MuscleBodyMap))
