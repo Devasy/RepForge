@@ -74,7 +74,7 @@ class BodyHeatmapWidget extends StatelessWidget {
 }
 
 /// Detailed side-by-side body map with accessible muscle selection controls.
-class MuscleBodyMap extends StatefulWidget {
+class MuscleBodyMap extends StatelessWidget {
   const MuscleBodyMap({
     super.key,
     this.muscleVolumes = const {},
@@ -90,49 +90,13 @@ class MuscleBodyMap extends StatefulWidget {
   final Color heatColor;
 
   @override
-  State<MuscleBodyMap> createState() => _MuscleBodyMapState();
-}
-
-class _MuscleBodyMapState extends State<MuscleBodyMap> {
-  BodyFigure _figure = BodyFigure.male;
-
-  @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider?>();
-    final figure = settings?.bodyFigure ?? _figure;
+    final figure =
+        context.watch<SettingsProvider?>()?.bodyFigure ?? BodyFigure.male;
     return Material(
       type: MaterialType.transparency,
       child: Column(
         children: [
-          if (widget.showControls) ...[
-            SegmentedButton<BodyFigure>(
-              segments: const [
-                ButtonSegment(value: BodyFigure.male, label: Text('Male')),
-                ButtonSegment(value: BodyFigure.female, label: Text('Female')),
-              ],
-              selected: {figure},
-              onSelectionChanged: (value) async {
-                if (settings != null) {
-                  try {
-                    await settings.setBodyFigure(value.single);
-                  } catch (_) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Could not save body figure. Try again.',
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                } else {
-                  setState(() => _figure = value.single);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-          ],
           LayoutBuilder(
             builder: (context, constraints) {
               final width = math.min(160.0, (constraints.maxWidth - 16) / 2);
@@ -156,11 +120,11 @@ class _MuscleBodyMapState extends State<MuscleBodyMap> {
                             width: width,
                             height: width * 2.2,
                             figure: figure,
-                            heatColor: widget.heatColor,
+                            heatColor: heatColor,
                             view: view,
-                            muscleVolumes: widget.muscleVolumes,
-                            selectedMuscle: widget.selectedMuscle,
-                            onMuscleTap: widget.onMuscleTap,
+                            muscleVolumes: muscleVolumes,
+                            selectedMuscle: selectedMuscle,
+                            onMuscleTap: onMuscleTap,
                           ),
                         ],
                       ),
@@ -169,7 +133,7 @@ class _MuscleBodyMapState extends State<MuscleBodyMap> {
               );
             },
           ),
-          if (widget.showControls) ...[
+          if (showControls) ...[
             const SizedBox(height: 12),
             const Text(
               'Weekly volume relative to your most trained muscle',
@@ -200,7 +164,7 @@ class _MuscleBodyMapState extends State<MuscleBodyMap> {
                 ),
               ],
             ),
-            if (widget.onMuscleTap != null) ...[
+            if (onMuscleTap != null) ...[
               const SizedBox(height: 10),
               const Text(
                 'Tap a region or choose a muscle for details',
@@ -214,7 +178,7 @@ class _MuscleBodyMapState extends State<MuscleBodyMap> {
                   for (final entry in MuscleGroups.names.entries)
                     ActionChip(
                       label: Text(entry.value),
-                      onPressed: () => widget.onMuscleTap!(entry.key),
+                      onPressed: () => onMuscleTap!(entry.key),
                     ),
                 ],
               ),
