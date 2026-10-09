@@ -6,6 +6,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -91,6 +92,12 @@ Future<void> _resolveStorageBackend() async {
 void main() async {
   DebugLogBuffer.attach();
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(
+      ['MuscleMap body geometry'],
+      await rootBundle.loadString('THIRD_PARTY_NOTICES.md'),
+    );
+  });
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -263,6 +270,10 @@ class AppInitializer extends StatefulWidget {
 class _AppInitializerState extends State<AppInitializer> {
   bool _initialized = false;
   bool _needsNamePrompt = false;
+  bool _needsGenderPrompt = false;
+  String? _pendingVersion;
+  String? _previousVersion;
+  bool _versionChanged = false;
   String? _error;
 
   @override
@@ -330,26 +341,38 @@ class _AppInitializerState extends State<AppInitializer> {
       setState(() {
         _initialized = true;
         _needsNamePrompt = needsName;
+        _needsGenderPrompt = !needsName && settings.needsGenderSelection;
+        _pendingVersion = version;
+        _previousVersion = settings.lastSeenVersion;
+        _versionChanged = versionChanged;
       });
 
-      if (!needsName && settings.lastSeenVersion == null) {
-        await settings.markVersionSeen(version);
-      }
-      if (!needsName && versionChanged) {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (!mounted) return;
-          await showVersionUpdateSheet(
-            context,
-            version,
-            previousVersion: settings.lastSeenVersion,
-          );
-          if (mounted) await settings.markVersionSeen(version);
-        });
+      if (!needsName && !_needsGenderPrompt) {
+        _finishUpgrade();
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString());
     }
+  }
+
+  void _finishUpgrade() {
+    final version = _pendingVersion;
+    if (version == null) return;
+    _pendingVersion = null;
+    if (!_versionChanged && _previousVersion != null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final settings = context.read<SettingsProvider>();
+      try {
+        if (_versionChanged) {
+          await showVersionUpdateSheet(context, version, previousVersion: _previousVersion);
+        }
+        if (mounted) await settings.markVersionSeen(version);
+      } catch (e, st) {
+        debugPrint('Finishing upgrade failed: $e\n$st');
+      }
+    });
   }
 
   @override
@@ -420,6 +443,13 @@ class _AppInitializerState extends State<AppInitializer> {
       return WelcomePage(
         onComplete: () => setState(() => _needsNamePrompt = false),
       );
+    }
+
+    if (_needsGenderPrompt) {
+      return GenderSetupPage(onComplete: () {
+        setState(() => _needsGenderPrompt = false);
+        _finishUpgrade();
+      });
     }
 
     return const HomeScreen();

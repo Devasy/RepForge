@@ -408,8 +408,16 @@ class _MuscleFocusCard extends StatelessWidget {
   final WorkoutProvider provider;
 
   static const _muscleOrder = [
-    'chest', 'back', 'shoulders', 'quads', 'hamstrings',
-    'glutes', 'biceps', 'triceps', 'abs', 'calves',
+    'chest',
+    'back',
+    'shoulders',
+    'quads',
+    'hamstrings',
+    'glutes',
+    'biceps',
+    'triceps',
+    'core',
+    'calves',
   ];
 
   @override
@@ -419,14 +427,6 @@ class _MuscleFocusCard extends StatelessWidget {
     final recovery = provider.getMuscleRecoveryScores();
     final growth = provider.getMuscleGrowthModels();
 
-    if (byMuscle.isEmpty && recovery.isEmpty) {
-      return _ChartCard(
-        title: 'Muscle Focus',
-        isEmpty: true,
-        child: const SizedBox.shrink(),
-      );
-    }
-
     // Union of muscles with volume or recovery data, ordered by volume desc.
     final ids = <String>{...byMuscle.keys, ...recovery.keys}.toList()
       ..sort((a, b) {
@@ -435,9 +435,7 @@ class _MuscleFocusCard extends StatelessWidget {
         return _muscleOrder.indexOf(a).compareTo(_muscleOrder.indexOf(b));
       });
     final top = ids.take(8).toList();
-    final maxVol = byMuscle.values.isEmpty
-        ? 0.0
-        : byMuscle.values.reduce(max);
+    final maxVol = byMuscle.values.isEmpty ? 0.0 : byMuscle.values.reduce(max);
 
     final normalized = <String, double>{
       if (maxVol > 0)
@@ -447,26 +445,31 @@ class _MuscleFocusCard extends StatelessWidget {
     return _ChartCard(
       title: 'Muscle Focus',
       subtitle: 'Weekly volume · recovery · trend — tap a muscle',
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          BodyHeatmapWidget(muscleVolumes: normalized),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              children: [
-                for (final id in top)
-                  _MuscleFocusRow(
-                    muscleId: id,
-                    weeklyVolume: byMuscle[id] ?? 0,
-                    fraction: maxVol > 0 ? (byMuscle[id] ?? 0) / maxVol : 0,
-                    recovery: recovery[id],
-                    growth: growth[id],
-                    settings: settings,
-                    onTap: () => _openDrillDown(context, id),
-                  ),
-              ],
+          MuscleBodyMap(
+            muscleVolumes: normalized,
+            onMuscleTap: (id) => _openDrillDown(context, id),
+          ),
+          const SizedBox(height: 16),
+          if (top.isEmpty)
+            const Text(
+              'Log a workout to see your weekly muscle volume.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
+          Column(
+            children: [
+              for (final id in top)
+                _MuscleFocusRow(
+                  muscleId: id,
+                  weeklyVolume: byMuscle[id] ?? 0,
+                  fraction: maxVol > 0 ? (byMuscle[id] ?? 0) / maxVol : 0,
+                  recovery: recovery[id],
+                  growth: growth[id],
+                  settings: settings,
+                  onTap: () => _openDrillDown(context, id),
+                ),
+            ],
           ),
         ],
       ),
@@ -481,10 +484,7 @@ class _MuscleFocusCard extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
-      builder: (_) => MuscleDetailSheet(
-        muscleId: muscleId,
-        provider: provider,
-      ),
+      builder: (_) => MuscleDetailSheet(muscleId: muscleId, provider: provider),
     );
   }
 }
@@ -695,13 +695,11 @@ class _ChartCard extends StatelessWidget {
     required this.title,
     required this.child,
     this.subtitle,
-    this.isEmpty = false,
   });
 
   final String title;
   final String? subtitle;
   final Widget child;
-  final bool isEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -725,13 +723,8 @@ class _ChartCard extends StatelessWidget {
               style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 11),
             ),
           ],
-          if (isEmpty) ...[
-            const SizedBox(height: 24),
-            const _EmptyChart(),
-          ] else ...[
-            const SizedBox(height: 14),
-            child,
-          ],
+          const SizedBox(height: 14),
+          child,
         ],
       ),
     );

@@ -17,6 +17,7 @@ import '../../services/interfaces/ml_service_interface.dart';
 import '../../data/exercise_database.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
+import 'body_heatmap.dart';
 import '../ai_coach_screen.dart';
 
 class MuscleDetailSheet extends StatelessWidget {
@@ -72,6 +73,9 @@ class MuscleDetailSheet extends StatelessWidget {
               ),
             ),
           ),
+
+          MuscleBodyMap(selectedMuscle: muscleId, showControls: false),
+          const SizedBox(height: AppSpacing.lg),
 
           // Header row: muscle name + recovery badge
           Row(

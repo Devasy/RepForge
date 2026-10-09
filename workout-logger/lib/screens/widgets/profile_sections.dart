@@ -10,6 +10,7 @@ import '../../services/ai/gemini_ai_service.dart';
 import '../../theme/app_theme.dart';
 import 'rf_dialogs.dart';
 import 'rf_widgets.dart';
+import 'gender_picker.dart';
 import 'release_widgets.dart';
 import '../onboarding_screen.dart';
 import '../../services/ai/gemini_model_catalog.dart';
@@ -116,6 +117,20 @@ class PreferencesSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          GenderPicker(value: settings.userGender, onChanged: (value) async {
+            try {
+              await settings.setUserGender(value);
+            } catch (_) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not save gender. Try again.')));
+              }
+            }
+          }),
+          const SizedBox(height: AppSpacing.md),
+          const Text('Your gender selects muscle diagrams throughout the app.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          const SizedBox(height: AppSpacing.md),
           const _SectionLabel('WEIGHT UNIT'),
           const SizedBox(height: AppSpacing.sm),
           Row(

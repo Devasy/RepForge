@@ -4,6 +4,16 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.1.7]
+
+### Features added
+- View detailed front and back muscle diagrams with selectable muscles and weekly volume shading.
+- Existing users are asked for gender once after upgrading; the saved choice selects diagrams throughout the app and can subsequently be changed only in Profile.
+- Explore labelled Stretched and Contracted exercise phases with blue and rose-red intensity scales for supported exercises.
+
+### Known limitations
+- Muscle phase views illustrate standard technique and catalogue target involvement; they do not measure live muscle stretch or force. Custom and unsupported exercises show target involvement only.
+
 ## [2.1.6]
 
 ### Features added

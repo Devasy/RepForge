@@ -1,6 +1,7 @@
 // Settings Provider - User preferences (weight unit, increments, user profile)
 
 import 'package:flutter/foundation.dart';
+import '../data/body_figure.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'ai/gemini_model_catalog.dart';
 import 'ai/gemini_ai_service.dart'
@@ -23,6 +24,8 @@ class SettingsProvider extends ChangeNotifier {
   bool _healthConnectEnabled = false;
   bool _readinessEnabled = false;
   String? _userName;
+  UserGender _userGender = UserGender.preferNotToSay;
+  bool _hasSavedGender = false;
   String? _lastSeenVersion;
   String _geminiApiKey = '';
   String _geminiModel = kDefaultGeminiModel;
@@ -40,6 +43,10 @@ class SettingsProvider extends ChangeNotifier {
   bool get healthConnectEnabled => _healthConnectEnabled;
   bool get readinessEnabled => _readinessEnabled;
   String? get userName => _userName;
+  UserGender get userGender => _userGender;
+  bool get needsGenderSelection => !_hasSavedGender;
+  BodyFigure get bodyFigure =>
+      _userGender == UserGender.female ? BodyFigure.female : BodyFigure.male;
   String? get lastSeenVersion => _lastSeenVersion;
   String get geminiApiKey => _geminiApiKey;
   String get geminiModel => _geminiModel;
@@ -72,6 +79,10 @@ class SettingsProvider extends ChangeNotifier {
     _readinessEnabled = readiness == 'true';
 
     _userName = await _storage.getSetting('userName');
+    final gender = await _storage.getSetting('userGender');
+    _userGender = UserGender.values.firstWhere(
+      (value) => value.name == gender, orElse: () => UserGender.preferNotToSay);
+    _hasSavedGender = UserGender.values.any((value) => value.name == gender);
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
     // Retain stable Flash IDs discovered by newer builds. The picker includes
@@ -114,6 +125,13 @@ class SettingsProvider extends ChangeNotifier {
     if (!_isValidBodyWeight(weight)) return;
     _userBodyWeight = weight;
     await _storage.saveSetting('userBodyWeight', weight.toString());
+    notifyListeners();
+  }
+
+  Future<void> setUserGender(UserGender gender) async {
+    await _storage.saveSetting('userGender', gender.name);
+    _userGender = gender;
+    _hasSavedGender = true;
     notifyListeners();
   }
 
