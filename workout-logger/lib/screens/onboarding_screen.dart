@@ -180,7 +180,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   GenderPicker(value: _gender, onChanged: _saving ? null :
                     (value) => setState(() => _gender = value)),
                   const SizedBox(height: 8),
-                  const Text('Used to choose your starting body diagram. You can change the diagram in Profile.',
+                  const Text('Chooses muscle diagrams throughout the app. Change your gender in Profile.',
                     style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
                   const SizedBox(height: AppSpacing.md),
                   SizedBox(
@@ -200,6 +200,58 @@ class _WelcomePageState extends State<WelcomePage> {
       ),
     );
   }
+}
+
+/// One-time setup for existing users whose database has no saved gender.
+class GenderSetupPage extends StatefulWidget {
+  const GenderSetupPage({super.key, required this.onComplete});
+  final VoidCallback onComplete;
+
+  @override
+  State<GenderSetupPage> createState() => _GenderSetupPageState();
+}
+
+class _GenderSetupPageState extends State<GenderSetupPage> {
+  bool _saving = false;
+
+  Future<void> _select(UserGender gender) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await context.read<SettingsProvider>().setUserGender(gender);
+      if (mounted) widget.onComplete();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not save your gender. Please try again.')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.background,
+    body: SafeArea(child: Center(child: SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Choose your gender', style: TextStyle(
+          color: AppColors.textPrimary, fontSize: 28, fontWeight: FontWeight.w700)),
+        const SizedBox(height: AppSpacing.md),
+        const Text('This selects the muscle diagrams used throughout RepForge. You can change your gender later in Profile.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
+        const SizedBox(height: AppSpacing.xl),
+        for (final entry in const {
+          UserGender.male: 'Male', UserGender.female: 'Female',
+          UserGender.preferNotToSay: 'Prefer not to say',
+        }.entries) Padding(padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: OutlinedButton(onPressed: _saving ? null : () => _select(entry.key),
+            child: Text(entry.value))),
+        if (_saving) const Center(child: CircularProgressIndicator()),
+      ]),
+    ))),
+  );
 }
 
 // ── Version-update bottom sheet ───────────────────────────────────────────────
