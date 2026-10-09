@@ -10,6 +10,7 @@ import 'package:repforge/screens/onboarding_screen.dart';
 import 'package:repforge/screens/widgets/body_heatmap.dart';
 import 'package:repforge/screens/widgets/exercise_muscle_map.dart';
 import 'package:repforge/screens/widgets/gender_picker.dart';
+import 'package:repforge/screens/widgets/profile_sections.dart';
 import 'package:repforge/services/settings_provider.dart';
 import 'test_utils/mock_storage_service.dart';
 
@@ -59,6 +60,123 @@ void main() {
     expect(settings.userGender, UserGender.preferNotToSay);
     expect(settings.bodyFigure, BodyFigure.male);
   });
+
+  testWidgets(
+    'failed Profile gender save keeps the displayed saved selection',
+    (tester) async {
+      final settings = SettingsProvider(_FailingStorage());
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: settings,
+          child: MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: PreferencesSection(settings: settings, onHaptic: () {}),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byType(DropdownButton<UserGender>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Female').last);
+      await tester.pumpAndSettle();
+      expect(settings.userGender, UserGender.preferNotToSay);
+      expect(
+        tester
+            .widget<DropdownButton<UserGender>>(
+              find.byType(DropdownButton<UserGender>),
+            )
+            .value,
+        UserGender.preferNotToSay,
+      );
+      expect(find.text('Could not save gender. Try again.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'gender picker follows successful external changes and onboarding selection',
+    (tester) async {
+      final settings = SettingsProvider(MockStorageService());
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: settings,
+          child: MaterialApp(
+            home: Scaffold(
+              body: Consumer<SettingsProvider>(
+                builder: (context, settings, _) => GenderPicker(
+                  value: settings.userGender,
+                  onChanged: settings.setUserGender,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await settings.setUserGender(UserGender.female);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<DropdownButton<UserGender>>(
+              find.byType(DropdownButton<UserGender>),
+            )
+            .value,
+        UserGender.female,
+      );
+      await tester.tap(find.byType(DropdownButton<UserGender>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Male').last);
+      await tester.pumpAndSettle();
+      expect(settings.userGender, UserGender.male);
+      expect(
+        tester
+            .widget<DropdownButton<UserGender>>(
+              find.byType(DropdownButton<UserGender>),
+            )
+            .value,
+        UserGender.male,
+      );
+    },
+  );
+
+  testWidgets(
+    'both shoulder presses show shoulder and triceps involvement in both phases',
+    (tester) async {
+      for (final id in ['overhead_press', 'dumbbell_shoulder_press']) {
+        final exercise = _exercise(id);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: ExerciseMuscleMap(key: ValueKey(id), exercise: exercise),
+              ),
+            ),
+          ),
+        );
+        final expected = {
+          for (final a in exercise.muscleActivations)
+            if (['shoulders', 'triceps'].contains(a.muscleGroupId))
+              a.muscleGroupId: a.activationPercentage / 100,
+        };
+        expect(
+          tester
+              .widget<MuscleBodyMap>(find.byType(MuscleBodyMap))
+              .muscleVolumes,
+          expected,
+        );
+        await tester.tap(find.text('Stretched'));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<MuscleBodyMap>(find.byType(MuscleBodyMap))
+              .muscleVolumes,
+          expected,
+        );
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
 
   testWidgets('saved diagram is shared by compact and detailed maps', (
     tester,
