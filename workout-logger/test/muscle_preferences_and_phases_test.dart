@@ -25,41 +25,47 @@ Exercise _exercise(String id) =>
 
 void main() {
   test(
-    'gender defaults are optional, and diagram override survives restart',
+    'saved gender selects diagrams and setup is required only without a valid choice',
     () async {
       final storage = MockStorageService();
       final settings = SettingsProvider(storage);
       await settings.init();
-      expect(settings.userGender, UserGender.preferNotToSay);
+      expect(settings.needsGenderSelection, isTrue);
       await settings.setUserGender(UserGender.female);
+      expect(settings.needsGenderSelection, isFalse);
       expect(settings.bodyFigure, BodyFigure.female);
-      await settings.setBodyFigure(BodyFigure.male);
-      await settings.setUserGender(UserGender.preferNotToSay);
       final restored = SettingsProvider(storage);
       await restored.init();
-      expect(restored.userGender, UserGender.preferNotToSay);
+      expect(restored.needsGenderSelection, isFalse);
+      expect(restored.bodyFigure, BodyFigure.female);
+      await restored.setUserGender(UserGender.male);
       expect(restored.bodyFigure, BodyFigure.male);
-      await storage.saveSetting('userGender', 'invalid');
-      await storage.saveSetting('bodyFigure', 'invalid');
+      // Ignore obsolete independent figure overrides in older backups.
+      await storage.saveSetting('bodyFigure', 'female');
       await restored.init();
-      expect(restored.userGender, UserGender.preferNotToSay);
       expect(restored.bodyFigure, BodyFigure.male);
+      await restored.setUserGender(UserGender.preferNotToSay);
+      await restored.init();
+      expect(restored.needsGenderSelection, isFalse);
+      await storage.saveSetting('userGender', 'invalid');
+      await restored.init();
+      expect(restored.needsGenderSelection, isTrue);
     },
   );
 
-  test('failed preference writes preserve active values', () async {
-    final settings = SettingsProvider(_FailingStorage());
-    await expectLater(
-      settings.setUserGender(UserGender.female),
-      throwsStateError,
-    );
-    await expectLater(
-      settings.setBodyFigure(BodyFigure.female),
-      throwsStateError,
-    );
-    expect(settings.userGender, UserGender.preferNotToSay);
-    expect(settings.bodyFigure, BodyFigure.male);
-  });
+  test(
+    'failed gender writes preserve active values and keep setup pending',
+    () async {
+      final settings = SettingsProvider(_FailingStorage());
+      await expectLater(
+        settings.setUserGender(UserGender.female),
+        throwsStateError,
+      );
+      expect(settings.needsGenderSelection, isTrue);
+      expect(settings.userGender, UserGender.preferNotToSay);
+      expect(settings.bodyFigure, BodyFigure.male);
+    },
+  );
 
   testWidgets(
     'failed Profile gender save keeps the displayed saved selection',
@@ -196,18 +202,23 @@ void main() {
         ),
       ),
     );
+    expect(find.byType(SegmentedButton<BodyFigure>), findsNothing);
     expect(
       tester
-          .widget<SegmentedButton<BodyFigure>>(
-            find.byType(SegmentedButton<BodyFigure>),
-          )
-          .selected,
-      {BodyFigure.female},
+          .widgetList<BodyHeatmapWidget>(find.byType(BodyHeatmapWidget))
+          .where((widget) => widget.figure != null)
+          .every((widget) => widget.figure == BodyFigure.female),
+      isTrue,
     );
-    await tester.tap(find.text('Male'));
+    await settings.setUserGender(UserGender.male);
     await tester.pumpAndSettle();
-    expect(await storage.getSetting('bodyFigure'), 'male');
-    expect(settings.bodyFigure, BodyFigure.male);
+    expect(
+      tester
+          .widgetList<BodyHeatmapWidget>(find.byType(BodyHeatmapWidget))
+          .where((widget) => widget.figure != null)
+          .every((widget) => widget.figure == BodyFigure.male),
+      isTrue,
+    );
     expect(tester.takeException(), isNull);
   });
 
