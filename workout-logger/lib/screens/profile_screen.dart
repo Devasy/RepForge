@@ -238,7 +238,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } catch (e) {
       if (mounted) {
-        _showSnack('Export failed. Please try again.', AppColors.error);
+        _showSnack(e is FormatException ? e.message : 'Export failed. Please try again.', AppColors.error);
       }
     } finally {
       if (mounted) setState(() => _isExporting = false);

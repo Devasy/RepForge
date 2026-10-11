@@ -426,14 +426,14 @@ class DataManagementSection extends StatelessWidget {
       icon: Icons.storage_rounded,
       iconColor: AppColors.secondary,
       title: 'Data Management',
-      subtitle: 'Export or import your workout data',
+      subtitle: 'Back up workouts and demonstration media',
       child: Column(
         children: [
           _ActionTile(
             icon: Icons.upload_file_rounded,
             iconColor: AppColors.secondary,
             title: 'Export Backup',
-            subtitle: 'Save a local .json backup file',
+            subtitle: 'Save workouts and media in a JSON file',
             loading: isExporting,
             onTap: onExport,
           ),
@@ -442,7 +442,7 @@ class DataManagementSection extends StatelessWidget {
             icon: Icons.download_rounded,
             iconColor: AppColors.secondary,
             title: 'Import Backup',
-            subtitle: 'Merge data from a .json backup',
+            subtitle: 'Merge workouts and restore demonstration media',
             loading: isImporting,
             onTap: onImport,
           ),

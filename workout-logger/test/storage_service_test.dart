@@ -347,7 +347,7 @@ void main() {
         expect(await storage.getWorkoutSession('legacy-backup'), isNotNull);
         await expectLater(
           storage.importData(
-            jsonEncode({'backupFormatVersion': 2, 'sessions': []}),
+            jsonEncode({'backupFormatVersion': 99, 'sessions': []}),
           ),
           throwsFormatException,
         );

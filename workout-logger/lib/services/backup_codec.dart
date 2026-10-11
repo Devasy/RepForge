@@ -1,5 +1,6 @@
 import 'dart:convert';
 import '../models/models.dart';
+import 'exercise_media_store.dart';
 
 /// Validate the complete payload before either backend starts merging records.
 /// Legacy backups omit backupFormatVersion and may contain JSON-string rows.
@@ -9,7 +10,7 @@ Map<String, dynamic> decodeBackup(String source) {
     throw const FormatException('Backup must be an object.');
   }
   final version = decoded['backupFormatVersion'];
-  if (version != null && version != 1) {
+  if (version != null && version != 1 && version != 2) {
     throw const FormatException('Unsupported backup format.');
   }
   final validators = <String, Object Function(Map<String, dynamic>)>{
@@ -39,6 +40,7 @@ Map<String, dynamic> decodeBackup(String source) {
       decoded['settings'] is! Map<String, dynamic>) {
     throw const FormatException('Settings must be an object.');
   }
+  ExerciseMediaStore.validateBackup(decoded);
   return decoded;
 }
 

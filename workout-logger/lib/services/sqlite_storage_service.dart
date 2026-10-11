@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 import 'backup_codec.dart';
+import 'exercise_media_store.dart';
 import 'dart:io';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
@@ -17,7 +18,7 @@ class SqliteStorageService implements IStorageService {
       _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 6;
+  static const int _dbVersion = 7;
 
   /// Dropped and rebuilt by the v2 → v3 upgrade. The health tables are a cache
   /// of Health Connect, so rebuilding them costs one re-sync rather than user
@@ -91,7 +92,8 @@ class SqliteStorageService implements IStorageService {
       category TEXT NOT NULL,
       is_custom INTEGER NOT NULL DEFAULT 0,
       available_handles TEXT,
-      exercise_type TEXT NOT NULL DEFAULT 'weightAndReps'
+      exercise_type TEXT NOT NULL DEFAULT 'weightAndReps',
+      media_json TEXT
     )''',
     '''CREATE TABLE muscle_groups (
       id TEXT PRIMARY KEY,
@@ -267,6 +269,10 @@ class SqliteStorageService implements IStorageService {
               whereArgs: ['health_sync.%'],
             );
           }
+        }
+        if (oldVersion < 7) {
+          final exists = (await db.rawQuery("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'exercises'")).isNotEmpty;
+          if (exists) await db.execute('ALTER TABLE exercises ADD COLUMN media_json TEXT');
         }
         if (oldVersion < 4) {
           final tables = (await db.rawQuery(
@@ -772,6 +778,7 @@ class SqliteStorageService implements IStorageService {
             ? null
             : jsonEncode(exercise.availableHandles),
         'exercise_type': exercise.exerciseType.name,
+        'media_json': jsonEncode(exercise.media.map((m) => m.toJson()).toList()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
       for (final ma in exercise.muscleActivations) {
         await txn.insert('exercise_muscle_activations', {
@@ -813,6 +820,8 @@ class SqliteStorageService implements IStorageService {
           : (jsonDecode(row['available_handles'] as String) as List)
                 .cast<String>(),
       exerciseType: type,
+      media: row['media_json'] == null ? const [] :
+        (jsonDecode(row['media_json'] as String) as List).map((m) => ExerciseMedia.fromJson(m as Map<String, dynamic>)).toList(),
       muscleActivations: activations
           .map(
             (a) => MuscleActivation(
@@ -1201,12 +1210,13 @@ class SqliteStorageService implements IStorageService {
       'exportDate': DateTime.now().toIso8601String(),
       'appVersion': _appVersion,
     };
-    return jsonEncode(data);
+    return ExerciseMediaStore.instance.encodeBackup(data);
   }
 
   @override
   Future<void> importData(String jsonData) async {
     final data = decodeBackup(jsonData);
+    await ExerciseMediaStore.instance.restoreBackup(data);
 
     final sessions = data['sessions'];
     if (sessions is List) {

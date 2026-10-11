@@ -94,7 +94,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks(
-      ['MuscleMap body geometry'],
+      ['MuscleMap body geometry', 'Free Exercise DB reference guides'],
       await rootBundle.loadString('THIRD_PARTY_NOTICES.md'),
     );
   });

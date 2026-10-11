@@ -1,5 +1,6 @@
 // workout_flow_screen.dart — Active workout session screen
 
+import 'widgets/exercise_demonstration_section.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -320,6 +321,18 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
 
     return Column(
       children: [
+        if (exercise != null)
+          Align(alignment: Alignment.centerRight, child: TextButton.icon(
+            icon: const Icon(Icons.ondemand_video_outlined),
+            label: const Text('Demonstration'),
+            onPressed: () => showModalBottomSheet<void>(
+              context: context, isScrollControlled: true,
+              builder: (context) => SafeArea(child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: ExerciseDemonstrationSection(exercise: exercise, provider: provider),
+              )),
+            ),
+          )),
         WorkoutHeader(
           exerciseName: exercise?.name ?? 'Workout',
           currentExerciseIndex: idx,

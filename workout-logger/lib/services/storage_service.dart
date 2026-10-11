@@ -6,6 +6,7 @@
 
 import 'dart:convert';
 import 'backup_codec.dart';
+import 'exercise_media_store.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../models/models.dart';
@@ -289,23 +290,16 @@ class StorageService implements IStorageService {
   Future<List<Exercise>> getAllExercises() async {
     final builtIn = ExerciseDatabase.getAll();
     final custom = await getCustomExercises();
-    return [...builtIn, ...custom];
+    final overrides = {for (final e in custom) e.id: e};
+    return [for (final e in builtIn) overrides.remove(e.id) ?? e, ...overrides.values];
   }
 
   /// Get exercise by ID (built-in or custom)
   @override
   Future<Exercise?> getExercise(String id) async {
-    // Check built-in first
-    final builtIn = ExerciseDatabase.getById(id);
-    if (builtIn != null) return builtIn;
-
-    // Check custom
     final json = _customExercisesBoxInstance.get(id);
-    if (json != null) {
-      return Exercise.fromJson(jsonDecode(json));
-    }
-
-    return null;
+    if (json != null) return Exercise.fromJson(jsonDecode(json));
+    return ExerciseDatabase.getById(id);
   }
 
   // ==================== SETTINGS ====================
@@ -399,12 +393,13 @@ class StorageService implements IStorageService {
       'exportDate': DateTime.now().toIso8601String(),
       'appVersion': _appVersion,
     };
-    return jsonEncode(data);
+    return ExerciseMediaStore.instance.encodeBackup(data);
   }
 
   @override
   Future<void> importData(String jsonData) async {
     final data = decodeBackup(jsonData);
+    await ExerciseMediaStore.instance.restoreBackup(data);
 
     // Import sessions (merge: skip if id already exists)
     final sessions = data['sessions'];
@@ -462,16 +457,18 @@ class StorageService implements IStorageService {
       }
     }
 
-    // Import custom exercises (merge: skip if id already exists)
-    final customExercises = data['customExercises'];
-    if (customExercises is List) {
-      for (var item in customExercises) {
-        final map = _normalizeImportItem(item);
-        if (map == null) continue;
-        final exercise = Exercise.fromJson(map);
-        final existing = _customExercisesBoxInstance.get(exercise.id);
-        if (existing == null) {
-          await saveCustomExercise(exercise);
+    // Built-in media overrides are imported like custom rows, without replacing
+    // an existing local override. Older backups have only customExercises.
+    for (final key in ['customExercises', 'exerciseOverrides']) {
+      final exercises = data[key];
+      if (exercises is List) {
+        for (final item in exercises) {
+          final map = _normalizeImportItem(item);
+          if (map == null) continue;
+          final exercise = Exercise.fromJson(map);
+          if (_customExercisesBoxInstance.get(exercise.id) == null) {
+            await saveCustomExercise(exercise);
+          }
         }
       }
     }

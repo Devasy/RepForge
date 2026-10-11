@@ -28,6 +28,7 @@ Tired of subscription-heavy fitness apps? RepForge is built *by* lifters, *for* 
 - **🗓️ Routines & Programs:** Build reusable routines, queue up your next session, and follow structured multi-week training programs.
 - **🫀 Health Connect Integration:** Syncs workouts to Android Health Connect and reads sleep/heart-rate data back in to score daily training readiness.
 - **🤖 AI Coach:** A conversational, tool-calling coach (powered by Gemini) that can query your own workout history, chart correlations, and explain your progress — see [Anti-Features](#-anti-features) below.
+- **🎬 Exercise Demonstrations:** Optional downloadable reference photo guides, plus your own local photos, GIFs, and short videos. View them while training and include them in backups.
 - **📱 Offline-First:** Your data is stored locally for fast, secure access anywhere, even without internet.
 - **🔄 Export/Import:** Never lose your data. Back up and restore your workout history at your convenience.
 - **🎨 Custom Theming:** A modern, soft-futurist interface with a consistent design system.
@@ -50,7 +51,7 @@ Tired of subscription-heavy fitness apps? RepForge is built *by* lifters, *for* 
 
 ## 🚫 Anti-Features
 
-RepForge's core workout logging, routines, and analytics work fully offline. The **AI Coach** is optional and relies on Google's Gemini API over the network — it's the only feature that isn't free/local, and it's disclosed as such in the app's F-Droid listing.
+RepForge's core workout logging, routines, analytics, and custom media work offline. The **AI Coach** is optional and relies on Google's Gemini API over the network. Reference photo guides are downloaded from GitHub only when requested and then work offline. Custom photos/videos are not automatically uploaded or sent to the coach. See [exercise media](docs/features/exercise-media.md) for sources, limits, and backup compatibility.
 
 ---
 
