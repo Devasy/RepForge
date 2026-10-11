@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show compute, listEquals;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -179,21 +180,18 @@ class ExerciseMediaStore {
     int? durationMs,
     String? source,
   }) async {
-    final extension = switch (kind) {
-      ExerciseMediaKind.image => 'png',
-      ExerciseMediaKind.gif => 'gif',
-      ExerciseMediaKind.video => 'mp4',
-    };
-    final media = ExerciseMedia(
-      fileName: '${sha256.convert(bytes)}.$extension',
-      kind: kind,
-      durationMs: durationMs,
-      source: source,
-    );
-    media.validate();
-    _validateBytes(media, bytes);
+    final media = await compute(_prepareMedia, (
+      bytes,
+      kind,
+      durationMs,
+      source,
+    ));
     final destination = await fileFor(media);
-    if (!await destination.exists()) {
+    final same =
+        await destination.exists() &&
+        await destination.length() == bytes.length &&
+        await compute(_sameBytes, (await destination.readAsBytes(), bytes));
+    if (!same) {
       final temp = File(
         '${destination.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
       );
@@ -285,7 +283,7 @@ class ExerciseMediaStore {
 
   Future<String> encodeBackup(Map<String, dynamic> data) async {
     final refs = references(data);
-    if (refs.isEmpty) return jsonEncode(data);
+    if (refs.isEmpty) return compute(jsonEncode, data);
     final blobs = <String, String>{};
     var size = 0;
     for (final media in refs) {
@@ -297,16 +295,18 @@ class ExerciseMediaStore {
         );
       }
       final bytes = await file.readAsBytes();
-      _validateBytes(media, bytes);
       size += bytes.length;
       if (size > maxBackupBytes) {
         throw const FormatException(
           'Media exceeds the 80 MB backup limit. Remove some media before exporting.',
         );
       }
-      blobs[media.fileName] = base64Encode(bytes);
+      blobs[media.fileName] = await compute(_encodeValidatedBlob, (
+        media,
+        bytes,
+      ));
     }
-    return jsonEncode({
+    return compute(jsonEncode, {
       ...data,
       'backupFormatVersion': 2,
       'exerciseMedia': blobs,
@@ -348,7 +348,7 @@ class ExerciseMediaStore {
   }
 
   Future<void> restoreBackup(Map<String, dynamic> data) async {
-    final blobs = validateBackup(data);
+    final blobs = await compute(validateBackup, data);
     if (blobs.isEmpty) return;
     for (final media in references(data)) {
       final bytes = blobs.remove(media.fileName);
@@ -362,4 +362,33 @@ class ExerciseMediaStore {
       }
     }
   }
+}
+
+// Top-level callbacks capture no widget/store/client state and are transferable
+// to compute's worker isolate. Engine image APIs stay on their async path above.
+ExerciseMedia _prepareMedia(
+  (Uint8List, ExerciseMediaKind, int?, String?) input,
+) {
+  final (bytes, kind, durationMs, source) = input;
+  final extension = switch (kind) {
+    ExerciseMediaKind.image => 'png',
+    ExerciseMediaKind.gif => 'gif',
+    ExerciseMediaKind.video => 'mp4',
+  };
+  final media = ExerciseMedia(
+    fileName: '${sha256.convert(bytes)}.$extension',
+    kind: kind,
+    durationMs: durationMs,
+    source: source,
+  );
+  media.validate();
+  ExerciseMediaStore._validateBytes(media, bytes);
+  return media;
+}
+
+bool _sameBytes((Uint8List, Uint8List) input) => listEquals(input.$1, input.$2);
+
+String _encodeValidatedBlob((ExerciseMedia, Uint8List) input) {
+  ExerciseMediaStore._validateBytes(input.$1, input.$2);
+  return base64Encode(input.$2);
 }

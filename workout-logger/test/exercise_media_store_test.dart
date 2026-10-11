@@ -329,4 +329,30 @@ void main() {
       throwsFormatException,
     );
   });
+  test(
+    'restore repairs a truncated or same-length corrupt destination',
+    () async {
+      final media = await store.importImage(tinyGif);
+      final row = ExerciseDatabase.getById(
+        'bench_press',
+      )!.copyWith(media: [media]).toJson();
+      final backup = decodeBackup(
+        await store.encodeBackup({
+          'exerciseOverrides': [row],
+        }),
+      );
+      final destination = await store.fileFor(media);
+      for (final corrupt in [
+        Uint8List.fromList([1, 2, 3]),
+        Uint8List(tinyGif.length),
+      ]) {
+        await destination.writeAsBytes(corrupt);
+        await store.restoreBackup(backup);
+        expect(await destination.readAsBytes(), tinyGif);
+      }
+      final previousModified = await destination.lastModified();
+      await store.restoreBackup(backup);
+      expect(await destination.lastModified(), previousModified);
+    },
+  );
 }

@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 import 'backup_codec.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'exercise_media_store.dart';
 import 'dart:io';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -1215,7 +1216,7 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<void> importData(String jsonData) async {
-    final data = decodeBackup(jsonData);
+    final data = await compute(decodeBackup, jsonData);
     await ExerciseMediaStore.instance.restoreBackup(data);
 
     final sessions = data['sessions'];

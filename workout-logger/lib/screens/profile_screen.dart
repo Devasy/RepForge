@@ -4,6 +4,7 @@ import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -302,7 +303,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
       final file = File(result.files.single.path!);
       final jsonString = await file.readAsString();
-      final data = jsonDecode(jsonString);
+      final data = await compute(jsonDecode, jsonString);
       if (!mounted) return;
       final provider = context.read<WorkoutProvider>();
       final settings = context.read<SettingsProvider>();

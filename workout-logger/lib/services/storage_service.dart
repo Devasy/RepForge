@@ -6,6 +6,7 @@
 
 import 'dart:convert';
 import 'backup_codec.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'exercise_media_store.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -398,7 +399,7 @@ class StorageService implements IStorageService {
 
   @override
   Future<void> importData(String jsonData) async {
-    final data = decodeBackup(jsonData);
+    final data = await compute(decodeBackup, jsonData);
     await ExerciseMediaStore.instance.restoreBackup(data);
 
     // Import sessions (merge: skip if id already exists)

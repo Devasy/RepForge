@@ -19,7 +19,9 @@ No custom file is uploaded or automatically sent to the AI coach.
 
 Media appears in exercise details and in the workout's Demonstration sheet.
 Files are copied into the app-private documents directory with SHA-256 filenames.
-The original external path and filename are not stored. Removed/cancelled editor
+The original external path and filename are not stored. Hashing, byte comparison,
+and backup encoding/validation run in worker isolates so large files do not block
+the editor or backup UI. A restore repairs corrupt existing files atomically. Removed/cancelled editor
 attachments and deleted custom exercise attachments are cleaned up when no other
 exercise references the same content. Failed saves keep the old exercise intact.
 
