@@ -2,6 +2,7 @@ package com.devasy.repforge
 
 import android.app.Dialog
 import android.media.MediaMetadataRetriever
+import android.media.AudioManager
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
@@ -61,6 +62,8 @@ class MainActivity : FlutterActivity() {
         val dialog = Dialog(this)
         val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val video = VideoView(this)
+        // A muted technique clip should not stop the lifter's music.
+        video.setAudioFocusRequest(AudioManager.AUDIOFOCUS_NONE)
         val controller = MediaController(this)
         controller.setAnchorView(video)
         video.setMediaController(controller)
