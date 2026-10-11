@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/models/models.dart';
+import 'package:repforge/data/exercise_database.dart';
 import 'package:repforge/screens/add_custom_exercise_screen.dart';
 import 'package:repforge/screens/widgets/exercise_demonstration_section.dart';
 import 'package:repforge/screens/widgets/exercise_media_gallery.dart';
@@ -193,6 +194,19 @@ void main() {
     expect(
       storage.lastSavedExercise!.media.single.fileName,
       store.fixture.fileName,
+    );
+    expect(
+      storage.lastSavedExercise!.muscleActivations
+          .map((m) => m.toJson())
+          .toList(),
+      ExerciseDatabase.getById(
+        'bench_press',
+      )!.muscleActivations.map((m) => m.toJson()).toList(),
+    );
+    expect(storage.lastSavedExercise!.muscleActivations.length, greaterThan(1));
+    expect(
+      storage.lastSavedExercise!.muscleActivations.first.activationPercentage,
+      isNot(100),
     );
     await tester.pumpWidget(const SizedBox());
     await tester.runAsync(() async {

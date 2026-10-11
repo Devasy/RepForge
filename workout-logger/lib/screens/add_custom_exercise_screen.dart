@@ -145,7 +145,8 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
           id: widget.initialExercise!.id,
           name: exerciseName,
           category: _category,
-          primaryMuscleGroupId: _muscleId!,
+          primaryMuscleGroupId: _muscleId == widget.initialExercise!.primaryMuscle
+              ? null : _muscleId,
           exerciseType: _exerciseType,
           availableHandles: handles,
           media: _media,
