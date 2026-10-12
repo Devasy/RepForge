@@ -18,6 +18,9 @@ void main() {
       expect(provider.weightIncrement, equals(2.5));
       expect(provider.healthConnectEnabled, isFalse);
       expect(provider.readinessEnabled, isFalse);
+      expect(provider.restAlertEnabled, isTrue);
+      expect(provider.restAlertSound, isTrue);
+      expect(provider.restAlertVibration, isTrue);
       expect(provider.userName, isNull);
       expect(provider.geminiApiKey, isEmpty);
       expect(provider.geminiModel, equals('gemini-3.6-flash'));
@@ -30,6 +33,9 @@ void main() {
       await mockStorage.saveSetting('weightIncrement', '5.0');
       await mockStorage.saveSetting('healthConnectEnabled', 'true');
       await mockStorage.saveSetting('readinessEnabled', 'true');
+      await mockStorage.saveSetting('restAlertEnabled', 'false');
+      await mockStorage.saveSetting('restAlertSound', 'false');
+      await mockStorage.saveSetting('restAlertVibration', 'false');
       await mockStorage.saveSetting('userName', 'Devasy');
       await mockStorage.saveSetting('geminiApiKey', 'secret_key');
       await mockStorage.saveSetting('geminiModel', 'gemini-3.5-flash');
@@ -43,11 +49,25 @@ void main() {
       expect(provider.weightIncrement, equals(5.0));
       expect(provider.healthConnectEnabled, isTrue);
       expect(provider.readinessEnabled, isTrue);
+      expect(provider.restAlertEnabled, isFalse);
+      expect(provider.restAlertSound, isFalse);
+      expect(provider.restAlertVibration, isFalse);
       expect(provider.userName, equals('Devasy'));
       expect(provider.geminiApiKey, equals('secret_key'));
       expect(provider.geminiModel, equals('gemini-3.5-flash'));
       expect(provider.geminiThinkingLevel, equals('high'));
       expect(provider.showAdvancedMetrics, isTrue);
+    });
+
+    test('rest alert controls persist and load on the next launch', () async {
+      await provider.setRestAlertEnabled(false);
+      await provider.setRestAlertSound(false);
+      await provider.setRestAlertVibration(false);
+      final restored = SettingsProvider(mockStorage);
+      await restored.init();
+      expect(restored.restAlertEnabled, isFalse);
+      expect(restored.restAlertSound, isFalse);
+      expect(restored.restAlertVibration, isFalse);
     });
 
     test('init falls back to the default model when the stored one is no '

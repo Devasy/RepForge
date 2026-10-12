@@ -117,19 +117,68 @@ class PreferencesSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GenderPicker(value: settings.userGender, onChanged: (value) async {
-            try {
-              await settings.setUserGender(value);
-            } catch (_) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Could not save gender. Try again.')));
+          GenderPicker(
+            value: settings.userGender,
+            onChanged: (value) async {
+              try {
+                await settings.setUserGender(value);
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not save gender. Try again.'),
+                    ),
+                  );
+                }
               }
-            }
-          }),
+            },
+          ),
           const SizedBox(height: AppSpacing.md),
-          const Text('Your gender selects muscle diagrams throughout the app.',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          const Text(
+            'Your gender selects muscle diagrams throughout the app.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const _SectionLabel('REST ALERT'),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Alert when rest ends'),
+            subtitle: const Text(
+              'Show a notification when your next set is due',
+            ),
+            value: settings.restAlertEnabled,
+            onChanged: (enabled) async {
+              try {
+                await settings.setRestAlertEnabled(enabled);
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not save rest alert setting.'),
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+          if (settings.restAlertEnabled) ...[
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Sound'),
+              value: settings.restAlertSound,
+              onChanged: (enabled) => settings.setRestAlertSound(enabled),
+            ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Vibration'),
+              value: settings.restAlertVibration,
+              onChanged: (enabled) => settings.setRestAlertVibration(enabled),
+            ),
+          ],
+          const Text(
+            'Android may ask for notification permission when rest starts.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          ),
           const SizedBox(height: AppSpacing.md),
           const _SectionLabel('WEIGHT UNIT'),
           const SizedBox(height: AppSpacing.sm),

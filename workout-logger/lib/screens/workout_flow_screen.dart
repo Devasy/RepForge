@@ -9,6 +9,8 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
+import '../services/rest_alert_service.dart';
+import '../services/rest_countdown.dart';
 import '../services/managers/pr_manager.dart';
 import '../services/managers/readiness_manager.dart';
 import '../theme/app_theme.dart';
@@ -42,11 +44,15 @@ class WorkoutFlowScreen extends StatefulWidget {
 
 enum _LeaveAction { discard, keep, cancel }
 
-class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
+class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
+    with WidgetsBindingObserver {
   // Rest timer
   bool _isResting = false;
   int _restSeconds = 90;
   Timer? _restTimer;
+  RestCountdown? _restCountdown;
+  final RestAlertService _restAlerts = RestAlertService();
+  bool _restWasBackgrounded = false;
   int _remainingSeconds = 0;
   int? _supersetReturnIndex;
 
@@ -69,12 +75,15 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initializeWorkout());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _restTimer?.cancel();
+    if (_isResting) unawaited(_restAlerts.cancel());
     _mainWeightCtrl.dispose();
     _mainRepsCtrl.dispose();
     for (final c in _dropWeightCtrls) {
@@ -84,6 +93,18 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed && _isResting) {
+      _restWasBackgrounded = true;
+    }
+    if (state == AppLifecycleState.resumed && _isResting) {
+      final expiredWhileAway = _restCountdown?.remainingSeconds == 0;
+      _updateRestTimer();
+      if (!expiredWhileAway) _restWasBackgrounded = false;
+    }
   }
 
   // ── Program helpers ─────────────────────────────────────────────────────────
@@ -662,25 +683,64 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
   // ── Rest timer ──────────────────────────────────────────────────────────────
 
   void _startRestTimer() {
+    _restTimer?.cancel();
+    _restCountdown = RestCountdown(_restSeconds);
+    _restWasBackgrounded = false;
     setState(() {
       _isResting = true;
       _remainingSeconds = _restSeconds;
     });
-    _restTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (_remainingSeconds <= 0) {
-        _skipRest();
-      } else {
-        setState(() => _remainingSeconds--);
-      }
-    });
+    _scheduleRestAlert();
+    _restTimer = Timer.periodic(
+      const Duration(milliseconds: 250),
+      (_) => _updateRestTimer(),
+    );
   }
 
-  void _skipRest() {
+  void _scheduleRestAlert() {
+    final settings = context.read<SettingsProvider>();
+    final countdown = _restCountdown;
+    if (countdown == null) return;
+    if (!settings.restAlertEnabled) {
+      unawaited(_restAlerts.cancel());
+      return;
+    }
+    unawaited(
+      _restAlerts.schedule(
+        countdown.deadline,
+        sound: settings.restAlertSound,
+        vibration: settings.restAlertVibration,
+      ),
+    );
+  }
+
+  void _updateRestTimer() {
+    if (!mounted || !_isResting) return;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
+      return;
+    }
+    final remaining = _restCountdown?.remainingSeconds ?? 0;
+    if (remaining == 0) {
+      _skipRest(completed: true);
+    } else if (remaining != _remainingSeconds) {
+      setState(() => _remainingSeconds = remaining);
+    }
+  }
+
+  void _skipRest({bool completed = false}) {
     _restTimer?.cancel();
+    final inForeground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    // The Android alarm owns the background alert; a paused Flutter timer may
+    // still fire, but must not remove its pending notification.
+    if (!completed || inForeground) unawaited(_restAlerts.cancel());
     final returnIdx = _supersetReturnIndex;
     setState(() {
       _isResting = false;
       _remainingSeconds = 0;
+      _restCountdown = null;
       _supersetReturnIndex = null;
     });
     if (returnIdx != null) {
@@ -690,14 +750,38 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
       final s = _slot(returnIdx, p: provider);
       if (s != null) setState(() => _restSeconds = s.restSeconds);
     }
-    HapticFeedback.lightImpact();
+    if (completed && inForeground) {
+      final settings = context.read<SettingsProvider>();
+      if (settings.restAlertEnabled) {
+        if (settings.restAlertSound && !_restWasBackgrounded) {
+          unawaited(SystemSound.play(SystemSoundType.alert));
+        }
+        if (settings.restAlertVibration && !_restWasBackgrounded) {
+          unawaited(HapticFeedback.vibrate());
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Rest complete — time for your next set'),
+          ),
+        );
+      }
+    } else if (!completed) {
+      HapticFeedback.lightImpact();
+    }
   }
 
   void _adjustRest(int delta) {
+    _restCountdown?.adjust(delta);
+    final remaining = _restCountdown?.remainingSeconds ?? 0;
+    if (remaining == 0) {
+      _skipRest();
+      return;
+    }
     setState(() {
-      _remainingSeconds = (_remainingSeconds + delta).clamp(0, 600);
+      _remainingSeconds = remaining;
       _restSeconds = (_restSeconds + delta).clamp(30, 600);
     });
+    _scheduleRestAlert();
     HapticFeedback.selectionClick();
   }
 

@@ -10,6 +10,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 - Download reference photo guides and read technique instructions for six common exercises; downloaded guides work offline.
 - Attach up to four local photos, GIFs, or short MP4 demonstrations to exercises and view them from the library or during a workout.
 - Include exercise media in portable backups and restore it on another device without losing existing local exercise changes.
+- Get a rest completion alert with optional sound and vibration; rest timers keep accurate time while the app is in the background.
 
 ### Known limitations
 - Curated guides show two reference positions rather than continuous movement; video playback is currently supported on Android.
