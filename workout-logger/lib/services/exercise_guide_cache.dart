@@ -10,6 +10,7 @@ class ExerciseGuideCache {
   ExerciseGuideCache({
     http.Client? client,
     Future<Directory> Function()? directory,
+    this.timeout = const Duration(seconds: 20),
   }) : _client = client ?? http.Client(),
        _directory = directory ?? getApplicationSupportDirectory;
 
@@ -17,6 +18,7 @@ class ExerciseGuideCache {
   static const maxImageBytes = 5 * 1024 * 1024;
   final http.Client _client;
   final Future<Directory> Function() _directory;
+  final Duration timeout;
 
   Future<File> fileFor(String exerciseId, int index) async {
     final guide = exerciseDemonstrations[exerciseId];
@@ -43,7 +45,9 @@ class ExerciseGuideCache {
       final file = await fileFor(exerciseId, i);
       if (await file.exists()) continue;
       final uri = Uri.parse(guide.images[i]);
-      final response = await _client.send(http.Request('GET', uri));
+      final response = await _client
+          .send(http.Request('GET', uri))
+          .timeout(timeout);
       if (response.statusCode != 200) {
         throw HttpException(
           'Guide download failed: ${response.statusCode}',
@@ -51,7 +55,7 @@ class ExerciseGuideCache {
         );
       }
       final bytes = <int>[];
-      await for (final chunk in response.stream) {
+      await for (final chunk in response.stream.timeout(timeout)) {
         bytes.addAll(chunk);
         if (bytes.length > maxImageBytes) {
           throw const FormatException('Guide image is too large');

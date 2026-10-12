@@ -1,9 +1,17 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:repforge/services/exercise_guide_cache.dart';
+
+class _StalledClient extends http.BaseClient {
+  _StalledClient(this.handler);
+  final Future<http.StreamedResponse> Function() handler;
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) => handler();
+}
 
 void main() {
   late Directory root;
@@ -48,4 +56,34 @@ void main() {
     await cache.download('push_ups');
     expect(await cache.isDownloaded('push_ups'), isTrue);
   });
+
+  test(
+    'a stalled request or body times out so the download can be retried',
+    () async {
+      final requestCache = ExerciseGuideCache(
+        directory: () async => root,
+        timeout: const Duration(milliseconds: 10),
+        client: _StalledClient(() => Completer<http.StreamedResponse>().future),
+      );
+      await expectLater(
+        requestCache.download('push_ups'),
+        throwsA(isA<TimeoutException>()),
+      );
+
+      final body = StreamController<List<int>>();
+      addTearDown(body.close);
+      final bodyCache = ExerciseGuideCache(
+        directory: () async => root,
+        timeout: const Duration(milliseconds: 10),
+        client: _StalledClient(
+          () async => http.StreamedResponse(body.stream, 200),
+        ),
+      );
+      await expectLater(
+        bodyCache.download('push_ups'),
+        throwsA(isA<TimeoutException>()),
+      );
+      expect(await bodyCache.isDownloaded('push_ups'), isFalse);
+    },
+  );
 }
