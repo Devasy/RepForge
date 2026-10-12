@@ -83,7 +83,12 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _restTimer?.cancel();
-    if (_isResting) unawaited(_restAlerts.cancel());
+    // An Android activity can be torn down in the background. Keep its alarm
+    // in that case; an explicit screen exit while visible cancels it.
+    if (_isResting &&
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      unawaited(_restAlerts.cancel());
+    }
     _mainWeightCtrl.dispose();
     _mainRepsCtrl.dispose();
     for (final c in _dropWeightCtrls) {
