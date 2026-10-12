@@ -6,6 +6,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ### Features added
 - View instructions for six built-in exercise variants and download their curated photo guides individually or all at once from Profile for offline viewing.
+- Get a rest completion alert with optional sound and vibration; rest timers keep accurate time while the app is in the background.
 
 ## [2.1.7]
 

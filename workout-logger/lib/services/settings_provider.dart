@@ -23,6 +23,9 @@ class SettingsProvider extends ChangeNotifier {
   double _weightIncrement = 2.5;
   bool _healthConnectEnabled = false;
   bool _readinessEnabled = false;
+  bool _restAlertEnabled = true;
+  bool _restAlertSound = true;
+  bool _restAlertVibration = true;
   String? _userName;
   UserGender _userGender = UserGender.preferNotToSay;
   bool _hasSavedGender = false;
@@ -42,6 +45,9 @@ class SettingsProvider extends ChangeNotifier {
   String get unitLabel => _weightUnit == WeightUnit.kg ? 'kg' : 'lbs';
   bool get healthConnectEnabled => _healthConnectEnabled;
   bool get readinessEnabled => _readinessEnabled;
+  bool get restAlertEnabled => _restAlertEnabled;
+  bool get restAlertSound => _restAlertSound;
+  bool get restAlertVibration => _restAlertVibration;
   String? get userName => _userName;
   UserGender get userGender => _userGender;
   bool get needsGenderSelection => !_hasSavedGender;
@@ -77,11 +83,18 @@ class SettingsProvider extends ChangeNotifier {
 
     final readiness = await _storage.getSetting('readinessEnabled');
     _readinessEnabled = readiness == 'true';
+    _restAlertEnabled =
+        (await _storage.getSetting('restAlertEnabled')) != 'false';
+    _restAlertSound = (await _storage.getSetting('restAlertSound')) != 'false';
+    _restAlertVibration =
+        (await _storage.getSetting('restAlertVibration')) != 'false';
 
     _userName = await _storage.getSetting('userName');
     final gender = await _storage.getSetting('userGender');
     _userGender = UserGender.values.firstWhere(
-      (value) => value.name == gender, orElse: () => UserGender.preferNotToSay);
+      (value) => value.name == gender,
+      orElse: () => UserGender.preferNotToSay,
+    );
     _hasSavedGender = UserGender.values.any((value) => value.name == gender);
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
@@ -185,6 +198,24 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setReadinessEnabled(bool enabled) async {
     _readinessEnabled = enabled;
     await _storage.saveSetting('readinessEnabled', enabled.toString());
+    notifyListeners();
+  }
+
+  Future<void> setRestAlertEnabled(bool enabled) async {
+    await _storage.saveSetting('restAlertEnabled', enabled.toString());
+    _restAlertEnabled = enabled;
+    notifyListeners();
+  }
+
+  Future<void> setRestAlertSound(bool enabled) async {
+    await _storage.saveSetting('restAlertSound', enabled.toString());
+    _restAlertSound = enabled;
+    notifyListeners();
+  }
+
+  Future<void> setRestAlertVibration(bool enabled) async {
+    await _storage.saveSetting('restAlertVibration', enabled.toString());
+    _restAlertVibration = enabled;
     notifyListeners();
   }
 
