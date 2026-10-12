@@ -7,8 +7,13 @@ import '../../models/models.dart';
 import '../../services/exercise_guide_cache.dart';
 
 class ExerciseDemonstrationSection extends StatefulWidget {
-  const ExerciseDemonstrationSection({super.key, required this.exercise});
+  const ExerciseDemonstrationSection({
+    super.key,
+    required this.exercise,
+    this.cache,
+  });
   final Exercise exercise;
+  final ExerciseGuideCache? cache;
 
   @override
   State<ExerciseDemonstrationSection> createState() =>
@@ -18,11 +23,12 @@ class ExerciseDemonstrationSection extends StatefulWidget {
 class _ExerciseDemonstrationSectionState
     extends State<ExerciseDemonstrationSection> {
   bool _downloading = false;
+  ExerciseGuideCache get _cache => widget.cache ?? ExerciseGuideCache.instance;
 
   Future<void> _download() async {
     setState(() => _downloading = true);
     try {
-      await ExerciseGuideCache.instance.download(widget.exercise.id);
+      await _cache.download(widget.exercise.id);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -57,7 +63,7 @@ class _ExerciseDemonstrationSectionState
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         FutureBuilder<bool>(
-          future: ExerciseGuideCache.instance.isDownloaded(widget.exercise.id),
+          future: _cache.isDownloaded(widget.exercise.id),
           builder: (context, snapshot) {
             if (snapshot.data == true) {
               return SizedBox(
@@ -67,10 +73,7 @@ class _ExerciseDemonstrationSectionState
                   itemCount: guide.images.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) => FutureBuilder<File>(
-                    future: ExerciseGuideCache.instance.fileFor(
-                      widget.exercise.id,
-                      index,
-                    ),
+                    future: _cache.fileFor(widget.exercise.id, index),
                     builder: (context, fileSnapshot) => fileSnapshot.hasData
                         ? Image.file(
                             fileSnapshot.data!,

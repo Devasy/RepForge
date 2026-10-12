@@ -1,7 +1,6 @@
 // workout_flow_screen.dart — Active workout session screen
 
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -22,6 +21,7 @@ import 'widgets/workout_header.dart';
 import 'widgets/exercise_input_section.dart';
 import 'widgets/rest_timer_view.dart';
 import 'widgets/exercise_demonstration_section.dart';
+import '../data/exercise_demonstrations.dart';
 
 class WorkoutFlowScreen extends StatefulWidget {
   final Routine? routine;
@@ -335,6 +335,27 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
           onSetRestTime: (s) => setState(() => _restSeconds = s),
           restSeconds: _restSeconds,
         ),
+        if (exercise != null && exerciseDemonstrations.containsKey(exercise.id))
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              icon: const Icon(Icons.menu_book_outlined),
+              label: const Text('Exercise guide'),
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => FractionallySizedBox(
+                  heightFactor: 0.75,
+                  child: SafeArea(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: ExerciseDemonstrationSection(exercise: exercise),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         Expanded(
           // minHeight + IntrinsicHeight let the section's Spacer do its work.
           child: LayoutBuilder(
@@ -345,107 +366,100 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen> {
                 constraints: BoxConstraints(
                   minHeight: constraints.maxHeight - AppSpacing.md * 2,
                 ),
-                child: Column(
-                  children: [
-                    IntrinsicHeight(
-                      child: ExerciseInputSection(
-                        // The section cannot measure itself under IntrinsicHeight.
-                        contentWidth: constraints.maxWidth - AppSpacing.md * 2,
-                        currentWeight: _currentWeight,
-                        currentReps: _currentReps,
-                        isDropset: _isDropset,
-                        drops: _drops,
-                        mainWeightController: _mainWeightCtrl,
-                        mainRepsController: _mainRepsCtrl,
-                        dropWeightControllers: _dropWeightCtrls,
-                        dropRepsControllers: _dropRepsCtrls,
-                        recommendations: recommendations,
-                        previousSets: log?.sets ?? [],
-                        lastSession: lastSession,
-                        settings: settings,
-                        exerciseId: exercise?.id,
-                        loadMode: _loadMode,
-                        onLoadModeChanged: (mode) => setState(() {
-                          _loadMode = mode;
-                          _currentWeight = 0;
-                          _mainWeightCtrl.text = '0';
-                          _drops.clear();
-                          for (final c in _dropWeightCtrls) {
-                            c.dispose();
-                          }
-                          for (final c in _dropRepsCtrls) {
-                            c.dispose();
-                          }
-                          _dropWeightCtrls.clear();
-                          _dropRepsCtrls.clear();
-                        }),
-                        availableHandles: exercise?.availableHandles,
-                        selectedHandle: selectedHandle,
-                        onHandleChanged: (h) {
-                          provider.setExerciseHandle(h);
-                          _loadLastSessionData();
-                        },
-                        isTimeBased:
-                            exercise?.exerciseType == ExerciseType.timeBased,
-                        durationSeconds: _currentDurationSeconds,
-                        onDurationChanged: (s) =>
-                            setState(() => _currentDurationSeconds = s),
-                        onTimerFinished: _completeSet,
-                        programSlot: _slot(idx, p: provider),
-                        programWeek: _resolvedWeek(provider),
-                        onWeightChanged: (v) =>
-                            setState(() => _currentWeight = v),
-                        onRepsChanged: (v) => setState(() => _currentReps = v),
-                        onDropsetToggled: _toggleDropset,
-                        onDropAdded: _addDrop,
-                        onDropRemoved: _removeDrop,
-                        onDropWeightChanged: (i, w) {
-                          if (i == -1) {
-                            _currentWeight = w;
-                          } else if (i < _drops.length) {
-                            _drops[i] = DropsetEntry(
-                              weight: w,
-                              reps: _drops[i].reps,
-                            );
-                          }
-                        },
-                        onDropRepsChanged: (i, r) {
-                          if (i == -1) {
-                            _currentReps = r;
-                          } else if (i < _drops.length) {
-                            _drops[i] = DropsetEntry(
-                              weight: _drops[i].weight,
-                              reps: r,
-                            );
-                          }
-                        },
-                        onApplyRecommendation: () {
-                          if (recommendations.isEmpty) return;
-                          final setIdx = (log?.sets.length ?? 0).clamp(
-                            0,
-                            recommendations.length - 1,
-                          );
-                          final rec = recommendations[setIdx];
-                          setState(() {
-                            _currentWeight = rec.weight;
-                            _currentReps = rec.reps;
-                            if (rec.targetDuration != null &&
-                                rec.targetDuration! > 0) {
-                              _currentDurationSeconds = rec.targetDuration!;
-                            }
-                            final settings = context.read<SettingsProvider>();
-                            final dw = settings.toDisplay(rec.weight);
-                            _mainWeightCtrl.text = dw == dw.truncateToDouble()
-                                ? dw.toStringAsFixed(0)
-                                : dw.toStringAsFixed(1);
-                            _mainRepsCtrl.text = rec.reps.toString();
-                          });
-                        },
-                      ),
-                    ),
-                    if (exercise != null)
-                      ExerciseDemonstrationSection(exercise: exercise),
-                  ],
+                child: IntrinsicHeight(
+                  child: ExerciseInputSection(
+                    // The section cannot measure itself under IntrinsicHeight.
+                    contentWidth: constraints.maxWidth - AppSpacing.md * 2,
+                    currentWeight: _currentWeight,
+                    currentReps: _currentReps,
+                    isDropset: _isDropset,
+                    drops: _drops,
+                    mainWeightController: _mainWeightCtrl,
+                    mainRepsController: _mainRepsCtrl,
+                    dropWeightControllers: _dropWeightCtrls,
+                    dropRepsControllers: _dropRepsCtrls,
+                    recommendations: recommendations,
+                    previousSets: log?.sets ?? [],
+                    lastSession: lastSession,
+                    settings: settings,
+                    exerciseId: exercise?.id,
+                    loadMode: _loadMode,
+                    onLoadModeChanged: (mode) => setState(() {
+                      _loadMode = mode;
+                      _currentWeight = 0;
+                      _mainWeightCtrl.text = '0';
+                      _drops.clear();
+                      for (final c in _dropWeightCtrls) {
+                        c.dispose();
+                      }
+                      for (final c in _dropRepsCtrls) {
+                        c.dispose();
+                      }
+                      _dropWeightCtrls.clear();
+                      _dropRepsCtrls.clear();
+                    }),
+                    availableHandles: exercise?.availableHandles,
+                    selectedHandle: selectedHandle,
+                    onHandleChanged: (h) {
+                      provider.setExerciseHandle(h);
+                      _loadLastSessionData();
+                    },
+                    isTimeBased:
+                        exercise?.exerciseType == ExerciseType.timeBased,
+                    durationSeconds: _currentDurationSeconds,
+                    onDurationChanged: (s) =>
+                        setState(() => _currentDurationSeconds = s),
+                    onTimerFinished: _completeSet,
+                    programSlot: _slot(idx, p: provider),
+                    programWeek: _resolvedWeek(provider),
+                    onWeightChanged: (v) => setState(() => _currentWeight = v),
+                    onRepsChanged: (v) => setState(() => _currentReps = v),
+                    onDropsetToggled: _toggleDropset,
+                    onDropAdded: _addDrop,
+                    onDropRemoved: _removeDrop,
+                    onDropWeightChanged: (i, w) {
+                      if (i == -1) {
+                        _currentWeight = w;
+                      } else if (i < _drops.length) {
+                        _drops[i] = DropsetEntry(
+                          weight: w,
+                          reps: _drops[i].reps,
+                        );
+                      }
+                    },
+                    onDropRepsChanged: (i, r) {
+                      if (i == -1) {
+                        _currentReps = r;
+                      } else if (i < _drops.length) {
+                        _drops[i] = DropsetEntry(
+                          weight: _drops[i].weight,
+                          reps: r,
+                        );
+                      }
+                    },
+                    onApplyRecommendation: () {
+                      if (recommendations.isEmpty) return;
+                      final setIdx = (log?.sets.length ?? 0).clamp(
+                        0,
+                        recommendations.length - 1,
+                      );
+                      final rec = recommendations[setIdx];
+                      setState(() {
+                        _currentWeight = rec.weight;
+                        _currentReps = rec.reps;
+                        if (rec.targetDuration != null &&
+                            rec.targetDuration! > 0) {
+                          _currentDurationSeconds = rec.targetDuration!;
+                        }
+                        final settings = context.read<SettingsProvider>();
+                        final dw = settings.toDisplay(rec.weight);
+                        _mainWeightCtrl.text = dw == dw.truncateToDouble()
+                            ? dw.toStringAsFixed(0)
+                            : dw.toStringAsFixed(1);
+                        _mainRepsCtrl.text = rec.reps.toString();
+                      });
+                    },
+                  ),
                 ),
               ),
             ),

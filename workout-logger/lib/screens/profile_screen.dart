@@ -26,7 +26,9 @@ import '../theme/app_theme.dart';
 import 'widgets/profile_sections.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.guideCache});
+
+  final ExerciseGuideCache? guideCache;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -44,7 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       _guidesDownloaded = 0;
     });
     try {
-      await ExerciseGuideCache.instance.downloadAll(
+      await (widget.guideCache ?? ExerciseGuideCache.instance).downloadAll(
         onProgress: (done, _) {
           if (mounted) setState(() => _guidesDownloaded = done);
         },
