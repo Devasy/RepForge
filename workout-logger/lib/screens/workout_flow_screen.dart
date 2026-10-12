@@ -780,13 +780,15 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
   void _adjustRest(int delta) {
     _restCountdown?.adjust(delta);
     final remaining = _restCountdown?.remainingSeconds ?? 0;
+    final total = (_restSeconds + delta).clamp(30, 600);
     if (remaining == 0) {
+      _restSeconds = total;
       _skipRest();
       return;
     }
     setState(() {
       _remainingSeconds = remaining;
-      _restSeconds = (_restSeconds + delta).clamp(30, 600);
+      _restSeconds = total;
     });
     _scheduleRestAlert();
     HapticFeedback.selectionClick();

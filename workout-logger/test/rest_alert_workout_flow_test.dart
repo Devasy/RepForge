@@ -84,6 +84,18 @@ void main() {
     expect(find.byType(RestTimerView), findsNothing);
     expect(find.text('Rest complete — time for your next set'), findsOneWidget);
     expect(calls, contains('cancel'));
+
+    await tester.tap(find.text('Log set'));
+    await tester.pump();
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(find.text('−30s'));
+      await tester.pump();
+    }
+    expect(find.byType(RestTimerView), findsNothing);
+    await tester.tap(find.text('Log set'));
+    await tester.pump();
+    expect(tester.widget<RestTimerView>(find.byType(RestTimerView))
+        .totalSeconds, 30);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }
