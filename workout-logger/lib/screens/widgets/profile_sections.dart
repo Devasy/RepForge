@@ -166,13 +166,37 @@ class PreferencesSection extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               title: const Text('Sound'),
               value: settings.restAlertSound,
-              onChanged: (enabled) => settings.setRestAlertSound(enabled),
+              onChanged: (enabled) async {
+                try {
+                  await settings.setRestAlertSound(enabled);
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not save rest alert setting.'),
+                      ),
+                    );
+                  }
+                }
+              },
             ),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               title: const Text('Vibration'),
               value: settings.restAlertVibration,
-              onChanged: (enabled) => settings.setRestAlertVibration(enabled),
+              onChanged: (enabled) async {
+                try {
+                  await settings.setRestAlertVibration(enabled);
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not save rest alert setting.'),
+                      ),
+                    );
+                  }
+                }
+              },
             ),
           ],
           const Text(

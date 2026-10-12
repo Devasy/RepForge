@@ -72,4 +72,25 @@ void main() {
     );
     expect(calls, ['requestPermission']);
   });
+
+  test('a failed platform call does not block the next cancellation', () async {
+    final channel = _FailOnceChannel();
+    final alerts = RestAlertService(channel: channel);
+    await expectLater(alerts.cancel(), throwsStateError);
+    await alerts.cancel();
+    expect(channel.calls, 2);
+  });
+}
+
+class _FailOnceChannel extends MethodChannel {
+  _FailOnceChannel() : super('repforge/rest_alert_fail_once_test');
+
+  int calls = 0;
+
+  @override
+  Future<T?> invokeMethod<T>(String method, [dynamic arguments]) async {
+    calls++;
+    if (calls == 1) throw StateError('platform unavailable');
+    return null;
+  }
 }

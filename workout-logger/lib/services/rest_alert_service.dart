@@ -43,7 +43,8 @@ class RestAlertService {
   });
 
   Future<void> _enqueue(Future<void> Function() action) {
-    _pending = _pending.then((_) => action());
-    return _pending;
+    final next = _pending.then((_) => action());
+    _pending = next.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return next;
   }
 }
