@@ -11,6 +11,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.media.AudioAttributes;
 import android.os.Build;
 
 /** Posts a rest completion alert even when the Flutter activity is suspended. */
@@ -87,7 +88,10 @@ public final class RestAlertReceiver extends BroadcastReceiver {
         NotificationChannel channel = new NotificationChannel(channelId, "Rest complete",
             NotificationManager.IMPORTANCE_HIGH);
         channel.setDescription("Alerts when a workout rest period ends");
-        channel.setSound(sound ? android.provider.Settings.System.DEFAULT_NOTIFICATION_URI : null, null);
+        channel.setSound(
+            sound ? android.provider.Settings.System.DEFAULT_NOTIFICATION_URI : null,
+            sound ? new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION).build() : null);
         channel.enableVibration(vibration);
         if (vibration) channel.setVibrationPattern(new long[]{0, 250, 150, 250});
         manager.createNotificationChannel(channel);
