@@ -29,6 +29,7 @@ class WorkoutFlowScreen extends StatefulWidget {
   final bool isQuickStart;
   final ProgramDay? programDay;
   final ProgramWeek? programWeek;
+  final DateTime Function()? clock;
 
   const WorkoutFlowScreen({
     super.key,
@@ -36,6 +37,7 @@ class WorkoutFlowScreen extends StatefulWidget {
     this.isQuickStart = false,
     this.programDay,
     this.programWeek,
+    this.clock,
   });
 
   @override
@@ -689,7 +691,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
 
   void _startRestTimer() {
     _restTimer?.cancel();
-    _restCountdown = RestCountdown(_restSeconds);
+    _restCountdown = RestCountdown(_restSeconds, clock: widget.clock);
     _restWasBackgrounded = false;
     setState(() {
       _isResting = true;
