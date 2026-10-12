@@ -4,16 +4,8 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
-## [2.1.8]
-
 ### Features added
-- Download reference photo guides and read technique instructions for six common exercises; downloaded guides work offline.
-- Attach up to four local photos, GIFs, or short MP4 demonstrations to exercises and view them from the library or during a workout.
-- Include exercise media in portable backups and restore it on another device without losing existing local exercise changes.
-
-### Known limitations
-- Curated guides show two reference positions rather than continuous movement; video playback is currently supported on Android.
-- Images are limited to 12 MB, videos to 30 MB and 60 seconds, and combined backup media to 80 MB; media backups require this version or newer to restore.
+- View instructions for six built-in exercise variants and download their curated photo guides individually or all at once from Profile for offline viewing.
 
 ## [2.1.7]
 

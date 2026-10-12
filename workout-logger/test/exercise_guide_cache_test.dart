@@ -1,0 +1,51 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:repforge/services/exercise_guide_cache.dart';
+
+void main() {
+  late Directory root;
+  setUp(() async => root = await Directory.systemTemp.createTemp('guides_'));
+  tearDown(() async => root.delete(recursive: true));
+
+  final jpeg = [0xff, 0xd8, 0xff, 0xd9];
+
+  test(
+    'bulk download caches only curated images and skips them on retry',
+    () async {
+      var requests = 0;
+      final cache = ExerciseGuideCache(
+        directory: () async => root,
+        client: MockClient((_) async {
+          requests++;
+          return http.Response.bytes(jpeg, 200);
+        }),
+      );
+      final progress = <int>[];
+      await cache.downloadAll(onProgress: (done, _) => progress.add(done));
+      expect(progress, [1, 2, 3, 4, 5, 6]);
+      expect(requests, 12);
+      expect(await cache.isDownloaded('bench_press'), isTrue);
+      await cache.downloadAll();
+      expect(requests, 12);
+      await expectLater(cache.fileFor('../outside', 0), throwsArgumentError);
+    },
+  );
+
+  test('invalid response is not cached and a later retry succeeds', () async {
+    var valid = false;
+    final cache = ExerciseGuideCache(
+      directory: () async => root,
+      client: MockClient(
+        (_) async => http.Response.bytes(valid ? jpeg : [0, 1, 2, 3], 200),
+      ),
+    );
+    await expectLater(cache.download('push_ups'), throwsFormatException);
+    expect(await cache.isDownloaded('push_ups'), isFalse);
+    valid = true;
+    await cache.download('push_ups');
+    expect(await cache.isDownloaded('push_ups'), isTrue);
+  });
+}

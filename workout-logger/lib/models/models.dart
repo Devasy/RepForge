@@ -2,8 +2,6 @@
 
 import 'dart:math' show log, max;
 import 'dart:convert';
-import 'exercise_media.dart';
-export 'exercise_media.dart';
 
 import 'package:uuid/uuid.dart';
 
@@ -108,7 +106,6 @@ class Exercise {
   final List<String>?
   availableHandles; // Attachment/handle options e.g. ['Rope', 'Bar']
   final ExerciseType exerciseType;
-  final List<ExerciseMedia> media;
 
   const Exercise({
     required this.id,
@@ -118,7 +115,6 @@ class Exercise {
     this.isCustom = false,
     this.availableHandles,
     this.exerciseType = ExerciseType.weightAndReps,
-    this.media = const [],
   });
 
   Exercise copyWith({
@@ -129,7 +125,6 @@ class Exercise {
     bool? isCustom,
     List<String>? availableHandles,
     ExerciseType? exerciseType,
-    List<ExerciseMedia>? media,
   }) => Exercise(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -138,7 +133,6 @@ class Exercise {
     isCustom: isCustom ?? this.isCustom,
     availableHandles: availableHandles ?? this.availableHandles,
     exerciseType: exerciseType ?? this.exerciseType,
-    media: media ?? this.media,
   );
 
   String get primaryMuscle {
@@ -157,13 +151,9 @@ class Exercise {
     'isCustom': isCustom,
     'availableHandles': availableHandles,
     'exerciseType': exerciseType.name,
-    if (media.isNotEmpty) 'media': media.map((m) => m.toJson()).toList(),
   };
 
   factory Exercise.fromJson(Map<String, dynamic> json) {
-    if ((json['media'] as List? ?? const []).length > 4) {
-      throw const FormatException('An exercise can have at most 4 media attachments.');
-    }
     final rawType = json['exerciseType'];
     final ExerciseType type;
     if (rawType == null) {
@@ -188,8 +178,6 @@ class Exercise {
       isCustom: json['isCustom'] ?? false,
       availableHandles: (json['availableHandles'] as List?)?.cast<String>(),
       exerciseType: type,
-      media: (json['media'] as List? ?? const [])
-          .map((m) => ExerciseMedia.fromJson(m as Map<String, dynamic>)).toList(),
     );
   }
 }

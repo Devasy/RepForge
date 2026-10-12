@@ -21,4 +21,3 @@ RepForge is fully offline by default. The optional AI Coach feature sends data t
 LICENSE
 
 Apache-2.0. Source code: https://github.com/Devasy/RepForge
-Exercise demonstrations: download optional reference photo guides for offline viewing, or attach your own local photos, GIFs and short MP4 videos. Custom media stays on your device and is included when you export a backup. Guide downloads connect to GitHub only after you request them.

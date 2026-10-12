@@ -1,8 +1,6 @@
 // add_custom_exercise_screen.dart — Form for creating or editing an exercise
 
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -11,8 +9,6 @@ import '../services/workout_provider.dart';
 import '../data/exercise_database.dart';
 import '../theme/app_theme.dart';
 import 'widgets/rf_widgets.dart';
-import 'widgets/exercise_media_gallery.dart';
-import '../services/exercise_media_store.dart';
 
 class AddCustomExerciseScreen extends StatefulWidget {
   final Exercise? initialExercise;
@@ -34,10 +30,6 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
   late ExerciseType _exerciseType;
   late List<String> _availableHandles;
   bool _isSubmitting = false;
-  bool _isPickingMedia = false;
-  late List<ExerciseMedia> _media;
-  final List<ExerciseMedia> _stagedMedia = [];
-  WorkoutProvider? _mediaProvider;
 
   bool get _isEditing => widget.initialExercise != null;
 
@@ -52,26 +44,12 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
         : null;
     _exerciseType = init?.exerciseType ?? ExerciseType.weightAndReps;
     _availableHandles = List<String>.from(init?.availableHandles ?? []);
-    _media = List<ExerciseMedia>.from(init?.media ?? const []);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _mediaProvider = context.read<WorkoutProvider>();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _handleInputController.dispose();
-    final provider = _mediaProvider;
-    if (provider != null && !_isSubmitting) {
-      unawaited(ExerciseMediaStore.instance.discardUnreferenced(
-        [..._stagedMedia, ...?widget.initialExercise?.media],
-        (name) => provider.allExercises.any((e) => e.media.any((m) => m.fileName == name)),
-      ));
-    }
     super.dispose();
   }
 
@@ -86,38 +64,6 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
       _availableHandles.add(text);
       _handleInputController.clear();
     });
-  }
-
-  Future<void> _pickMedia() async {
-    if (_media.length >= ExerciseMediaStore.maxItems) return;
-    setState(() => _isPickingMedia = true);
-    try {
-      final selection = await FilePicker.pickFiles(
-        type: FileType.custom, allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4'],
-      );
-      if (selection == null || !mounted) return;
-      final file = selection.files.single;
-      if (file.path == null) throw const FormatException('Could not open this file.');
-      final media = await ExerciseMediaStore.instance.importFile(file.path!);
-      _stagedMedia.add(media);
-      if (!mounted) {
-        final provider = _mediaProvider!;
-        await ExerciseMediaStore.instance.discardUnreferenced([media],
-          (name) => provider.allExercises.any((e) => e.media.any((m) => m.fileName == name)));
-        return;
-      }
-      if (mounted) {
-        setState(() {
-        if (!_media.any((m) => m.fileName == media.fileName)) _media.add(media);
-      });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
-        e is FormatException ? e.message : 'Could not add this media. Try a JPG, PNG, GIF, or short MP4 file.',
-      )));
-      }
-    } finally { if (mounted) setState(() => _isPickingMedia = false); }
   }
 
   Future<void> _save() async {
@@ -145,11 +91,9 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
           id: widget.initialExercise!.id,
           name: exerciseName,
           category: _category,
-          primaryMuscleGroupId: _muscleId == widget.initialExercise!.primaryMuscle
-              ? null : _muscleId,
+          primaryMuscleGroupId: _muscleId!,
           exerciseType: _exerciseType,
           availableHandles: handles,
-          media: _media,
         );
       } else {
         await provider.addCustomExercise(
@@ -158,7 +102,6 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
           primaryMuscleGroupId: _muscleId!,
           exerciseType: _exerciseType,
           availableHandles: handles,
-          media: _media,
         );
       }
 
@@ -188,13 +131,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      } else {
-        unawaited(ExerciseMediaStore.instance.discardUnreferenced(
-          [..._stagedMedia, ...?widget.initialExercise?.media],
-          (name) => provider.allExercises.any((e) => e.media.any((m) => m.fileName == name))));
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -211,7 +148,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
         iconTheme: const IconThemeData(color: AppColors.textSoft),
         actions: [
           TextButton(
-            onPressed: _isSubmitting || _isPickingMedia ? null : _save,
+            onPressed: _isSubmitting ? null : _save,
             child: _isSubmitting
                 ? const SizedBox(
                     width: 18,
@@ -370,24 +307,6 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
 
               const SizedBox(height: AppSpacing.lg),
 
-              const Text('Demonstration media', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              const Text('Add up to 4 photos, GIFs, or MP4 videos (60s maximum). Images: 12 MB; videos: 30 MB. Files stay on this device and are included in backups.'),
-              const SizedBox(height: 8),
-              for (final media in _media) ...[
-                ExerciseMediaPreview(key: ValueKey(media.fileName), media: media),
-                Align(alignment: Alignment.centerRight, child: TextButton.icon(
-                  onPressed: _isSubmitting || _isPickingMedia ? null : () => setState(() => _media.remove(media)),
-                  icon: const Icon(Icons.delete_outline), label: const Text('Remove media'),
-                )),
-              ],
-              OutlinedButton.icon(
-                onPressed: _isSubmitting || _isPickingMedia || _media.length >= ExerciseMediaStore.maxItems ? null : _pickMedia,
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: Text(_isPickingMedia ? 'Adding media…' : 'Add photo, GIF, or video'),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
               // Attachments & Handles section
               _label('ATTACHMENTS / HANDLES (OPTIONAL)'),
               const SizedBox(height: AppSpacing.sm),
@@ -537,7 +456,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                     ? 'Saving…'
                     : (_isEditing ? 'Save Changes' : 'Add Exercise'),
                 icon: _isEditing ? Icons.check_rounded : Icons.add_rounded,
-                onPressed: _isSubmitting || _isPickingMedia ? null : _save,
+                onPressed: _isSubmitting ? null : _save,
                 fullWidth: true,
               ),
 

@@ -72,10 +72,7 @@ class ExerciseManager extends ChangeNotifier {
     required String primaryMuscleGroupId,
     ExerciseType exerciseType = ExerciseType.weightAndReps,
     List<String>? availableHandles,
-    List<ExerciseMedia> media = const [],
   }) async {
-    if (media.length > 4) throw ArgumentError('At most 4 media attachments are allowed');
-    for (final item in media) { item.validate(); }
     // Validate and normalize name
     final normalizedName = name.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (normalizedName.isEmpty) {
@@ -114,7 +111,6 @@ class ExerciseManager extends ChangeNotifier {
       isCustom: true,
       availableHandles: availableHandles,
       exerciseType: exerciseType,
-      media: List.unmodifiable(media),
     );
 
     await _storage.saveCustomExercise(exercise);
@@ -135,12 +131,7 @@ class ExerciseManager extends ChangeNotifier {
     List<String>? availableHandles,
     String? category,
     String? primaryMuscleGroupId,
-    List<ExerciseMedia>? media,
   }) async {
-    if (media != null) {
-      if (media.length > 4) throw ArgumentError('At most 4 media attachments are allowed');
-      for (final item in media) { item.validate(); }
-    }
     final existing = getExercise(id);
     if (existing == null) {
       throw ArgumentError('Exercise with id "$id" not found');
@@ -178,7 +169,6 @@ class ExerciseManager extends ChangeNotifier {
       muscleActivations: activations,
       exerciseType: exerciseType ?? existing.exerciseType,
       availableHandles: availableHandles ?? existing.availableHandles,
-      media: media == null ? null : List.unmodifiable(media),
     );
 
     await _storage.saveCustomExercise(updated);

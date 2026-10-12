@@ -13,7 +13,6 @@
 // Following Dependency Inversion Principle: this class now depends on
 // abstractions (IStorageService, IMLService) rather than concrete implementations.
 
-import 'exercise_media_store.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -355,10 +354,7 @@ class WorkoutProvider extends ChangeNotifier {
     required String primaryMuscleGroupId,
     ExerciseType exerciseType = ExerciseType.weightAndReps,
     List<String>? availableHandles,
-    List<ExerciseMedia> media = const [],
   }) async {
-    if (media.length > 4) throw ArgumentError('At most 4 media attachments are allowed');
-    for (final item in media) { item.validate(); }
     // Validate and normalize name (trim and collapse whitespace)
     final normalizedName = name.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (normalizedName.isEmpty) {
@@ -398,7 +394,6 @@ class WorkoutProvider extends ChangeNotifier {
       isCustom: true,
       availableHandles: availableHandles,
       exerciseType: exerciseType,
-      media: List.unmodifiable(media),
     );
 
     // Persist to storage
@@ -419,12 +414,7 @@ class WorkoutProvider extends ChangeNotifier {
     List<String>? availableHandles,
     String? category,
     String? primaryMuscleGroupId,
-    List<ExerciseMedia>? media,
   }) async {
-    if (media != null) {
-      if (media.length > 4) throw ArgumentError('At most 4 media attachments are allowed');
-      for (final item in media) { item.validate(); }
-    }
     final existing = getExercise(id);
     if (existing == null) {
       throw ArgumentError('Exercise with id "$id" not found');
@@ -462,7 +452,6 @@ class WorkoutProvider extends ChangeNotifier {
       muscleActivations: activations,
       exerciseType: exerciseType ?? existing.exerciseType,
       availableHandles: availableHandles ?? existing.availableHandles,
-      media: media == null ? null : List.unmodifiable(media),
     );
 
     await _storage.saveCustomExercise(updated);
@@ -539,8 +528,6 @@ class WorkoutProvider extends ChangeNotifier {
 
     // Also remove any growth model
     _growthModels.remove(exerciseId);
-    await ExerciseMediaStore.instance.discardUnreferenced(exercise.media,
-      (name) => _allExercises.any((e) => e.media.any((m) => m.fileName == name)));
 
     notifyListeners();
     return true;

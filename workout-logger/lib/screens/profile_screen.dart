@@ -3,8 +3,8 @@
 import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -15,6 +15,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/workout_provider.dart';
 import '../services/settings_provider.dart';
+import '../services/exercise_guide_cache.dart';
 import '../services/managers/pr_manager.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/ai/gemini_ai_service.dart';
@@ -34,6 +35,38 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen>
     with WidgetsBindingObserver {
   bool _isExporting = false;
+  bool _isDownloadingGuides = false;
+  int _guidesDownloaded = 0;
+
+  Future<void> _downloadAllGuides() async {
+    setState(() {
+      _isDownloadingGuides = true;
+      _guidesDownloaded = 0;
+    });
+    try {
+      await ExerciseGuideCache.instance.downloadAll(
+        onProgress: (done, _) {
+          if (mounted) setState(() => _guidesDownloaded = done);
+        },
+      );
+      if (mounted) {
+        _showSnack(
+          'All exercise photo guides are available offline.',
+          AppColors.success,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        _showSnack(
+          'Download stopped. $_guidesDownloaded guides saved; tap to retry.',
+          AppColors.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDownloadingGuides = false);
+    }
+  }
+
   bool _isImporting = false;
   bool _isRequestingHcPermission = false;
   bool _isRequestingReadinessPermission = false;
@@ -239,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } catch (e) {
       if (mounted) {
-        _showSnack(e is FormatException ? e.message : 'Export failed. Please try again.', AppColors.error);
+        _showSnack('Export failed. Please try again.', AppColors.error);
       }
     } finally {
       if (mounted) setState(() => _isExporting = false);
@@ -303,7 +336,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
       final file = File(result.files.single.path!);
       final jsonString = await file.readAsString();
-      final data = await compute(jsonDecode, jsonString);
+      final data = jsonDecode(jsonString);
       if (!mounted) return;
       final provider = context.read<WorkoutProvider>();
       final settings = context.read<SettingsProvider>();
@@ -421,6 +454,22 @@ class _ProfileScreenState extends State<ProfileScreen>
                   isImporting: _isImporting,
                   onExport: _isExporting ? null : _exportToFile,
                   onImport: _isImporting ? null : _importFromFile,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.download_for_offline_outlined),
+                    title: const Text('Download all exercise guides'),
+                    subtitle: Text(
+                      _isDownloadingGuides
+                          ? 'Downloading guide ${_guidesDownloaded + 1} of 6…'
+                          : 'Save 12 curated photos for offline viewing',
+                    ),
+                    trailing: _isDownloadingGuides
+                        ? const CircularProgressIndicator()
+                        : const Icon(Icons.chevron_right),
+                    onTap: _isDownloadingGuides ? null : _downloadAllGuides,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 const AiSettingsSection(),
