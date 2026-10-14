@@ -204,10 +204,13 @@ class ExerciseDetailsSheet extends StatelessWidget {
 
           const SizedBox(height: AppSpacing.lg),
 
+          const RFSectionHeader('Exercise guide'),
+          const SizedBox(height: AppSpacing.sm),
+          ExerciseDemonstrationSection(exercise: exercise),
+          const SizedBox(height: AppSpacing.lg),
           const RFSectionHeader('Muscle movement'),
           const SizedBox(height: AppSpacing.sm),
           ExerciseMuscleMap(exercise: exercise),
-          ExerciseDemonstrationSection(exercise: exercise),
           const SizedBox(height: AppSpacing.lg),
 
           // Muscle activations
