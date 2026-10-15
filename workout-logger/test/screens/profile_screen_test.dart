@@ -25,6 +25,7 @@ void main() {
     tester,
   ) async {
     final cache = _ProfileGuideCache();
+    addTearDown(cache.close);
     final storage = MockStorageService();
     final settings = SettingsProvider(storage);
     await settings.init();

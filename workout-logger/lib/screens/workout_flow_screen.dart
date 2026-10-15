@@ -22,8 +22,9 @@ import 'widgets/rf_dialogs.dart';
 import 'widgets/workout_header.dart';
 import 'widgets/exercise_input_section.dart';
 import 'widgets/rest_timer_view.dart';
-import 'widgets/exercise_demonstration_section.dart';
+import 'exercise_guide_screen.dart';
 import '../data/exercise_demonstrations.dart';
+import '../data/exercise_animations.dart';
 
 class WorkoutFlowScreen extends StatefulWidget {
   final Routine? routine;
@@ -363,23 +364,18 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
           onSetRestTime: (s) => setState(() => _restSeconds = s),
           restSeconds: _restSeconds,
         ),
-        if (exercise != null && exerciseDemonstrations.containsKey(exercise.id))
+        if (exercise != null &&
+            !exercise.isCustom &&
+            (ExerciseAnimation.forExercise(exercise) != null ||
+                exerciseDemonstrations.containsKey(exercise.id)))
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              icon: const Icon(Icons.menu_book_outlined),
+              icon: const Icon(Icons.play_circle_outline_rounded),
               label: const Text('Exercise guide'),
-              onPressed: () => showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                builder: (_) => FractionallySizedBox(
-                  heightFactor: 0.75,
-                  child: SafeArea(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: ExerciseDemonstrationSection(exercise: exercise),
-                    ),
-                  ),
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => ExerciseGuideScreen(exercise: exercise),
                 ),
               ),
             ),

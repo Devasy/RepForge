@@ -12,13 +12,20 @@ class ExerciseGuideCache {
     Future<Directory> Function()? directory,
     this.timeout = const Duration(seconds: 20),
   }) : _client = client ?? http.Client(),
+       _ownsClient = client == null,
        _directory = directory ?? getApplicationSupportDirectory;
 
   static final instance = ExerciseGuideCache();
   static const maxImageBytes = 5 * 1024 * 1024;
   final http.Client _client;
+  final bool _ownsClient;
   final Future<Directory> Function() _directory;
   final Duration timeout;
+
+  /// Injected clients remain owned by their caller.
+  void close() {
+    if (_ownsClient) _client.close();
+  }
 
   Future<File> fileFor(String exerciseId, int index) async {
     final guide = exerciseDemonstrations[exerciseId];

@@ -39,6 +39,7 @@ void main() {
     tester,
   ) async {
     final cache = _GuideCache();
+    addTearDown(cache.close);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -55,6 +56,7 @@ void main() {
     );
     expect(find.text('Download photo guide'), findsOneWidget);
     expect(cache.downloads, 0);
+    await tester.ensureVisible(find.text('Download photo guide'));
     await tester.tap(find.text('Download photo guide'));
     await tester.pumpAndSettle();
     expect(cache.downloads, 1);
@@ -64,14 +66,18 @@ void main() {
     tester,
   ) async {
     final cache = _GuideCache()..fail = true;
+    addTearDown(cache.close);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: ExerciseDemonstrationSection(exercise: bench, cache: cache),
+          body: SingleChildScrollView(
+            child: ExerciseDemonstrationSection(exercise: bench, cache: cache),
+          ),
         ),
       ),
     );
     await tester.pump();
+    await tester.ensureVisible(find.text('Download photo guide'));
     await tester.tap(find.text('Download photo guide'));
     await tester.pump();
     expect(find.textContaining('Could not download the guide'), findsOneWidget);
