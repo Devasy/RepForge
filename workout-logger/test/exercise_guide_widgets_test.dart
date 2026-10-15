@@ -39,6 +39,7 @@ void main() {
     tester,
   ) async {
     final cache = _GuideCache();
+    addTearDown(cache.close);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -65,6 +66,7 @@ void main() {
     tester,
   ) async {
     final cache = _GuideCache()..fail = true;
+    addTearDown(cache.close);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

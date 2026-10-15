@@ -91,76 +91,125 @@ class _ExerciseDemonstrationSectionState
         if (animation != null)
           ExerciseAnimationPlayer(exercise: widget.exercise),
         if (guide != null) ...[
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            'Photo reference',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Reference variant: ${guide.title}',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          FutureBuilder<bool>(
-            future: _downloaded,
-            builder: (context, snapshot) {
-              if (snapshot.data == true) {
-                return SizedBox(
-                  height: 180,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: guide.images.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) => FutureBuilder<File>(
-                      future: _cache.fileFor(widget.exercise.id, index),
-                      builder: (context, fileSnapshot) => fileSnapshot.hasData
-                          ? Image.file(
-                              fileSnapshot.data!,
-                              width: 220,
-                              fit: BoxFit.contain,
-                              semanticLabel:
-                                  '${guide.title}, reference photo ${index + 1}',
-                              errorBuilder: (_, _, _) => const SizedBox(
-                                width: 220,
-                                child: Center(
-                                  child: Text('Photo could not be displayed.'),
+          const SizedBox(height: AppSpacing.md),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              border: Border.all(color: AppColors.glassBorderStrong),
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Photo reference',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Reference variant: ${guide.title}',
+                    style: const TextStyle(color: AppColors.textSoft),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  FutureBuilder<bool>(
+                    future: _downloaded,
+                    builder: (context, snapshot) {
+                      if (snapshot.data == true) {
+                        return Row(
+                          children: [
+                            for (
+                              var index = 0;
+                              index < guide.images.length;
+                              index++
+                            ) ...[
+                              if (index > 0)
+                                const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.md,
+                                  ),
+                                  child: AspectRatio(
+                                    aspectRatio: 1,
+                                    child: FutureBuilder<File>(
+                                      future: _cache.fileFor(
+                                        widget.exercise.id,
+                                        index,
+                                      ),
+                                      builder: (context, fileSnapshot) =>
+                                          fileSnapshot.hasData
+                                          ? Image.file(
+                                              fileSnapshot.data!,
+                                              fit: BoxFit.contain,
+                                              semanticLabel:
+                                                  '${guide.title}, reference photo ${index + 1}',
+                                              errorBuilder: (_, _, _) =>
+                                                  const Center(
+                                                    child: Text(
+                                                      'Photo could not be displayed.',
+                                                    ),
+                                                  ),
+                                            )
+                                          : const Center(
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            )
-                          : const SizedBox(width: 220),
-                    ),
+                            ],
+                          ],
+                        );
+                      }
+                      return OutlinedButton.icon(
+                        onPressed: _downloading ? null : _download,
+                        icon: _downloading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.download_outlined),
+                        label: Text(
+                          _downloading
+                              ? 'Downloading…'
+                              : 'Download photo guide',
+                        ),
+                      );
+                    },
                   ),
-                );
-              }
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: OutlinedButton.icon(
-                  onPressed: _downloading ? null : _download,
-                  icon: _downloading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.download_outlined),
-                  label: Text(
-                    _downloading ? 'Downloading…' : 'Download photo guide',
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text(
+                    'Photo guide: Free Exercise DB · Unlicense',
+                    style: TextStyle(color: AppColors.textSoft, fontSize: 12),
                   ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          for (var i = 0; i < guide.instructions.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text('${i + 1}. ${guide.instructions[i]}'),
+                  const SizedBox(height: AppSpacing.sm),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: EdgeInsets.zero,
+                    title: const Text('Technique instructions'),
+                    children: [
+                      for (var i = 0; i < guide.instructions.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: Text(
+                            '${i + 1}. ${guide.instructions[i]}',
+                            style: const TextStyle(color: AppColors.textSoft),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          const Text(
-            'Photo guide: Free Exercise DB · Unlicense',
-            style: TextStyle(fontSize: 12),
           ),
-          const SizedBox(height: 16),
         ],
       ],
     );

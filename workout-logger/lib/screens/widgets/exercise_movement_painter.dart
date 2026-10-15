@@ -378,11 +378,26 @@ class ExerciseMovementPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final scale = math.min(size.width / 360, size.height / 240);
+    final wide = {
+      ExerciseMovement.benchPress,
+      ExerciseMovement.skullCrusher,
+      ExerciseMovement.pushUp,
+      ExerciseMovement.plank,
+      ExerciseMovement.legCurl,
+      ExerciseMovement.hipThrust,
+      ExerciseMovement.crunch,
+      ExerciseMovement.legRaise,
+    }.contains(animation.movement);
+    final scene = Rect.fromLTWH(wide ? 20 : 40, -10, wide ? 320 : 280, 245);
+    final scale = math.min(
+      size.width / scene.width,
+      size.height / scene.height,
+    );
     canvas.save();
+    canvas.clipRect(Offset.zero & size);
     canvas.translate(
-      (size.width - 360 * scale) / 2,
-      (size.height - 240 * scale) / 2,
+      (size.width - scene.width * scale) / 2 - scene.left * scale,
+      (size.height - scene.height * scale) / 2 - scene.top * scale,
     );
     canvas.scale(scale);
     final pose = ExercisePose.at(animation, amount);
@@ -508,87 +523,19 @@ class ExerciseMovementPainter extends CustomPainter {
 
   void _body(Canvas c, ExercisePose p) {
     final front = p.front;
-    final far = AppColors.textMuted;
     final near = AppColors.textPrimary;
-    final legColor =
-        {
-          ExerciseMovement.squat,
-          ExerciseMovement.lunge,
-          ExerciseMovement.legPress,
-          ExerciseMovement.legExtension,
-          ExerciseMovement.legCurl,
-          ExerciseMovement.deadlift,
-          ExerciseMovement.calfRaise,
-          ExerciseMovement.hipThrust,
-        }.contains(animation.movement)
-        ? muscleColor
-        : near;
-    final shift = front ? const Offset(12, 0) : const Offset(8, -3);
-    _limb(
-      c,
-      p.hip + shift,
-      p.otherKnee ?? p.knee + shift,
-      p.otherAnkle ?? p.ankle + shift,
-      far,
-      14,
-    );
-    if (p.otherHand != null) {
-      _limb(
-        c,
-        p.shoulder + const Offset(13, 0),
-        p.otherElbow!,
-        p.otherHand!,
-        near,
-        11,
-      );
-    } else {
-      _limb(c, p.shoulder + shift, p.elbow + shift, p.hand + shift, far, 11);
-    }
-    _limb(c, p.hip, p.knee, p.ankle, legColor, 15);
-    final toe = animation.movement == ExerciseMovement.calfRaise
-        ? const Offset(146, 216)
-        : p.ankle + const Offset(-14, 3);
-    _line(c, p.ankle, toe, near, 7);
-    final axis = p.hip - p.shoulder;
-    final normal = Offset(-axis.dy, axis.dx) / axis.distance;
-    final torso = Path()
-      ..moveTo((p.shoulder + normal * 16).dx, (p.shoulder + normal * 16).dy)
-      ..lineTo((p.hip + normal * 11).dx, (p.hip + normal * 11).dy)
-      ..quadraticBezierTo(
-        p.hip.dx,
-        p.hip.dy + 9,
-        (p.hip - normal * 11).dx,
-        (p.hip - normal * 11).dy,
-      )
-      ..lineTo((p.shoulder - normal * 16).dx, (p.shoulder - normal * 16).dy)
-      ..close();
-    c.drawPath(torso, Paint()..color = AppColors.cardHigh);
-    c.drawPath(
-      torso,
-      Paint()
-        ..color = near
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
-    final core = {
-      ExerciseMovement.crunch,
-      ExerciseMovement.plank,
-      ExerciseMovement.twist,
-      ExerciseMovement.legRaise,
-      ExerciseMovement.cableCrunch,
+    final far = near.withValues(alpha: .55);
+    final legs = {
+      ExerciseMovement.squat,
+      ExerciseMovement.lunge,
+      ExerciseMovement.legPress,
+      ExerciseMovement.legExtension,
+      ExerciseMovement.legCurl,
+      ExerciseMovement.deadlift,
+      ExerciseMovement.calfRaise,
+      ExerciseMovement.hipThrust,
     }.contains(animation.movement);
-    _line(
-      c,
-      Offset.lerp(p.shoulder, p.hip, core ? .4 : .12)!,
-      Offset.lerp(p.shoulder, p.hip, core ? .82 : .4)!,
-      muscleColor.withValues(alpha: .75),
-      front ? 20 : 13,
-    );
-    _line(c, p.shoulder, p.head, near, 9);
-    c.drawCircle(p.head, 11, Paint()..color = near);
-    final armRoot = p.shoulder + Offset(front ? -13 : 0, 0);
-    _limb(c, armRoot, p.elbow, p.hand, near, 11);
-    final arm = {
+    final arms = {
       ExerciseMovement.curl,
       ExerciseMovement.pushDown,
       ExerciseMovement.skullCrusher,
@@ -597,16 +544,124 @@ class ExerciseMovementPainter extends CustomPainter {
       ExerciseMovement.lateralRaise,
       ExerciseMovement.frontRaise,
     }.contains(animation.movement);
-    if (arm) {
-      _line(
+    final calf = animation.movement == ExerciseMovement.calfRaise;
+    final shift = front ? const Offset(12, 0) : const Offset(10, -2);
+    final farAnkle = p.otherAnkle ?? p.ankle + shift;
+    _limb(
+      c,
+      p.hip + shift,
+      p.otherKnee ?? p.knee + shift,
+      farAnkle,
+      far,
+      24,
+      highlight: legs ? muscleColor.withValues(alpha: .55) : null,
+      calf: calf,
+    );
+    _shoe(c, farAnkle, far, calf: calf);
+    if (p.otherHand != null) {
+      _limb(
         c,
-        Offset.lerp(armRoot, p.elbow, .15)!,
-        Offset.lerp(armRoot, p.elbow, .85)!,
-        muscleColor,
-        12,
+        p.shoulder + const Offset(13, 0),
+        p.otherElbow!,
+        p.otherHand!,
+        far,
+        16,
+        highlight: arms ? muscleColor.withValues(alpha: .55) : null,
+      );
+    } else {
+      _limb(
+        c,
+        p.shoulder + shift,
+        p.elbow + shift,
+        p.hand + shift,
+        far,
+        16,
+        highlight: arms ? muscleColor.withValues(alpha: .55) : null,
       );
     }
-    c.drawCircle(p.hand, 5, Paint()..color = near);
+    _limb(
+      c,
+      p.hip,
+      p.knee,
+      p.ankle,
+      near,
+      26,
+      highlight: legs ? muscleColor : null,
+      calf: calf,
+    );
+    _shoe(c, p.ankle, near, calf: calf);
+
+    final axis = p.hip - p.shoulder;
+    final normal = Offset(-axis.dy, axis.dx) / axis.distance;
+    final upper = p.shoulder + axis * .18;
+    final waist = p.shoulder + axis * .62;
+    final torso = Path()
+      ..moveTo((p.shoulder + normal * 17).dx, (p.shoulder + normal * 17).dy)
+      ..cubicTo(
+        (upper + normal * 21).dx,
+        (upper + normal * 21).dy,
+        (waist + normal * 11).dx,
+        (waist + normal * 11).dy,
+        (p.hip + normal * 16).dx,
+        (p.hip + normal * 16).dy,
+      )
+      ..quadraticBezierTo(
+        (p.hip + axis / axis.distance * 10).dx,
+        (p.hip + axis / axis.distance * 10).dy,
+        (p.hip - normal * 16).dx,
+        (p.hip - normal * 16).dy,
+      )
+      ..cubicTo(
+        (waist - normal * 11).dx,
+        (waist - normal * 11).dy,
+        (upper - normal * 21).dx,
+        (upper - normal * 21).dy,
+        (p.shoulder - normal * 17).dx,
+        (p.shoulder - normal * 17).dy,
+      )
+      ..quadraticBezierTo(
+        p.shoulder.dx,
+        p.shoulder.dy - 6,
+        (p.shoulder + normal * 17).dx,
+        (p.shoulder + normal * 17).dy,
+      )
+      ..close();
+    c.drawPath(torso, Paint()..color = AppColors.card);
+    if (!legs && !arms) {
+      c.save();
+      c.clipPath(torso);
+      _line(
+        c,
+        Offset.lerp(p.shoulder, p.hip, .23)!,
+        Offset.lerp(p.shoulder, p.hip, .62)!,
+        muscleColor,
+        24,
+      );
+      c.restore();
+    }
+    c.drawPath(
+      torso,
+      Paint()
+        ..color = near
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    _line(c, p.shoulder, p.head, near, 11);
+    c.drawOval(
+      Rect.fromCenter(center: p.head, width: 27, height: 31),
+      Paint()..color = near,
+    );
+    final root = p.shoulder + Offset(front ? -13 : 0, 0);
+    _limb(
+      c,
+      root,
+      p.elbow,
+      p.hand,
+      near,
+      18,
+      highlight: arms ? muscleColor : null,
+    );
+    c.drawCircle(p.hand, 6, Paint()..color = near);
   }
 
   void _limb(
@@ -615,11 +670,107 @@ class ExerciseMovementPainter extends CustomPainter {
     Offset joint,
     Offset end,
     Color color,
-    double width,
-  ) {
-    _line(c, a, joint, color, width);
-    _line(c, joint, end, color, width - 2);
-    c.drawCircle(joint, 3, Paint()..color = AppColors.cardHigh);
+    double width, {
+    Color? highlight,
+    bool calf = false,
+  }) {
+    _segment(
+      c,
+      a,
+      joint,
+      width / 2,
+      width * .36,
+      color,
+      highlight: calf ? null : highlight,
+    );
+    _segment(
+      c,
+      joint,
+      end,
+      width * .36,
+      width * .24,
+      color,
+      highlight: calf ? highlight : null,
+    );
+    c.drawCircle(joint, width * .23, Paint()..color = AppColors.card);
+    c.drawCircle(
+      joint,
+      width * .23,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+  }
+
+  void _segment(
+    Canvas c,
+    Offset a,
+    Offset b,
+    double startRadius,
+    double endRadius,
+    Color color, {
+    Color? highlight,
+  }) {
+    final delta = b - a;
+    if (delta.distance < .001) return;
+    final direction = delta / delta.distance;
+    final normal = Offset(-direction.dy, direction.dx);
+    final center = Offset.lerp(a, b, .5)!;
+    final path = Path()
+      ..moveTo((a + normal * startRadius).dx, (a + normal * startRadius).dy)
+      ..quadraticBezierTo(
+        (center + normal * (startRadius + 3)).dx,
+        (center + normal * (startRadius + 3)).dy,
+        (b + normal * endRadius).dx,
+        (b + normal * endRadius).dy,
+      )
+      ..quadraticBezierTo(
+        (b + direction * endRadius).dx,
+        (b + direction * endRadius).dy,
+        (b - normal * endRadius).dx,
+        (b - normal * endRadius).dy,
+      )
+      ..quadraticBezierTo(
+        (center - normal * (startRadius + 3)).dx,
+        (center - normal * (startRadius + 3)).dy,
+        (a - normal * startRadius).dx,
+        (a - normal * startRadius).dy,
+      )
+      ..quadraticBezierTo(
+        (a - direction * startRadius).dx,
+        (a - direction * startRadius).dy,
+        (a + normal * startRadius).dx,
+        (a + normal * startRadius).dy,
+      )
+      ..close();
+    c.drawPath(path, Paint()..color = highlight ?? color);
+    c.drawPath(
+      path,
+      Paint()
+        ..color = highlight == null ? AppColors.card : color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4,
+    );
+  }
+
+  void _shoe(Canvas c, Offset ankle, Color color, {bool calf = false}) {
+    final toe = calf ? Offset(146, 219) : ankle + const Offset(-19, 7);
+    final path = Path()
+      ..moveTo(ankle.dx - 5, ankle.dy - 2)
+      ..quadraticBezierTo(ankle.dx - 10, ankle.dy + 2, toe.dx, toe.dy - 4)
+      ..quadraticBezierTo(toe.dx - 4, toe.dy, toe.dx, toe.dy + 1)
+      ..lineTo(ankle.dx + 8, ankle.dy + 8)
+      ..quadraticBezierTo(ankle.dx + 8, ankle.dy, ankle.dx + 4, ankle.dy - 3)
+      ..close();
+    c.drawPath(path, Paint()..color = AppColors.card);
+    c.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6,
+    );
   }
 
   void _weight(Canvas c, Offset hand, {bool vertical = false}) {
@@ -678,17 +829,32 @@ class ExerciseMovementPainter extends CustomPainter {
         4,
       );
       for (final sign in [-1.0, 1.0]) {
-        c.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromCenter(
-              center: center + Offset(half * .8 * sign, 0),
-              width: 8,
-              height: 30,
-            ),
-            const Radius.circular(2),
-          ),
-          Paint()..color = AppColors.cyan,
+        final plate = center + Offset(half * .8 * sign, 0);
+        final rect = Rect.fromCenter(
+          center: plate,
+          width: p.front ? 12 : 20,
+          height: 38,
         );
+        c.drawOval(
+          rect.shift(const Offset(3, 0)),
+          Paint()..color = AppColors.card,
+        );
+        c.drawOval(
+          rect.shift(const Offset(3, 0)),
+          Paint()
+            ..color = AppColors.cyan
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+        c.drawOval(rect, Paint()..color = AppColors.card);
+        c.drawOval(
+          rect,
+          Paint()
+            ..color = AppColors.cyan
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+        c.drawCircle(plate, 3, Paint()..color = AppColors.cyan);
       }
     } else if (animation.equipment == ExerciseEquipment.dumbbell) {
       _weight(c, p.hand, vertical: animation.movement == ExerciseMovement.curl);

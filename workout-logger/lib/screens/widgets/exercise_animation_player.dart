@@ -74,8 +74,14 @@ class _ExerciseAnimationPlayerState extends State<ExerciseAnimationPlayer>
       _pause();
     } else if (box is RenderBox && box.hasSize && box.attached) {
       final top = box.localToGlobal(Offset.zero).dy;
-      if (top >= MediaQuery.sizeOf(context).height ||
-          top + box.size.height <= 0) {
+      var viewportTop = 0.0;
+      var viewportBottom = MediaQuery.sizeOf(context).height;
+      final viewport = Scrollable.maybeOf(context)?.context.findRenderObject();
+      if (viewport is RenderBox && viewport.hasSize && viewport.attached) {
+        viewportTop = viewport.localToGlobal(Offset.zero).dy;
+        viewportBottom = viewportTop + viewport.size.height;
+      }
+      if (top >= viewportBottom || top + box.size.height <= viewportTop) {
         _pause();
       }
     }
@@ -126,6 +132,7 @@ class _ExerciseAnimationPlayerState extends State<ExerciseAnimationPlayer>
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.glassBorderStrong),
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -141,7 +148,7 @@ class _ExerciseAnimationPlayerState extends State<ExerciseAnimationPlayer>
               children: [
                 Text(
                   widget.exercise.name,
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 const Text(
@@ -155,7 +162,7 @@ class _ExerciseAnimationPlayerState extends State<ExerciseAnimationPlayer>
                   child: RepaintBoundary(
                     child: SizedBox(
                       width: double.infinity,
-                      height: 240,
+                      height: 280,
                       child: CustomPaint(
                         key: const ValueKey('exercise-movement-canvas'),
                         painter: ExerciseMovementPainter(
@@ -193,10 +200,11 @@ class _ExerciseAnimationPlayerState extends State<ExerciseAnimationPlayer>
                       _controller.value = value;
                     },
                   ),
-                  Wrap(
+                  OverflowBar(
                     spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.sm,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                    overflowSpacing: AppSpacing.sm,
+                    overflowAlignment: OverflowBarAlignment.start,
+                    alignment: MainAxisAlignment.spaceBetween,
                     children: [
                       FilledButton.icon(
                         onPressed: _reducedMotion ? null : _toggle,
@@ -207,7 +215,7 @@ class _ExerciseAnimationPlayerState extends State<ExerciseAnimationPlayer>
                         ),
                         label: Text(_playing ? 'Pause' : 'Play'),
                         style: FilledButton.styleFrom(
-                          minimumSize: const Size(96, 48),
+                          minimumSize: const Size(124, 48),
                         ),
                       ),
                       IconButton(
@@ -221,6 +229,11 @@ class _ExerciseAnimationPlayerState extends State<ExerciseAnimationPlayer>
                           minWidth: 48,
                           minHeight: 48,
                         ),
+                        style: IconButton.styleFrom(
+                          side: const BorderSide(
+                            color: AppColors.glassBorderStrong,
+                          ),
+                        ),
                       ),
                       PopupMenuButton<double>(
                         tooltip: 'Playback speed',
@@ -233,7 +246,14 @@ class _ExerciseAnimationPlayerState extends State<ExerciseAnimationPlayer>
                               child: Text('$speed× speed'),
                             ),
                         ],
-                        child: Padding(
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: AppColors.glassBorderStrong,
+                            ),
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                          ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 14,

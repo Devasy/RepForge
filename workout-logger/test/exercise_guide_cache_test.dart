@@ -13,12 +13,28 @@ class _StalledClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) => handler();
 }
 
+class _CloseTrackingClient extends MockClient {
+  _CloseTrackingClient() : super((_) async => http.Response('', 200));
+  bool closed = false;
+  @override
+  void close() => closed = true;
+}
+
 void main() {
   late Directory root;
   setUp(() async => root = await Directory.systemTemp.createTemp('guides_'));
   tearDown(() async => root.delete(recursive: true));
 
   final jpeg = [0xff, 0xd8, 0xff, 0xd9];
+
+  test('closing a cache leaves an injected client under caller ownership', () {
+    final client = _CloseTrackingClient();
+    final cache = ExerciseGuideCache(client: client);
+    cache.close();
+    expect(client.closed, isFalse);
+    client.close();
+    expect(client.closed, isTrue);
+  });
 
   test(
     'bulk download caches only curated images and skips them on retry',

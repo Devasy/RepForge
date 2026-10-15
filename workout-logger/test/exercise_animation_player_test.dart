@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/data/exercise_animations.dart';
@@ -216,6 +218,45 @@ void main() {
   });
 
   testWidgets(
+    'pauses above a clipped scroll viewport while still inside the screen',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.only(top: 200),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    ExerciseAnimationPlayer(exercise: exercises.first),
+                    const SizedBox(height: 1600),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final toggle = tester.widget<FilledButton>(find.byType(FilledButton));
+      toggle.onPressed!();
+      await tester.pump();
+      final height = tester
+          .getSize(find.byType(ExerciseAnimationPlayer))
+          .height;
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(height + 20);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        tester.getBottomLeft(find.byType(ExerciseAnimationPlayer)).dy,
+        greaterThan(0),
+      );
+      expect(find.text('Play'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'reduced motion disables playback while preserving manual inspection',
     (tester) async {
       await tester.pumpWidget(player('squat', reducedMotion: true));
@@ -287,7 +328,9 @@ void main() {
     await tester.pumpWidget(player('squat'));
     await expectLater(
       find.byType(Scaffold),
-      matchesGoldenFile('goldens/exercise_animation_player.png'),
+      matchesGoldenFile(
+        'goldens/${Platform.operatingSystem}/exercise_animation_player.png',
+      ),
     );
   });
 }

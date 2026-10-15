@@ -2,6 +2,8 @@
 
 All 44 built-in exercises have bundled movement illustrations in **Exercise guide**, accessible from exercise details and the active workout. Each exact catalogue ID selects an authored joint diagram and equipment configuration. Illustrations work offline with no downloads or additional media dependencies.
 
+The active workout opens a full guide page with a Back control. The player uses curved body segments, outlined weight plates, and highlighted target regions. Optional photo references appear together in a separate panel; technique instructions expand below them.
+
 Playback starts paused. **Play / Pause**, **Restart movement**, the repetition slider, and **0.5× / 1.0× / 1.5× speed** let users inspect movement and return phases. Playback pauses when the app backgrounds, the guide leaves the viewport, or another route covers it. The system's reduced-motion setting disables continuous playback while preserving the slider. Plank shows a static hold with breathing cues instead of inventing a repetition. Custom and unknown exercise IDs show an unavailable state.
 
 These are simplified movement diagrams, not anatomical models or form assessments. The highlighted region indicates the exercise's first catalogue target muscle group. Joint paths illustrate a representative movement; they do not measure muscle stretch or force.

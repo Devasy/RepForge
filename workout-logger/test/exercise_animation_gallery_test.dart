@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/data/exercise_animations.dart';
@@ -76,7 +78,9 @@ void main() {
     );
     await expectLater(
       find.byType(Scaffold),
-      matchesGoldenFile('goldens/exercise_animation_gallery.png'),
+      matchesGoldenFile(
+        'goldens/${Platform.operatingSystem}/exercise_animation_gallery.png',
+      ),
     );
   });
 }
