@@ -4,6 +4,10 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+### Features added
+- Inspect offline movement illustrations for all 44 built-in exercises, with play/pause, restart, a repetition slider, and playback speed controls in exercise details and active workouts.
+- View instructions for six built-in exercise variants and download their curated photo guides individually or all at once from Profile for offline viewing.
+
 ## [2.1.7]
 
 ### Features added

@@ -24,3 +24,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Curated exercise instructions and downloadable reference photos are from Free Exercise DB
+(https://github.com/yuhonas/free-exercise-db), pinned at commit
+f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5 and published under the Unlicense.

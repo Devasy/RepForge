@@ -11,6 +11,7 @@ import '../../data/exercise_database.dart';
 import '../add_custom_exercise_screen.dart';
 import 'rf_widgets.dart';
 import 'exercise_muscle_map.dart';
+import 'exercise_demonstration_section.dart';
 
 class ExerciseDetailsSheet extends StatelessWidget {
   const ExerciseDetailsSheet({
@@ -66,8 +67,8 @@ class ExerciseDetailsSheet extends StatelessWidget {
                   exercise.exerciseType == ExerciseType.timeBased
                       ? Icons.timer_rounded
                       : (exercise.category == 'compound'
-                          ? Icons.fitness_center_rounded
-                          : Icons.accessibility_new_rounded),
+                            ? Icons.fitness_center_rounded
+                            : Icons.accessibility_new_rounded),
                   color: color,
                   size: 26,
                 ),
@@ -117,9 +118,8 @@ class ExerciseDetailsSheet extends StatelessWidget {
                   Navigator.of(context).pop();
                   await Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => AddCustomExerciseScreen(
-                        initialExercise: exercise,
-                      ),
+                      builder: (_) =>
+                          AddCustomExerciseScreen(initialExercise: exercise),
                     ),
                   );
                 },
@@ -165,34 +165,49 @@ class ExerciseDetailsSheet extends StatelessWidget {
             Wrap(
               spacing: AppSpacing.xs,
               runSpacing: AppSpacing.xs,
-              children: exercise.availableHandles!.map((h) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.cardHigh,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  border: Border.all(color: AppColors.glassBorder),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.link_rounded, size: 13, color: AppColors.cyan),
-                    const SizedBox(width: 4),
-                    Text(
-                      h,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+              children: exercise.availableHandles!
+                  .map(
+                    (h) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardHigh,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(color: AppColors.glassBorder),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.link_rounded,
+                            size: 13,
+                            color: AppColors.cyan,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            h,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              )).toList(),
+                  )
+                  .toList(),
             ),
           ],
 
           const SizedBox(height: AppSpacing.lg),
 
+          const RFSectionHeader('Exercise guide'),
+          const SizedBox(height: AppSpacing.sm),
+          ExerciseDemonstrationSection(exercise: exercise),
+          const SizedBox(height: AppSpacing.lg),
           const RFSectionHeader('Muscle movement'),
           const SizedBox(height: AppSpacing.sm),
           ExerciseMuscleMap(exercise: exercise),
@@ -273,7 +288,8 @@ class ExerciseDetailsSheet extends StatelessWidget {
                     border: Border.all(color: AppColors.glassBorder),
                   ),
                   child: Text(
-                    (exercise.exerciseType == ExerciseType.timeBased && (s.timeTaken ?? 0) > 0)
+                    (exercise.exerciseType == ExerciseType.timeBased &&
+                            (s.timeTaken ?? 0) > 0)
                         ? '${s.timeTaken}s${s.weight > 0 ? " (+${settings.toDisplay(s.weight).toStringAsFixed(0)}${settings.unitLabel})" : ""}'
                         : '${settings.toDisplay(s.weight).toStringAsFixed(settings.toDisplay(s.weight) == settings.toDisplay(s.weight).truncateToDouble() ? 0 : 1)}${settings.unitLabel} × ${s.reps}',
                     style: const TextStyle(
