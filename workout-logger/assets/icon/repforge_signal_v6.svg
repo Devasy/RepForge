@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>RepForge — rounded signal</title>
+  <desc>Rounded forge-orange weight plates and a graphite pulse, with restrained depth and a gentle top-left light.</desc>
+  <defs>
+    <linearGradient id="weightFill" x1="15%" y1="0%" x2="75%" y2="100%">
+      <stop offset="0" stop-color="#FFB178"/>
+      <stop offset="0.42" stop-color="#F58B4C"/>
+      <stop offset="1" stop-color="#E87437"/>
+    </linearGradient>
+    <linearGradient id="signalFill" x1="20%" y1="0%" x2="65%" y2="100%">
+      <stop offset="0" stop-color="#6C818C"/>
+      <stop offset="0.48" stop-color="#4C626E"/>
+      <stop offset="1" stop-color="#32434C"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0%" y1="0%" x2="20%" y2="100%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.32"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path fill="#C75B2B" transform="translate(0 7)" d="M226 416 H232 Q250 416 250 434 V590 Q250 608 232 608 H226 Q208 608 208 590 V434 Q208 416 226 416 Z M298 344 H340 Q368 344 368 372 V652 Q368 680 340 680 H298 Q270 680 270 652 V372 Q270 344 298 344 Z M792 416 H798 Q816 416 816 434 V590 Q816 608 798 608 H792 Q774 608 774 590 V434 Q774 416 792 416 Z M684 344 H726 Q754 344 754 372 V652 Q754 680 726 680 H684 Q656 680 656 652 V372 Q656 344 684 344 Z"/>
+  <path data-monochrome="true" fill="url(#weightFill)" d="M226 416 H232 Q250 416 250 434 V590 Q250 608 232 608 H226 Q208 608 208 590 V434 Q208 416 226 416 Z M298 344 H340 Q368 344 368 372 V652 Q368 680 340 680 H298 Q270 680 270 652 V372 Q270 344 298 344 Z M792 416 H798 Q816 416 816 434 V590 Q816 608 798 608 H792 Q774 608 774 590 V434 Q774 416 792 416 Z M684 344 H726 Q754 344 754 372 V652 Q754 680 726 680 H684 Q656 680 656 652 V372 Q656 344 684 344 Z"/>
+  <path fill="none" stroke="url(#rim)" stroke-width="2" d="M226 417 H232 Q249 417 249 434 V590 Q249 607 232 607 H226 Q209 607 209 590 V434 Q209 417 226 417 Z M298 345 H340 Q367 345 367 372 V652 Q367 679 340 679 H298 Q271 679 271 652 V372 Q271 345 298 345 Z M792 417 H798 Q815 417 815 434 V590 Q815 607 798 607 H792 Q775 607 775 590 V434 Q775 417 792 417 Z M684 345 H726 Q753 345 753 372 V652 Q753 679 726 679 H684 Q657 679 657 652 V372 Q657 345 684 345 Z"/>
+  <path fill="none" stroke="#233038" stroke-width="56" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 6)" d="M368 512 H416 Q430 512 438 500 L465 458 Q478 438 489 462 L532 558 Q546 589 562 565 L588 524 Q596 512 610 512 H656"/>
+  <path data-monochrome="true" fill="none" stroke="url(#signalFill)" stroke-width="56" stroke-linecap="round" stroke-linejoin="round" d="M368 512 H416 Q430 512 438 500 L465 458 Q478 438 489 462 L532 558 Q546 589 562 565 L588 524 Q596 512 610 512 H656"/>
+</svg>
