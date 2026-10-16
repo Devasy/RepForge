@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from assets/icon/repforge_signal_v7.svg. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="1024" android:viewportHeight="1024">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M226 416 H232 Q250 416 250 434 V590 Q250 608 232 608 H226 Q208 608 208 590 V434 Q208 416 226 416 Z M298 344 H340 Q368 344 368 372 V652 Q368 680 340 680 H298 Q270 680 270 652 V372 Q270 344 298 344 Z M792 416 H798 Q816 416 816 434 V590 Q816 608 798 608 H792 Q774 608 774 590 V434 Q774 416 792 416 Z M684 344 H726 Q754 344 754 372 V652 Q754 680 726 680 H684 Q656 680 656 652 V372 Q656 344 684 344 Z"/>
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="56" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M368 512 H416 Q430 512 438 500 L465 458 Q478 438 489 462 L532 558 Q546 589 562 565 L588 524 Q596 512 610 512 H656"/>
+</vector>

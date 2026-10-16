@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>RepForge — strength in your signal</title>
+  <desc>A flat violet dumbbell connected by a cyan pulse. Transparent adaptive foreground.</desc>
+  <path fill="#7C3AED" d="M208 432 L224 416 H250 V608 H224 L208 592 Z M270 366 L292 344 H346 L368 366 V658 L346 680 H292 L270 658 Z M774 416 H800 L816 432 V592 L800 608 H774 Z M656 366 L678 344 H732 L754 366 V658 L732 680 H678 L656 658 Z"/>
+  <path fill="none" stroke="#00C2D4" stroke-width="56" stroke-linecap="round" stroke-linejoin="round" d="M368 512 H430 L478 440 L546 584 L594 512 H656"/>
+</svg>
