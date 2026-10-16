@@ -33,6 +33,3 @@ image-generation prompt. Earlier icon files in the original checkout are retaine
 reference. The flat v5 and the
 orange/light v6 vector sources are included; their PNGs can be regenerated. Pass `5` or `6` to the
 generator to explicitly render an archived design; default generation uses v7.
-
-See `docs/APP_CAPABILITIES_AND_ICON_2026-10-16.md` at the repository root for the
-feature analysis, AI tool inventory, data-question examples and design rationale.
