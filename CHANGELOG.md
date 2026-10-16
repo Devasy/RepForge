@@ -4,6 +4,8 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.1.9]
+
 ### Changes
 - Refresh the launcher icon with rounded violet weights, a cyan signal, subtle depth, a dark background, and a matching Android themed silhouette.
 
