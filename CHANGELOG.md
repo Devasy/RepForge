@@ -4,9 +4,16 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.1.8]
+
 ### Features added
 - Inspect offline movement illustrations for all 44 built-in exercises, with play/pause, restart, a repetition slider, and playback speed controls in exercise details and active workouts.
 - View instructions for six built-in exercise variants and download their curated photo guides individually or all at once from Profile for offline viewing.
+- Get a rest completion alert with optional sound and vibration; rest timers keep accurate time while the app is in the background.
+
+### Known limitations
+- Movement illustrations show representative technique and target regions; they do not assess form or measure muscle stretch or force. Custom and unknown exercises have no movement illustration.
+- On Android 12 and newer, background rest notifications can arrive late when exact alarm access is unavailable.
 
 ## [2.1.7]
 
