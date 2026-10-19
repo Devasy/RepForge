@@ -19,6 +19,7 @@ import 'package:repforge/services/settings_provider.dart';
 import 'package:repforge/services/sqlite_storage_service.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/viewmodels/routine_optimizer_view_model.dart';
+import 'package:repforge/viewmodels/ai_coach_view_model.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'test_utils/mock_storage_service.dart';
@@ -126,6 +127,121 @@ void main() {
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+  });
+
+  test('failed shared checkpoint initialization can be retried', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'checkpoint-retry-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final storage = _TransientStorage('${directory.path}/app.db');
+    await storage.init();
+    addTearDown(storage.close);
+    final store = AppCheckpointStore(storage);
+    final failed = [store.load('one'), store.load('two')];
+    await Future.wait([
+      for (final future in failed) expectLater(future, throwsStateError),
+    ]);
+    expect(storage.attempts, 1);
+    expect(await store.load('one'), null);
+    expect(storage.attempts, 2);
+    expect(await store.load('two'), null);
+    expect(storage.attempts, 2);
+  });
+
+  test('coach can leave, restore and delete a pending approval', () async {
+    final storage = MockStorageService();
+    final model = ScriptedModel([write(), done()]);
+    final provider = WorkoutProvider(
+      storage,
+      programManager: ProgramManager(storage),
+    );
+    await provider.init();
+    final view = AiCoachViewModel(
+      ai: GeminiAiService(),
+      coachTools: CoachToolService(
+        workoutProvider: provider,
+        prManager: PRManager(storage),
+      ),
+      conversations: ConversationManager(storage),
+      settings: SettingsProvider(storage),
+      agents: RepForgeAgents(model: model, store: AppCheckpointStore(storage)),
+    );
+    addTearDown(view.dispose);
+    await view.sendMessage('Propose a routine');
+    final id = view.activeConversationId!;
+    final approval = view.pendingInput!.request.id;
+    final count = view.messages.length;
+    await view.sendMessage('Blocked while awaiting approval');
+    expect(view.messages, hasLength(count));
+    view.newConversation();
+    expect(view.activeConversationId, null);
+    await view.sendMessage('New conversation');
+    expect(view.activeConversationId, isNot(id));
+    final restored = Completer<void>();
+    void changed() {
+      if (view.pendingInput?.request.id == approval && !restored.isCompleted) {
+        restored.complete();
+      }
+    }
+
+    view.addListener(changed);
+    view.selectConversation(id);
+    await restored.future.timeout(const Duration(seconds: 3));
+    view.removeListener(changed);
+    await Future<void>.delayed(Duration.zero);
+    expect(view.activeConversationId, id);
+    await view.deleteConversation(id);
+    expect(view.conversations.any((c) => c.id == id), false);
+    expect(view.pendingInput, null);
+    expect(model.requests, hasLength(2));
+  });
+
+  test('optimizer can leave, restore and delete pending questions', () async {
+    final storage = MockStorageService();
+    final model = ScriptedModel([question(), done()]);
+    final provider = WorkoutProvider(
+      storage,
+      programManager: ProgramManager(storage),
+    );
+    await provider.init();
+    final view = RoutineOptimizerViewModel(
+      ai: GeminiAiService(),
+      coachTools: CoachToolService(
+        workoutProvider: provider,
+        prManager: PRManager(storage),
+      ),
+      conversations: ConversationManager(storage, kind: 'optimizer'),
+      settings: SettingsProvider(storage),
+      agents: RepForgeAgents(model: model, store: AppCheckpointStore(storage)),
+    );
+    addTearDown(view.dispose);
+    await view.startForRoutine(
+      Routine(id: 'one', name: 'Push', exerciseIds: []),
+    );
+    final id = view.activeConversationId!;
+    final questionId = view.pendingInput!.request.id;
+    await view.startForRoutine(
+      Routine(id: 'two', name: 'Pull', exerciseIds: []),
+    );
+    expect(view.activeConversationId, isNot(id));
+    final restored = Completer<void>();
+    void changed() {
+      if (view.pendingInput?.request.id == questionId &&
+          !restored.isCompleted) {
+        restored.complete();
+      }
+    }
+
+    view.addListener(changed);
+    view.selectConversation(id);
+    await restored.future.timeout(const Duration(seconds: 3));
+    view.removeListener(changed);
+    await Future<void>.delayed(Duration.zero);
+    await view.deleteConversation(id);
+    expect(view.conversations.any((c) => c.id == id), false);
+    expect(view.pendingInput, null);
+    expect(model.requests, hasLength(2));
   });
 
   test(
@@ -383,4 +499,14 @@ class ControlledModel implements ModelProvider {
     ModelRequest request,
     CancellationToken cancellation,
   ) => output;
+}
+
+class _TransientStorage extends SqliteStorageService {
+  int attempts = 0;
+  _TransientStorage(String path) : super(databasePathOverride: path);
+  @override
+  Database get database {
+    if (attempts++ == 0) throw StateError('Transient initialization failure');
+    return super.database;
+  }
 }

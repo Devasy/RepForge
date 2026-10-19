@@ -24,7 +24,16 @@ class AppCheckpointStore implements CheckpointStore {
     return _SettingsCheckpoints(storage);
   }
 
-  Future<CheckpointStore> get _store => _ready ??= _open();
+  Future<CheckpointStore> get _store async {
+    final opening = _ready ??= _open();
+    try {
+      return await opening;
+    } catch (_) {
+      if (identical(_ready, opening)) _ready = null;
+      rethrow;
+    }
+  }
+
   @override
   Future<RunCheckpoint?> load(String threadId) async =>
       (await _store).load(threadId);

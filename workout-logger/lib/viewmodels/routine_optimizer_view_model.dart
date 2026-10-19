@@ -38,6 +38,7 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
 
   bool get isConfigured => _ai.isConfigured;
   bool get isLoading => _busy || (_session?.isLoading ?? false);
+  bool get _navigationBusy => _busy || (_session?.isWorking ?? false);
   String get streamingText => _session?.streamingText ?? '';
   PendingQuestions? get pendingQuestions => _session?.pendingQuestions;
   PendingAgentInput? get pendingInput => _session?.pendingInput;
@@ -92,7 +93,7 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
   }
 
   void selectConversation(String id) {
-    if (isLoading) return;
+    if (_navigationBusy) return;
     _conversations.selectConversation(id);
     if (_conversations.active == null) return;
     _busy = true;
@@ -107,7 +108,7 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
   }
 
   Future<void> deleteConversation(String id) async {
-    if (isLoading) return;
+    if (_navigationBusy) return;
     await _agents.forget('optimizer', id);
     if (id == activeConversationId) {
       _session?.removeListener(_notify);
@@ -117,7 +118,7 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
   }
 
   Future<void> startForRoutine(Routine routine) async {
-    if (isLoading) return;
+    if (_navigationBusy) return;
     _session?.removeListener(_notify);
     _session = null;
     _conversations.startNewConversation();

@@ -111,6 +111,8 @@ class RepForgeAgentSession extends ChangeNotifier {
   AgentViewState<ChatState> get state => controller.state;
   bool get isLoading =>
       _command || state.isRunning || state.pendingInput != null;
+  bool get isWorking =>
+      _command || _submitting || state.isRunning || state.isCommandPending;
   AiFailure? get failure => _failure;
   bool get canRetry =>
       !_command &&

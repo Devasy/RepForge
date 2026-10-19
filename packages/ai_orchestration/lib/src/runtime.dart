@@ -47,7 +47,9 @@ class RunHandle {
   final Completer<RunCheckpoint> _done = Completer();
   final CancellationToken _cancellation = CancellationToken();
   RunCheckpoint _snapshot;
-  RunHandle._(this._snapshot);
+  RunHandle._(this._snapshot) {
+    _done.future.ignore();
+  }
   RunCheckpoint get snapshot => _snapshot;
   Stream<RunEvent> get events => _events.stream;
   Future<RunCheckpoint> get done => _done.future;
@@ -189,6 +191,9 @@ class AgentRuntime {
     }
     final active = _active[threadId];
     if (active != null) {
+      if (active.snapshot.runId != checkpoint.runId) {
+        throw const CheckpointConflict();
+      }
       active._cancellation.cancel();
       return active.done;
     }

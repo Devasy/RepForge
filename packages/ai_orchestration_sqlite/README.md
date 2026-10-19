@@ -34,6 +34,8 @@ The mutation and receipt use the **same SQLite transaction**. A repeated operati
 
 This guarantee does not cover external API calls, other databases, or a newly generated operation ID. A checkpoint plus a separate remote write is not an exactly-once transaction. The host still reconciles a crashed side-effecting node before recovery.
 
+The example fingerprints the tool name and arguments deliberately. An operation ID is scoped to the run, model invocation and native call ID, so reusing it for a different tool must conflict even if the argument values match. Removing the tool name could incorrectly reuse a different mutation's receipt.
+
 ## Reading application data
 
 `SchemaCatalogTool` exposes only host-selected metadata: tables/views, columns, units, relationships and available query tools. It does not enumerate all tables or automatically expose checkpoint/settings data.

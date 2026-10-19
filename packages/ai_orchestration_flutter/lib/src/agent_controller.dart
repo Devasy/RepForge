@@ -143,10 +143,25 @@ class AgentController<S> extends ChangeNotifier
         'Reload this thread before cancelling its run.',
       );
     }
-    final cancelled = await runtime.cancel(
-      threadId,
-      expectedRevision: saved.revision,
-    );
+    RunCheckpoint cancelled;
+    try {
+      cancelled = await runtime.cancel(
+        threadId,
+        expectedRevision: saved.revision,
+      );
+    } on CheckpointConflict {
+      final latest = await runtime.inspect(threadId);
+      final active = runtime.attach(threadId);
+      if (latest == null ||
+          latest.runId != target.runId ||
+          active?.snapshot.runId != target.runId) {
+        rethrow;
+      }
+      cancelled = await runtime.cancel(
+        threadId,
+        expectedRevision: latest.revision,
+      );
+    }
     if (_disposed || epoch != _epoch) return;
     _acceptCheckpoint(cancelled);
   });

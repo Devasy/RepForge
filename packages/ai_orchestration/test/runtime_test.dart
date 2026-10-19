@@ -5,6 +5,32 @@ import 'support.dart';
 
 void main() {
   test(
+    'event-only hosts do not receive an uncaught completion error',
+    () async {
+      final errors = <Object>[];
+      await runZonedGuarded(() async {
+        final runtime = AgentRuntime(store: _FailingSaveStore());
+        final handle = await runtime.start(
+          workflow: intWorkflow(
+            WorkflowNode(
+              execute: (_, _) => NodeResult(
+                update: (value) => value + 1,
+                transition: const Complete(),
+              ),
+            ),
+          ),
+          threadId: 'event-only',
+        );
+        await handle.events.drain<void>();
+        await Future<void>.delayed(Duration.zero);
+        expect(errors, isEmpty);
+        await expectLater(handle.done, throwsStateError);
+      }, (error, _) => errors.add(error));
+      expect(errors, isEmpty);
+    },
+  );
+
+  test(
     'typed updates are committed and next turn initializes from prior state',
     () async {
       final workflow = intWorkflow(
@@ -332,4 +358,15 @@ void main() {
     ).recover(workflow: safe, threadId: 'a', expectedRevision: 0)).done;
     expect(recovered.state['value'], 1);
   });
+}
+
+class _FailingSaveStore extends MemoryCheckpointStore {
+  @override
+  Future<void> save(
+    RunCheckpoint checkpoint, {
+    required int? expectedRevision,
+  }) async {
+    if (expectedRevision != null) throw StateError('Storage unavailable');
+    await super.save(checkpoint, expectedRevision: expectedRevision);
+  }
 }

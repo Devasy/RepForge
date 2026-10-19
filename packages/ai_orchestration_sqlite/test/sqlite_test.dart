@@ -21,15 +21,42 @@ void main() {
   late SqliteCheckpointStore store;
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('orchestration_test_');
+    addTearDown(() => directory.delete(recursive: true));
     path = '${directory.path}/app.db';
     database = await databaseFactoryFfi.openDatabase(path);
+    addTearDown(() async {
+      if (database.isOpen) await database.close();
+    });
     store = SqliteCheckpointStore(database);
     await store.initialize();
   });
-  tearDown(() async {
-    if (database.isOpen) await database.close();
-    await directory.delete(recursive: true);
-  });
+
+  test(
+    'receipt reuse rejects a different tool with identical arguments',
+    () async {
+      var writes = 0;
+      Future<JsonMap> execute(ToolContext context) => store.executeOnce(
+        operationId: context.operationId,
+        arguments: context.call.toJson(),
+        action: (_) async => {'write': ++writes},
+      );
+      final first = _context('create_task', {'title': 'Draft'});
+      final different = _context('delete_task', {'title': 'Draft'});
+      expect(first.operationId, different.operationId);
+      expect(await execute(first), {'write': 1});
+      await expectLater(
+        execute(different),
+        throwsA(
+          isA<OrchestrationException>().having(
+            (e) => e.code,
+            'code',
+            'operation_conflict',
+          ),
+        ),
+      );
+      expect(writes, 1);
+    },
+  );
 
   test(
     'cancellation during a local mutation rolls back both write and receipt',
@@ -245,6 +272,15 @@ void main() {
         parameterNames: ['title'],
         maxRows: 2,
       );
+      var closed = false;
+      Future<void> closeTool() async {
+        if (!closed) {
+          await tool.close();
+          closed = true;
+        }
+      }
+
+      addTearDown(closeTool);
       final result =
           await tool.execute(_context('open_tasks', {'title': '%'}))
               as ToolSuccess;
@@ -255,7 +291,7 @@ void main() {
           await tool.execute(_context('open_tasks', {'title': "' OR 1=1 --"}))
               as ToolSuccess;
       expect(injected.data['row_count'], 0);
-      await tool.close();
+      await closeTool();
       expect(database.isOpen, true);
       expect(await database.query('tasks'), hasLength(4));
     },

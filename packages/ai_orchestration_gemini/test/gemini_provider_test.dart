@@ -25,6 +25,64 @@ ModelRequest request({List<ModelMessage>? messages}) => ModelRequest(
 );
 
 void main() {
+  test('retry backoff can exceed the I/O timeout', () async {
+    var attempts = 0;
+    final provider = GeminiModelProvider(
+      apiKey: 'key',
+      timeout: const Duration(milliseconds: 100),
+      retryDelay: (_) => const Duration(milliseconds: 250),
+      clientFactory: () => MockClient(
+        (_) async => ++attempts == 1
+            ? http.Response('busy', 503)
+            : http.Response(
+                sse(
+                  packet([
+                    {'text': 'Ready'},
+                  ]),
+                ),
+                200,
+              ),
+      ),
+    );
+    final events = await provider
+        .stream(request(), CancellationToken())
+        .toList();
+    expect(attempts, 2);
+    expect(events.whereType<ModelText>().single.text, 'Ready');
+  });
+
+  test('cancellation interrupts a long retry backoff', () async {
+    final backingOff = Completer<void>();
+    var attempts = 0;
+    final provider = GeminiModelProvider(
+      apiKey: 'key',
+      timeout: const Duration(milliseconds: 100),
+      retryDelay: (_) {
+        backingOff.complete();
+        return const Duration(seconds: 30);
+      },
+      clientFactory: () => MockClient((_) async {
+        attempts++;
+        return http.Response('busy', 503);
+      }),
+    );
+    final token = CancellationToken();
+    final result = expectLater(
+      provider.stream(request(), token).toList(),
+      throwsA(
+        isA<OrchestrationException>().having(
+          (e) => e.code,
+          'code',
+          'cancelled',
+        ),
+      ),
+    );
+    await backingOff.future;
+    token.cancel();
+    await result.timeout(const Duration(seconds: 2));
+    expect(attempts, 1);
+  });
+
   test(
     'preserves signed raw parts, same-name native IDs, attachments and usage through a real loop',
     () async {

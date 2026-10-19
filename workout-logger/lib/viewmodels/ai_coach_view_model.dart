@@ -62,6 +62,7 @@ class AiCoachViewModel extends ChangeNotifier {
 
   bool get isConfigured => _ai.isConfigured;
   bool get isLoading => _loading || (_session?.isLoading ?? false);
+  bool get _navigationBusy => _loading || (_session?.isWorking ?? false);
   String get streamingText => _session?.streamingText ?? '';
   List<String> get streamingToolCalls =>
       List.unmodifiable(_session?.toolCalls ?? const <String>[]);
@@ -108,7 +109,7 @@ class AiCoachViewModel extends ChangeNotifier {
   }
 
   void newConversation() {
-    if (isLoading) return;
+    if (_navigationBusy) return;
     _localFailure = null;
     _session?.removeListener(_notify);
     _session = null;
@@ -116,14 +117,14 @@ class AiCoachViewModel extends ChangeNotifier {
   }
 
   void selectConversation(String id) {
-    if (isLoading) return;
+    if (_navigationBusy) return;
     _localFailure = null;
     _conversations.selectConversation(id);
     unawaited(_restoreActive());
   }
 
   Future<void> deleteConversation(String id) async {
-    if (isLoading) return;
+    if (_navigationBusy) return;
     await _agents.forget('coach', id);
     if (id == activeConversationId) {
       _localFailure = null;

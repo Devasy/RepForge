@@ -335,7 +335,18 @@ class GeminiModelProvider implements ModelProvider {
       } finally {
         close();
       }
-      await _guard(Future<void>.delayed(delay), cancellation);
+      await _backoff(delay, cancellation);
+    }
+  }
+
+  Future<void> _backoff(Duration delay, CancellationToken cancellation) async {
+    final elapsed = Completer<void>();
+    final timer = Timer(delay, elapsed.complete);
+    try {
+      await Future.any([elapsed.future, cancellation.whenCancelled]);
+      cancellation.check();
+    } finally {
+      timer.cancel();
     }
   }
 

@@ -1,9 +1,102 @@
+import 'dart:async';
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:ai_orchestration_flutter/ai_orchestration_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support.dart';
 
 void main() {
+  test('cancel cannot cross into a new run between checkpoint loads', () async {
+    final store = _LoadRaceStore();
+    final release = Completer<void>();
+    var calls = 0;
+    final workflow = Workflow<int>(
+      id: 'race',
+      entryNode: 'wait',
+      codec: IntCodec(),
+      initialize: (previous, _) => previous ?? 0,
+      nodes: {
+        'wait': WorkflowNode(
+          execute: (_, _) async {
+            if (++calls == 1) {
+              await release.future;
+              return NodeResult(
+                update: (value) => value + 1,
+                transition: const Complete(),
+              );
+            }
+            return Completer<NodeResult<int>>().future;
+          },
+        ),
+      },
+    );
+    final runtime = AgentRuntime(store: store);
+    final controller = AgentController(
+      runtime: runtime,
+      workflow: workflow,
+      threadId: 'race',
+    );
+    addTearDown(controller.dispose);
+    await controller.start();
+    final original = runtime.attach('race')!;
+    late RunHandle newer;
+    store.afterLoad = () async {
+      store.afterLoad = () async {
+        release.complete();
+        await original.done;
+        newer = await runtime.start(workflow: workflow, threadId: 'race');
+      };
+    };
+    expect(await controller.cancel(), false);
+    expect(controller.state.error?.code, 'conflict');
+    expect(newer.snapshot.runId, isNot(original.snapshot.runId));
+    expect(newer.snapshot.status, RunStatus.running);
+    expect(runtime.attach('race'), same(newer));
+    await runtime.cancel('race', expectedRevision: newer.snapshot.revision);
+  });
+
+  test('cancel retries a checkpoint race only for the same live run', () async {
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    final store = _LoadRaceStore();
+    final workflow = Workflow<int>(
+      id: 'race',
+      entryNode: 'first',
+      codec: IntCodec(),
+      initialize: (_, _) => 0,
+      nodes: {
+        'first': WorkflowNode(
+          destinations: {'wait'},
+          execute: (_, _) async {
+            entered.complete();
+            await release.future;
+            return NodeResult(
+              update: (value) => value + 1,
+              transition: const ContinueAt('wait'),
+            );
+          },
+        ),
+        'wait': WorkflowNode(
+          execute: (_, _) => Completer<NodeResult<int>>().future,
+        ),
+      },
+    );
+    final controller = AgentController(
+      runtime: AgentRuntime(store: store),
+      workflow: workflow,
+      threadId: 'race',
+    );
+    addTearDown(controller.dispose);
+    await controller.start();
+    await entered.future;
+    store.afterLoad = () async {
+      release.complete();
+      await until(controller, (state) => state.data == 1);
+    };
+    expect(await controller.cancel(), true);
+    expect(controller.state.status, RunStatus.cancelled);
+    expect(controller.state.error?.code, 'cancelled');
+  });
+
   test(
     'projects typed state and supports later turns on the same thread',
     () async {
@@ -386,4 +479,16 @@ void main() {
       expect(restored.state.artifacts.single.payload['total'], 42);
     },
   );
+}
+
+class _LoadRaceStore extends MemoryCheckpointStore {
+  Future<void> Function()? afterLoad;
+  @override
+  Future<RunCheckpoint?> load(String threadId) async {
+    final checkpoint = await super.load(threadId);
+    final hook = afterLoad;
+    afterLoad = null;
+    await hook?.call();
+    return checkpoint;
+  }
 }

@@ -2,6 +2,7 @@ import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:google_generative_ai/google_generative_ai.dart' as sdk;
 
 import '../coach_tool_service.dart';
+import 'sdk_schema.dart';
 
 ToolRegistry repforgeTools(
   CoachToolService service, {
@@ -38,12 +39,7 @@ class RepForgeTool implements AgentTool {
       );
 
   static ValueSchema _arguments(sdk.FunctionDeclaration declaration) {
-    final schema = _schema(
-      jsonObject(
-        declaration.parameters?.toJson() ??
-            {'type': 'object', 'properties': <String, Object?>{}},
-      ),
-    );
+    final schema = sdkArgumentSchema(declaration);
     if (declaration.name == 'ask_user_questions') {
       final properties = jsonObject(schema['properties']);
       schema['properties'] = {
@@ -57,20 +53,6 @@ class RepForgeTool implements AgentTool {
     }
     return ValueSchema(schema);
   }
-
-  static JsonMap _schema(JsonMap schema) => {
-    for (final entry in schema.entries)
-      entry.key: switch (entry.key) {
-        'type' => (entry.value! as String).toLowerCase(),
-        'properties' => jsonObject(
-          entry.value,
-        ).map((key, value) => MapEntry(key, _schema(jsonObject(value)))),
-        'items' => _schema(jsonObject(entry.value)),
-        _ => entry.value,
-      },
-    if (schema['type'].toString().toLowerCase() == 'object')
-      'additionalProperties': false,
-  };
 
   @override
   Future<ToolOutcome> execute(ToolContext context) async {

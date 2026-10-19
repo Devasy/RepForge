@@ -4,9 +4,10 @@ import 'dart:convert';
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart';
 import 'ai_failure.dart';
+import 'orchestration/legacy_chat.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, FunctionCall, Tool, TextPart, DataPart;
+    show Content, FunctionCall, Tool;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
@@ -199,7 +200,13 @@ class GeminiAiService extends ChangeNotifier
   // Optional storage so cumulative token usage survives restarts.
   final IStorageService? _storage;
 
-  GeminiAiService({IStorageService? storage}) : _storage = storage;
+  final http.Client Function()? _modelClientFactory;
+
+  GeminiAiService({
+    IStorageService? storage,
+    http.Client Function()? modelClientFactory,
+  }) : _storage = storage,
+       _modelClientFactory = modelClientFactory;
 
   static const String _usageKey = 'aiTokenUsage';
 
@@ -461,6 +468,7 @@ class GeminiAiService extends ChangeNotifier
   ) =>
       GeminiModelProvider(
         apiKey: _apiKey,
+        clientFactory: _modelClientFactory,
         generationConfig: (model) => {
           'thinkingConfig': model.startsWith('gemini-2')
               ? {'thinkingBudget': 0}
@@ -502,54 +510,18 @@ class GeminiAiService extends ChangeNotifier
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
     String? imageBytesBase64,
     String? imageMimeType,
-  }) async* {
-    if (tools != null && tools.isNotEmpty) {
-      throw StateError('Use AgentRuntime for tool-enabled conversations.');
-    }
-    final token = CancellationToken();
-    try {
-      final request = ModelRequest(
-        modelId: _model,
-        systemPrompt: systemPrompt,
-        messages: [
-          for (final content in history)
-            ModelMessage(
-              role: content.role == 'model' ? 'assistant' : 'user',
-              text: content.parts
-                  .whereType<TextPart>()
-                  .map((part) => part.text)
-                  .join(),
-              attachments: [
-                for (final part in content.parts.whereType<DataPart>())
-                  {'mimeType': part.mimeType, 'data': base64Encode(part.bytes)},
-              ],
-            ),
-          ModelMessage(
-            role: 'user',
-            text: userMessage,
-            attachments: [
-              if (imageBytesBase64 != null)
-                {
-                  'mimeType': imageMimeType ?? 'image/jpeg',
-                  'data': imageBytesBase64,
-                },
-            ],
-          ),
-        ],
-        tools: const [],
-      );
-      await for (final event in stream(request, token)) {
-        if (event is ModelText) yield event.text;
-        if (event is ModelFinished && event.reason != ModelFinishReason.stop) {
-          throw const AiFailure(
-            'Gemini could not finish this reply. Please try again.',
-          );
-        }
-      }
-    } finally {
-      token.cancel();
-    }
-  }
+  }) => legacyChatReply(
+    model: this,
+    modelId: _model,
+    maxModelCalls: _maxToolRounds,
+    userMessage: userMessage,
+    systemPrompt: systemPrompt,
+    history: history,
+    tools: tools,
+    onToolCall: onToolCall,
+    imageBytesBase64: imageBytesBase64,
+    imageMimeType: imageMimeType,
+  );
 
   // ── Generic domain-agnostic structured JSON generator ───────────────────
   @override
