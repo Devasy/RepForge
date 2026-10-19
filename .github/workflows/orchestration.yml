@@ -6,6 +6,7 @@ on:
       - 'packages/ai_orchestration/**'
       - 'packages/ai_orchestration_sqlite/**'
       - 'packages/ai_orchestration_flutter/**'
+      - 'packages/ai_orchestration_gemini/**'
       - '.github/workflows/orchestration.yml'
   push:
     branches: [main, 'codex/reusable-ai-orchestration']
@@ -13,6 +14,7 @@ on:
       - 'packages/ai_orchestration/**'
       - 'packages/ai_orchestration_sqlite/**'
       - 'packages/ai_orchestration_flutter/**'
+      - 'packages/ai_orchestration_gemini/**'
       - '.github/workflows/orchestration.yml'
   workflow_dispatch:
 
@@ -24,7 +26,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        package: [ai_orchestration, ai_orchestration_sqlite]
+        package: [ai_orchestration, ai_orchestration_sqlite, ai_orchestration_gemini]
     runs-on: ${{ matrix.os }}
     defaults:
       run:

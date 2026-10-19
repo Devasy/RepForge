@@ -1,3 +1,4 @@
+import 'test_utils/legacy_ai_fixture.dart';
 // Widget tests for RoutineOptimizerScreen.
 //
 // Tests the view layer by injecting a pre-built RoutineOptimizerViewModel
@@ -28,8 +29,8 @@ import 'test_utils/mock_storage_service.dart';
 // ── Fake AI services ───────────────────────────────────────────────────────
 
 /// AI that immediately yields a single reply chunk and completes.
-class _ImmediateAi implements IAiService {
-  const _ImmediateAi({this.reply = 'All done!'});
+class _ImmediateAi with TestAiModelProvider implements IAiService {
+  _ImmediateAi({this.reply = 'All done!'});
   final String reply;
 
   @override
@@ -71,28 +72,26 @@ class _ImmediateAi implements IAiService {
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
     String? imageBytesBase64,
     String? imageMimeType,
-  }) =>
-      streamCoachReply(
-        userMessage: userMessage,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: tools,
-        onToolCall: onToolCall,
-        imageBytesBase64: imageBytesBase64,
-        imageMimeType: imageMimeType,
-      );
+  }) => streamCoachReply(
+    userMessage: userMessage,
+    systemPrompt: systemPrompt,
+    history: history,
+    tools: tools,
+    onToolCall: onToolCall,
+    imageBytesBase64: imageBytesBase64,
+    imageMimeType: imageMimeType,
+  );
 
   @override
   Future<T> generateStructuredJson<T>({
     required String systemPrompt,
     required String userPrompt,
     required T Function(Map<String, dynamic> json) fromJson,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 }
 
 /// AI that hangs indefinitely — keeps `isLoading` true for the entire test.
-class _HangingAi implements IAiService {
+class _HangingAi with TestAiModelProvider implements IAiService {
   final _done = Completer<void>();
 
   @override
@@ -136,29 +135,27 @@ class _HangingAi implements IAiService {
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
     String? imageBytesBase64,
     String? imageMimeType,
-  }) =>
-      streamCoachReply(
-        userMessage: userMessage,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: tools,
-        onToolCall: onToolCall,
-        imageBytesBase64: imageBytesBase64,
-        imageMimeType: imageMimeType,
-      );
+  }) => streamCoachReply(
+    userMessage: userMessage,
+    systemPrompt: systemPrompt,
+    history: history,
+    tools: tools,
+    onToolCall: onToolCall,
+    imageBytesBase64: imageBytesBase64,
+    imageMimeType: imageMimeType,
+  );
 
   @override
   Future<T> generateStructuredJson<T>({
     required String systemPrompt,
     required String userPrompt,
     required T Function(Map<String, dynamic> json) fromJson,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 }
 
 /// AI that fires an `ask_user_questions` tool call before yielding a reply.
-class _QuestionAi implements IAiService {
-  const _QuestionAi();
+class _QuestionAi with TestAiModelProvider implements IAiService {
+  _QuestionAi();
 
   @override
   bool get isConfigured => true;
@@ -176,15 +173,17 @@ class _QuestionAi implements IAiService {
     String? imageMimeType,
   }) async* {
     if (onToolCall != null) {
-      await onToolCall(FunctionCall('ask_user_questions', {
-        'preamble': 'Before I start, a quick question.',
-        'questions': [
-          {
-            'question': 'What is your primary goal?',
-            'options': ['Strength', 'Hypertrophy', 'Fat loss'],
-          },
-        ],
-      }));
+      await onToolCall(
+        FunctionCall('ask_user_questions', {
+          'preamble': 'Before I start, a quick question.',
+          'questions': [
+            {
+              'question': 'What is your primary goal?',
+              'options': ['Strength', 'Hypertrophy', 'Fat loss'],
+            },
+          ],
+        }),
+      );
     }
     yield 'Done.';
   }
@@ -210,24 +209,37 @@ class _QuestionAi implements IAiService {
     Future<Map<String, Object?>> Function(FunctionCall call)? onToolCall,
     String? imageBytesBase64,
     String? imageMimeType,
-  }) =>
-      streamCoachReply(
-        userMessage: userMessage,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: tools,
-        onToolCall: onToolCall,
-        imageBytesBase64: imageBytesBase64,
-        imageMimeType: imageMimeType,
-      );
+  }) => streamCoachReply(
+    userMessage: userMessage,
+    systemPrompt: systemPrompt,
+    history: history,
+    tools: tools,
+    onToolCall: onToolCall,
+    imageBytesBase64: imageBytesBase64,
+    imageMimeType: imageMimeType,
+  );
 
   @override
   Future<T> generateStructuredJson<T>({
     required String systemPrompt,
     required String userPrompt,
     required T Function(Map<String, dynamic> json) fromJson,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
+}
+
+Future<void> _startRoutine(
+  WidgetTester tester,
+  RoutineOptimizerViewModel vm,
+) async {
+  var completed = false;
+  final starting = vm
+      .startForRoutine(_pushDay)
+      .whenComplete(() => completed = true);
+  for (var frame = 0; frame < 100 && !completed; frame++) {
+    await tester.pump(const Duration(milliseconds: 10));
+  }
+  expect(completed, isTrue, reason: 'The orchestration segment should finish.');
+  await starting;
 }
 
 // ── Test helpers ───────────────────────────────────────────────────────────
@@ -250,19 +262,19 @@ RoutineOptimizerViewModel _buildVm(IAiService ai) {
 }
 
 Widget _wrap(RoutineOptimizerViewModel vm) => MaterialApp(
-      theme: AppTheme.darkTheme,
-      home: ChangeNotifierProvider<RoutineOptimizerViewModel>.value(
-        value: vm,
-        child: RoutineOptimizerScreen.testBody(_pushDay),
-      ),
-    );
+  theme: AppTheme.darkTheme,
+  home: ChangeNotifierProvider<RoutineOptimizerViewModel>.value(
+    value: vm,
+    child: RoutineOptimizerScreen.testBody(_pushDay),
+  ),
+);
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 void main() {
   group('RoutineOptimizerScreen', () {
     testWidgets('shows title and routine name in header', (tester) async {
-      final vm = _buildVm(const _ImmediateAi());
+      final vm = _buildVm(_ImmediateAi());
       await tester.pumpWidget(_wrap(vm));
       await tester.pump();
 
@@ -270,7 +282,9 @@ void main() {
       expect(find.text('Push Day'), findsOneWidget);
     });
 
-    testWidgets('shows loading indicator while AI is streaming', (tester) async {
+    testWidgets('shows loading indicator while AI is streaming', (
+      tester,
+    ) async {
       final ai = _HangingAi();
       final vm = _buildVm(ai);
       await tester.pumpWidget(_wrap(vm));
@@ -280,14 +294,19 @@ void main() {
       await tester.pump();
 
       // Streaming bubble with loading dots should be visible.
-      expect(find.byType(CircularProgressIndicator).evaluate().isNotEmpty ||
-             // RFLoadingDots is the animated dot indicator used in the bubble.
-             find.byWidgetPredicate(
-               (w) => w.runtimeType.toString() == 'RFLoadingDots',
-             ).evaluate().isNotEmpty ||
-             find.byIcon(Icons.auto_fix_high_rounded).evaluate().isNotEmpty,
-             isTrue,
-             reason: 'A streaming/loading indicator should be visible');
+      expect(
+        find.byType(CircularProgressIndicator).evaluate().isNotEmpty ||
+            // RFLoadingDots is the animated dot indicator used in the bubble.
+            find
+                .byWidgetPredicate(
+                  (w) => w.runtimeType.toString() == 'RFLoadingDots',
+                )
+                .evaluate()
+                .isNotEmpty ||
+            find.byIcon(Icons.auto_fix_high_rounded).evaluate().isNotEmpty,
+        isTrue,
+        reason: 'A streaming/loading indicator should be visible',
+      );
 
       // Verify we are in a loading state overall
       expect(vm.isLoading, isTrue);
@@ -297,10 +316,10 @@ void main() {
     });
 
     testWidgets('renders seed user message and AI reply', (tester) async {
-      final vm = _buildVm(const _ImmediateAi(reply: 'Great plan!'));
+      final vm = _buildVm(_ImmediateAi(reply: 'Great plan!'));
       await tester.pumpWidget(_wrap(vm));
 
-      await vm.startForRoutine(_pushDay);
+      await _startRoutine(tester, vm);
       await tester.pump();
 
       // Seed user message
@@ -315,9 +334,9 @@ void main() {
     });
 
     testWidgets('user messages align to the right', (tester) async {
-      final vm = _buildVm(const _ImmediateAi());
+      final vm = _buildVm(_ImmediateAi());
       await tester.pumpWidget(_wrap(vm));
-      await vm.startForRoutine(_pushDay);
+      await _startRoutine(tester, vm);
       await tester.pump();
 
       // There should be at least one message in the list.
@@ -345,7 +364,10 @@ void main() {
 
         // Submitting an answer unblocks the stream.
         vm.submitAnswers([
-          AnswerSpec(question: 'What is your primary goal?', selected: ['Strength']),
+          AnswerSpec(
+            question: 'What is your primary goal?',
+            selected: ['Strength'],
+          ),
         ]);
         await tester.pumpAndSettle();
         expect(find.byType(RFQuestionCard), findsNothing);
@@ -357,28 +379,34 @@ void main() {
 
     testWidgets('back button pops the route', (tester) async {
       bool popped = false;
-      final vm = _buildVm(const _ImmediateAi());
+      final vm = _buildVm(_ImmediateAi());
 
-      await tester.pumpWidget(MaterialApp(
-        theme: AppTheme.darkTheme,
-        home: Builder(builder: (ctx) {
-          return Scaffold(
-            body: ElevatedButton(
-              onPressed: () => Navigator.push(
-                ctx,
-                MaterialPageRoute<void>(
-                  builder: (_) => ChangeNotifierProvider<
-                      RoutineOptimizerViewModel>.value(
-                    value: vm,
-                    child: RoutineOptimizerScreen.testBody(_pushDay),
-                  ),
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Builder(
+            builder: (ctx) {
+              return Scaffold(
+                body: ElevatedButton(
+                  onPressed: () => Navigator.push(
+                    ctx,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ChangeNotifierProvider<
+                            RoutineOptimizerViewModel
+                          >.value(
+                            value: vm,
+                            child: RoutineOptimizerScreen.testBody(_pushDay),
+                          ),
+                    ),
+                  ).then((_) => popped = true),
+                  child: const Text('Open'),
                 ),
-              ).then((_) => popped = true),
-              child: const Text('Open'),
-            ),
-          );
-        }),
-      ));
+              );
+            },
+          ),
+        ),
+      );
 
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
@@ -390,9 +418,10 @@ void main() {
       expect(popped, isTrue);
     });
 
-    testWidgets('history sheet shows empty state when no conversations',
-        (tester) async {
-      final vm = _buildVm(const _ImmediateAi());
+    testWidgets('history sheet shows empty state when no conversations', (
+      tester,
+    ) async {
+      final vm = _buildVm(_ImmediateAi());
       await tester.pumpWidget(_wrap(vm));
       await tester.pump();
 
@@ -401,10 +430,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Optimization History'), findsOneWidget);
-      expect(
-        find.text('No saved optimization sessions yet.'),
-        findsOneWidget,
-      );
+      expect(find.text('No saved optimization sessions yet.'), findsOneWidget);
     });
   });
 }

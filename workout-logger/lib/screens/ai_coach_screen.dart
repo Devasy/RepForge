@@ -15,6 +15,8 @@ import '../genui/a2ui.dart';
 import '../viewmodels/ai_coach_view_model.dart';
 import '../services/ai/gemini_ai_service.dart';
 import '../services/ai/coach_tool_service.dart';
+import '../services/ai/orchestration/repforge_agents.dart';
+import 'widgets/agent_run_controls.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
 import '../theme/app_theme.dart';
@@ -40,6 +42,7 @@ class AiCoachScreen extends StatelessWidget {
         coachTools: ctx.read<CoachToolService>(),
         conversations: ctx.read<ConversationManager>(),
         settings: ctx.read<SettingsProvider>(),
+        agents: ctx.read<RepForgeAgents>(),
       )..loadConversations(),
       child: _AiCoachView(seedPrompt: seedPrompt),
     );
@@ -148,6 +151,8 @@ class _AiCoachViewState extends State<_AiCoachView> {
                     ],
                   ),
                 ),
+              AgentRunControls(pending: vm.pendingInput, needsRecovery: vm.needsRecovery,
+                onSubmit: vm.submitInput, onStop: vm.cancelRun),
               if (vm.isConfigured) _buildInputBar(vm),
             ],
           ),

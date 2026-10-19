@@ -7,6 +7,7 @@ import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/settings_provider.dart';
 import 'package:repforge/services/ai/gemini_ai_service.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
+import 'package:repforge/services/ai/orchestration/repforge_agents.dart';
 import 'package:repforge/services/managers/conversation_manager.dart';
 import 'package:repforge/services/managers/history_manager.dart';
 import 'package:repforge/services/managers/health_history_manager.dart';
@@ -62,6 +63,7 @@ class TestHarness {
         Provider<IHealthConnectService>.value(value: const StubHcService()),
         Provider<HealthDataSyncService?>.value(value: null),
         Provider<CoachToolService>.value(value: tools),
+        Provider<RepForgeAgents>.value(value: RepForgeAgents.inMemory(ai)),
         Provider<IMLService>.value(value: MockMLService()),
       ],
       child: MaterialApp(

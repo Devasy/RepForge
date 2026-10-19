@@ -34,6 +34,9 @@ class SqlQueryService {
   ];
 
   static const _forbiddenIdentifiers = [
+    'REPFORGE_AI_RUNS',
+    'REPFORGE_AI_META',
+    'REPFORGE_AI_OPERATIONS',
     'SETTINGS',
     'SQLITE_MASTER',
     'SQLITE_TEMP_MASTER',

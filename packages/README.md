@@ -7,6 +7,7 @@ This is the first implementation slice from the orchestration review. These pack
 | `ai_orchestration` | Pure Dart graph coordinator, typed state updates, provider port, model/tool loop, schema validation, host tool policy, correlated events, interrupts, cancellation, execution limits and checkpoint port. |
 | `ai_orchestration_sqlite` | Persistent SQLite checkpoints, revision checks, transaction-scoped operation deduplication, curated schema descriptions and named parameterized read tools. |
 | `ai_orchestration_flutter` | Typed observable controller, attach/restore/detach lifecycle, input submission, artifact renderer registry and optional approval widgets. |
+| `ai_orchestration_gemini` | Gemini REST streaming adapter, continuation/signature preservation, native tool correlation, usage, cancellation and request-scoped retry/fallback. |
 
 All packages are private `0.1.0` packages while the API settles. They inherit this repository's Apache-2.0 license. They can be used through path dependencies; only the Flutter bridge requires Flutter.
 
@@ -34,10 +35,8 @@ dart run example/task_assistant.dart
 
 The expense example suspends for input and continues through a new runtime instance. The task example queries a real SQLite database and persists execution state. Their providers are deliberately scripted for deterministic examples. They demonstrate two domains using the same engine; they do not evaluate a live language model.
 
-## Next implementation slices
+## RepForge integration
 
-1. Implement a Gemini adapter against `ModelProvider`, preserving native IDs, finish reasons, opaque continuation data, multimodal payloads, usage and typed failures. Keep transport retries inside that adapter and scoped to an individual request.
-2. Adopt the packages in RepForge's current coach, then migrate the optimizer to an explicit application workflow. Preserve existing health/SQL tools, A2UI, attachments, settings and failure handling.
-3. Add richer SQLite query planning only with driver-specific resource controls. The current query tools accept application-owned SQL templates, not arbitrary generated SQL. SQLite data access remains an ordinary registered tool; runtime checkpoint storage is a separate responsibility.
+RepForge's coach and optimizer now use application-scoped agent sessions and the Flutter bridge. The app supplies its existing analytics/health/SQL/domain tools through a registry, requires explicit approval for writes, persists optimizer questions and checkpoints, and keeps A2UI rendering in its existing message UI. Gemini settings, quota fallback and token accounting remain host-owned. View disposal detaches; process recreation restores committed questions/approvals. Interrupted running work requires an explicit stop and reconciliation instead of automatic write replay. Chat deletion removes its execution checkpoint. Portable backups contain conversations, not executable continuations.
 
-The Flutter bridge is implemented, but the existing app is not wired to these packages yet. Its screens and behavior remain unchanged in this slice.
+SQLite data access remains an ordinary registered tool; runtime checkpoint storage is separate. The reusable read tools accept application-owned SQL templates. RepForge retains its existing read-only SQL tool and protections, including restrictions on orchestration/settings tables. Richer generated-query planning and native resource controls remain future work.

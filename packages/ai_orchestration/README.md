@@ -29,6 +29,8 @@ await subscription.cancel();
 
 ## Application workflows
 
+`chatWorkflow(initialMessages: ...)` can import existing conversation history for the first turn. Later turns use saved state. `ChatState.turnStart` identifies the current user turn for host transcript projection and survives checkpoint/resume.
+
 Use `Workflow<S>`, an immutable application state type and `StateCodec<S>` for domain-specific graphs. Each `WorkflowNode<S>` returns a `NodeResult<S>` containing a typed update and a `ContinueAt`, `SuspendAt` or `Complete` transition. Only the runtime applies the update. All possible destinations must be declared and present in the graph.
 
 The codec converts state to finite JSON. The checkpoint freezes that JSON; connections, credentials, services and widgets belong outside state. The host must supply immutable decoded state. Change `Workflow.version` when state or graph compatibility changes. Restoring a different version fails explicitly; automatic migration is not implemented.
@@ -60,11 +62,13 @@ New turns on running or suspended threads are rejected. A new chat turn after a 
 
 ## Tools, policies and schemas
 
+`runtime.retry` retries only a saved failed node explicitly marked `replaySafe`, preserving run identity, state and accumulated budgets. It rejects active, suspended and exhausted runs and non-replay-safe nodes. Unlike `recover`, it does not claim orphaned running work. Hosts should still decide whether a retry is appropriate after earlier side effects; RepForge disables retry after any tool was requested.
+
 An `AgentTool` advertises an immutable `ToolDefinition` and receives `ToolContext`. Arguments are validated before policy or execution. Duplicate tool names and unavailable calls are rejected. The default policy allows reads and denies writes. A host policy can allow a clearly requested operation, deny it, or require approval. Approval is bound to the pending call and its arguments, rechecked against the current policy, and persisted before execution.
 
 Tools return `ToolSuccess` with JSON data and optional artifacts, or `ToolNeedsInput` with a generic `InputRequest`. Input requests describe data, not Flutter widgets. The `tool_approval` request kind is reserved for authorization. Render artifacts through host-registered handlers using their type/version; the core imposes no chart or UI framework.
 
-`ValueSchema` supports types, enum, object properties/required/additionalProperties, array items/minItems/maxItems and numeric minimum/maximum. Unsupported keywords fail during registration rather than being silently ignored. It is a bounded vocabulary, not a complete JSON Schema implementation.
+`ValueSchema` supports types, enum, object properties/required/additionalProperties, array items/minItems/maxItems, numeric minimum/maximum, nullable values and description annotations. Unsupported keywords fail during registration rather than being silently ignored. It is a bounded vocabulary, not a complete JSON Schema implementation.
 
 Tool failures are explicit run failures in this first version. Application-specific repair/error-to-model policies can be implemented as custom nodes. There are no automatic mutation retries. `ToolContext.operationId` scopes a receipt to thread, run, model invocation and native call ID. Native IDs may repeat across different model invocations without aliasing receipts. Custom nodes invoking tools outside model passes must use distinct call IDs for distinct logical operations.
 

@@ -98,6 +98,25 @@ class AgentController<S> extends ChangeNotifier
         _bind(handle, epoch);
       });
 
+  /// Retries the saved failed node only when its workflow marks replay safe.
+  Future<bool> retry() => _command((epoch) async {
+    final saved = _checkpoint;
+    if (saved == null) {
+      throw const OrchestrationException(
+        'missing_run',
+        'No saved run was found.',
+      );
+    }
+    _bind(
+      await runtime.retry(
+        workflow: workflow,
+        threadId: threadId,
+        expectedRevision: saved.revision,
+      ),
+      epoch,
+    );
+  });
+
   /// Host must first establish that the previous executor has stopped.
   Future<bool> recover() => _command((epoch) async {
     final saved = _checkpoint;

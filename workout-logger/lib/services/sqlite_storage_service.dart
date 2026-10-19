@@ -201,6 +201,7 @@ class SqliteStorageService implements IStorageService {
   /// File path of the open database — used by SqlQueryService to open a
   /// separate read-only connection for the coach's SQL tool.
   String get databasePath => _db.path;
+  Database get database => _db;
 
   Future<void> close() async {
     if (!_initialized) return;
@@ -1064,6 +1065,11 @@ class SqliteStorageService implements IStorageService {
   @override
   Future<void> deleteConversation(String id) async {
     await _db.delete('conversations', where: 'id = ?', whereArgs: [id]);
+    final tables = await _db.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'repforge_ai_runs'");
+    if (tables.isNotEmpty) {
+      await _db.delete('repforge_ai_runs', where: 'thread_id IN (?, ?)', whereArgs: ['coach:$id', 'optimizer:$id']);
+    }
+    await _db.delete('settings', where: 'key IN (?, ?)', whereArgs: ['aiCheckpoint:coach:$id', 'aiCheckpoint:optimizer:$id']);
   }
 
   // ==================== STATS ====================
@@ -1180,7 +1186,7 @@ class SqliteStorageService implements IStorageService {
     final settingsRows = await _db.query('settings');
     final settingsMap = <String, String>{
       for (final row in settingsRows)
-        if (row['value'] != null) row['key'] as String: row['value'] as String,
+        if (row['value'] != null && !(row['key']! as String).startsWith('aiCheckpoint:')) row['key'] as String: row['value'] as String,
     };
 
     final programs = await getAllTrainingPrograms();

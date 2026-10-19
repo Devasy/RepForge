@@ -135,6 +135,30 @@ class AgentRuntime {
     return _launch(workflow, resumed, RunEventType.resumed);
   }
 
+  /// Retries a failed replay-safe node without resetting its persisted budgets.
+  Future<RunHandle> retry<S>({
+    required Workflow<S> workflow,
+    required String threadId,
+    required int expectedRevision,
+  }) async {
+    final checkpoint = await _load(workflow, threadId, expectedRevision);
+    if (_active.containsKey(threadId) ||
+        checkpoint.status != RunStatus.failed ||
+        workflow.nodes[checkpoint.nextNode]?.replaySafe != true) {
+      throw const OrchestrationException(
+        'unsafe_retry',
+        'This node cannot be retried safely.',
+      );
+    }
+    final retried = checkpoint.update({
+      'revision': checkpoint.revision + 1,
+      'status': RunStatus.running.name,
+      'failure': null,
+    });
+    await store.save(retried, expectedRevision: expectedRevision);
+    return _launch(workflow, retried, RunEventType.resumed);
+  }
+
   /// Only call after the previous executor has stopped; this is not a lease.
   Future<RunHandle> recover<S>({
     required Workflow<S> workflow,

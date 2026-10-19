@@ -21,6 +21,7 @@ class ConversationManager extends ChangeNotifier {
 
   List<Conversation> _conversations = [];
   Conversation? _active;
+  Future<void> _writes = Future.value();
 
   ConversationManager(this._storage, {this.kind = 'coach'});
 
@@ -61,6 +62,7 @@ class ConversationManager extends ChangeNotifier {
   /// then persist. The conversation title is derived from the first user
   /// message. Bumps `updatedAt` and re-sorts the list newest-first.
   Future<void> appendMessage(ChatMessage message) async {
+    await _writes;
     final current = _active;
     final Conversation updated;
 
@@ -84,6 +86,25 @@ class ConversationManager extends ChangeNotifier {
     _active = updated;
     _upsert(updated);
     await _storage.saveConversation(updated);
+    notifyListeners();
+  }
+
+  Future<void> appendTo(String conversationId, ChatMessage message) async {
+    final operation = _writes.then((_) => _appendTo(conversationId, message));
+    _writes = operation.then<void>((_) => null, onError: (Object _, StackTrace _) => null);
+    return operation;
+  }
+
+  Future<void> _appendTo(String conversationId, ChatMessage message) async {
+    final current = _conversations.where((c) => c.id == conversationId).firstOrNull;
+    if (current == null || current.messages.any((m) => m.id == message.id)) return;
+    final updated = current.copyWith(
+      updatedAt: DateTime.now(),
+      messages: [...current.messages, message],
+    );
+    await _storage.saveConversation(updated);
+    if (_active?.id == conversationId) _active = updated;
+    _upsert(updated);
     notifyListeners();
   }
 

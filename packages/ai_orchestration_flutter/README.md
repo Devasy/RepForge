@@ -96,4 +96,6 @@ flutter analyze --no-pub --fatal-infos
 flutter test --no-pub
 ```
 
-This package does not connect Gemini or migrate RepForge's screens. Those integrations remain separate consumers of the bridge and core.
+`retry()` delegates to the runtime's failed-node retry, with the captured checkpoint revision. It preserves budgets and is permitted only for replay-safe failed nodes. The host still chooses whether to offer a retry after earlier side effects.
+
+The sibling Gemini adapter and RepForge app are separate consumers of the bridge and core; this package has no provider or application dependency.

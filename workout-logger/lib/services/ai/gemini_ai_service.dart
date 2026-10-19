@@ -1,20 +1,12 @@
-// gemini_ai_service.dart — google_generative_ai implementation of IAiService.
-//
-// Backs the AI coach chat (streaming + tool calling), program generation, and
-// insights. Uses a user-supplied Google AI Studio API key (free-tier friendly).
-// Implements [IAiService] so the backend can be swapped without touching consumers.
-//
-// Uses direct HTTP calls (rather than the SDK's chat helpers) so we can pass
-// thinkingConfig: {thinkingBudget: 0} and avoid the SDK crashing on the
-// `thoughtSignature` parts that Gemini 3.x models return when thinking is active.
-// The SDK is still used for its type definitions (Content, Tool, FunctionCall)
-// and their toJson() serialisers which are part of the public API.
+// Gemini settings, usage and generation facade; execution belongs to AgentRuntime.
 
 import 'dart:convert';
+import 'package:ai_orchestration/ai_orchestration.dart';
+import 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart';
 import 'ai_failure.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, FunctionCall, Tool;
+    show Content, FunctionCall, Tool, TextPart, DataPart;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
@@ -202,7 +194,8 @@ List<Object?> buildGeminiChatContents(
   return contents;
 }
 
-class GeminiAiService extends ChangeNotifier implements IAiService {
+class GeminiAiService extends ChangeNotifier
+    implements IAiService, ModelProvider {
   // Optional storage so cumulative token usage survives restarts.
   final IStorageService? _storage;
 
@@ -393,92 +386,6 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     }
   }
 
-  // Streams parsed SSE chunks from the streamGenerateContent endpoint.
-  Stream<Map<String, dynamic>> _streamSse(Map<String, dynamic> body) async* {
-    // Establish the connection with retries. Retrying is only safe here —
-    // before any bytes are yielded — so a transient 503 never reaches the user,
-    // but a mid-stream failure is not retried (it would duplicate output).
-    http.Client client = http.Client();
-    http.StreamedResponse streamed;
-    for (var attempt = 0; ; attempt++) {
-      final uri = Uri.parse(
-        '$_apiBase/$_model:streamGenerateContent?alt=sse&key=$_apiKey',
-      );
-      final request = http.Request('POST', uri)
-        ..headers['Content-Type'] = 'application/json'
-        ..body = jsonEncode(body);
-      final resp = await client.send(request);
-      if (resp.statusCode == 200) {
-        streamed = resp;
-        break;
-      }
-      final err = await resp.stream.bytesToString();
-
-      // Automatically fallback to next model when daily free quota limit is reached.
-      if (_isDailyQuotaExhausted(err)) {
-        final fallback = getFallbackModel(_model);
-        if (fallback != null) {
-          _model = fallback;
-          _thinkingLevel = clampThinkingLevel(_model, _thinkingLevel);
-          // gemini-2.5-flash and the 3.x family use different thinkingConfig
-          // shapes (see _thinkingConfig) — rebuild it for the new model so the
-          // retried request isn't rejected for the previous model's shape.
-          (body['generationConfig'] as Map<String, dynamic>)['thinkingConfig'] =
-              _thinkingConfig;
-          notifyListeners();
-          client.close();
-          client = http.Client();
-          continue;
-        }
-      }
-
-      final customDelay = _extractRetryDelay(err);
-      if (_isRetryableStatus(resp.statusCode) &&
-          (attempt < _kMaxRetries ||
-              (customDelay != null && attempt < _kMaxRetriesWithServerDelay))) {
-        client.close();
-        final delay = customDelay ?? _retryBackoff(attempt);
-        await Future.delayed(delay);
-        client = http.Client();
-        continue;
-      }
-      client.close();
-      throw AiFailure.from(
-        _errorMessage(resp.statusCode, err),
-        statusCode: resp.statusCode,
-      );
-    }
-
-    try {
-      final lineBuf = StringBuffer();
-      await for (final raw in streamed.stream.transform(utf8.decoder)) {
-        lineBuf.write(raw);
-        final text = lineBuf.toString();
-        final lines = text.split('\n');
-        lineBuf
-          ..clear()
-          ..write(lines.last); // keep potentially incomplete last line
-        for (var i = 0; i < lines.length - 1; i++) {
-          final line = lines[i].trim();
-          if (!line.startsWith('data: ')) continue;
-          final payload = line.substring(6).trim();
-          if (payload.isEmpty || payload == '[DONE]') continue;
-          yield jsonDecode(payload) as Map<String, dynamic>;
-        }
-      }
-      // Flush any remaining buffered line.
-      final tail = lineBuf.toString().trim();
-      if (tail.startsWith('data: ')) {
-        final payload = tail.substring(6).trim();
-        if (payload.isNotEmpty && payload != '[DONE]') {
-          yield jsonDecode(payload) as Map<String, dynamic>;
-        }
-      }
-    } finally {
-      client.close();
-    }
-  }
-
   // Single-shot (non-streaming) generateContent call, with retry on 5xx/429.
   Future<Map<String, dynamic>> _generate(Map<String, dynamic> body) async {
     for (var attempt = 0; ; attempt++) {
@@ -548,6 +455,45 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
   );
 
   @override
+  Stream<ModelEvent> stream(
+    ModelRequest request,
+    CancellationToken cancellation,
+  ) =>
+      GeminiModelProvider(
+        apiKey: _apiKey,
+        generationConfig: (model) => {
+          'thinkingConfig': model.startsWith('gemini-2')
+              ? {'thinkingBudget': 0}
+              : {'thinkingLevel': clampThinkingLevel(model, _thinkingLevel)},
+        },
+        fallbackModel: getFallbackModel,
+        onModelChanged: (model) {
+          _model = model;
+          _thinkingLevel = clampThinkingLevel(model, _thinkingLevel);
+          notifyListeners();
+        },
+        onUsage: (usage) async {
+          try {
+            await recordUsage(
+              prompt: (usage['promptTokenCount'] as num?)?.toInt() ?? 0,
+              response: (usage['candidatesTokenCount'] as num?)?.toInt() ?? 0,
+              total: (usage['totalTokenCount'] as num?)?.toInt() ?? 0,
+            );
+          } catch (_) {
+            debugPrint('Could not persist AI usage.');
+          }
+        },
+      ).stream(
+        ModelRequest(
+          modelId: _model,
+          systemPrompt: request.systemPrompt,
+          messages: request.messages,
+          tools: request.tools,
+        ),
+        cancellation,
+      );
+
+  @override
   Stream<String> streamCoachReply({
     required String userMessage,
     required String systemPrompt,
@@ -557,116 +503,51 @@ class GeminiAiService extends ChangeNotifier implements IAiService {
     String? imageBytesBase64,
     String? imageMimeType,
   }) async* {
-    if (!isConfigured) {
-      yield 'Please add your Gemini API key in Profile → AI Features to get started.';
-      return;
+    if (tools != null && tools.isNotEmpty) {
+      throw StateError('Use AgentRuntime for tool-enabled conversations.');
     }
+    final token = CancellationToken();
     try {
-      final userParts = <Map<String, Object?>>[];
-      if (imageBytesBase64 != null && imageBytesBase64.isNotEmpty) {
-        userParts.add({
-          'inlineData': {
-            'mimeType': imageMimeType ?? 'image/jpeg',
-            'data': imageBytesBase64,
-          },
-        });
-      }
-      userParts.add({
-        'text': userMessage.trim().isNotEmpty
-            ? userMessage.trim()
-            : (imageBytesBase64 != null ? 'Please analyze this image.' : ''),
-      });
-
-      // Build the mutable contents list; grows with each tool-call round.
-      final contents = buildGeminiChatContents(history, userParts);
-
-      for (var round = 0; round < _maxToolRounds; round++) {
-        final body = _makeBody(
-          contents: contents,
-          system: systemPrompt,
-          tools: tools,
-        );
-
-        // Raw parts from the model turn — preserved verbatim so that any
-        // thought_signature fields on functionCall parts are not dropped when
-        // we echo this turn back to the API in the next round.
-        final rawModelParts = <Map<String, dynamic>>[];
-        final calls = <FunctionCall>[];
-        // Parallel to `calls` — the SDK's FunctionCall type has no `id`
-        // field, so ids are tracked alongside it and matched back up when
-        // building functionResponse parts (needed to correlate responses in
-        // multi-tool-call turns).
-        final callIds = <String?>[];
-        Map<String, dynamic>? lastUsage;
-
-        await for (final chunk in _streamSse(body)) {
-          final candidates = chunk['candidates'] as List<dynamic>? ?? [];
-          for (final raw in candidates) {
-            final c = raw as Map<String, dynamic>;
-            for (final t in _textFromCandidate(c)) {
-              yield t;
-            }
-            // Collect raw parts for the model-turn echo.
-            final content = c['content'] as Map<String, dynamic>?;
-            final parts = content?['parts'] as List<dynamic>? ?? [];
-            for (final part in parts) {
-              if (part is! Map<String, dynamic>) continue;
-              rawModelParts.add(part);
-              if (part.containsKey('functionCall')) {
-                final fc = part['functionCall'] as Map<String, dynamic>;
-                calls.add(
-                  FunctionCall(
-                    fc['name'] as String,
-                    (fc['args'] as Map<String, dynamic>? ?? {})
-                        .cast<String, Object?>(),
-                  ),
-                );
-                callIds.add(fc['id'] as String?);
-              }
-            }
-          }
-          if (chunk['usageMetadata'] != null) {
-            lastUsage = chunk['usageMetadata'] as Map<String, dynamic>;
-          }
+      final request = ModelRequest(
+        modelId: _model,
+        systemPrompt: systemPrompt,
+        messages: [
+          for (final content in history)
+            ModelMessage(
+              role: content.role == 'model' ? 'assistant' : 'user',
+              text: content.parts
+                  .whereType<TextPart>()
+                  .map((part) => part.text)
+                  .join(),
+              attachments: [
+                for (final part in content.parts.whereType<DataPart>())
+                  {'mimeType': part.mimeType, 'data': base64Encode(part.bytes)},
+              ],
+            ),
+          ModelMessage(
+            role: 'user',
+            text: userMessage,
+            attachments: [
+              if (imageBytesBase64 != null)
+                {
+                  'mimeType': imageMimeType ?? 'image/jpeg',
+                  'data': imageBytesBase64,
+                },
+            ],
+          ),
+        ],
+        tools: const [],
+      );
+      await for (final event in stream(request, token)) {
+        if (event is ModelText) yield event.text;
+        if (event is ModelFinished && event.reason != ModelFinishReason.stop) {
+          throw const AiFailure(
+            'Gemini could not finish this reply. Please try again.',
+          );
         }
-        _recordRawUsage(lastUsage);
-
-        // No tools requested (or no handler) → the streamed text is the answer.
-        if (calls.isEmpty || onToolCall == null) return;
-
-        // Echo the model turn back verbatim (preserves thought_signature).
-        contents.add({'role': 'model', 'parts': rawModelParts});
-
-        // Resolve every call and feed the results back as one function turn.
-        final responseParts = <Map<String, dynamic>>[];
-        for (var i = 0; i < calls.length; i++) {
-          final call = calls[i];
-          final id = callIds[i];
-          try {
-            final result = await onToolCall(call);
-            responseParts.add({
-              'functionResponse': {
-                'name': call.name,
-                'id': ?id,
-                'response': result,
-              },
-            });
-          } catch (e) {
-            responseParts.add({
-              'functionResponse': {
-                'name': call.name,
-                'id': ?id,
-                'response': {'error': '$e'},
-              },
-            });
-          }
-        }
-        contents.add({'role': 'user', 'parts': responseParts});
       }
-      // Exhausted the tool-round budget without a final text answer.
-      yield '\n\n_(Stopped after $_maxToolRounds tool steps — try rephrasing.)_';
-    } catch (e) {
-      throw e is AiFailure ? e : AiFailure.from(e);
+    } finally {
+      token.cancel();
     }
   }
 

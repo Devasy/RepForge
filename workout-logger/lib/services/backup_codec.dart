@@ -39,6 +39,10 @@ Map<String, dynamic> decodeBackup(String source) {
       decoded['settings'] is! Map<String, dynamic>) {
     throw const FormatException('Settings must be an object.');
   }
+  final settings = decoded['settings'];
+  if (settings is Map<String, dynamic>) {
+    settings.removeWhere((key, _) => key.startsWith('aiCheckpoint:'));
+  }
   return decoded;
 }
 

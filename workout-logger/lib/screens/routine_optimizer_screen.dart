@@ -13,6 +13,8 @@ import '../models/models.dart';
 import '../viewmodels/routine_optimizer_view_model.dart';
 import '../services/ai/gemini_ai_service.dart';
 import '../services/ai/coach_tool_service.dart';
+import '../services/ai/orchestration/repforge_agents.dart';
+import 'widgets/agent_run_controls.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/interfaces/storage_service_interface.dart';
 import '../services/settings_provider.dart';
@@ -43,9 +45,9 @@ class RoutineOptimizerScreen extends StatelessWidget {
           coachTools: ctx.read<CoachToolService>(),
           conversations: conversations,
           settings: ctx.read<SettingsProvider>(),
+          agents: ctx.read<RepForgeAgents>(),
         )
-          ..loadConversations()
-          ..startForRoutine(routine);
+          ..initializeForRoutine(routine);
       },
       child: _OptimizerView(routine: routine),
     );
@@ -111,6 +113,10 @@ class _OptimizerViewState extends State<_OptimizerView> {
               children: [
                 _buildHeader(context, vm),
                 Expanded(child: _buildChatArea(vm)),
+                if (vm.failure != null) Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md), child: Text(vm.failure!.message)),
+                AgentRunControls(pending: vm.pendingInput, needsRecovery: vm.needsRecovery,
+                  onSubmit: vm.submitInput, onStop: vm.cancelRun),
               ],
             ),
           ),
@@ -242,11 +248,13 @@ class _OptimizerViewState extends State<_OptimizerView> {
         if (i == messages.length) {
           // Loading slot — show question card if pending, else streaming bubble
           if (vm.pendingQuestions != null) {
+            final target = vm.pendingInput!;
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.md),
               child: RFQuestionCard(
                 questions: vm.pendingQuestions!.questions,
-                onSubmit: vm.submitAnswers,
+                onSubmit: (answers) => vm.submitAnswers(answers, target: target),
+                key: ValueKey('${target.runId}:${target.request.id}'),
               ),
             );
           }

@@ -19,6 +19,8 @@ import 'services/ai/sql_query_service.dart';
 import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
 import 'services/ai/coach_tool_service.dart';
+import 'services/ai/orchestration/repforge_agents.dart';
+import 'services/ai/orchestration/app_checkpoint_store.dart';
 import 'services/health_connect_service.dart';
 import 'services/health_data_sync_service.dart';
 import 'services/interfaces/storage_service_interface.dart';
@@ -179,6 +181,12 @@ class WorkoutLoggerApp extends StatelessWidget {
   static final ConversationManager _conversationManager = ConversationManager(
     _storageService,
   );
+  static final RepForgeAgents _agents = RepForgeAgents(
+    model: _geminiService,
+    store: AppCheckpointStore(_storageService),
+    maxModelCalls: () => _geminiService.maxToolRounds,
+    modelId: () => _geminiService.currentModel,
+  );
 
   const WorkoutLoggerApp({super.key});
 
@@ -216,6 +224,7 @@ class WorkoutLoggerApp extends StatelessWidget {
         // program generator) receive it typed as IAiService at construction —
         // the future firebase_ai swap point — without a separate provider.
         ChangeNotifierProvider<GeminiAiService>.value(value: _geminiService),
+        Provider<RepForgeAgents>.value(value: _agents),
         ChangeNotifierProvider<ConversationManager>.value(
           value: _conversationManager,
         ),

@@ -39,6 +39,8 @@ class ValueSchema {
       'maximum',
       'minItems',
       'maxItems',
+      'nullable',
+      'description',
     };
     if (schema.keys.any((key) => !supported.contains(key)) ||
         !{
@@ -53,6 +55,10 @@ class ValueSchema {
       throw ArgumentError('Unsupported schema keyword or type.');
     }
     final properties = schema['properties'];
+    if ((schema['nullable'] != null && schema['nullable'] is! bool) ||
+        (schema['description'] != null && schema['description'] is! String)) {
+      throw ArgumentError('Invalid schema annotation.');
+    }
     if (properties != null) {
       for (final value in jsonObject(properties).values) {
         _checkDefinition(jsonObject(value));
@@ -95,6 +101,7 @@ class ValueSchema {
       throw OrchestrationException('validation', '$path: $reason');
 
   static void _validate(JsonMap schema, Object? value, String path) {
+    if (value == null && schema['nullable'] == true) return;
     final valid = switch (schema['type']) {
       'object' => value is JsonMap,
       'array' => value is List<Object?>,

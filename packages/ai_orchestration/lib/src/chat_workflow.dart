@@ -10,6 +10,7 @@ class ChatState {
   final List<ToolCall> pendingCalls;
   final int nextCall;
   final List<Artifact> artifacts;
+  final int turnStart;
   ChatState({
     required this.modelId,
     required this.systemPrompt,
@@ -17,6 +18,7 @@ class ChatState {
     List<ToolCall> pendingCalls = const [],
     this.nextCall = 0,
     List<Artifact> artifacts = const [],
+    this.turnStart = 0,
   }) : messages = List.unmodifiable(messages),
        pendingCalls = List.unmodifiable(pendingCalls),
        artifacts = List.unmodifiable(artifacts);
@@ -35,6 +37,7 @@ class ChatState {
     ],
     pendingCalls: reply.calls,
     artifacts: artifacts,
+    turnStart: turnStart,
   );
 
   ChatState withResult(ToolSuccess result) {
@@ -56,6 +59,7 @@ class ChatState {
       pendingCalls: pendingCalls,
       nextCall: nextCall + 1,
       artifacts: byId.values.toList(),
+      turnStart: turnStart,
     );
   }
 }
@@ -70,6 +74,7 @@ class ChatStateCodec implements StateCodec<ChatState> {
     'pendingCalls': state.pendingCalls.map((call) => call.toJson()).toList(),
     'nextCall': state.nextCall,
     'artifacts': state.artifacts.map((artifact) => artifact.toJson()).toList(),
+    'turnStart': state.turnStart,
   };
   @override
   ChatState decode(JsonMap json) => ChatState(
@@ -82,6 +87,7 @@ class ChatStateCodec implements StateCodec<ChatState> {
         .map((item) => ToolCall.fromJson(jsonObject(item)))
         .toList(),
     nextCall: json['nextCall']! as int,
+    turnStart: json['turnStart'] as int? ?? 0,
     artifacts: (json['artifacts']! as List<Object?>)
         .map((item) => Artifact.fromJson(jsonObject(item)))
         .toList(),
@@ -96,6 +102,7 @@ Workflow<ChatState> chatWorkflow({
   required ToolRegistry tools,
   ToolPolicy authorize = readOnlyToolPolicy,
   int maxMessages = 200,
+  List<ModelMessage> initialMessages = const [],
 }) {
   if (maxMessages < 1) throw ArgumentError('maxMessages must be positive.');
   return Workflow(
@@ -106,7 +113,7 @@ Workflow<ChatState> chatWorkflow({
     tools: tools,
     authorize: authorize,
     initialize: (previous, input) {
-      final messages = [...?previous?.messages];
+      final messages = [...previous?.messages ?? initialMessages];
       if (previous != null) {
         for (final call in previous.pendingCalls.skip(previous.nextCall)) {
           messages.add(
@@ -137,6 +144,7 @@ Workflow<ChatState> chatWorkflow({
         systemPrompt: systemPrompt,
         messages: messages,
         artifacts: previous?.artifacts ?? const [],
+        turnStart: messages.length - 1,
       );
     },
     nodes: {
