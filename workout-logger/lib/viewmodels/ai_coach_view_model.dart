@@ -1,23 +1,16 @@
-// ai_coach_view_model.dart — orchestration for the AI coach screen.
-//
-// Owns all coach logic so the View stays dumb: builds the system prompt,
-// drives the streaming tool-call loop via IAiService + CoachToolService, and
-// persists each turn through ConversationManager. Exposes immutable state.
-
 import 'dart:convert';
+import 'dart:async';
+import 'package:ai_orchestration_flutter/ai_orchestration_flutter.dart';
 import '../services/ai/ai_failure.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, TextPart, Part, FunctionCall, DataPart;
-
 import '../models/models.dart';
 import '../services/interfaces/ai_service_interface.dart';
 import '../services/ai/coach_tool_service.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
-import '../services/gemini_context_builder.dart';
+import '../services/ai/orchestration/repforge_agents.dart';
 
 class AiCoachViewModel extends ChangeNotifier {
   final IAiService _ai;
@@ -25,30 +18,11 @@ class AiCoachViewModel extends ChangeNotifier {
   final ConversationManager _conversations;
   final SettingsProvider _settings;
 
-  AiFailure? failure;
-  String? _retryText;
-  String? _retryImage;
-  String? _retryMime;
-  List<Content>? _retryHistory;
-  bool get canRetry =>
-      failure?.canRetry == true && _retryText != null && !_loading;
-
-  /// Repeats the failed request without adding another user message.
-  Future<void> retry() async {
-    if (canRetry) await _sendMessage(_retryText!, retrying: true);
-  }
-
-  void _clearFailure() {
-    failure = null;
-    _retryText = null;
-    _retryHistory = null;
-    _retryImage = null;
-    _retryMime = null;
-  }
-
+  late final RepForgeAgents _agents;
+  RepForgeAgentSession? _session;
   bool _loading = false;
-  String _streamingText = '';
-  final List<String> _streamingToolCalls = [];
+  bool _disposed = false;
+  AiFailure? _localFailure;
   Uint8List? _pendingImageBytes;
   String? _pendingImageMimeType;
 
@@ -57,56 +31,106 @@ class AiCoachViewModel extends ChangeNotifier {
     required CoachToolService coachTools,
     required ConversationManager conversations,
     required SettingsProvider settings,
+    RepForgeAgents? agents,
   }) : _ai = ai,
        _coachTools = coachTools,
        _conversations = conversations,
        _settings = settings {
-    // Forward conversation-store changes so the View only watches the VM.
-    _conversations.addListener(notifyListeners);
+    _agents = agents ?? RepForgeAgents.inMemory(ai);
+    _conversations.addListener(_notify);
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
   }
 
   @override
   void dispose() {
-    _conversations.removeListener(notifyListeners);
+    _disposed = true;
+    _session?.removeListener(_notify);
+    _session = null;
+    _conversations.removeListener(_notify);
     super.dispose();
   }
 
-  // ── Exposed state (immutable snapshots) ────────────────────────────────────
+  AiFailure? get failure => _localFailure ?? _session?.failure;
+  bool get canRetry => !_loading && (_session?.canRetry ?? false);
+  Future<void> retry() async {
+    await _session?.retry();
+    _notify();
+  }
 
   bool get isConfigured => _ai.isConfigured;
-  bool get isLoading => _loading;
-  String get streamingText => _streamingText;
-  // Tool names invoked so far for the in-flight reply, in call order.
-  List<String> get streamingToolCalls => List.unmodifiable(_streamingToolCalls);
+  bool get isLoading => _loading || (_session?.isLoading ?? false);
+  bool get _navigationBusy => _loading || (_session?.isWorking ?? false);
+  String get streamingText => _session?.streamingText ?? '';
+  List<String> get streamingToolCalls =>
+      List.unmodifiable(_session?.toolCalls ?? const <String>[]);
   List<ChatMessage> get messages => _conversations.activeMessages;
   List<Conversation> get conversations => _conversations.conversations;
   String? get activeConversationId => _conversations.active?.id;
   Uint8List? get pendingImageBytes => _pendingImageBytes;
   bool get hasPendingImage => _pendingImageBytes != null;
+  PendingAgentInput? get pendingInput => _session?.pendingInput;
+  bool get needsRecovery => _session?.state.needsRecovery ?? false;
+  Future<bool> submitInput(PendingAgentInput target, Object? value) async =>
+      await _session?.submit(target, value) ?? false;
+  Future<void> cancelRun() async {
+    await _session?.cancel();
+    _notify();
+  }
 
-  // ── Commands ───────────────────────────────────────────────────────────────
+  void _bindSession() {
+    _session?.removeListener(_notify);
+    _session = _agents.session(
+      conversations: _conversations,
+      settings: _settings,
+      tools: _coachTools,
+    );
+    if (!_disposed) _session!.addListener(_notify);
+  }
 
-  /// Load the persisted conversation list (call when the screen opens).
-  Future<void> loadConversations() => _conversations.loadConversations();
+  Future<void> _restoreActive() async {
+    if (_conversations.active == null) return;
+    _loading = true;
+    _bindSession();
+    _notify();
+    try {
+      await _session!.restore();
+    } finally {
+      _loading = false;
+      _notify();
+    }
+  }
 
-  /// Start a fresh, unsaved conversation.
+  Future<void> loadConversations() async {
+    await _conversations.loadConversations();
+    await _restoreActive();
+  }
+
   void newConversation() {
-    if (_loading) return;
-    _clearFailure();
+    if (_navigationBusy) return;
+    _localFailure = null;
+    _session?.removeListener(_notify);
+    _session = null;
     _conversations.startNewConversation();
   }
 
-  /// Switch to an existing conversation.
   void selectConversation(String id) {
-    if (_loading) return;
-    _clearFailure();
+    if (_navigationBusy) return;
+    _localFailure = null;
     _conversations.selectConversation(id);
+    unawaited(_restoreActive());
   }
 
-  /// Delete a conversation.
   Future<void> deleteConversation(String id) async {
-    if (_loading) return;
-    if (id == activeConversationId) _clearFailure();
+    if (_navigationBusy) return;
+    await _agents.forget('coach', id);
+    if (id == activeConversationId) {
+      _localFailure = null;
+      _session?.removeListener(_notify);
+      _session = null;
+    }
     await _conversations.deleteConversation(id);
   }
 
@@ -119,7 +143,7 @@ class AiCoachViewModel extends ChangeNotifier {
 
   /// Pick an image to attach to the next message.
   Future<void> pickImage() async {
-    if (_loading) return;
+    if (isLoading) return;
     try {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
@@ -169,7 +193,7 @@ class AiCoachViewModel extends ChangeNotifier {
 
       _pendingImageBytes = bytes;
       _pendingImageMimeType = mimeType;
-      notifyListeners();
+      _notify();
     } catch (e) {
       debugPrint('Error picking image: $e');
     }
@@ -179,162 +203,53 @@ class AiCoachViewModel extends ChangeNotifier {
   void clearPendingImage() {
     _pendingImageBytes = null;
     _pendingImageMimeType = null;
-    notifyListeners();
+    _notify();
   }
 
   @visibleForTesting
   void setPendingImageForTesting(Uint8List? bytes, String? mimeType) {
     _pendingImageBytes = bytes;
     _pendingImageMimeType = mimeType;
-    notifyListeners();
+    _notify();
   }
 
-  /// Send a user message and stream the coach's reply (running the tool-call
-  /// loop). Both the user message and the final reply are persisted.
-  Future<void> sendMessage(String text) => _sendMessage(text);
-
-  Future<void> _sendMessage(String text, {bool retrying = false}) async {
+  Future<void> sendMessage(String text) async {
     final trimmed = text.trim();
-    if ((trimmed.isEmpty && _pendingImageBytes == null && !retrying) ||
-        _loading) {
+    if ((trimmed.isEmpty && !hasPendingImage) || isLoading || needsRecovery) {
       return;
     }
-
-    failure = null;
     _loading = true;
-    _streamingText = '';
-    _streamingToolCalls.clear();
-
-    final imageBytes = _pendingImageBytes;
-    final imageMimeType = _pendingImageMimeType;
-    final imageBase64 = retrying
-        ? _retryImage
-        : (imageBytes != null ? base64Encode(imageBytes) : null);
-    final requestMime = retrying ? _retryMime : imageMimeType;
-
-    if (!retrying) {
-      _pendingImageBytes = null;
-      _pendingImageMimeType = null;
-    }
-    notifyListeners();
-
-    bool requestStarted = false;
-    bool responseComplete = false;
+    _localFailure = null;
+    final image = _pendingImageBytes == null
+        ? null
+        : base64Encode(_pendingImageBytes!);
+    final mime = _pendingImageMimeType;
+    clearPendingImage();
+    _notify();
     try {
-      // Persist the user message first; history is derived from the store.
-      if (!retrying) {
-        await _conversations.appendMessage(
-          ChatMessage(
-            role: 'user',
-            text: trimmed,
-            imageBytesBase64: imageBase64,
-            imageMimeType: requestMime,
-          ),
-        );
-      }
-
-      final systemPrompt = _buildSystemPrompt();
-      final history = retrying ? _retryHistory! : _buildHistory();
-      _retryText = trimmed;
-      _retryImage = imageBase64;
-      _retryMime = requestMime;
-      _retryHistory = history;
-
-      final buffer = StringBuffer();
-      requestStarted = true;
-      await for (final chunk in _ai.streamCoachReply(
-        userMessage: trimmed,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: _coachTools.buildTools(),
-        onToolCall: _recordAndDispatch,
-        imageBytesBase64: imageBase64,
-        imageMimeType: requestMime,
-      )) {
-        buffer.write(chunk);
-        _streamingText = buffer.toString();
-        notifyListeners();
-      }
-      responseComplete = true;
-      final reply = buffer.toString().trim();
-      if (reply.isNotEmpty) {
-        await _conversations.appendMessage(
-          ChatMessage(
-            role: 'model',
-            text: reply,
-            toolCalls: _streamingToolCalls.isEmpty
-                ? null
-                : List.of(_streamingToolCalls),
-          ),
-        );
-      }
-      _clearFailure();
-    } catch (e) {
-      if (!requestStarted || responseComplete) {
-        _clearFailure();
-        failure = const AiFailure(
-          'Your chat could not be saved. Check available storage and reopen the chat before continuing.',
-          canRetry: false,
-        );
-      } else {
-        failure = e is AiFailure ? e : AiFailure.from(e);
-      }
-      // Tool calls can change workouts or programs. Replaying them is unsafe.
-      if (_streamingToolCalls.isNotEmpty) {
-        _retryText = null;
-        failure = AiFailure(
-          '${failure!.message} Some actions may already have completed. Check the conversation and send a new message to continue.',
-          canRetry: false,
-        );
-      }
+      await _conversations.appendMessage(
+        ChatMessage(
+          role: 'user',
+          text: trimmed,
+          imageBytesBase64: image,
+          imageMimeType: mime,
+        ),
+      );
+      _bindSession();
+      await _session!.send(
+        trimmed,
+        attachments: [
+          if (image != null) {'mimeType': mime ?? 'image/jpeg', 'data': image},
+        ],
+      );
+    } catch (_) {
+      _localFailure = const AiFailure(
+        'Your chat could not be saved. Check available storage and reopen the chat before continuing.',
+        canRetry: false,
+      );
     } finally {
-      _streamingText = '';
-      _streamingToolCalls.clear();
       _loading = false;
-      notifyListeners();
+      _notify();
     }
-  }
-
-  // Records the tool name for UI display, then delegates to the real handler.
-  Future<Map<String, Object?>> _recordAndDispatch(FunctionCall call) async {
-    _streamingToolCalls.add(call.name);
-    notifyListeners();
-    return _coachTools.handleCall(call);
-  }
-
-  // ── Internals ──────────────────────────────────────────────────────────────
-
-  // Static prompt — live data is fetched by the model via the coach tools,
-  // keeping the prefix stable for implicit prompt caching.
-  String _buildSystemPrompt() => GeminiContextBuilder.buildCoachSystemPrompt(
-    userName: _settings.userName,
-    unitLabel: _settings.unitLabel,
-  );
-
-  /// Prior turns (everything before the user message just appended).
-  /// Preserves attached images as data parts alongside text, while retaining
-  /// text fallback for image-only turns.
-  List<Content> _buildHistory() {
-    final msgs = _conversations.activeMessages;
-    final prior = msgs.length > 1
-        ? msgs.sublist(0, msgs.length - 1)
-        : <ChatMessage>[];
-    return prior.map((m) {
-      final parts = <Part>[];
-      if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
-        try {
-          final bytes = base64Decode(m.imageBytesBase64!);
-          parts.add(DataPart(m.imageMimeType ?? 'image/jpeg', bytes));
-        } catch (_) {}
-      }
-      if (m.text.isNotEmpty) {
-        parts.add(TextPart(m.text));
-      } else if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
-        parts.add(TextPart('[Attached image]'));
-      } else {
-        parts.add(TextPart(''));
-      }
-      return Content(m.role, parts);
-    }).toList();
   }
 }

@@ -11,6 +11,14 @@ environment:
   flutter: 3.47.2
 
 dependencies:
+  ai_orchestration:
+    path: ../packages/ai_orchestration
+  ai_orchestration_flutter:
+    path: ../packages/ai_orchestration_flutter
+  ai_orchestration_gemini:
+    path: ../packages/ai_orchestration_gemini
+  ai_orchestration_sqlite:
+    path: ../packages/ai_orchestration_sqlite
   flutter:
     sdk: flutter
 

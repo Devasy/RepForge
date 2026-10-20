@@ -1,0 +1,71 @@
+name: Orchestration packages
+
+on:
+  pull_request:
+    paths:
+      - 'packages/ai_orchestration/**'
+      - 'packages/ai_orchestration_sqlite/**'
+      - 'packages/ai_orchestration_flutter/**'
+      - 'packages/ai_orchestration_gemini/**'
+      - '.github/workflows/orchestration.yml'
+  push:
+    branches: [main, 'codex/reusable-ai-orchestration']
+    paths:
+      - 'packages/ai_orchestration/**'
+      - 'packages/ai_orchestration_sqlite/**'
+      - 'packages/ai_orchestration_flutter/**'
+      - 'packages/ai_orchestration_gemini/**'
+      - '.github/workflows/orchestration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        package: [ai_orchestration, ai_orchestration_sqlite, ai_orchestration_gemini]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
+        with:
+          sdk: '3.13.2'
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: dart analyze --fatal-infos
+      - run: dart test
+      - name: Run domain example
+        if: matrix.package == 'ai_orchestration'
+        run: dart run example/expense_agent.dart
+      - name: Run SQLite example
+        if: matrix.package == 'ai_orchestration_sqlite'
+        run: dart run example/task_assistant.dart
+
+  flutter-bridge:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/ai_orchestration_flutter
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.2'
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: flutter analyze --no-pub --fatal-infos
+      - run: flutter test --no-pub

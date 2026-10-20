@@ -1,3 +1,4 @@
+import 'test_utils/legacy_ai_fixture.dart';
 // Unit tests for AiCoachViewModel — verifies orchestration (send → stream →
 // persist) using a fake IAiService, so the View has no logic left to test.
 
@@ -19,7 +20,7 @@ import 'package:repforge/viewmodels/ai_coach_view_model.dart';
 import 'test_utils/mock_storage_service.dart';
 
 /// Scripted IAiService: yields fixed chunks; optionally invokes a tool first.
-class _FakeAiService implements IAiService {
+class _FakeAiService with TestAiModelProvider implements IAiService {
   _FakeAiService({
     this.chunks = const ['Hello ', 'world'],
     this.invokeTool = false,
@@ -384,7 +385,7 @@ void main() {
 }
 
 /// IAiService that always throws on streamCoachReply.
-class _ThrowingAiService implements IAiService {
+class _ThrowingAiService with TestAiModelProvider implements IAiService {
   @override
   bool get isConfigured => true;
 

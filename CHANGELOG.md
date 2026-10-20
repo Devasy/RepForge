@@ -4,6 +4,19 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+### Features added
+
+- Resume saved AI coach and optimizer questions or proposed changes after reopening the conversation.
+- Review and approve or decline AI changes to routines and exercises before they are applied.
+
+### Changes
+
+- Run coach and optimizer conversations through a shared workflow engine with durable checkpoints, execution limits, and safe provider failures.
+
+### Known limitations
+
+- A reply interrupted by an app restart must be stopped after checking any changes already made; write actions are never replayed automatically.
+
 ## [2.1.9]
 
 ### Changes

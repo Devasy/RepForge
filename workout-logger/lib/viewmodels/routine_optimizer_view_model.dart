@@ -1,230 +1,180 @@
-// routine_optimizer_view_model.dart — Conversational routine optimizer VM.
-//
-// Drives IAiService.streamCoachReply with an optimizer-focused system prompt.
-// Intercepts ask_user_questions tool calls — sets pendingQuestions and returns
-// a Completer.future, suspending the stream until submitAnswers() is called.
-
 import 'dart:async';
-import 'dart:convert';
-import '../services/ai/ai_failure.dart';
+
+import 'package:ai_orchestration_flutter/ai_orchestration_flutter.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_generative_ai/google_generative_ai.dart'
-    show Content, TextPart, FunctionCall, Tool, Part, DataPart;
 
 import '../models/models.dart';
-import '../services/interfaces/ai_service_interface.dart';
+import '../services/ai/ai_failure.dart';
 import '../services/ai/coach_tool_service.dart';
+import '../services/ai/orchestration/repforge_agents.dart';
+import '../services/interfaces/ai_service_interface.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
-import '../services/gemini_context_builder.dart';
 
 class RoutineOptimizerViewModel extends ChangeNotifier {
   final IAiService _ai;
-  final CoachToolService _coachTools;
+  final CoachToolService _tools;
   final ConversationManager _conversations;
   final SettingsProvider _settings;
-
-  bool _loading = false;
+  late final RepForgeAgents _agents;
+  RepForgeAgentSession? _session;
+  bool _busy = false;
   bool _disposed = false;
-  String _streamingText = '';
-  PendingQuestions? _pendingQuestions;
-  Completer<Map<String, Object?>>? _pendingCompleter;
+  AiFailure? _localFailure;
 
   RoutineOptimizerViewModel({
     required IAiService ai,
     required CoachToolService coachTools,
     required ConversationManager conversations,
     required SettingsProvider settings,
+    RepForgeAgents? agents,
   }) : _ai = ai,
-       _coachTools = coachTools,
+       _tools = coachTools,
        _conversations = conversations,
        _settings = settings {
+    _agents = agents ?? RepForgeAgents.inMemory(ai);
     _conversations.addListener(_notify);
+  }
+
+  bool get isConfigured => _ai.isConfigured;
+  bool get isLoading => _busy || (_session?.isLoading ?? false);
+  bool get _navigationBusy => _busy || (_session?.isWorking ?? false);
+  String get streamingText => _session?.streamingText ?? '';
+  PendingQuestions? get pendingQuestions => _session?.pendingQuestions;
+  PendingAgentInput? get pendingInput => _session?.pendingInput;
+  bool get needsRecovery => _session?.state.needsRecovery ?? false;
+  AiFailure? get failure => _localFailure ?? _session?.failure;
+  List<ChatMessage> get messages => _conversations.activeMessages;
+  List<Conversation> get conversations => _conversations.conversations;
+  String? get activeConversationId => _conversations.active?.id;
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  void _bind() {
+    _session?.removeListener(_notify);
+    _session = _agents.session(
+      conversations: _conversations,
+      settings: _settings,
+      tools: _tools,
+    );
+    if (!_disposed) _session!.addListener(_notify);
+  }
+
+  Future<void> loadConversations() => _conversations.loadConversations();
+  Future<void> initializeForRoutine(Routine routine) async {
+    await loadConversations();
+    if (_disposed) return;
+    final seed =
+        'Optimize my "${routine.name}" routine based on my past performance.';
+    final previous = conversations
+        .where(
+          (conversation) => conversation.messages.firstOrNull?.text == seed,
+        )
+        .firstOrNull;
+    if (previous != null) {
+      _busy = true;
+      try {
+        _conversations.selectConversation(previous.id);
+        _bind();
+        await _session!.restore();
+        if (_disposed) return;
+        if (_session!.pendingInput != null ||
+            _session!.state.isRunning ||
+            _session!.failure != null) {
+          return;
+        }
+      } finally {
+        _busy = false;
+        _notify();
+      }
+    }
+    if (!_disposed) await startForRoutine(routine);
+  }
+
+  void selectConversation(String id) {
+    if (_navigationBusy) return;
+    _conversations.selectConversation(id);
+    if (_conversations.active == null) return;
+    _busy = true;
+    _localFailure = null;
+    _bind();
+    unawaited(
+      _session!.restore().whenComplete(() {
+        _busy = false;
+        _notify();
+      }),
+    );
+  }
+
+  Future<void> deleteConversation(String id) async {
+    if (_navigationBusy) return;
+    await _agents.forget('optimizer', id);
+    if (id == activeConversationId) {
+      _session?.removeListener(_notify);
+      _session = null;
+    }
+    await _conversations.deleteConversation(id);
+  }
+
+  Future<void> startForRoutine(Routine routine) async {
+    if (_navigationBusy) return;
+    _session?.removeListener(_notify);
+    _session = null;
+    _conversations.startNewConversation();
+    await sendMessage(
+      'Optimize my "${routine.name}" routine based on my past performance.',
+    );
+  }
+
+  Future<bool> submitInput(PendingAgentInput target, Object? response) async =>
+      await _session?.submit(target, response) ?? false;
+
+  Future<void> submitAnswers(
+    List<AnswerSpec> answers, {
+    PendingAgentInput? target,
+  }) async {
+    final pending = target ?? pendingInput;
+    if (pending == null || pending.request.kind != 'repforge_questions') return;
+    await submitInput(pending, {
+      'answers': [for (final answer in answers) answer.toJson()],
+    });
+    _notify();
+  }
+
+  Future<void> cancelRun() async {
+    await _session?.cancel();
+    _notify();
+  }
+
+  Future<void> sendMessage(String text) async {
+    if (text.trim().isEmpty || isLoading || needsRecovery) return;
+    _busy = true;
+    _localFailure = null;
+    _notify();
+    try {
+      await _conversations.appendMessage(
+        ChatMessage(role: 'user', text: text.trim()),
+      );
+      _bind();
+      await _session!.send(text.trim());
+    } catch (_) {
+      _localFailure = const AiFailure(
+        'Your chat could not be saved. Reopen it before continuing.',
+        canRetry: false,
+      );
+    } finally {
+      _busy = false;
+      _notify();
+    }
   }
 
   @override
   void dispose() {
     _disposed = true;
-    _pendingCompleter?.complete({'answers': <Object?>[], 'aborted': true});
-    _pendingCompleter = null;
-    _pendingQuestions = null;
+    _session?.removeListener(_notify);
+    _session = null;
     _conversations.removeListener(_notify);
     super.dispose();
-  }
-
-  void _notify() {
-    if (!_disposed) notifyListeners();
-  }
-
-  // ── State ──────────────────────────────────────────────────────────────────
-
-  bool get isConfigured => _ai.isConfigured;
-  bool get isLoading => _loading;
-  String get streamingText => _streamingText;
-  PendingQuestions? get pendingQuestions => _pendingQuestions;
-  List<ChatMessage> get messages => _conversations.activeMessages;
-  List<Conversation> get conversations => _conversations.conversations;
-  String? get activeConversationId => _conversations.active?.id;
-
-  // ── Commands ───────────────────────────────────────────────────────────────
-
-  Future<void> loadConversations() => _conversations.loadConversations();
-
-  void selectConversation(String id) {
-    if (_loading) return;
-    _conversations.selectConversation(id);
-  }
-
-  Future<void> deleteConversation(String id) =>
-      _conversations.deleteConversation(id);
-
-  /// Begin a fresh conversation and auto-send the optimization seed prompt.
-  Future<void> startForRoutine(Routine routine) async {
-    _conversations.startNewConversation();
-    final seed =
-        'Optimize my "${routine.name}" routine based on my past performance.';
-    await sendMessage(seed);
-  }
-
-  /// Submit the user's answers to the pending ask_user_questions call.
-  Future<void> submitAnswers(List<AnswerSpec> answers) async {
-    _pendingQuestions = null;
-
-    final text = answers
-        .map((a) {
-          final parts = [...a.selected];
-          if (a.custom != null && a.custom!.isNotEmpty) parts.add(a.custom!);
-          return '${a.question}: ${parts.join(', ')}';
-        })
-        .join(' · ');
-
-    if (text.isNotEmpty) {
-      await _conversations.appendMessage(ChatMessage(role: 'user', text: text));
-    }
-
-    _pendingCompleter?.complete(<String, Object?>{
-      'answers': [for (final a in answers) a.toJson()],
-    });
-    _pendingCompleter = null;
-    _notify();
-  }
-
-  Future<void> sendMessage(String text) async {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty || _loading) return;
-
-    _loading = true;
-    _streamingText = '';
-    _notify();
-
-    await _conversations.appendMessage(
-      ChatMessage(role: 'user', text: trimmed),
-    );
-
-    final systemPrompt = GeminiContextBuilder.buildOptimizerSystemPrompt(
-      userName: _settings.userName,
-      unitLabel: _settings.unitLabel,
-    );
-    final history = _buildHistory();
-    final tools = [
-      ..._coachTools.buildTools(),
-      Tool(
-        functionDeclarations: [CoachToolService.askUserQuestionsDeclaration],
-      ),
-    ];
-
-    final buffer = StringBuffer();
-    try {
-      await for (final chunk in _ai.streamCoachReply(
-        userMessage: trimmed,
-        systemPrompt: systemPrompt,
-        history: history,
-        tools: tools,
-        onToolCall: _routeToolCall,
-      )) {
-        buffer.write(chunk);
-        _streamingText = buffer.toString();
-        _notify();
-      }
-      final reply = buffer.toString().trim();
-      if (reply.isNotEmpty) {
-        await _conversations.appendMessage(
-          ChatMessage(role: 'model', text: reply),
-        );
-      }
-    } catch (e) {
-      // Swallow internal abort signals from dispose().
-      if (e is! StateError || e.message != 'optimizer_aborted') {
-        await _conversations.appendMessage(
-          ChatMessage(
-            role: 'model',
-            text: (e is AiFailure ? e : AiFailure.from(e)).message,
-          ),
-        );
-      }
-    } finally {
-      _streamingText = '';
-      _loading = false;
-      _pendingQuestions = null;
-      _notify();
-    }
-  }
-
-  Future<Map<String, Object?>> _routeToolCall(FunctionCall call) async {
-    if (call.name == 'ask_user_questions') {
-      return _handleAskUserQuestions(Map<String, dynamic>.from(call.args));
-    }
-    return _coachTools.handleCall(call);
-  }
-
-  Future<Map<String, Object?>> _handleAskUserQuestions(
-    Map<String, dynamic> args,
-  ) async {
-    final pending = PendingQuestions.fromJson(args);
-
-    final preamble = pending.preamble;
-    if (preamble != null && preamble.isNotEmpty) {
-      await _conversations.appendMessage(
-        ChatMessage(role: 'model', text: preamble),
-      );
-    }
-
-    _pendingQuestions = pending;
-    final completer = Completer<Map<String, Object?>>();
-    _pendingCompleter = completer;
-    _notify();
-
-    final result = await completer.future;
-
-    // If the session was abandoned (e.g. dispose() was called), abort cleanly.
-    if (result['aborted'] == true) {
-      throw StateError('optimizer_aborted');
-    }
-
-    return result;
-  }
-
-  List<Content> _buildHistory() {
-    final msgs = _conversations.activeMessages;
-    final prior = msgs.length > 1
-        ? msgs.sublist(0, msgs.length - 1)
-        : <ChatMessage>[];
-    return prior.map((m) {
-      final parts = <Part>[];
-      if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
-        try {
-          final bytes = base64Decode(m.imageBytesBase64!);
-          parts.add(DataPart(m.imageMimeType ?? 'image/jpeg', bytes));
-        } catch (_) {}
-      }
-      if (m.text.isNotEmpty) {
-        parts.add(TextPart(m.text));
-      } else if (m.imageBytesBase64 != null && m.imageBytesBase64!.isNotEmpty) {
-        parts.add(TextPart('[Attached image]'));
-      } else {
-        parts.add(TextPart(''));
-      }
-      return Content(m.role, parts);
-    }).toList();
   }
 }

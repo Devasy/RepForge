@@ -1,3 +1,4 @@
+import 'test_utils/legacy_ai_fixture.dart';
 // Unit tests for RoutineOptimizerViewModel
 
 import 'dart:async';
@@ -19,7 +20,7 @@ import 'test_utils/mock_storage_service.dart';
 
 // ── Fake IAiService ────────────────────────────────────────────────────────
 
-class _SimpleAi implements IAiService {
+class _SimpleAi with TestAiModelProvider implements IAiService {
   _SimpleAi({this.chunks = const ['Done.'], this.toolCall});
 
   final List<String> chunks;
@@ -92,7 +93,7 @@ class _SimpleAi implements IAiService {
   }) => throw UnimplementedError();
 }
 
-class _ThrowingAi implements IAiService {
+class _ThrowingAi with TestAiModelProvider implements IAiService {
   @override
   bool get isConfigured => true;
   @override
@@ -235,6 +236,7 @@ void main() {
 
     test('submitAnswers persists answers as a user message', () async {
       bool questionsSeen = false;
+      Future<void>? submitted;
       final questionCall = FunctionCall('ask_user_questions', {
         'questions': [
           {
@@ -246,31 +248,31 @@ void main() {
       final ai = _SimpleAi(chunks: ['Done.'], toolCall: questionCall);
       final vm = _buildVm(storage: storage, ai: ai);
 
-      vm.addListener(() async {
+      vm.addListener(() {
         if (vm.pendingQuestions != null && !questionsSeen) {
           questionsSeen = true;
-          await vm.submitAnswers([
+          submitted = vm.submitAnswers([
             AnswerSpec(question: 'Goal?', selected: ['Strength']),
           ]);
         }
       });
 
       await vm.startForRoutine(_routine);
+      await submitted;
 
       final userMessages = vm.messages.where((m) => m.role == 'user').toList();
       expect(userMessages.any((m) => m.text.contains('Strength')), isTrue);
     });
 
-    test('stream error appends error message and clears loading', () async {
+    test('stream error exposes a failure and clears loading', () async {
       final vm = _buildVm(storage: storage, ai: _ThrowingAi());
       await vm.startForRoutine(_routine);
       expect(vm.isLoading, isFalse);
       expect(vm.pendingQuestions, isNull);
-      final modelMsgs = vm.messages.where((m) => m.role == 'model').toList();
-      expect(modelMsgs.any((m) => m.text.contains('connection')), isTrue);
+      expect(vm.failure!.message, contains('connection'));
     });
 
-    test('dispose completes pending Completer without leaking', () async {
+    test('disposing the view detaches without waiting for an answer', () async {
       final questionCall = FunctionCall('ask_user_questions', {
         'questions': [
           {

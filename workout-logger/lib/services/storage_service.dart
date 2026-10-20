@@ -369,6 +369,7 @@ class StorageService implements IStorageService {
   @override
   Future<String> exportAllData() async {
     final settingsMap = await getAllSettingsForMigration();
+    settingsMap.removeWhere((key, _) => key.startsWith('aiCheckpoint:'));
 
     final programs = await getAllTrainingPrograms();
     final records = await getAllPersonalRecords();
@@ -621,6 +622,8 @@ class StorageService implements IStorageService {
   @override
   Future<void> deleteConversation(String id) async {
     await _aiConversationsBoxInstance.delete(id);
+    await _settingsBoxInstance.delete('aiCheckpoint:coach:$id');
+    await _settingsBoxInstance.delete('aiCheckpoint:optimizer:$id');
   }
 
   // ==================== STATS ====================
