@@ -20,26 +20,18 @@ permissions:
 
 jobs:
   changelog:
-    name: Release readiness (auto-bump)
+    name: Release readiness
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
-        with:
-          sdk: '3.13.2'
-      - name: Check feature and prepared-release version notes
+      - name: Validate release branch version and notes
         env:
-          BEFORE_SHA: ${{ github.event.before }}
+          SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
-        run: |
-          BASE_REF="origin/$BASE_BRANCH"
-          if [[ "$GITHUB_EVENT_NAME" == "push" && -n "$BEFORE_SHA" && ! "$BEFORE_SHA" =~ ^0+$ ]]; then
-            BASE_REF="$BEFORE_SHA"
-          fi
-          python3 workout-logger/scripts/check_release_readiness.py --base-ref "$BASE_REF"
+        run: python3 workout-logger/scripts/check_release_readiness.py --branch "$SOURCE_BRANCH" --base-ref "origin/$BASE_BRANCH"
       - run: python3 workout-logger/scripts/build_release_notes.py --check
       - run: python3 -m unittest discover -s workout-logger/scripts -p 'test_*.py'
 

@@ -1,11 +1,11 @@
 # Changelog authoring contract
 
 `CHANGELOG.md` at the repository root is the single source for user-facing release
-notes. Developers must author the target version before merging a release PR.
-For a feature PR with pubspec at 2.1.19, author `## [2.1.20]`. After the feature
-merges, automation opens or updates `codex/release-2.1.20` with the patch/build
-bump. Merge that release PR after its checks pass to publish the committed
-version. Tag/manual builds use the committed pubspec version.
+notes. Ordinary feature PRs can add draft notes under `## [Unreleased]` and
+merge without starting a release. Cut a release branch named exactly `rX.Y.Z`
+from current main, for example `r2.1.20`, and author its `## [2.1.20]` entry.
+Preparation reads that branch name and updates pubspec version/build on the
+release branch. Merging its checked PR to main publishes that committed version.
 
 ```markdown
 # Changelog
@@ -46,31 +46,33 @@ Rules:
   release history. Versions 2.0.1 through 2.1.5 are reconstructed from published
   releases and tagged changes; see [the source map](changelog-history-sources.md).
 
-The required `Release readiness (auto-bump)` check compares the PR with current
-main. An unchanged version requires notes for the actual bump script's predicted
-next patch. A prepared release must advance both semantic version and build
-number and have authored notes for that exact committed version. Draft
-Unreleased notes do not satisfy either case. If main advances before merging,
-update the PR branch and, when needed, author the newly predicted release entry.
-Do not manually bump pubspec in ordinary feature PRs; release preparation does
-that through a separate PR. Explicit major/minor releases may commit their
-version/build advance with matching notes.
+The required `Release readiness` check always validates changelog format.
+Ordinary PRs keep the version/build unchanged. Release PRs must have a pubspec
+version matching their `rX.Y.Z` branch exactly, a semantic version and build
+number newer than current main, and a nonempty changelog entry for that exact
+version. Unreleased drafts cannot satisfy a release check. A typo such as
+`r2.1.20-extra` is rejected. Do not reuse a published release branch.
 
 Run the same check from the repository root:
 
 ```sh
 git fetch origin main
-python3 workout-logger/scripts/check_release_readiness.py --base-ref origin/main
+python3 workout-logger/scripts/check_release_readiness.py --branch r2.1.20 --base-ref origin/main
 ```
 
-Release preparation validates notes before committing its version bump to the
-release branch. Publication checks the committed pubspec version (`--current`)
-before building, and creates a tag only after the signed builds and APK version
-checks succeed. The bot never pushes commits directly to main. CI also
-validates the complete file. The release workflow requires a valid entry for
-its exact target version **before committing a version bump, tagging or deploying**.
-Missing/malformed notes fail the release; there is no PR-title fallback. The
-matching entry becomes the GitHub Release body alongside the downloadable assets.
+Creating or pushing a release branch runs preparation. If its notes are missing,
+preparation fails before changing pubspec; add the exact entry and push again.
+Preparation is idempotent and never pushes commits to main. The bot explicitly
+dispatches CI after updating the release branch. Normal branches do not need a
+future release entry and version changes on them fail the check.
+
+Only a merged same-repository `rX.Y.Z` PR targeting main can publish or deploy to
+Google Play. The release workflow checks the branch version against the exact
+merge commit's pubspec and notes before building. Tags are created only after
+the signed builds and APK version checks pass. Manual runs on release branches
+build validation artifacts without publishing. Main pushes and tag pushes do
+not trigger release publication. The matching changelog entry becomes the
+GitHub Release body; there is no PR-title fallback.
 
 The app fetches `https://raw.githubusercontent.com/Devasy/RepForge/main/CHANGELOG.md`,
 validates it, and shows entries where previous version < entry <= installed

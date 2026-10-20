@@ -218,18 +218,20 @@ dart run build_runner build --delete-conflicting-outputs
 
 ## CI/CD Pipeline (.github/workflows/release.yml)
 
-Feature merges to `main` validate authored notes for the next automatic patch
-and open/update a version-bump PR on `codex/release-X.Y.Z`. The bot dispatches its
-CI checks explicitly. Merging that checked release PR builds the committed
-version, then tags and publishes it. No bot commits are pushed directly to main.
+Ordinary feature PRs merge to main without starting a release. Add draft notes
+under Unreleased and leave pubspec version/build unchanged.
 
-- Feature PRs at version 2.1.19 need an authored `## [2.1.20]` changelog entry.
-- Prepared release PRs validate their committed version/build advance and exact
-  notes; they must not be checked as though another patch bump will occur.
-- Run `python3 workout-logger/scripts/check_release_readiness.py --base-ref origin/main`
-  from the repository root after fetching main. Keep the PR up to date with main.
-- Do not manually bump pubspec in ordinary feature PRs. An explicit major/minor
-  release must advance both version and build and include matching notes.
+For a release, create `rMAJOR.MINOR.PATCH` from current main, such as `r2.1.20`,
+and author the matching `## [2.1.20]` changelog entry. Preparation sets pubspec
+version from the branch name and advances its build number on that branch. CI
+requires the exact branch version, matching notes, and an advance beyond main.
+Merging that checked release PR builds the exact merge commit, then tags and
+publishes it to GitHub and Google Play. Other branch types never publish.
+
+Run `python3 workout-logger/scripts/check_release_readiness.py --branch r2.1.20
+--base-ref origin/main` from the root after fetching main. Do not manually patch
+bump on merge or push bot commits to main. Do not reuse a published release
+branch. Manual release-workflow runs only build validation artifacts.
 
 ---
 

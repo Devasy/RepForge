@@ -1,75 +1,76 @@
-"""Check authored notes for the version the release workflow will actually build."""
+"""Validate release branches against their exact version and authored notes."""
 import argparse
-import os
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
-from build_release_notes import build
+from build_release_notes import build, parse_changelog
 
 ROOT = Path(__file__).resolve().parents[2]
-BUMP_SCRIPT = ROOT / 'scripts/bump_version.dart'
+PUBSPEC = 'workout-logger/pubspec.yaml'
+
+
+def branch_version(branch):
+    match = re.fullmatch(r'r([0-9]+\.[0-9]+\.[0-9]+)', branch)
+    if match:
+        return match[1]
+    if re.match(r'^r[0-9]', branch):
+        raise ValueError('Release branches must be named rMAJOR.MINOR.PATCH')
+    return None
 
 
 def read_version(pubspec):
-    match = re.search(r'^version: ([0-9]+\.[0-9]+\.[0-9]+)(?:\+([0-9]+))?\s*$',
+    match = re.search(r'^version: ([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)\s*$',
                       pubspec, re.MULTILINE)
     if match is None:
-        raise ValueError('Could not read the release version')
-    return match[1], int(match[2] or 0)
+        raise ValueError('pubspec.yaml needs version: MAJOR.MINOR.PATCH+BUILD')
+    return match[1], int(match[2])
 
 
 def base_pubspec(root, ref):
     if ref.startswith('-') or not re.fullmatch(r'[a-zA-Z0-9_./-]+', ref):
         raise ValueError('Invalid base reference')
     return subprocess.run(
-        ['git', 'show', f'{ref}:workout-logger/pubspec.yaml'], cwd=root,
-        check=True, capture_output=True, text=True, encoding='utf-8',
+        ['git', 'show', f'{ref}:{PUBSPEC}'], cwd=root, check=True,
+        capture_output=True, text=True, encoding='utf-8',
     ).stdout
 
 
-def next_version(pubspec):
-    with tempfile.TemporaryDirectory() as directory:
-        root = Path(directory)
-        (root / 'workout-logger').mkdir()
-        (root / 'workout-logger/pubspec.yaml').write_text(pubspec, encoding='utf-8')
-        result = subprocess.run(
-            [os.environ.get('DART', 'dart'), str(BUMP_SCRIPT), 'patch', '--dry-run'],
-            cwd=root, check=True, capture_output=True, text=True, encoding='utf-8',
-        )
-        match = re.search(r'^NEW_VERSION=([0-9]+\.[0-9]+\.[0-9]+)\+[0-9]+$',
-                          result.stdout, re.MULTILINE)
-        if match is None:
-            raise ValueError('The version bump did not report a release version')
-        return match[1]
+def require_advance(version, build_number, baseline):
+    base_version, base_build = read_version(baseline)
+    if (tuple(map(int, version.split('.'))) <= tuple(map(int, base_version.split('.')))
+            or build_number <= base_build):
+        raise ValueError('A release must advance both version and build number beyond main')
 
 
-def check_release(root=ROOT, *, current=False, base_ref=None):
-    pubspec = (root / 'workout-logger/pubspec.yaml').read_text(encoding='utf-8')
-    version, build_number = read_version(pubspec)
-    if not current:
-        baseline = base_pubspec(root, base_ref) if base_ref else pubspec
-        base_version, base_build = read_version(baseline)
-        if (version, build_number) == (base_version, base_build):
-            version = next_version(baseline)
-        elif (tuple(map(int, version.split('.'))) <= tuple(map(int, base_version.split('.')))
-              or build_number <= base_build):
-            raise ValueError('A prepared release must advance both version and build number')
-    build(version, root / 'CHANGELOG.md')
+def check_release(root=ROOT, *, branch, base_ref=None):
+    version = branch_version(branch)
+    notes_path = root / 'CHANGELOG.md'
+    if version is None:
+        parse_changelog(notes_path.read_text(encoding='utf-8'))
+        if base_ref:
+            actual = read_version((root / PUBSPEC).read_text(encoding='utf-8'))
+            if actual != read_version(base_pubspec(root, base_ref)):
+                raise ValueError('Version changes belong on an rMAJOR.MINOR.PATCH release branch')
+        return None
+    build(version, notes_path)
+    actual_version, build_number = read_version((root / PUBSPEC).read_text(encoding='utf-8'))
+    if actual_version != version:
+        raise ValueError(f'{branch} requires pubspec version {version}; release preparation must finish first')
+    if base_ref:
+        require_advance(version, build_number, base_pubspec(root, base_ref))
     return version
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--current', action='store_true',
-                        help='Check tag/manual builds, which do not bump the version')
-    parser.add_argument('--base-ref', help='Compare a feature or release PR with this Git base')
+    parser.add_argument('--branch', required=True)
+    parser.add_argument('--base-ref')
     args = parser.parse_args()
     try:
-        version = check_release(current=args.current, base_ref=args.base_ref)
-        print(f'Release readiness passed: CHANGELOG.md has authored notes for {version}')
+        version = check_release(branch=args.branch, base_ref=args.base_ref)
+        print(f'Release readiness passed: {version or "ordinary branch; changelog format valid"}')
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
-        print(f'Error: release readiness failed: {error}', file=sys.stderr)
+        print(f'Error: {error}', file=sys.stderr)
         sys.exit(1)
