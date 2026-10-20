@@ -2,8 +2,10 @@
 
 `CHANGELOG.md` at the repository root is the single source for user-facing release
 notes. Developers must author the target version before merging a release PR.
-The existing main-branch release workflow increments the patch version: with
-pubspec at 2.1.19, author `## [2.1.20]`. Tag/manual builds use the pubspec version.
+For a feature PR with pubspec at 2.1.19, author `## [2.1.20]`. After the feature
+merges, automation opens or updates `codex/release-2.1.20` with the patch/build
+bump. Merge that release PR after its checks pass to publish the committed
+version. Tag/manual builds use the committed pubspec version.
 
 ```markdown
 # Changelog
@@ -44,20 +46,27 @@ Rules:
   release history. Versions 2.0.1 through 2.1.5 are reconstructed from published
   releases and tagged changes; see [the source map](changelog-history-sources.md).
 
-The `Release readiness (auto-bump)` PR check runs the actual bump script in
-read-only mode and requires a nonempty entry for its predicted version. Draft
-Unreleased notes and notes for the current version do not satisfy this check.
-Do not manually bump pubspec for a normal patch release. If main advances before
-merging, update the PR branch and author the newly predicted release entry.
+The required `Release readiness (auto-bump)` check compares the PR with current
+main. An unchanged version requires notes for the actual bump script's predicted
+next patch. A prepared release must advance both semantic version and build
+number and have authored notes for that exact committed version. Draft
+Unreleased notes do not satisfy either case. If main advances before merging,
+update the PR branch and, when needed, author the newly predicted release entry.
+Do not manually bump pubspec in ordinary feature PRs; release preparation does
+that through a separate PR. Explicit major/minor releases may commit their
+version/build advance with matching notes.
 
 Run the same check from the repository root:
 
 ```sh
-python3 workout-logger/scripts/check_release_readiness.py
+git fetch origin main
+python3 workout-logger/scripts/check_release_readiness.py --base-ref origin/main
 ```
 
-The release workflow repeats this check before changing versions or building.
-Tag/manual builds instead check the current pubspec version (`--current`). CI also
+Release preparation validates notes before committing its version bump to the
+release branch. Publication checks the committed pubspec version (`--current`)
+before building, and creates a tag only after the signed builds and APK version
+checks succeed. The bot never pushes commits directly to main. CI also
 validates the complete file. The release workflow requires a valid entry for
 its exact target version **before committing a version bump, tagging or deploying**.
 Missing/malformed notes fail the release; there is no PR-title fallback. The

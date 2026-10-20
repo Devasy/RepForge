@@ -59,8 +59,8 @@ class ReleaseReadinessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'no entry for 2.1.21'):
             check_release(self.root)
 
-    def test_repository_is_ready_for_actual_auto_bump(self):
-        self.assertRegex(check_release(ROOT), r'^\d+\.\d+\.\d+$')
+    def test_repository_has_notes_for_committed_version(self):
+        self.assertRegex(check_release(ROOT, current=True), r'^\d+\.\d+\.\d+$')
 
 
 if __name__ == '__main__':

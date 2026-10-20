@@ -212,19 +212,24 @@ After modifying service interfaces, regenerate mocks:
 dart run build_runner build --delete-conflicting-outputs
 ```
 
-**Run tests before committing** — the CI does not run tests, only builds the APK.
+**Run tests before committing** — CI also runs tests, release-readiness checks, analysis, and Android builds.
 
 ---
 
 ## CI/CD Pipeline (.github/workflows/release.yml)
 
-Triggers automatically on push to `main`:
-1. Runs `dart scripts/bump_version.dart patch` (increments patch version)
-2. Commits version bump and creates a git tag (`v{version}`)
-3. Builds the release APK with the Flutter version pinned in `workout-logger/pubspec.yaml` (currently 3.41.5)
-4. Creates a GitHub Release with the APK attached
+Feature merges to `main` validate authored notes for the next automatic patch
+and open/update a version-bump PR on `codex/release-X.Y.Z`. The bot dispatches its
+CI checks explicitly. Merging that checked release PR builds the committed
+version, then tags and publishes it. No bot commits are pushed directly to main.
 
-**Do not** manually edit `pubspec.yaml` version before merging to `main` — the CI handles it. For a minor/major bump, edit `pubspec.yaml` manually before the merge.
+- Feature PRs at version 2.1.19 need an authored `## [2.1.20]` changelog entry.
+- Prepared release PRs validate their committed version/build advance and exact
+  notes; they must not be checked as though another patch bump will occur.
+- Run `python3 workout-logger/scripts/check_release_readiness.py --base-ref origin/main`
+  from the repository root after fetching main. Keep the PR up to date with main.
+- Do not manually bump pubspec in ordinary feature PRs. An explicit major/minor
+  release must advance both version and build and include matching notes.
 
 ---
 

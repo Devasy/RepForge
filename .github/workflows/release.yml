@@ -12,17 +12,80 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
+  plan:
+    name: Plan protected-branch release
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
+        with:
+          sdk: '3.13.2'
+      - name: Validate notes and choose preparation or publication
+        id: plan
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: python3 workout-logger/scripts/release_plan.py
+
+  prepare:
+    name: Prepare release pull request
+    needs: plan
+    if: needs.plan.outputs.mode == 'prepare'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
+        with:
+          sdk: '3.13.2'
+      - name: Prepare version on a release branch
+        id: branch
+        run: python3 workout-logger/scripts/prepare_release_branch.py "$VERSION" --build-floor "$GITHUB_RUN_NUMBER"
+      - name: Open the release PR and explicitly dispatch its checks
+        if: steps.branch.outputs.branch != ''
+        env:
+          RELEASE_BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          PR_NUMBER=$(gh pr list --base main --head "$RELEASE_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [[ -z "$PR_NUMBER" ]]; then
+            cat > "$RUNNER_TEMP/release-pr-body.md" <<'NOTES'
+          Prepare the already authored release version and build number through a protected pull request.
+
+          Merge after the required checks pass. Merging this version change builds and publishes the exact merged commit; the release bot never pushes commits directly to main.
+          NOTES
+            gh pr create --base main --head "$RELEASE_BRANCH" --title "chore: release $VERSION" --body-file "$RUNNER_TEMP/release-pr-body.md"
+          fi
+          gh workflow run ci.yml --ref "$RELEASE_BRANCH"
+          gh workflow run orchestration.yml --ref "$RELEASE_BRANCH"
+
   release:
     name: Build, Release & Deploy
-    if: github.actor != 'github-actions[bot]'
+    needs: plan
+    if: needs.plan.outputs.mode == 'publish' || needs.plan.outputs.mode == 'verify'
     runs-on: ubuntu-24.04
 
     env:
       LDFLAGS: -Wl,--build-id=none
 
     permissions:
-      contents: write      # Required to create releases and push commits
+      contents: write      # Required to tag the checked commit and publish releases
 
     steps:
       - name: Checkout repository
@@ -56,15 +119,8 @@ jobs:
           cache: true
           pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
 
-      - name: Check release notes before changing version or building
-        env:
-          AUTO_BUMP: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
-        run: |
-          if [[ "$AUTO_BUMP" == "true" ]]; then
-            python3 workout-logger/scripts/check_release_readiness.py
-          else
-            python3 workout-logger/scripts/check_release_readiness.py --current
-          fi
+      - name: Check notes for the committed release version
+        run: python3 workout-logger/scripts/check_release_readiness.py --current
 
       - name: Install dependencies
         working-directory: ./workout-logger
@@ -82,17 +138,6 @@ jobs:
             fi
           done
 
-      - name: Bump version
-        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
-        id: bump_version
-        run: |
-          dart scripts/bump_version.dart patch
-          FULL_VERSION=$(sed -n 's/^version: //p' workout-logger/pubspec.yaml | tr -d '\r')
-          BUILD_NUMBER=${FULL_VERSION##*+}
-          if (( BUILD_NUMBER < GITHUB_RUN_NUMBER )); then
-            sed -i "s/^version: .*/version: ${FULL_VERSION%%+*}+${GITHUB_RUN_NUMBER}/" workout-logger/pubspec.yaml
-          fi
-
       - name: Read version
         id: version
         run: |
@@ -109,33 +154,6 @@ jobs:
 
       - name: Validate and extract CHANGELOG.md release notes
         run: python3 workout-logger/scripts/build_release_notes.py "${{ steps.version.outputs.value }}" > release-notes.md
-
-      - name: Configure Git
-        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Commit version bump
-        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
-        id: commit_version
-        run: |
-          git add workout-logger/pubspec.yaml
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-            echo "committed=false" >> $GITHUB_OUTPUT
-          else
-            git commit -m "chore: bump version to ${{ steps.version.outputs.value }}"
-            git push origin HEAD:${{ github.ref_name }}
-            echo "committed=true" >> $GITHUB_OUTPUT
-          fi
-          echo "commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Create Git tag
-        if: github.event_name == 'push' && steps.commit_version.outputs.committed == 'true'
-        run: |
-          git tag "v${{ steps.version.outputs.value }}"
-          git push origin "v${{ steps.version.outputs.value }}"
 
       - name: Decode release keystore
         id: decode_keystore
@@ -188,6 +206,18 @@ jobs:
             mv "$APK" "$DIR/repforge-v${V}-${ABI}.apk"
           done
 
+      - name: Tag the verified merged commit
+        if: needs.plan.outputs.mode == 'publish' && !startsWith(github.ref, 'refs/tags/')
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          if git rev-parse --verify "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+            [[ "$(git rev-parse "refs/tags/v${VERSION}^{commit}")" == "$GITHUB_SHA" ]] || { echo "Error: release tag points to another commit" >&2; exit 1; }
+          else
+            git tag "v${VERSION}" "$GITHUB_SHA"
+            git push origin "refs/tags/v${VERSION}"
+          fi
+
       - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -209,7 +239,7 @@ jobs:
           retention-days: 7
 
       - name: Deploy to Google Play (Closed Testing Track)
-        if: github.event_name == 'push' && env.PLAY_STORE_JSON_KEY != ''
+        if: needs.plan.outputs.mode == 'publish' && env.PLAY_STORE_JSON_KEY != ''
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
@@ -227,7 +257,7 @@ jobs:
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
 
       - name: Create GitHub Release
-        if: github.event_name == 'push' && (steps.commit_version.outputs.committed == 'true' || startsWith(github.ref, 'refs/tags/'))
+        if: needs.plan.outputs.mode == 'publish'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.value }}

@@ -16,7 +16,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 - Try another Gemini model after timeouts, unavailable models, or exhausted retries, with visible retry progress and a Stop control.
 - Keep all changes in a proposal visible during approval, with numbered progress and applied or declined states.
 - Copy and filter diagnostic logs from About, pause the log display while reading, and redact API keys.
-- Validate authored changelog notes for the exact automatic patch bump in PR checks and before any release version changes or builds.
+- Validate changelog notes for the exact automatic patch bump, prepare version changes through checked release PRs, and publish the committed version without direct bot pushes to main.
 
 ### Changes
 
