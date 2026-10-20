@@ -37,6 +37,11 @@ graph TD
 
 Triggered on every Pull Request and Push to `main` (and release branches):
 
+The `Release readiness (auto-bump)` check runs `scripts/bump_version.dart patch
+--dry-run` and validates authored changelog notes for the resulting version. For
+example, pubspec `2.1.19` requires `## [2.1.20]`, not only an Unreleased draft.
+The release job repeats this preflight before changing files or building.
+
 1. **`security_scan`**:
    - **Gitleaks**: Scans commits for accidental secret leakage, tokens, or private keys.
    - **Dependency Review**: Blocks PRs introducing vulnerable dependencies or incompatible licenses.
@@ -73,7 +78,7 @@ Triggered on:
 2. **Build Numbering**: GitHub release APKs use the committed `pubspec.yaml` base build number. Split APK version codes are `base * 10 + ABI`, where armeabi-v7a = 1, arm64-v8a = 2, and x86_64 = 3. The Play AAB retains `${{ github.run_number }}` as its separate version code. The workflow checks each APK's actual version code before publishing it.
 3. **Disposable Keystore Decoding**: Safely decodes `KEYSTORE_BASE64` to `${{ runner.temp }}/upload-keystore.jks` and cleans it up in a guaranteed `if: always()` step.
 4. **Google Play Closed Testing Deployment**: Push-triggered releases automatically upload the signed `.aab` to the **Closed Testing (Alpha) Track** via `r0adkll/upload-google-play@v1`. Manual runs build validation artifacts without deploying to Google Play or publishing a GitHub release.
-5. **GitHub Release Publication**: Builds split release APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) and attaches both the APKs and `.aab` bundle to the GitHub release along with automatically generated release notes from merged pull requests.
+5. **GitHub Release Publication**: Builds split release APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) and attaches both the APKs and `.aab` bundle to the GitHub release along with the authored notes for that exact version from `CHANGELOG.md`.
 
 ### Android SDK 37 and F-Droid builds
 

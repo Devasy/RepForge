@@ -56,6 +56,16 @@ jobs:
           cache: true
           pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
 
+      - name: Check release notes before changing version or building
+        env:
+          AUTO_BUMP: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          if [[ "$AUTO_BUMP" == "true" ]]; then
+            python3 workout-logger/scripts/check_release_readiness.py
+          else
+            python3 workout-logger/scripts/check_release_readiness.py --current
+          fi
+
       - name: Install dependencies
         working-directory: ./workout-logger
         run: |

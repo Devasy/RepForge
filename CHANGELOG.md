@@ -4,10 +4,19 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.1.10]
+
 ### Features added
 
 - Resume saved AI coach and optimizer questions or proposed changes after reopening the conversation.
 - Review and approve or decline AI changes to routines and exercises before they are applied.
+
+### Fixes
+
+- Try another Gemini model after timeouts, unavailable models, or exhausted retries, with visible retry progress and a Stop control.
+- Keep all changes in a proposal visible during approval, with numbered progress and applied or declined states.
+- Copy and filter diagnostic logs from About, pause the log display while reading, and redact API keys.
+- Validate authored changelog notes for the exact automatic patch bump in PR checks and before any release version changes or builds.
 
 ### Changes
 

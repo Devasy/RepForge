@@ -19,10 +19,15 @@ permissions:
 
 jobs:
   changelog:
-    name: Changelog format
+    name: Release readiness (auto-bump)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
+        with:
+          sdk: '3.13.2'
+      - name: Check notes for the actual merge-time release version
+        run: python3 workout-logger/scripts/check_release_readiness.py
       - run: python3 workout-logger/scripts/build_release_notes.py --check
       - run: python3 -m unittest discover -s workout-logger/scripts -p 'test_*.py'
 

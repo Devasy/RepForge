@@ -3,7 +3,7 @@ import 'dart:io';
 /// Script to automatically bump version in pubspec.yaml
 /// Increments build number by default.
 /// Increments patch version ONLY if 'patch' argument is provided.
-/// Usage: dart scripts/bump_version.dart [patch]
+/// Usage: dart scripts/bump_version.dart [patch] [--dry-run]
 void main(List<String> args) async {
   final pubspecFile = File('workout-logger/pubspec.yaml');
 
@@ -20,14 +20,14 @@ void main(List<String> args) async {
 
   // Check if patch bump is requested
   final shouldBumpPatch = args.contains('patch');
+  final dryRun = args.contains('--dry-run');
 
   for (var line in lines) {
     if (line.startsWith('version:')) {
       // Extract current version (format: version: 1.0.2+3 or 1.0.2)
       // Group 1: Major, Group 2: Minor, Group 3: Patch, Group 4: Build (optional)
-      final versionMatch = RegExp(
-        r'version:\s*(\d+)\.(\d+)\.(\d+)(?:\+(\d+))?',
-      ).firstMatch(line);
+      final versionMatch = RegExp(r'version:\s*(\d+)\.(\d+)\.(\d+)(?:\+(\d+))?')
+          .firstMatch(line);
 
       if (versionMatch == null) {
         print('Error: Could not parse version from: $line');
@@ -62,14 +62,16 @@ void main(List<String> args) async {
   }
 
   // Write updated content back to file
-  await pubspecFile.writeAsString(updatedLines.join('\n'));
+  if (!dryRun) {
+    await pubspecFile.writeAsString(updatedLines.join('\n'));
+  }
 
   // Output new version for GitHub Actions to use
   print('NEW_VERSION=$newVersion');
 
   // Also write to GitHub Actions output if running in CI
   final githubOutput = Platform.environment['GITHUB_OUTPUT'];
-  if (githubOutput != null) {
+  if (!dryRun && githubOutput != null) {
     try {
       final outputFile = File(githubOutput);
       await outputFile.writeAsString(
