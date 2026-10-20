@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:ai_orchestration_flutter/ai_orchestration_flutter.dart';
@@ -12,6 +13,8 @@ import '../../settings_provider.dart';
 import '../ai_failure.dart';
 import '../coach_tool_service.dart';
 import 'repforge_tools.dart';
+import 'agent_change_review.dart';
+import '../../debug_log_buffer.dart';
 
 class RepForgeAgents {
   final ModelProvider model;
@@ -87,11 +90,10 @@ class RepForgeAgentSession extends ChangeNotifier {
   bool _disposed = false;
   bool _command = false;
   int? _projectedRevision;
+  String? _loggedCheckpoint;
   AiFailure? _failure;
   bool _projectionFailed = false;
-  String? _retryText;
   bool _submitting = false;
-  bool _attemptedTool = false;
 
   RepForgeAgentSession._(
     this.owner,
@@ -105,6 +107,8 @@ class RepForgeAgentSession extends ChangeNotifier {
   }
 
   String get threadId => '${original.kind}:${original.id}';
+  AgentChangeReview? get changeReview => AgentChangeReview.fromState(state);
+  String get statusText => state.statusText;
   bool get optimizer => original.kind == 'optimizer';
   bool get canEvict =>
       !hasListeners && !state.isRunning && !_command && !_submitting;
@@ -119,8 +123,7 @@ class RepForgeAgentSession extends ChangeNotifier {
       state.status == RunStatus.failed &&
       !state.isRunning &&
       state.pendingInput == null &&
-      !_attemptedTool &&
-      _retryText != null &&
+      state.checkpoint?.nextNode == 'model' &&
       _failure?.canRetry == true;
   PendingAgentInput? get pendingInput => state.pendingInput;
   List<String> get toolCalls => [
@@ -170,6 +173,7 @@ class RepForgeAgentSession extends ChangeNotifier {
         store: owner.store,
         model: owner.model,
         limits: RunLimits(
+          activeTimeout: const Duration(minutes: 8),
           maxModelCalls: rounds,
           maxToolCalls: rounds * 16,
           maxSteps: rounds * 20 + 1,
@@ -235,8 +239,6 @@ class RepForgeAgentSession extends ChangeNotifier {
       controller.dispose();
       controller = _controller(history: history);
       controller.addListener(_changed);
-      _retryText = text;
-      _attemptedTool = false;
       _projectedRevision = null;
       if (await controller.start(
         input: {'text': text, 'attachments': attachments},
@@ -279,6 +281,7 @@ class RepForgeAgentSession extends ChangeNotifier {
       return await _submit(target, response);
     } finally {
       _submitting = false;
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -316,6 +319,10 @@ class RepForgeAgentSession extends ChangeNotifier {
         return false;
       }
     }
+    _failure = null;
+    DebugLogBuffer.instance.write(
+      '[AI] input_response run=${target.runId} kind=${target.request.kind} accepted=${response == true}',
+    );
     if (!await controller.submitInput(target, response)) {
       _readFailure();
       return false;
@@ -345,11 +352,13 @@ class RepForgeAgentSession extends ChangeNotifier {
   void _readFailure() {
     final error = state.error;
     if (_projectionFailed) return;
-    if (error != null) {
+    if (state.status == RunStatus.cancelled) {
+      _failure = null;
+    } else if (error != null) {
       _failure = AiFailure(
         error.message,
         canRetry:
-            !_attemptedTool &&
+            state.checkpoint?.nextNode == 'model' &&
             !{
               'model_auth',
               'model_unavailable',
@@ -366,10 +375,16 @@ class RepForgeAgentSession extends ChangeNotifier {
   String _messageId(int index) => '${state.checkpoint!.runId}:$index';
   void _changed() {
     if (_disposed) return;
-    if (toolCalls.isNotEmpty || state.activeTools.isNotEmpty) {
-      _attemptedTool = true;
-    }
     final checkpoint = state.checkpoint;
+    final logKey = checkpoint == null
+        ? null
+        : '${checkpoint.runId}:${checkpoint.revision}';
+    if (checkpoint != null && _loggedCheckpoint != logKey) {
+      _loggedCheckpoint = logKey;
+      DebugLogBuffer.instance.write(
+        '[AI] ${jsonEncode({'event': 'checkpoint', 'run': checkpoint.runId, 'status': checkpoint.status.name, 'modelCalls': checkpoint.modelCalls, 'toolCalls': checkpoint.toolCalls, 'nextCall': state.data?.nextCall, 'pendingCalls': state.data?.pendingCalls.length, 'input': checkpoint.interrupt?.kind, 'failure': checkpoint.failure?['code']})}',
+      );
+    }
     if (checkpoint != null && checkpoint.revision != _projectedRevision) {
       _projectedRevision = checkpoint.revision;
       final data = state.data;

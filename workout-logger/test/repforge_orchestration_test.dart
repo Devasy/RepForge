@@ -9,6 +9,7 @@ import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'package:repforge/services/ai/gemini_ai_service.dart';
 import 'package:repforge/services/ai/orchestration/app_checkpoint_store.dart';
 import 'package:repforge/services/ai/orchestration/repforge_agents.dart';
+import 'package:repforge/services/ai/orchestration/agent_change_review.dart';
 import 'package:repforge/services/ai/sql_query_service.dart';
 import 'package:repforge/services/backup_codec.dart';
 import 'package:repforge/services/interfaces/storage_service_interface.dart';
@@ -27,13 +28,20 @@ import 'test_utils/mock_storage_service.dart';
 class ScriptedModel implements ModelProvider {
   final List<List<ModelEvent>> replies;
   final List<ModelRequest> requests = [];
-  ScriptedModel(this.replies);
+  final int? failAt;
+  ScriptedModel(this.replies, {this.failAt});
   @override
   Stream<ModelEvent> stream(
     ModelRequest request,
     CancellationToken cancellation,
   ) async* {
     requests.add(request);
+    if (requests.length == failAt) {
+      throw const OrchestrationException(
+        'model_transport',
+        'Gemini is temporarily unavailable.',
+      );
+    }
     yield* Stream.fromIterable(replies.removeAt(0));
   }
 }
@@ -128,6 +136,91 @@ void main() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   });
+
+  test(
+    'retry after an approved write resumes the model without repeating the write',
+    () async {
+      final storage = MockStorageService();
+      final model = ScriptedModel([write(), done()], failAt: 2);
+      final host = RepForgeAgents(
+        model: model,
+        store: AppCheckpointStore(storage),
+      );
+      final (_, run) = await session(storage, host, kind: 'coach');
+      await run.send('Create a routine');
+      await run.submit(run.pendingInput!, true);
+      expect(run.state.status, RunStatus.failed);
+      expect(run.canRetry, true);
+      expect(await storage.getAllRoutines(), hasLength(1));
+      await run.retry();
+      expect(run.state.status, RunStatus.completed);
+      expect(await storage.getAllRoutines(), hasLength(1));
+      expect(
+        model.requests.last.messages.where((m) => m.role == 'tool'),
+        hasLength(1),
+      );
+      run.dispose();
+    },
+  );
+
+  test(
+    'proposal review keeps all writes visible through each approval and restoration',
+    () async {
+      final storage = MockStorageService();
+      final model = ScriptedModel([
+        [
+          ModelToolCall(
+            ToolCall(
+              id: 'one',
+              name: 'create_routine',
+              arguments: {'name': 'One', 'exercise_names': <String>[]},
+            ),
+          ),
+          ModelToolCall(
+            ToolCall(
+              id: 'two',
+              name: 'create_routine',
+              arguments: {'name': 'Two', 'exercise_names': <String>[]},
+            ),
+          ),
+          ModelFinished(ModelFinishReason.toolCalls),
+        ],
+        done(),
+      ]);
+      final host = RepForgeAgents(
+        model: model,
+        store: AppCheckpointStore(storage),
+      );
+      final (conversations, run) = await session(storage, host, kind: 'coach');
+      await run.send('Create two routines');
+      expect(run.changeReview!.position, 1);
+      expect(run.changeReview!.changes.map((c) => c.status), [
+        AgentChangeStatus.review,
+        AgentChangeStatus.waiting,
+      ]);
+      expect(await run.submit(run.pendingInput!, true), true);
+      expect(run.changeReview!.position, 2);
+      expect(run.changeReview!.changes.map((c) => c.status), [
+        AgentChangeStatus.applied,
+        AgentChangeStatus.review,
+      ]);
+      run.dispose();
+      final (_, reopened) = await session(
+        storage,
+        RepForgeAgents(model: model, store: AppCheckpointStore(storage)),
+        id: conversations.active!.id,
+        kind: 'coach',
+      );
+      await reopened.restore();
+      expect(reopened.changeReview!.changes, hasLength(2));
+      expect(reopened.changeReview!.position, 2);
+      expect(await reopened.submit(reopened.pendingInput!, false), true);
+      expect(reopened.state.status, RunStatus.completed);
+      expect(reopened.changeReview, null);
+      expect((await storage.getAllRoutines()).map((r) => r.name), ['One']);
+      reopened.dispose();
+    },
+  );
 
   test('failed shared checkpoint initialization can be retried', () async {
     final directory = await Directory.systemTemp.createTemp(

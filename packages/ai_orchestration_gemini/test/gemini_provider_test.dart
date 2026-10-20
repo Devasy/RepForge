@@ -25,6 +25,248 @@ ModelRequest request({List<ModelMessage>? messages}) => ModelRequest(
 );
 
 void main() {
+  test(
+    'one-shot generation shares fallback, keeps JSON settings and closes clients',
+    () async {
+      final requests = <http.Request>[];
+      final diagnostics = <JsonMap>[];
+      final provider = GeminiModelProvider(
+        apiKey: 'key',
+        maxRetries: 0,
+        fallbackModel: (_) => 'small',
+        generationConfig: (model) => {
+          'thinkingConfig': {'model': model},
+        },
+        onDiagnostic: diagnostics.add,
+        clientFactory: () => MockClient((incoming) async {
+          requests.add(incoming);
+          return requests.length == 1
+              ? http.Response('overloaded', 503)
+              : http.Response(
+                  jsonEncode({
+                    'candidates': [
+                      {
+                        'content': {
+                          'parts': [
+                            {'text': '{"ok":true}'},
+                          ],
+                        },
+                      },
+                    ],
+                  }),
+                  200,
+                );
+        }),
+      );
+      final body = <String, Object?>{
+        'contents': [
+          {
+            'role': 'user',
+            'parts': [
+              {'text': 'Request'},
+            ],
+          },
+        ],
+        'generationConfig': {'responseMimeType': 'application/json'},
+      };
+      final result = await provider.generate(modelId: 'primary', body: body);
+      expect(result['candidates'], hasLength(1));
+      expect(
+        requests.every((r) => r.url.path.endsWith(':generateContent')),
+        true,
+      );
+      expect(requests.last.url.path, contains('small:'));
+      expect(requests.last.url.queryParameters.containsKey('key'), false);
+      final config = jsonObject(
+        jsonObject(jsonDecode(requests.last.body))['generationConfig'],
+      );
+      expect(config['responseMimeType'], 'application/json');
+      expect(config['thinkingConfig'], {'model': 'small'});
+      expect(diagnostics.last['event'], 'response_complete');
+      expect(body['generationConfig'], {
+        'responseMimeType': 'application/json',
+      });
+    },
+  );
+
+  test(
+    'timeouts, overload and unavailable models traverse the fallback ladder',
+    () async {
+      final models = <String>[];
+      final diagnostics = <JsonMap>[];
+      final provider = GeminiModelProvider(
+        apiKey: 'secret',
+        timeout: const Duration(milliseconds: 100),
+        retryDelay: (_) => Duration.zero,
+        onDiagnostic: diagnostics.add,
+        fallbackModel: (model) => {'a': 'b', 'b': 'c', 'c': 'd'}[model],
+        clientFactory: () => MockClient((incoming) async {
+          final model = incoming.url.pathSegments.last.split(':').first;
+          models.add(model);
+          if (model == 'a') return Completer<http.Response>().future;
+          if (model == 'b') return http.Response('overloaded', 503);
+          if (model == 'c') return http.Response('removed', 404);
+          return http.Response(
+            sse(
+              packet([
+                {'text': 'Recovered'},
+              ]),
+            ),
+            200,
+          );
+        }),
+      );
+      final events = await provider
+          .stream(
+            ModelRequest(
+              modelId: 'a',
+              systemPrompt: 'Test',
+              messages: [ModelMessage(role: 'user', text: 'Hello')],
+              tools: [],
+            ),
+            CancellationToken(),
+          )
+          .toList();
+      expect(models, ['a', 'b', 'b', 'c', 'd']);
+      expect(events.whereType<ModelText>().single.text, 'Recovered');
+      expect(
+        events.whereType<ModelStatus>().any(
+          (e) => e.message.contains('another model'),
+        ),
+        true,
+      );
+      expect(diagnostics.where((e) => e['event'] == 'fallback'), hasLength(3));
+      expect(jsonEncode(diagnostics), isNot(contains('secret')));
+    },
+  );
+
+  test('minute quota retries then falls back without cycling', () async {
+    final models = <String>[];
+    final provider = GeminiModelProvider(
+      apiKey: 'key',
+      retryDelay: (_) => Duration.zero,
+      fallbackModel: (model) => model == 'a' ? 'b' : 'a',
+      clientFactory: () => MockClient((incoming) async {
+        models.add(incoming.url.pathSegments.last.split(':').first);
+        return http.Response(
+          jsonEncode({
+            'error': {
+              'status': 'RESOURCE_EXHAUSTED',
+              'details': [
+                {
+                  'quotaMetric': 'generate_content_free_tier_requests',
+                  'quotaId':
+                      'GenerateRequestsPerMinutePerProjectPerModel-FreeTier',
+                },
+              ],
+            },
+          }),
+          429,
+        );
+      }),
+    );
+    await expectLater(
+      provider
+          .stream(
+            ModelRequest(
+              modelId: 'a',
+              systemPrompt: 'Test',
+              messages: [],
+              tools: [],
+            ),
+            CancellationToken(),
+          )
+          .toList(),
+      throwsA(
+        isA<GeminiFailure>().having((e) => e.code, 'code', 'model_quota'),
+      ),
+    );
+    expect(models, ['a', 'a', 'b', 'b']);
+  });
+
+  test('bad requests and authentication errors never switch models', () async {
+    for (final code in [400, 401, 403]) {
+      var attempts = 0;
+      final provider = GeminiModelProvider(
+        apiKey: 'key',
+        maxRetries: 0,
+        fallbackModel: (_) => 'fallback',
+        clientFactory: () => MockClient((_) async {
+          attempts++;
+          return http.Response('private diagnostic', code);
+        }),
+      );
+      await expectLater(
+        provider.stream(request(), CancellationToken()).toList(),
+        throwsA(isA<GeminiFailure>()),
+      );
+      expect(attempts, 1);
+    }
+  });
+
+  test(
+    'partial streamed output is not replayed after an idle timeout',
+    () async {
+      final output = StreamController<List<int>>();
+      addTearDown(output.close);
+      var attempts = 0;
+      final provider = GeminiModelProvider(
+        apiKey: 'key',
+        timeout: const Duration(milliseconds: 100),
+        fallbackModel: (_) => 'fallback',
+        clientFactory: () => MockClient.streaming((_, _) async {
+          attempts++;
+          output.add(
+            utf8.encode(
+              sse(
+                packet([
+                  {'text': 'Partial'},
+                ], finish: null),
+              ),
+            ),
+          );
+          return http.StreamedResponse(output.stream, 200);
+        }),
+      );
+      final texts = <String>[];
+      await expectLater(
+        provider.stream(request(), CancellationToken()).forEach((event) {
+          if (event is ModelText) texts.add(event.text);
+        }),
+        throwsA(
+          isA<GeminiFailure>().having((e) => e.code, 'code', 'model_timeout'),
+        ),
+      );
+      expect(texts, ['Partial']);
+      expect(attempts, 1);
+    },
+  );
+
+  test('total request budget bounds an exhausted fallback ladder', () async {
+    final models = <String>[];
+    final provider = GeminiModelProvider(
+      apiKey: 'key',
+      timeout: const Duration(milliseconds: 80),
+      maxRequestTime: const Duration(milliseconds: 180),
+      fallbackModel: (m) => '${m}x',
+      clientFactory: () => MockClient((incoming) async {
+        models.add(incoming.url.pathSegments.last);
+        return Completer<http.Response>().future;
+      }),
+    );
+    await expectLater(
+      provider
+          .stream(request(), CancellationToken())
+          .toList()
+          .timeout(const Duration(seconds: 2)),
+      throwsA(
+        isA<GeminiFailure>().having((e) => e.code, 'code', 'model_timeout'),
+      ),
+    );
+    expect(models.length, inInclusiveRange(1, 8));
+    expect(models.toSet(), hasLength(models.length));
+  });
+
   test('retry backoff can exceed the I/O timeout', () async {
     var attempts = 0;
     final provider = GeminiModelProvider(

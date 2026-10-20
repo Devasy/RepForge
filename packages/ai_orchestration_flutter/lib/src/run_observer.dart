@@ -15,6 +15,7 @@ class RunObserver extends ChangeNotifier {
   final RunHandle handle;
   late RunCheckpoint checkpoint = handle.snapshot;
   String streamingText = '';
+  String statusText = '';
   final Map<String, ActiveAgentTool> activeTools = {};
   final Map<String, Artifact> artifacts = {};
   AgentControllerFailure? failure;
@@ -36,6 +37,8 @@ class RunObserver extends ChangeNotifier {
     _lastSequence = event.sequence;
     if (event.sequence <= checkpoint.sequence) return;
     switch (event.type) {
+      case RunEventType.modelStatus:
+        statusText = event.data['message']! as String;
       case RunEventType.textDelta:
         streamingText += event.data['text']! as String;
       case RunEventType.toolStarted:
@@ -69,6 +72,7 @@ class RunObserver extends ChangeNotifier {
 
   void _clearProgress() {
     streamingText = '';
+    statusText = '';
     activeTools.clear();
     artifacts.clear();
   }

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../services/debug_log_buffer.dart';
+import 'debug_log_sheet.dart';
 import '../../services/settings_provider.dart';
 import '../../services/ai/gemini_ai_service.dart';
 import '../../theme/app_theme.dart';
@@ -553,7 +553,7 @@ class _AboutSectionState extends State<AboutSection> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
-      builder: (_) => const _DebugLogSheet(),
+      builder: (_) => DebugLogSheet(appVersion: widget.appVersion),
     );
   }
 
@@ -582,6 +582,11 @@ class _AboutSectionState extends State<AboutSection> {
               child: const Text('Release history'),
             ),
           ],
+          TextButton.icon(
+            onPressed: () => _showDebugLogs(context),
+            icon: const Icon(Icons.bug_report_outlined),
+            label: const Text('Debug logs'),
+          ),
           const _SectionDivider(),
           _InfoTile(
             label: 'Created by',
@@ -1455,115 +1460,4 @@ String _formatInt(int n) {
     buf.write(s[i]);
   }
   return buf.toString();
-}
-
-// ── Debug log viewer (tap version 5× to open) ────────────────────────────────
-class _DebugLogSheet extends StatelessWidget {
-  const _DebugLogSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) {
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.sm,
-                AppSpacing.sm,
-                0,
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    'Debug Logs',
-                    style: TextStyle(
-                      fontFamily: 'GeistMono',
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => DebugLogBuffer.instance.clear(),
-                    child: Text(
-                      'Clear',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        color: AppColors.accent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.close,
-                      color: AppColors.textMuted,
-                      size: 18,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(color: AppColors.glassBorder, height: 1),
-            Expanded(
-              child: ListenableBuilder(
-                listenable: DebugLogBuffer.instance,
-                builder: (context, _) {
-                  final lines = DebugLogBuffer.instance.lines;
-                  if (lines.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No logs yet',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          color: AppColors.textFaint,
-                          fontSize: 13,
-                        ),
-                      ),
-                    );
-                  }
-                  return ListView.builder(
-                    controller: scrollController,
-                    reverse: true,
-                    padding: const EdgeInsets.all(AppSpacing.sm),
-                    itemCount: lines.length,
-                    itemBuilder: (context, i) {
-                      final line = lines[lines.length - 1 - i];
-                      final isHc = line.contains('[HC]');
-                      final isReadiness = line.contains('[Readiness]');
-                      final color = isHc
-                          ? AppColors.secondary
-                          : isReadiness
-                          ? AppColors.primary
-                          : AppColors.textSoft;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 1),
-                        child: Text(
-                          line,
-                          style: TextStyle(
-                            fontFamily: 'GeistMono',
-                            fontSize: 10,
-                            color: color,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }

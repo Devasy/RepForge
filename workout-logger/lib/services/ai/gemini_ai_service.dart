@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart';
 import 'ai_failure.dart';
+import '../debug_log_buffer.dart';
 import 'orchestration/legacy_chat.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
@@ -17,6 +18,7 @@ import '../interfaces/storage_service_interface.dart';
 
 // Ordered list of available Gemini models shown in the picker.
 const kGeminiModels = [
+  ('gemini-2.5-flash-lite', 'Gemini 2.5 Flash Lite'),
   ('gemini-2.5-flash', 'Gemini 2.5 Flash'),
   ('gemini-3.1-flash-lite', 'Gemini 3.1 Flash Lite'),
   ('gemini-3.5-flash-lite', 'Gemini 3.5 Flash Lite'),
@@ -66,77 +68,6 @@ const int kDefaultMaxToolRounds = 5;
 const int kMinMaxToolRounds = 3;
 const int kMaxMaxToolRounds = 25;
 
-// Retry policy for transient (5xx / 429) errors. Total attempts = 1 + retries.
-const int _kMaxRetries = 3;
-
-// When the server supplies an explicit retryDelay, honor it up to this many
-// attempts even past _kMaxRetries — a server-specified delay is more likely
-// to actually resolve the transient error than our own backoff schedule.
-const int _kMaxRetriesWithServerDelay = 4;
-
-const String _apiBase =
-    'https://generativelanguage.googleapis.com/v1beta/models';
-
-// 429 (rate limit) and 5xx (server/overload, e.g. 503 "high demand") are
-// transient and worth retrying; 4xx (bad key, bad request) are not.
-bool _isRetryableStatus(int code) => code == 429 || (code >= 500 && code < 600);
-
-// Exponential backoff: 500ms, 1s, 2s …
-Duration _retryBackoff(int attempt) =>
-    Duration(milliseconds: 500 * (1 << attempt));
-
-/// Extracts exact retryDelay provided by Google in 429/503 payloads.
-/// Checks error.details (google.rpc.RetryInfo) or error.message ("Please retry in Xs").
-Duration? _extractRetryDelay(String body) {
-  try {
-    final decoded = jsonDecode(body);
-    if (decoded is Map && decoded['error'] is Map) {
-      final errMap = decoded['error'] as Map;
-      // 1. Check error.details for google.rpc.RetryInfo
-      final details = errMap['details'];
-      if (details is List) {
-        for (final item in details) {
-          if (item is Map && item['retryDelay'] is String) {
-            final delayStr = (item['retryDelay'] as String)
-                .replaceAll('s', '')
-                .trim();
-            final seconds = double.tryParse(delayStr);
-            if (seconds != null && seconds > 0) {
-              final ms = (seconds * 1000).ceil() + 350;
-              return Duration(milliseconds: ms.clamp(500, 45000));
-            }
-          }
-        }
-      }
-      // 2. Regex match in error.message (e.g. "Please retry in 23.690750876s.")
-      final message = errMap['message'];
-      if (message is String) {
-        final match = RegExp(
-          r'retry in\s+([\d.]+)\s*s',
-          caseSensitive: false,
-        ).firstMatch(message);
-        if (match != null) {
-          final seconds = double.tryParse(match.group(1)!);
-          if (seconds != null && seconds > 0) {
-            final ms = (seconds * 1000).ceil() + 350;
-            return Duration(milliseconds: ms.clamp(500, 45000));
-          }
-        }
-      }
-    }
-  } catch (_) {}
-  return null;
-}
-
-// Deliberately narrow: only match identifiers Gemini uses for DAILY-scale
-// quota metrics. Generic markers like "QuotaExceeded"/"RESOURCE_EXHAUSTED"
-// also fire for per-minute rate limits, which should fall through to the
-// normal retry-with-delay handling instead of triggering a model fallback.
-bool _isDailyQuotaExhausted(String body) {
-  return body.contains('GenerateRequestsPerDay') ||
-      body.contains('free_tier_requests');
-}
-
 String? getFallbackModel(String currentModel) {
   switch (currentModel) {
     case 'gemini-3.8-flash':
@@ -149,24 +80,12 @@ String? getFallbackModel(String currentModel) {
       return 'gemini-3.5-flash-lite';
     case 'gemini-3.5-flash-lite':
       return 'gemini-2.5-flash';
+    case 'gemini-3.1-flash-lite':
+    case 'gemini-2.5-flash':
+      return 'gemini-2.5-flash-lite';
     default:
       return null;
   }
-}
-
-// Gemini error bodies look like {"error":{"code":503,"message":"…","status":"…"}}.
-// Surface just the human-readable message rather than the whole JSON blob.
-String _errorMessage(int code, String body) {
-  try {
-    final decoded = jsonDecode(body);
-    if (decoded is Map && decoded['error'] is Map) {
-      final msg = (decoded['error'] as Map)['message'];
-      if (msg is String && msg.isNotEmpty) return msg;
-    }
-  } catch (_) {
-    // Body wasn't JSON — fall through to a generic message.
-  }
-  return 'request failed (HTTP $code).';
 }
 
 /// Combines adjacent user turns after an interrupted reply, as Gemini expects.
@@ -253,6 +172,7 @@ class GeminiAiService extends ChangeNotifier
     String thinkingLevel = kDefaultThinkingLevel,
   }) {
     _apiKey = apiKey.trim();
+    DebugLogBuffer.instance.protect(_apiKey);
     _model = model;
     _maxToolRounds = maxToolRounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
     _thinkingLevel = clampThinkingLevel(_model, thinkingLevel);
@@ -324,6 +244,7 @@ class GeminiAiService extends ChangeNotifier
 
   void updateApiKey(String key) {
     _apiKey = key.trim();
+    DebugLogBuffer.instance.protect(_apiKey);
     notifyListeners();
   }
 
@@ -393,45 +314,14 @@ class GeminiAiService extends ChangeNotifier
     }
   }
 
-  // Single-shot (non-streaming) generateContent call, with retry on 5xx/429.
   Future<Map<String, dynamic>> _generate(Map<String, dynamic> body) async {
-    for (var attempt = 0; ; attempt++) {
-      final uri = Uri.parse('$_apiBase/$_model:generateContent?key=$_apiKey');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
+    try {
+      return await _modelProvider().generate(
+        modelId: _model,
+        body: jsonObject(body),
       );
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-
-      if (_isDailyQuotaExhausted(response.body)) {
-        final fallback = getFallbackModel(_model);
-        if (fallback != null) {
-          _model = fallback;
-          _thinkingLevel = clampThinkingLevel(_model, _thinkingLevel);
-          // See the matching comment in _streamSse — the thinkingConfig shape
-          // must match whichever model this attempt is about to hit.
-          (body['generationConfig'] as Map<String, dynamic>)['thinkingConfig'] =
-              _thinkingConfig;
-          notifyListeners();
-          continue;
-        }
-      }
-
-      final customDelay = _extractRetryDelay(response.body);
-      if (_isRetryableStatus(response.statusCode) &&
-          (attempt < _kMaxRetries ||
-              (customDelay != null && attempt < _kMaxRetriesWithServerDelay))) {
-        final delay = customDelay ?? _retryBackoff(attempt);
-        await Future.delayed(delay);
-        continue;
-      }
-      throw AiFailure.from(
-        _errorMessage(response.statusCode, response.body),
-        statusCode: response.statusCode,
-      );
+    } on GeminiFailure catch (error) {
+      throw AiFailure(error.message, canRetry: error.canRetry);
     }
   }
 
@@ -461,45 +351,48 @@ class GeminiAiService extends ChangeNotifier
     imageMimeType: imageMimeType,
   );
 
+  GeminiModelProvider _modelProvider() => GeminiModelProvider(
+    apiKey: _apiKey,
+    onDiagnostic: (event) =>
+        DebugLogBuffer.instance.write('[AI] ${jsonEncode(event)}'),
+    clientFactory: _modelClientFactory,
+    generationConfig: (model) => {
+      'thinkingConfig': model.startsWith('gemini-2')
+          ? {'thinkingBudget': 0}
+          : {'thinkingLevel': clampThinkingLevel(model, _thinkingLevel)},
+    },
+    fallbackModel: getFallbackModel,
+    onModelChanged: (model) {
+      _model = model;
+      _thinkingLevel = clampThinkingLevel(model, _thinkingLevel);
+      notifyListeners();
+    },
+    onUsage: (usage) async {
+      try {
+        await recordUsage(
+          prompt: (usage['promptTokenCount'] as num?)?.toInt() ?? 0,
+          response: (usage['candidatesTokenCount'] as num?)?.toInt() ?? 0,
+          total: (usage['totalTokenCount'] as num?)?.toInt() ?? 0,
+        );
+      } catch (_) {
+        debugPrint('Could not persist AI usage.');
+      }
+    },
+  );
+
   @override
   Stream<ModelEvent> stream(
     ModelRequest request,
     CancellationToken cancellation,
-  ) =>
-      GeminiModelProvider(
-        apiKey: _apiKey,
-        clientFactory: _modelClientFactory,
-        generationConfig: (model) => {
-          'thinkingConfig': model.startsWith('gemini-2')
-              ? {'thinkingBudget': 0}
-              : {'thinkingLevel': clampThinkingLevel(model, _thinkingLevel)},
-        },
-        fallbackModel: getFallbackModel,
-        onModelChanged: (model) {
-          _model = model;
-          _thinkingLevel = clampThinkingLevel(model, _thinkingLevel);
-          notifyListeners();
-        },
-        onUsage: (usage) async {
-          try {
-            await recordUsage(
-              prompt: (usage['promptTokenCount'] as num?)?.toInt() ?? 0,
-              response: (usage['candidatesTokenCount'] as num?)?.toInt() ?? 0,
-              total: (usage['totalTokenCount'] as num?)?.toInt() ?? 0,
-            );
-          } catch (_) {
-            debugPrint('Could not persist AI usage.');
-          }
-        },
-      ).stream(
-        ModelRequest(
-          modelId: _model,
-          systemPrompt: request.systemPrompt,
-          messages: request.messages,
-          tools: request.tools,
-        ),
-        cancellation,
-      );
+  ) => _modelProvider().stream(
+    ModelRequest(
+      modelId: _model,
+      systemPrompt: request.systemPrompt,
+      messages: request.messages,
+      tools: request.tools,
+    ),
+    cancellation,
+  );
 
   @override
   Stream<String> streamCoachReply({

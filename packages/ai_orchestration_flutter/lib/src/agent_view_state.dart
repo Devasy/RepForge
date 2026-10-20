@@ -48,6 +48,7 @@ class AgentViewState<S> {
   final RunCheckpoint? checkpoint;
   final S? data;
   final String streamingText;
+  final String statusText;
   final List<ActiveAgentTool> activeTools;
   final List<Artifact> artifacts;
   final bool isAttached;
@@ -59,6 +60,7 @@ class AgentViewState<S> {
     this.checkpoint,
     this.data,
     this.streamingText = '',
+    this.statusText = '',
     List<ActiveAgentTool> activeTools = const [],
     List<Artifact> artifacts = const [],
     this.isAttached = false,

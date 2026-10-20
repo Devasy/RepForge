@@ -94,11 +94,23 @@ Future<void> _resolveStorageBackend() async {
 void main() async {
   DebugLogBuffer.attach();
   WidgetsFlutterBinding.ensureInitialized();
-  LicenseRegistry.addLicense(() async* {
-    yield LicenseEntryWithLineBreaks(
-      ['MuscleMap body geometry'],
-      await rootBundle.loadString('THIRD_PARTY_NOTICES.md'),
+  final previousErrorHandler = FlutterError.onError;
+  FlutterError.onError = (details) {
+    DebugLogBuffer.instance.write(
+      '[FlutterError] ${details.exceptionAsString()}\n${details.stack ?? ''}',
     );
+    previousErrorHandler?.call(details);
+  };
+  final dispatcher = WidgetsBinding.instance.platformDispatcher;
+  final previousUnhandled = dispatcher.onError;
+  dispatcher.onError = (error, stack) {
+    DebugLogBuffer.instance.write('[Unhandled] $error\n$stack');
+    return previousUnhandled?.call(error, stack) ?? false;
+  };
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'MuscleMap body geometry',
+    ], await rootBundle.loadString('THIRD_PARTY_NOTICES.md'));
   });
 
   // Set preferred orientations
@@ -375,7 +387,11 @@ class _AppInitializerState extends State<AppInitializer> {
       final settings = context.read<SettingsProvider>();
       try {
         if (_versionChanged) {
-          await showVersionUpdateSheet(context, version, previousVersion: _previousVersion);
+          await showVersionUpdateSheet(
+            context,
+            version,
+            previousVersion: _previousVersion,
+          );
         }
         if (mounted) await settings.markVersionSeen(version);
       } catch (e, st) {
@@ -455,10 +471,12 @@ class _AppInitializerState extends State<AppInitializer> {
     }
 
     if (_needsGenderPrompt) {
-      return GenderSetupPage(onComplete: () {
-        setState(() => _needsGenderPrompt = false);
-        _finishUpgrade();
-      });
+      return GenderSetupPage(
+        onComplete: () {
+          setState(() => _needsGenderPrompt = false);
+          _finishUpgrade();
+        },
+      );
     }
 
     return const HomeScreen();

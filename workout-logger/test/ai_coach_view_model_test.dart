@@ -294,14 +294,16 @@ void main() {
     );
 
     test(
-      'retry is disabled after a tool call to avoid repeating actions',
+      'failed model continuation stays retryable after a read tool',
       () async {
         final ai = _FakeAiService(invokeTool: true)..fail = true;
         final retryVm = await buildVm(ai);
         await retryVm.sendMessage('check recovery');
-        expect(retryVm.canRetry, isFalse);
+        expect(retryVm.canRetry, isTrue);
+        ai.fail = false;
         await retryVm.retry();
-        expect(ai.toolCallsMade, 1);
+        expect(retryVm.failure, isNull);
+        expect(retryVm.messages.where((m) => m.role == 'user'), hasLength(1));
       },
     );
 
