@@ -21,6 +21,7 @@ class GeminiModelProvider implements ModelProvider {
   final void Function(JsonMap event)? onDiagnostic;
   final int maxRetries;
   final Duration timeout;
+  final Duration modelTimeout;
   final Duration maxRequestTime;
   final Duration Function(int attempt) retryDelay;
 
@@ -34,7 +35,8 @@ class GeminiModelProvider implements ModelProvider {
     this.onDiagnostic,
     this.maxRetries = 1,
     this.timeout = const Duration(seconds: 15),
-    this.maxRequestTime = const Duration(seconds: 90),
+    this.modelTimeout = const Duration(minutes: 5),
+    this.maxRequestTime = const Duration(minutes: 10),
     Duration Function(int attempt)? retryDelay,
   }) : clientFactory = clientFactory ?? http.Client.new,
        generationConfig = generationConfig ?? ((_) => const {}),
@@ -44,6 +46,7 @@ class GeminiModelProvider implements ModelProvider {
     if (maxRetries < 0 ||
         maxRetries > 5 ||
         timeout <= Duration.zero ||
+        modelTimeout <= Duration.zero ||
         maxRequestTime <= Duration.zero) {
       throw ArgumentError('Invalid request limits.');
     }
@@ -260,6 +263,7 @@ class GeminiModelProvider implements ModelProvider {
       );
       var received = false;
       Duration delay = Duration.zero;
+      late GeminiFailure retryFailure;
       try {
         await for (final chunk in _attempt(
           request,
@@ -322,12 +326,15 @@ class GeminiModelProvider implements ModelProvider {
           }
         }
         if (!failure.canRetry || retries >= maxRetries) rethrow;
+        retryFailure = failure;
         delay = failure is _HttpFailure && failure.retryAfter != null
             ? failure.retryAfter!
             : retryDelay(retries);
         retries++;
       }
-      if (delay >= maxRequestTime - clock.elapsed) throw _timeoutFailure;
+      if (delay >= maxRequestTime - clock.elapsed) {
+        throw retryFailure;
+      }
       _diagnose({
         'event': 'retry',
         'model': model,
@@ -363,8 +370,27 @@ class GeminiModelProvider implements ModelProvider {
     }
 
     unawaited(cancellation.whenCancelled.then((_) => close()));
-    Future<T> guard<T>(Future<T> future) =>
-        _guard(future, cancellation, budget: maxRequestTime - clock.elapsed);
+    final attemptClock = Stopwatch()..start();
+    var hasPacket = false;
+    JsonMap decodePacket(String payload) {
+      final result = _packet(payload);
+      hasPacket = true;
+      return result;
+    }
+
+    Future<T> guard<T>(Future<T> future) {
+      final remaining = maxRequestTime - clock.elapsed;
+      final attemptRemaining = modelTimeout - attemptClock.elapsed;
+      final wait = body == null && hasPacket && timeout < attemptRemaining
+          ? timeout
+          : attemptRemaining;
+      return _guard(
+        future,
+        cancellation,
+        budget: wait < remaining ? wait : remaining,
+      );
+    }
+
     try {
       final outgoing =
           http.Request(
@@ -384,7 +410,9 @@ class GeminiModelProvider implements ModelProvider {
                   ? {
                       ...body,
                       'generationConfig': {
-                        ...jsonObject(body['generationConfig'] ?? const {}),
+                        ...jsonObject(
+                          body['generationConfig'] ?? const <String, Object?>{},
+                        ),
                         ...generationConfig(model),
                       },
                     }
@@ -437,7 +465,7 @@ class GeminiModelProvider implements ModelProvider {
         if (utf8.encode(payload).length > 16 * 1024 * 1024) {
           throw const FormatException('Response too large');
         }
-        yield _packet(payload);
+        yield decodePacket(payload);
         return;
       }
       final lines = StreamIterator(
@@ -450,7 +478,7 @@ class GeminiModelProvider implements ModelProvider {
           if (line.isEmpty && event.isNotEmpty) {
             final payload = event.toString();
             event = StringBuffer();
-            if (payload.trim() != '[DONE]') yield _packet(payload);
+            if (payload.trim() != '[DONE]') yield decodePacket(payload);
           } else if (line.startsWith('data:')) {
             if (event.isNotEmpty) event.writeln();
             event.write(line.substring(5).trimLeft());
@@ -460,7 +488,7 @@ class GeminiModelProvider implements ModelProvider {
           }
         }
         if (event.isNotEmpty && event.toString().trim() != '[DONE]') {
-          yield _packet(event.toString());
+          yield decodePacket(event.toString());
         }
       } finally {
         close();
@@ -520,14 +548,14 @@ class GeminiModelProvider implements ModelProvider {
   Future<T> _guard<T>(
     Future<T> future,
     CancellationToken cancellation, {
-    Duration? budget,
+    required Duration budget,
   }) => Future.any([
     future,
     cancellation.whenCancelled.then<T>((_) {
       cancellation.check();
       throw StateError('Cancelled');
     }),
-  ]).timeout(budget != null && budget < timeout ? budget : timeout);
+  ]).timeout(budget);
 
   Duration? _serverDelay(String body) {
     final match = RegExp(

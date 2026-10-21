@@ -25,6 +25,143 @@ ModelRequest request({List<ModelMessage>? messages}) => ModelRequest(
 );
 
 void main() {
+  test('streaming allows generation time before the first packet', () async {
+    final provider = GeminiModelProvider(
+      apiKey: 'key',
+      timeout: const Duration(milliseconds: 50),
+      modelTimeout: const Duration(seconds: 2),
+      clientFactory: () => MockClient.streaming(
+        (_, _) async => http.StreamedResponse(
+          Stream.fromFuture(
+            Future.delayed(
+              const Duration(milliseconds: 250),
+              () => utf8.encode(
+                sse(
+                  packet([
+                    {'text': 'Ready'},
+                  ]),
+                ),
+              ),
+            ),
+          ),
+          200,
+        ),
+      ),
+    );
+    final events = await provider
+        .stream(request(), CancellationToken())
+        .toList();
+    expect(events.whereType<ModelText>().single.text, 'Ready');
+  });
+
+  test(
+    'one-shot generation allows slow headers and bodies beyond the SSE idle limit',
+    () async {
+      for (final delayHeaders in [true, false]) {
+        var attempts = 0;
+        final payload = utf8.encode(
+          jsonEncode(
+            packet([
+              {'text': 'Complete'},
+            ]),
+          ),
+        );
+        final provider = GeminiModelProvider(
+          apiKey: 'key',
+          timeout: const Duration(milliseconds: 50),
+          modelTimeout: const Duration(seconds: 2),
+          maxRequestTime: const Duration(seconds: 3),
+          maxRetries: 0,
+          clientFactory: () => MockClient.streaming((_, _) async {
+            attempts++;
+            if (delayHeaders) {
+              await Future<void>.delayed(const Duration(milliseconds: 250));
+            }
+            return http.StreamedResponse(
+              delayHeaders
+                  ? Stream.value(payload)
+                  : Stream.fromFuture(
+                      Future.delayed(
+                        const Duration(milliseconds: 250),
+                        () => payload,
+                      ),
+                    ),
+              200,
+            );
+          }),
+        );
+        expect(
+          (await provider.generate(modelId: 'primary', body: {}))['candidates'],
+          hasLength(1),
+        );
+        expect(attempts, 1);
+      }
+    },
+  );
+
+  test('one-shot deadline leaves budget for timeout fallback', () async {
+    final models = <String>[];
+    final provider = GeminiModelProvider(
+      apiKey: 'key',
+      modelTimeout: const Duration(milliseconds: 100),
+      maxRequestTime: const Duration(seconds: 2),
+      fallbackModel: (model) => model == 'primary' ? 'fallback' : null,
+      clientFactory: () => MockClient((incoming) async {
+        final model = incoming.url.pathSegments.last.split(':').first;
+        models.add(model);
+        if (model == 'primary') return Completer<http.Response>().future;
+        return http.Response(
+          jsonEncode(
+            packet([
+              {'text': 'Recovered'},
+            ]),
+          ),
+          200,
+        );
+      }),
+    );
+    expect(
+      (await provider.generate(modelId: 'primary', body: {}))['candidates'],
+      hasLength(1),
+    );
+    expect(models, ['primary', 'fallback']);
+  });
+
+  test('one-shot generation still respects the total request budget', () async {
+    final provider = GeminiModelProvider(
+      apiKey: 'key',
+      modelTimeout: const Duration(seconds: 10),
+      maxRequestTime: const Duration(milliseconds: 100),
+      clientFactory: () => MockClient((_) => Completer<http.Response>().future),
+    );
+    await expectLater(
+      provider
+          .generate(modelId: 'primary', body: {})
+          .timeout(const Duration(seconds: 2)),
+      throwsA(
+        isA<GeminiFailure>().having((e) => e.code, 'code', 'model_timeout'),
+      ),
+    );
+  });
+
+  test(
+    'quota errors survive when the server delay exceeds the remaining budget',
+    () async {
+      final provider = GeminiModelProvider(
+        apiKey: 'key',
+        maxRequestTime: const Duration(milliseconds: 100),
+        clientFactory: () =>
+            MockClient((_) async => http.Response('{"retryDelay":"45s"}', 429)),
+      );
+      await expectLater(
+        provider.stream(request(), CancellationToken()).toList(),
+        throwsA(
+          isA<GeminiFailure>().having((e) => e.code, 'code', 'model_quota'),
+        ),
+      );
+    },
+  );
+
   test(
     'one-shot generation shares fallback, keeps JSON settings and closes clients',
     () async {
@@ -97,6 +234,7 @@ void main() {
       final provider = GeminiModelProvider(
         apiKey: 'secret',
         timeout: const Duration(milliseconds: 100),
+        modelTimeout: const Duration(milliseconds: 100),
         retryDelay: (_) => Duration.zero,
         onDiagnostic: diagnostics.add,
         fallbackModel: (model) => {'a': 'b', 'b': 'c', 'c': 'd'}[model],
@@ -247,6 +385,7 @@ void main() {
     final provider = GeminiModelProvider(
       apiKey: 'key',
       timeout: const Duration(milliseconds: 80),
+      modelTimeout: const Duration(milliseconds: 80),
       maxRequestTime: const Duration(milliseconds: 180),
       fallbackModel: (m) => '${m}x',
       clientFactory: () => MockClient((incoming) async {

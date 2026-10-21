@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,9 +15,12 @@ class DebugLogSheet extends StatefulWidget {
 class _DebugLogSheetState extends State<DebugLogSheet> {
   bool _paused = false;
   bool _aiOnly = false;
+  String? _copyStatus;
+  Timer? _copyTimer;
   List<String> _snapshot = const [];
   List<String> get _visible =>
       (_paused ? _snapshot : DebugLogBuffer.instance.lines)
+          .map(DebugLogBuffer.instance.redact)
           .where((line) => !_aiOnly || line.contains('[AI]'))
           .toList();
 
@@ -31,11 +35,18 @@ class _DebugLogSheetState extends State<DebugLogSheet> {
     } catch (_) {
       message = 'Could not copy logs. Please try again.';
     }
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    }
+    if (!mounted) return;
+    _copyTimer?.cancel();
+    setState(() => _copyStatus = message);
+    _copyTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _copyStatus = null);
+    });
+  }
+
+  @override
+  void dispose() {
+    _copyTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -82,6 +93,7 @@ class _DebugLogSheetState extends State<DebugLogSheet> {
                       aiOnly: _aiOnly,
                       paused: _paused,
                       count: lines.length,
+                      copyStatus: _copyStatus,
                       onFilter: () => setState(() => _aiOnly = !_aiOnly),
                       onPause: () => setState(() {
                         _snapshot = DebugLogBuffer.instance.lines;
@@ -112,6 +124,7 @@ class _LogToolbar extends StatelessWidget {
   final bool aiOnly;
   final bool paused;
   final int count;
+  final String? copyStatus;
   final VoidCallback onFilter;
   final VoidCallback onPause;
   final VoidCallback? onCopy;
@@ -120,6 +133,7 @@ class _LogToolbar extends StatelessWidget {
     required this.aiOnly,
     required this.paused,
     required this.count,
+    this.copyStatus,
     required this.onFilter,
     required this.onPause,
     required this.onCopy,
@@ -158,9 +172,13 @@ class _LogToolbar extends StatelessWidget {
             TextButton(onPressed: onClear, child: const Text('Clear')),
           ],
         ),
-        Text(
-          '$count lines · ${paused ? 'Paused — new logs are still recorded' : 'Live · newest first'}',
-          style: Theme.of(context).textTheme.bodySmall,
+        Semantics(
+          liveRegion: true,
+          child: Text(
+            copyStatus ??
+                '$count lines · ${paused ? 'Paused — new logs are still recorded' : 'Live · newest first'}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
       ],

@@ -40,8 +40,10 @@ class RunObserver extends ChangeNotifier {
       case RunEventType.modelStatus:
         statusText = event.data['message']! as String;
       case RunEventType.textDelta:
+        statusText = '';
         streamingText += event.data['text']! as String;
       case RunEventType.toolStarted:
+        statusText = '';
         final id = event.callId;
         if (id != null) {
           activeTools[id] = ActiveAgentTool(

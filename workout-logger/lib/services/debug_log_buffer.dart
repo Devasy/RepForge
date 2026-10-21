@@ -12,11 +12,11 @@ class DebugLogBuffer extends ChangeNotifier {
 
   List<String> get lines => List.unmodifiable(_lines);
   void protect(String secret) {
-    if (secret.trim().isNotEmpty) {
-      _secrets.add(secret);
+    if (secret.trim().isNotEmpty && _secrets.add(secret)) {
       for (var i = 0; i < _lines.length; i++) {
-        _lines[i] = _redact(_lines[i]);
+        _lines[i] = redact(_lines[i]);
       }
+      _notify();
     }
   }
 
@@ -30,7 +30,7 @@ class DebugLogBuffer extends ChangeNotifier {
     debugPrint = _interceptor!;
   }
 
-  String _redact(String message) {
+  String redact(String message) {
     for (final secret in _secrets) {
       message = message.replaceAll(secret, '[redacted]');
     }
@@ -44,7 +44,7 @@ class DebugLogBuffer extends ChangeNotifier {
 
   void write(String message) {
     final stamp = DateTime.now().toIso8601String().substring(11, 19);
-    for (final line in _redact(message).split('\n')) {
+    for (final line in redact(message).split('\n')) {
       _lines.add(
         '[$stamp] ${line.length > 2048 ? '${line.substring(0, 2048)}…' : line}',
       );

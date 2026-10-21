@@ -44,6 +44,26 @@ void main() {
     });
 
     test(
+      'new protected secrets redact existing lines and notify once',
+      () async {
+        buffer.write('late-buffer-secret');
+        await Future<void>.delayed(Duration.zero);
+        var notifications = 0;
+        void changed() => notifications++;
+        buffer.addListener(changed);
+        addTearDown(() => buffer.removeListener(changed));
+        buffer.protect('late-buffer-secret');
+        await Future<void>.delayed(Duration.zero);
+        expect(notifications, 1);
+        expect(buffer.lines.join(), isNot(contains('late-buffer-secret')));
+        buffer.protect('late-buffer-secret');
+        buffer.protect('  ');
+        await Future<void>.delayed(Duration.zero);
+        expect(notifications, 1);
+      },
+    );
+
+    test(
       'attach intercepts debugPrint and appends timestamped message',
       () async {
         DebugLogBuffer.attach();

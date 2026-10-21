@@ -173,7 +173,7 @@ class RepForgeAgentSession extends ChangeNotifier {
         store: owner.store,
         model: owner.model,
         limits: RunLimits(
-          activeTimeout: const Duration(minutes: 8),
+          activeTimeout: Duration(minutes: rounds * 10 + 1),
           maxModelCalls: rounds,
           maxToolCalls: rounds * 16,
           maxSteps: rounds * 20 + 1,

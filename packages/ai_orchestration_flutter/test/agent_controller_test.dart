@@ -203,8 +203,11 @@ void main() {
       addTearDown(first.dispose);
       addTearDown(second.dispose);
       await first.start(input: {'text': 'Hello'});
+      model.output.add(const ModelStatus('Connecting'));
+      await until(first, (state) => state.statusText == 'Connecting');
       model.output.add(const ModelText('Hello '));
       await until(first, (state) => state.streamingText == 'Hello ');
+      expect(first.state.statusText, isEmpty);
       first.detach();
       expect(first.state.hasLiveRun, true);
       expect(first.state.needsRecovery, false);

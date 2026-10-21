@@ -11,7 +11,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ### Fixes
 
-- Try another Gemini model after timeouts, unavailable models, or exhausted retries, with visible retry progress and a Stop control.
+- Allow up to five minutes for each Gemini model request, advance to fallback models after failures, and show accurate progress with a Stop control.
 - Keep all changes in a proposal visible during approval, with numbered progress and applied or declined states.
 - Copy and filter diagnostic logs from About, pause the log display while reading, and redact API keys.
 - Derive release versions from rMAJOR.MINOR.PATCH branches, require matching changelog notes before merge, and publish only merged release PRs; ordinary PRs do not trigger releases.
