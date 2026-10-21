@@ -4,6 +4,8 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.2.0]
+
 ### Features added
 
 - Resume saved AI coach and optimizer questions or proposed changes after reopening the conversation.
