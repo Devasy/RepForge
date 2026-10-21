@@ -1,0 +1,60 @@
+name: Prepare release branch version
+
+on:
+  create:
+  push:
+    branches: ['r[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+
+concurrency:
+  group: prepare-release-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: github.event_name != 'create' || github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Select release branch
+        id: branch
+        env:
+          SOURCE_BRANCH: ${{ github.event_name == 'create' && github.event.ref || github.ref_name }}
+        run: |
+          if [[ "$SOURCE_BRANCH" =~ ^r[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "name=$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: steps.branch.outputs.name != ''
+        with:
+          ref: ${{ steps.branch.outputs.name }}
+          fetch-depth: 0
+      - name: Set version from branch and require authored notes
+        if: steps.branch.outputs.name != ''
+        id: version
+        env:
+          RELEASE_BRANCH: ${{ steps.branch.outputs.name }}
+        run: python3 workout-logger/scripts/prepare_release_version.py --branch "$RELEASE_BRANCH"
+      - name: Commit the version on its release branch
+        if: steps.version.outputs.changed == 'true'
+        env:
+          RELEASE_BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- workout-logger/pubspec.yaml
+          git commit -m "chore: set version from $RELEASE_BRANCH"
+          git push origin "HEAD:refs/heads/$RELEASE_BRANCH"
+      - name: Run checks on the prepared branch
+        if: steps.branch.outputs.name != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          gh workflow run ci.yml --ref "$RELEASE_BRANCH"
+          gh workflow run orchestration.yml --ref "$RELEASE_BRANCH"

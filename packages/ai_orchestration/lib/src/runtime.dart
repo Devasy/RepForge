@@ -12,6 +12,7 @@ enum RunEventType {
   resumed,
   nodeStarted,
   textDelta,
+  modelStatus,
   toolStarted,
   toolCompleted,
   artifact,
@@ -502,6 +503,8 @@ class _Execution<S> implements NodeContext {
           );
         }
         switch (iterator.current) {
+          case ModelStatus(:final message):
+            emit(RunEventType.modelStatus, data: {'message': message});
           case ModelText(:final text):
             emit(RunEventType.textDelta, data: {'text': text});
             textBuffer.write(text);

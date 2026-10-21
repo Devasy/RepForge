@@ -11,6 +11,7 @@ import '../services/ai/coach_tool_service.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
 import '../services/ai/orchestration/repforge_agents.dart';
+import '../services/ai/orchestration/agent_change_review.dart';
 
 class AiCoachViewModel extends ChangeNotifier {
   final IAiService _ai;
@@ -60,6 +61,9 @@ class AiCoachViewModel extends ChangeNotifier {
     _notify();
   }
 
+  AgentChangeReview? get changeReview => _session?.changeReview;
+  bool get isRunning => _session?.state.isRunning ?? false;
+  String get statusText => _session?.statusText ?? '';
   bool get isConfigured => _ai.isConfigured;
   bool get isLoading => _loading || (_session?.isLoading ?? false);
   bool get _navigationBusy => _loading || (_session?.isWorking ?? false);

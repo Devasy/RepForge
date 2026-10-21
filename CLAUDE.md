@@ -212,19 +212,26 @@ After modifying service interfaces, regenerate mocks:
 dart run build_runner build --delete-conflicting-outputs
 ```
 
-**Run tests before committing** — the CI does not run tests, only builds the APK.
+**Run tests before committing** — CI also runs tests, release-readiness checks, analysis, and Android builds.
 
 ---
 
 ## CI/CD Pipeline (.github/workflows/release.yml)
 
-Triggers automatically on push to `main`:
-1. Runs `dart scripts/bump_version.dart patch` (increments patch version)
-2. Commits version bump and creates a git tag (`v{version}`)
-3. Builds the release APK with the Flutter version pinned in `workout-logger/pubspec.yaml` (currently 3.41.5)
-4. Creates a GitHub Release with the APK attached
+Ordinary feature PRs merge to main without starting a release. Add draft notes
+under Unreleased and leave pubspec version/build unchanged.
 
-**Do not** manually edit `pubspec.yaml` version before merging to `main` — the CI handles it. For a minor/major bump, edit `pubspec.yaml` manually before the merge.
+For a release, create `rMAJOR.MINOR.PATCH` from current main, such as `r2.1.20`,
+and author the matching `## [2.1.20]` changelog entry. Preparation sets pubspec
+version from the branch name and advances its build number on that branch. CI
+requires the exact branch version, matching notes, and an advance beyond main.
+Merging that checked release PR builds the exact merge commit, then tags and
+publishes it to GitHub and Google Play. Other branch types never publish.
+
+Run `python3 workout-logger/scripts/check_release_readiness.py --branch r2.1.20
+--base-ref origin/main` from the root after fetching main. Do not manually patch
+bump on merge or push bot commits to main. Do not reuse a published release
+branch. Manual release-workflow runs only build validation artifacts.
 
 ---
 

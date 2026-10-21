@@ -18,8 +18,11 @@ class GeminiModelProvider implements ModelProvider {
   final String? Function(String model)? fallbackModel;
   final void Function(String model)? onModelChanged;
   final FutureOr<void> Function(JsonMap usage)? onUsage;
+  final void Function(JsonMap event)? onDiagnostic;
   final int maxRetries;
   final Duration timeout;
+  final Duration modelTimeout;
+  final Duration maxRequestTime;
   final Duration Function(int attempt) retryDelay;
 
   GeminiModelProvider({
@@ -29,15 +32,22 @@ class GeminiModelProvider implements ModelProvider {
     this.fallbackModel,
     this.onModelChanged,
     this.onUsage,
-    this.maxRetries = 3,
-    this.timeout = const Duration(seconds: 60),
+    this.onDiagnostic,
+    this.maxRetries = 1,
+    this.timeout = const Duration(seconds: 15),
+    this.modelTimeout = const Duration(minutes: 5),
+    this.maxRequestTime = const Duration(minutes: 10),
     Duration Function(int attempt)? retryDelay,
   }) : clientFactory = clientFactory ?? http.Client.new,
        generationConfig = generationConfig ?? ((_) => const {}),
        retryDelay =
            retryDelay ??
            ((attempt) => Duration(milliseconds: 500 * (1 << attempt))) {
-    if (maxRetries < 0 || maxRetries > 5 || timeout <= Duration.zero) {
+    if (maxRetries < 0 ||
+        maxRetries > 5 ||
+        timeout <= Duration.zero ||
+        modelTimeout <= Duration.zero ||
+        maxRequestTime <= Duration.zero) {
       throw ArgumentError('Invalid request limits.');
     }
   }
@@ -60,7 +70,12 @@ class GeminiModelProvider implements ModelProvider {
     var usage = <String, Object?>{};
     String? finish;
     var bytes = 0;
-    await for (final chunk in _request(request, contents, cancellation)) {
+    await for (final event in _request(request, contents, cancellation)) {
+      if (event is ModelStatus) {
+        yield event;
+        continue;
+      }
+      final chunk = event as JsonMap;
       bytes += utf8.encode(jsonEncode(chunk)).length;
       if (bytes > 16 * 1024 * 1024) {
         throw const GeminiFailure(
@@ -193,151 +208,331 @@ class GeminiModelProvider implements ModelProvider {
     );
   }
 
-  Stream<JsonMap> _request(
+  Future<JsonMap> generate({
+    required String modelId,
+    required JsonMap body,
+    CancellationToken? cancellation,
+  }) async {
+    if (apiKey.trim().isEmpty) {
+      throw const GeminiFailure(
+        'model_auth',
+        'Add your Gemini API key in Settings.',
+        canRetry: false,
+      );
+    }
+    final token = cancellation ?? CancellationToken();
+    final request = ModelRequest(
+      modelId: modelId,
+      systemPrompt: '',
+      messages: [],
+      tools: [],
+    );
+    JsonMap? result;
+    await for (final event in _request(request, const [], token, body: body)) {
+      if (event is JsonMap) result = event;
+    }
+    if (result != null) return result;
+    throw const GeminiFailure(
+      'model_protocol',
+      'Gemini returned an empty response.',
+      canRetry: false,
+    );
+  }
+
+  Stream<Object> _request(
     ModelRequest request,
     List<JsonMap> contents,
-    CancellationToken cancellation,
-  ) async* {
+    CancellationToken cancellation, {
+    JsonMap? body,
+  }) async* {
     var model = request.modelId;
     final visited = <String>{model};
+    final clock = Stopwatch()..start();
     var retries = 0;
     while (true) {
       cancellation.check();
-      if (!RegExp(r'^[a-zA-Z0-9._-]+$').hasMatch(model)) {
-        throw const GeminiFailure(
-          'model_capability',
-          'Invalid Gemini model ID.',
-          canRetry: false,
-        );
-      }
-      final client = clientFactory();
-      var open = true;
-      void close() {
-        if (open) {
-          open = false;
-          client.close();
-        }
-      }
-
-      unawaited(cancellation.whenCancelled.then((_) => close()));
-      Duration? delay;
+      if (clock.elapsed >= maxRequestTime) throw _timeoutFailure;
+      _diagnose({
+        'event': 'request',
+        'model': model,
+        'attempt': retries + 1,
+        'elapsedMs': clock.elapsedMilliseconds,
+      });
+      yield ModelStatus(
+        retries == 0 ? 'Connecting to Gemini…' : 'Retrying Gemini…',
+      );
+      var received = false;
+      Duration delay = Duration.zero;
+      late GeminiFailure retryFailure;
       try {
-        final uri = Uri.https(
-          'generativelanguage.googleapis.com',
-          '/v1beta/models/$model:streamGenerateContent',
-          {'alt': 'sse'},
-        );
-        final body = {
-          'contents': contents,
-          'systemInstruction': {
-            'parts': [
-              {'text': request.systemPrompt},
-            ],
-          },
-          if (request.tools.isNotEmpty)
-            'tools': [
-              {
-                'functionDeclarations': [
-                  for (final tool in request.tools)
-                    {
-                      'name': tool.name,
-                      'description': tool.description,
-                      'parameters': geminiSchema(tool.arguments.definition),
-                    },
-                ],
-              },
-            ],
-          'generationConfig': {...generationConfig(model), 'candidateCount': 1},
-        };
-        final outgoing = http.Request('POST', uri)
-          ..headers.addAll({
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-          })
-          ..body = jsonEncode(body);
-        final response = await _guard(client.send(outgoing), cancellation);
-        if (response.statusCode != 200) {
-          final error = await _guard(
-            response.stream.bytesToString(),
-            cancellation,
-          );
+        await for (final chunk in _attempt(
+          request,
+          contents,
+          model,
+          cancellation,
+          clock,
+          body: body,
+        )) {
+          received = true;
+          yield chunk;
+        }
+        _diagnose({
+          'event': 'response_complete',
+          'model': model,
+          'elapsedMs': clock.elapsedMilliseconds,
+        });
+        return;
+      } on GeminiFailure catch (failure) {
+        cancellation.check();
+        _diagnose({
+          'event': 'request_failed',
+          'model': model,
+          'code': failure.code,
+          if (failure is _HttpFailure) 'status': failure.status,
+          'partial': received,
+          'elapsedMs': clock.elapsedMilliseconds,
+        });
+        if (received || clock.elapsed >= maxRequestTime) rethrow;
+        final canSwitch =
+            {
+              'model_timeout',
+              'model_busy',
+              'model_quota',
+              'model_unavailable',
+              'model_transport',
+              'model_network',
+            }.contains(failure.code) &&
+            (failure.canRetry || failure.code == 'model_unavailable');
+        final immediate =
+            failure.code == 'model_timeout' ||
+            failure.code == 'model_unavailable' ||
+            failure is _HttpFailure && failure.dailyQuota;
+        if (canSwitch && (immediate || retries >= maxRetries)) {
           final fallback = fallbackModel?.call(model);
-          if (response.statusCode == 429 &&
-              (error.contains('GenerateRequestsPerDay') ||
-                  error.contains('free_tier_requests')) &&
-              fallback != null &&
-              visited.length < 6 &&
-              visited.add(fallback)) {
+          if (fallback != null && visited.length < 8 && visited.add(fallback)) {
+            _diagnose({
+              'event': 'fallback',
+              'from': model,
+              'to': fallback,
+              'code': failure.code,
+            });
+            yield const ModelStatus(
+              'Gemini is unavailable. Trying another model…',
+            );
             model = fallback;
+            retries = 0;
             onModelChanged?.call(model);
             continue;
           }
-          if ((response.statusCode == 429 || response.statusCode >= 500) &&
-              retries < maxRetries) {
-            delay = _serverDelay(error) ?? retryDelay(retries);
-            retries++;
-          } else {
-            throw _statusFailure(response.statusCode);
-          }
-        } else {
-          final lines = StreamIterator(
-            response.stream
-                .transform(utf8.decoder)
-                .transform(const LineSplitter()),
-          );
-          var event = StringBuffer();
-          try {
-            while (await _guard(lines.moveNext(), cancellation)) {
-              final line = lines.current;
-              if (line.isEmpty) {
-                if (event.isNotEmpty) {
-                  final payload = event.toString();
-                  event = StringBuffer();
-                  if (payload.trim() != '[DONE]') {
-                    yield jsonObject(jsonDecode(payload));
-                  }
-                }
-              } else if (line.startsWith('data:')) {
-                if (event.isNotEmpty) event.writeln();
-                event.write(line.substring(5).trimLeft());
-                if (event.length > 1024 * 1024) {
-                  throw const FormatException('SSE event too large');
-                }
-              }
-            }
-            if (event.isNotEmpty && event.toString().trim() != '[DONE]') {
-              yield jsonObject(jsonDecode(event.toString()));
-            }
-          } finally {
-            close();
-            unawaited(lines.cancel());
-          }
-          return;
         }
-      } on OrchestrationException {
-        rethrow;
-      } on TimeoutException {
-        throw const GeminiFailure(
-          'model_timeout',
-          'Gemini took too long to respond. Please try again.',
-        );
-      } on FormatException {
-        throw const GeminiFailure(
-          'model_protocol',
-          'Gemini returned an incomplete response. Please try again.',
-        );
-      } catch (_) {
-        cancellation.check();
-        throw const GeminiFailure(
-          'model_network',
-          'The connection to Gemini was lost. Check your internet connection and try again.',
-        );
-      } finally {
-        close();
+        if (!failure.canRetry || retries >= maxRetries) rethrow;
+        retryFailure = failure;
+        delay = failure is _HttpFailure && failure.retryAfter != null
+            ? failure.retryAfter!
+            : retryDelay(retries);
+        retries++;
       }
+      if (delay >= maxRequestTime - clock.elapsed) {
+        throw retryFailure;
+      }
+      _diagnose({
+        'event': 'retry',
+        'model': model,
+        'delayMs': delay.inMilliseconds,
+      });
+      yield const ModelStatus('Gemini is busy. Waiting before retrying…');
       await _backoff(delay, cancellation);
     }
   }
+
+  Stream<JsonMap> _attempt(
+    ModelRequest request,
+    List<JsonMap> contents,
+    String model,
+    CancellationToken cancellation,
+    Stopwatch clock, {
+    JsonMap? body,
+  }) async* {
+    if (!RegExp(r'^[a-zA-Z0-9._-]+$').hasMatch(model)) {
+      throw const GeminiFailure(
+        'model_capability',
+        'Invalid Gemini model ID.',
+        canRetry: false,
+      );
+    }
+    final client = clientFactory();
+    var open = true;
+    void close() {
+      if (open) {
+        open = false;
+        client.close();
+      }
+    }
+
+    unawaited(cancellation.whenCancelled.then((_) => close()));
+    final attemptClock = Stopwatch()..start();
+    var hasPacket = false;
+    JsonMap decodePacket(String payload) {
+      final result = _packet(payload);
+      hasPacket = true;
+      return result;
+    }
+
+    Future<T> guard<T>(Future<T> future) {
+      final remaining = maxRequestTime - clock.elapsed;
+      final attemptRemaining = modelTimeout - attemptClock.elapsed;
+      final wait = body == null && hasPacket && timeout < attemptRemaining
+          ? timeout
+          : attemptRemaining;
+      return _guard(
+        future,
+        cancellation,
+        budget: wait < remaining ? wait : remaining,
+      );
+    }
+
+    try {
+      final outgoing =
+          http.Request(
+              'POST',
+              Uri.https(
+                'generativelanguage.googleapis.com',
+                '/v1beta/models/$model:${body == null ? 'streamGenerateContent' : 'generateContent'}',
+                body == null ? {'alt': 'sse'} : null,
+              ),
+            )
+            ..headers.addAll({
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            })
+            ..body = jsonEncode(
+              body != null
+                  ? {
+                      ...body,
+                      'generationConfig': {
+                        ...jsonObject(
+                          body['generationConfig'] ?? const <String, Object?>{},
+                        ),
+                        ...generationConfig(model),
+                      },
+                    }
+                  : {
+                      'contents': contents,
+                      'systemInstruction': {
+                        'parts': [
+                          {'text': request.systemPrompt},
+                        ],
+                      },
+                      if (request.tools.isNotEmpty)
+                        'tools': [
+                          {
+                            'functionDeclarations': [
+                              for (final tool in request.tools)
+                                {
+                                  'name': tool.name,
+                                  'description': tool.description,
+                                  'parameters': geminiSchema(
+                                    tool.arguments.definition,
+                                  ),
+                                },
+                            ],
+                          },
+                        ],
+                      'generationConfig': {
+                        ...generationConfig(model),
+                        'candidateCount': 1,
+                      },
+                    },
+            );
+      final response = await guard(client.send(outgoing));
+      if (response.statusCode != 200) {
+        final body = await guard(response.stream.bytesToString());
+        final failure = _statusFailure(response.statusCode);
+        throw _HttpFailure(
+          failure.code,
+          failure.message,
+          canRetry: failure.canRetry,
+          status: response.statusCode,
+          dailyQuota:
+              response.statusCode == 429 &&
+              (body.toLowerCase().contains('requestsperday') ||
+                  body.toLowerCase().contains('requests_per_day')),
+          retryAfter: _serverDelay(body),
+        );
+      }
+      if (body != null) {
+        final payload = await guard(response.stream.bytesToString());
+        if (utf8.encode(payload).length > 16 * 1024 * 1024) {
+          throw const FormatException('Response too large');
+        }
+        yield decodePacket(payload);
+        return;
+      }
+      final lines = StreamIterator(
+        response.stream.transform(utf8.decoder).transform(const LineSplitter()),
+      );
+      var event = StringBuffer();
+      try {
+        while (await guard(lines.moveNext())) {
+          final line = lines.current;
+          if (line.isEmpty && event.isNotEmpty) {
+            final payload = event.toString();
+            event = StringBuffer();
+            if (payload.trim() != '[DONE]') yield decodePacket(payload);
+          } else if (line.startsWith('data:')) {
+            if (event.isNotEmpty) event.writeln();
+            event.write(line.substring(5).trimLeft());
+            if (event.length > 1024 * 1024) {
+              throw const FormatException('SSE event too large');
+            }
+          }
+        }
+        if (event.isNotEmpty && event.toString().trim() != '[DONE]') {
+          yield decodePacket(event.toString());
+        }
+      } finally {
+        close();
+        unawaited(lines.cancel());
+      }
+    } on OrchestrationException {
+      rethrow;
+    } on TimeoutException {
+      throw _timeoutFailure;
+    } on FormatException {
+      throw const GeminiFailure(
+        'model_protocol',
+        'Gemini returned an incomplete response. Please try again.',
+        canRetry: false,
+      );
+    } catch (_) {
+      cancellation.check();
+      throw const GeminiFailure(
+        'model_network',
+        'The connection to Gemini was lost. Check your internet connection and try again.',
+      );
+    } finally {
+      close();
+    }
+  }
+
+  JsonMap _packet(String payload) {
+    final packet = jsonObject(jsonDecode(payload));
+    if (packet['error'] case final Map<String, Object?> error) {
+      throw _statusFailure((error['code'] as num?)?.toInt() ?? 500);
+    }
+    return packet;
+  }
+
+  void _diagnose(JsonMap event) {
+    try {
+      onDiagnostic?.call(event);
+    } catch (_) {}
+  }
+
+  GeminiFailure get _timeoutFailure => const GeminiFailure(
+    'model_timeout',
+    'Gemini took too long to respond. Please try again.',
+  );
 
   Future<void> _backoff(Duration delay, CancellationToken cancellation) async {
     final elapsed = Completer<void>();
@@ -350,14 +545,17 @@ class GeminiModelProvider implements ModelProvider {
     }
   }
 
-  Future<T> _guard<T>(Future<T> future, CancellationToken cancellation) =>
-      Future.any([
-        future,
-        cancellation.whenCancelled.then<T>((_) {
-          cancellation.check();
-          throw StateError('Cancelled');
-        }),
-      ]).timeout(timeout);
+  Future<T> _guard<T>(
+    Future<T> future,
+    CancellationToken cancellation, {
+    required Duration budget,
+  }) => Future.any([
+    future,
+    cancellation.whenCancelled.then<T>((_) {
+      cancellation.check();
+      throw StateError('Cancelled');
+    }),
+  ]).timeout(budget);
 
   Duration? _serverDelay(String body) {
     final match = RegExp(
@@ -396,4 +594,18 @@ class GeminiModelProvider implements ModelProvider {
       canRetry: status >= 500,
     ),
   };
+}
+
+class _HttpFailure extends GeminiFailure {
+  final bool dailyQuota;
+  final int status;
+  final Duration? retryAfter;
+  const _HttpFailure(
+    super.code,
+    super.message, {
+    required super.canRetry,
+    required this.dailyQuota,
+    required this.status,
+    this.retryAfter,
+  });
 }

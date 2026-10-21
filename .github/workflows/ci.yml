@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -19,10 +20,18 @@ permissions:
 
 jobs:
   changelog:
-    name: Changelog format
+    name: Release readiness
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate release branch version and notes
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+        run: python3 workout-logger/scripts/check_release_readiness.py --branch "$SOURCE_BRANCH" --base-ref "origin/$BASE_BRANCH"
       - run: python3 workout-logger/scripts/build_release_notes.py --check
       - run: python3 -m unittest discover -s workout-logger/scripts -p 'test_*.py'
 
@@ -200,6 +209,6 @@ jobs:
           retention-days: 14
 
       - name: Verify release shrinking rules
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         working-directory: ./workout-logger
         run: flutter build apk --release --split-per-abi --target-platform android-arm64 --no-pub

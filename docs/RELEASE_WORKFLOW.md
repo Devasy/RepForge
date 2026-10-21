@@ -21,10 +21,12 @@ graph TD
     end
 
     subgraph Release & CD Workflow: release.yml
-        M[Push to main or Release Tag v*] --> N[Bump Version & Create Tag]
-        N --> O[Decode Disposable Keystore]
+        M[Create rX.Y.Z branch and author release notes] --> N[Prepare pubspec from branch version]
+        N --> N1[Required checks on release PR]
+        N1 --> N2[Merge release PR to main]
+        N2 --> O[Decode Disposable Keystore]
         O --> P[Build Release App Bundle: flutter build appbundle --release]
-        P --> Q[Build Split APKs for GitHub Releases]
+        P --> Q[Build and verify split APKs, then tag merged commit]
         P --> R[Deploy AAB to Google Play Closed Testing Alpha Track: r0adkll/upload-google-play]
         Q --> S[Publish GitHub Release]
         R & S --> T[Purge Keystore File: always cleanup]
@@ -36,6 +38,11 @@ graph TD
 ## 1. Continuous Integration (`.github/workflows/ci.yml`)
 
 Triggered on every Pull Request and Push to `main` (and release branches):
+
+The required `Release readiness` check validates changelog format on every PR.
+For ordinary branches it requires unchanged pubspec version/build. For `rX.Y.Z`
+branches it requires that exact committed version, an advanced build number, and
+matching authored release notes. Strict checks require an up-to-date base.
 
 1. **`security_scan`**:
    - **Gitleaks**: Scans commits for accidental secret leakage, tokens, or private keys.
@@ -63,17 +70,35 @@ Triggered on every Pull Request and Push to `main` (and release branches):
 
 ## 2. Continuous Delivery (`.github/workflows/release.yml`)
 
-Triggered on:
-- Merges/pushes to `main`
-- Release tags matching `v*` (e.g., `v2.1.2`)
-- Manual execution via `workflow_dispatch`
+Preparation (`prepare-release.yml`) runs when a release branch is created or
+pushed. Branch names are exactly `rMAJOR.MINOR.PATCH`, for example `r2.1.20`.
+Create one from current main and author the matching changelog entry. The bot
+sets pubspec from the branch version, increments its build number beyond main,
+and pushes only to that release branch. Repeating preparation does not bump
+again. It explicitly dispatches CI on the prepared head without creating,
+approving, or merging a PR. Open the release branch's PR to main normally.
+
+Publication (`release.yml`) selects only merged same-repository release PRs
+whose base is main. Ordinary PR merges, main pushes, tag pushes, forks and
+unmerged PRs never publish or deploy to Google Play. Manual runs on release
+branches build validation artifacts only; manual runs on main do not release.
 
 ### Release Steps:
-1. **Release Version**: On push to `main`, `scripts/bump_version.dart patch` increments the patch version and base build number. The workflow raises the base to at least its run number to preserve upgrades from earlier APKs that used run numbers directly. It commits the resulting version and creates its `vX.Y.Z` tag. Tag builds require the tag to match the committed version. Release branches retain the current version until the main-branch release run bumps it.
+1. **Release Version**: Parse the exact version from the merged PR's `rX.Y.Z` branch. Check that the exact merge commit contains that pubspec version and matching authored notes. Build that commit without modifying or committing version metadata. Create its tag only after signed builds and APK version checks succeed.
 2. **Build Numbering**: GitHub release APKs use the committed `pubspec.yaml` base build number. Split APK version codes are `base * 10 + ABI`, where armeabi-v7a = 1, arm64-v8a = 2, and x86_64 = 3. The Play AAB retains `${{ github.run_number }}` as its separate version code. The workflow checks each APK's actual version code before publishing it.
 3. **Disposable Keystore Decoding**: Safely decodes `KEYSTORE_BASE64` to `${{ runner.temp }}/upload-keystore.jks` and cleans it up in a guaranteed `if: always()` step.
-4. **Google Play Closed Testing Deployment**: Push-triggered releases automatically upload the signed `.aab` to the **Closed Testing (Alpha) Track** via `r0adkll/upload-google-play@v1`. Manual runs build validation artifacts without deploying to Google Play or publishing a GitHub release.
-5. **GitHub Release Publication**: Builds split release APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) and attaches both the APKs and `.aab` bundle to the GitHub release along with automatically generated release notes from merged pull requests.
+4. **Google Play Closed Testing Deployment**: Merged release PRs automatically upload the signed `.aab` to the **Closed Testing (Alpha) Track** via `r0adkll/upload-google-play@v1`. Manual runs build validation artifacts without deploying to Google Play or publishing a GitHub release.
+5. **GitHub Release Publication**: Builds split release APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) and attaches both the APKs and `.aab` bundle to the GitHub release along with the authored notes for that exact version from `CHANGELOG.md`.
+
+### Repository merge and automation settings
+
+The main ruleset requires a PR, an up-to-date base, and the `Release readiness`
+check from GitHub Actions. It has no bypass actors. Tests, quality, security and
+Android builds also run in CI. GitHub's default extra-approval protection for
+unattributed changes is retained; the configured review-count requirement is zero.
+The shared Actions PR-creation/approval setting is disabled because this flow
+needs neither capability. Preparation has only contents/actions write access;
+publication has contents write for tags and releases. No bot commits go to main.
 
 ### Android SDK 37 and F-Droid builds
 
@@ -81,7 +106,7 @@ The Android build pins AGP 9.1.1, Gradle 9.3.1, Java 17, and build tools 36.0.0.
 
 Release dependency installation uses `flutter pub get --enforce-lockfile`, followed by builds with `--no-pub`. The JNI CMake linker patch and `LDFLAGS=-Wl,--build-id=none` match the F-Droid recipe's native build inputs.
 
-The `r2.1.4` branch retains `2.1.3+37`; CI bumps it to 2.1.4 after merge to main. The published 2.1.3 arm64 APK used code 582. To preserve upgrades while making F-Droid's version calculation reproducible, CI commits a base of at least its release run number before building. The final three APK codes are determined from that committed base, not hard-coded in advance.
+Historically, `r2.1.4` retained `2.1.3+37` until the old workflow bumped it after merge. Release versions now come from the release branch and pass through a protected PR. The published 2.1.3 arm64 APK used code 582. To preserve upgrades while making F-Droid's version calculation reproducible, Release preparation advances the committed base beyond current main before its PR is merged. The final three APK codes are determined from that committed base, not hard-coded in advance.
 
 After the release exists, update all three entries in `fdroiddata/metadata/com.devasy.repforge.yml` to the release's full upstream commit hash, version name, and ABI version codes; set `CurrentVersionCode` to the x86_64 code. Build and verify each ABI in the Linux F-Droid environment against its corresponding signed GitHub APK. A Windows compilation check does not establish Linux reproducibility.
 

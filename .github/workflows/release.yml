@@ -1,34 +1,59 @@
 name: Release Build & Deploy
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*'
+  pull_request:
+    types: [closed]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-publication
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
+  plan:
+    name: Select merged release branch
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    outputs:
+      eligible: ${{ steps.plan.outputs.eligible }}
+      version: ${{ steps.plan.outputs.version }}
+      branch: ${{ steps.plan.outputs.branch }}
+      commit: ${{ steps.plan.outputs.commit }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          persist-credentials: false
+      - name: Select only merged release PRs or manual release-branch builds
+        id: plan
+        run: python3 workout-logger/scripts/release_plan.py
+
   release:
     name: Build, Release & Deploy
-    if: github.actor != 'github-actions[bot]'
+    needs: plan
+    if: needs.plan.outputs.eligible == 'true'
     runs-on: ubuntu-24.04
 
     env:
       LDFLAGS: -Wl,--build-id=none
 
     permissions:
-      contents: write      # Required to create releases and push commits
+      contents: write      # Required to tag the checked commit and publish releases
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for proper versioning
+          ref: ${{ needs.plan.outputs.commit }}
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Java
@@ -56,6 +81,11 @@ jobs:
           cache: true
           pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('workout-logger/pubspec.lock') }}"
 
+      - name: Check branch version against committed pubspec and notes
+        env:
+          RELEASE_BRANCH: ${{ needs.plan.outputs.branch }}
+        run: python3 workout-logger/scripts/check_release_readiness.py --branch "$RELEASE_BRANCH"
+
       - name: Install dependencies
         working-directory: ./workout-logger
         run: |
@@ -72,17 +102,6 @@ jobs:
             fi
           done
 
-      - name: Bump version
-        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
-        id: bump_version
-        run: |
-          dart scripts/bump_version.dart patch
-          FULL_VERSION=$(sed -n 's/^version: //p' workout-logger/pubspec.yaml | tr -d '\r')
-          BUILD_NUMBER=${FULL_VERSION##*+}
-          if (( BUILD_NUMBER < GITHUB_RUN_NUMBER )); then
-            sed -i "s/^version: .*/version: ${FULL_VERSION%%+*}+${GITHUB_RUN_NUMBER}/" workout-logger/pubspec.yaml
-          fi
-
       - name: Read version
         id: version
         run: |
@@ -90,42 +109,11 @@ jobs:
           [[ "$FULL_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\+[0-9]+$ ]]
           VERSION=${FULL_VERSION%%+*}
           BUILD_NUMBER=${FULL_VERSION##*+}
-          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v${VERSION}" ]]; then
-            echo "Error: release tag does not match pubspec.yaml" >&2
-            exit 1
-          fi
           echo "value=$VERSION" >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
 
       - name: Validate and extract CHANGELOG.md release notes
         run: python3 workout-logger/scripts/build_release_notes.py "${{ steps.version.outputs.value }}" > release-notes.md
-
-      - name: Configure Git
-        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Commit version bump
-        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
-        id: commit_version
-        run: |
-          git add workout-logger/pubspec.yaml
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-            echo "committed=false" >> $GITHUB_OUTPUT
-          else
-            git commit -m "chore: bump version to ${{ steps.version.outputs.value }}"
-            git push origin HEAD:${{ github.ref_name }}
-            echo "committed=true" >> $GITHUB_OUTPUT
-          fi
-          echo "commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Create Git tag
-        if: github.event_name == 'push' && steps.commit_version.outputs.committed == 'true'
-        run: |
-          git tag "v${{ steps.version.outputs.value }}"
-          git push origin "v${{ steps.version.outputs.value }}"
 
       - name: Decode release keystore
         id: decode_keystore
@@ -178,6 +166,19 @@ jobs:
             mv "$APK" "$DIR/repforge-v${V}-${ABI}.apk"
           done
 
+      - name: Tag the verified merged commit
+        if: needs.plan.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+          SOURCE_COMMIT: ${{ needs.plan.outputs.commit }}
+        run: |
+          if git rev-parse --verify "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+            [[ "$(git rev-parse "refs/tags/v${VERSION}^{commit}")" == "$SOURCE_COMMIT" ]] || { echo "Error: release tag points to another commit" >&2; exit 1; }
+          else
+            git tag "v${VERSION}" "$SOURCE_COMMIT"
+            git push origin "refs/tags/v${VERSION}"
+          fi
+
       - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -199,7 +200,7 @@ jobs:
           retention-days: 7
 
       - name: Deploy to Google Play (Closed Testing Track)
-        if: github.event_name == 'push' && env.PLAY_STORE_JSON_KEY != ''
+        if: needs.plan.outputs.publish == 'true' && env.PLAY_STORE_JSON_KEY != ''
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
@@ -217,7 +218,7 @@ jobs:
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
 
       - name: Create GitHub Release
-        if: github.event_name == 'push' && (steps.commit_version.outputs.committed == 'true' || startsWith(github.ref, 'refs/tags/'))
+        if: needs.plan.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.value }}

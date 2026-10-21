@@ -98,6 +98,11 @@ class ModelToolCall extends ModelEvent {
   const ModelToolCall(this.call);
 }
 
+class ModelStatus extends ModelEvent {
+  final String message;
+  const ModelStatus(this.message);
+}
+
 enum ModelFinishReason { stop, toolCalls, length, blocked }
 
 class ModelFinished extends ModelEvent {

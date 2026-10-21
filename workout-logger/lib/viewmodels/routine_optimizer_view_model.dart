@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../services/ai/ai_failure.dart';
 import '../services/ai/coach_tool_service.dart';
 import '../services/ai/orchestration/repforge_agents.dart';
+import '../services/ai/orchestration/agent_change_review.dart';
 import '../services/interfaces/ai_service_interface.dart';
 import '../services/managers/conversation_manager.dart';
 import '../services/settings_provider.dart';
@@ -36,6 +37,9 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
     _conversations.addListener(_notify);
   }
 
+  AgentChangeReview? get changeReview => _session?.changeReview;
+  bool get isRunning => _session?.state.isRunning ?? false;
+  String get statusText => _session?.statusText ?? '';
   bool get isConfigured => _ai.isConfigured;
   bool get isLoading => _busy || (_session?.isLoading ?? false);
   bool get _navigationBusy => _busy || (_session?.isWorking ?? false);
@@ -43,6 +47,12 @@ class RoutineOptimizerViewModel extends ChangeNotifier {
   PendingQuestions? get pendingQuestions => _session?.pendingQuestions;
   PendingAgentInput? get pendingInput => _session?.pendingInput;
   bool get needsRecovery => _session?.state.needsRecovery ?? false;
+  bool get canRetry => !_busy && (_session?.canRetry ?? false);
+  Future<void> retry() async {
+    await _session?.retry();
+    _notify();
+  }
+
   AiFailure? get failure => _localFailure ?? _session?.failure;
   List<ChatMessage> get messages => _conversations.activeMessages;
   List<Conversation> get conversations => _conversations.conversations;

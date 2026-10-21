@@ -38,16 +38,14 @@ class RoutineOptimizerScreen extends StatelessWidget {
     final storage = context.read<IStorageService>();
     return ChangeNotifierProvider<RoutineOptimizerViewModel>(
       create: (ctx) {
-        final conversations =
-            ConversationManager(storage, kind: 'optimizer');
+        final conversations = ConversationManager(storage, kind: 'optimizer');
         return RoutineOptimizerViewModel(
           ai: ctx.read<GeminiAiService>(),
           coachTools: ctx.read<CoachToolService>(),
           conversations: conversations,
           settings: ctx.read<SettingsProvider>(),
           agents: ctx.read<RepForgeAgents>(),
-        )
-          ..initializeForRoutine(routine);
+        )..initializeForRoutine(routine);
       },
       child: _OptimizerView(routine: routine),
     );
@@ -113,10 +111,29 @@ class _OptimizerViewState extends State<_OptimizerView> {
               children: [
                 _buildHeader(context, vm),
                 Expanded(child: _buildChatArea(vm)),
-                if (vm.failure != null) Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md), child: Text(vm.failure!.message)),
-                AgentRunControls(pending: vm.pendingInput, needsRecovery: vm.needsRecovery,
-                  onSubmit: vm.submitInput, onStop: vm.cancelRun),
+                if (vm.failure != null)
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(vm.failure!.message)),
+                        if (vm.canRetry)
+                          TextButton(
+                            onPressed: vm.retry,
+                            child: const Text('Retry'),
+                          ),
+                      ],
+                    ),
+                  ),
+                AgentRunControls(
+                  pending: vm.pendingInput,
+                  review: vm.changeReview,
+                  isRunning: vm.isRunning,
+                  statusText: vm.statusText,
+                  needsRecovery: vm.needsRecovery,
+                  onSubmit: vm.submitInput,
+                  onStop: vm.cancelRun,
+                ),
               ],
             ),
           ),
@@ -185,7 +202,8 @@ class _OptimizerViewState extends State<_OptimizerView> {
               children: [
                 Text(
                   'Optimize Routine',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -196,7 +214,8 @@ class _OptimizerViewState extends State<_OptimizerView> {
                   widget.routine.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
@@ -253,7 +272,8 @@ class _OptimizerViewState extends State<_OptimizerView> {
               padding: const EdgeInsets.only(bottom: AppSpacing.md),
               child: RFQuestionCard(
                 questions: vm.pendingQuestions!.questions,
-                onSubmit: (answers) => vm.submitAnswers(answers, target: target),
+                onSubmit: (answers) =>
+                    vm.submitAnswers(answers, target: target),
                 key: ValueKey('${target.runId}:${target.request.id}'),
               ),
             );
@@ -299,7 +319,8 @@ class _OptimizerViewState extends State<_OptimizerView> {
             const SizedBox(height: AppSpacing.lg),
             Text(
               'Analyzing your routine…',
-              style: TextStyle(fontFamily: 'Geist', 
+              style: TextStyle(
+                fontFamily: 'Geist',
                 color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -310,7 +331,8 @@ class _OptimizerViewState extends State<_OptimizerView> {
             Text(
               'Reviewing your history and building a personalized plan.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Geist', 
+              style: TextStyle(
+                fontFamily: 'Geist',
                 color: AppColors.textMuted,
                 fontSize: 14,
                 height: 1.5,
@@ -359,8 +381,9 @@ class _MessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isUser) ...[
@@ -388,7 +411,9 @@ class _MessageBubble extends StatelessWidget {
                   bottomLeft: Radius.circular(isUser ? AppRadius.lg : 4),
                   bottomRight: Radius.circular(isUser ? 4 : AppRadius.lg),
                 ),
-                border: isUser ? null : Border.all(color: AppColors.glassBorder),
+                border: isUser
+                    ? null
+                    : Border.all(color: AppColors.glassBorder),
                 boxShadow: isUser
                     ? [
                         BoxShadow(
@@ -402,7 +427,8 @@ class _MessageBubble extends StatelessWidget {
               child: isUser
                   ? Text(
                       message.text,
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textPrimary,
                         fontSize: 14,
                         height: 1.55,
@@ -468,7 +494,8 @@ class _OptimizerMarkdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return GptMarkdown(
       text,
-      style: TextStyle(fontFamily: 'Geist', 
+      style: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 14,
         height: 1.55,
@@ -498,7 +525,11 @@ class _OptimizerAvatar extends StatelessWidget {
           ),
         ],
       ),
-      child: const Icon(Icons.auto_fix_high_rounded, color: Colors.white, size: 14),
+      child: const Icon(
+        Icons.auto_fix_high_rounded,
+        color: Colors.white,
+        size: 14,
+      ),
     );
   }
 }
@@ -524,7 +555,8 @@ class _ConversationsSheet extends StatelessWidget {
               children: [
                 Text(
                   'Optimization History',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -533,10 +565,13 @@ class _ConversationsSheet extends StatelessWidget {
                 const SizedBox(height: AppSpacing.md),
                 if (conversations.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.lg,
+                    ),
                     child: Text(
                       'No saved optimization sessions yet.',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textMuted,
                         fontSize: 13,
                       ),
@@ -611,8 +646,11 @@ class _ConversationTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.auto_fix_high_rounded,
-                color: AppColors.textMuted, size: 16),
+            const Icon(
+              Icons.auto_fix_high_rounded,
+              color: AppColors.textMuted,
+              size: 16,
+            ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
@@ -624,7 +662,8 @@ class _ConversationTile extends StatelessWidget {
                         : conversation.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -632,7 +671,8 @@ class _ConversationTile extends StatelessWidget {
                   ),
                   Text(
                     '${conversation.messages.length} messages',
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textFaint,
                       fontSize: 11,
                     ),
@@ -644,8 +684,11 @@ class _ConversationTile extends StatelessWidget {
               onTap: onDelete,
               child: const Padding(
                 padding: EdgeInsets.only(left: AppSpacing.sm),
-                child: Icon(Icons.delete_outline_rounded,
-                    color: AppColors.textFaint, size: 18),
+                child: Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppColors.textFaint,
+                  size: 18,
+                ),
               ),
             ),
           ],

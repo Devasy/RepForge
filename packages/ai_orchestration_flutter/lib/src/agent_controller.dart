@@ -247,6 +247,7 @@ class AgentController<S> extends ChangeNotifier
       checkpoint: _checkpoint,
       data: _data,
       streamingText: observer?.streamingText ?? '',
+      statusText: observer?.statusText ?? '',
       activeTools: observer?.activeTools.values.toList() ?? const [],
       artifacts: artifacts.values.toList(),
       isAttached: observer != null && !observer.ended,
