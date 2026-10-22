@@ -19,7 +19,15 @@ class SqliteStorageService implements IStorageService {
       _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 6;
+  static const int _dbVersion = 7;
+  static const _messageChunkBytes = 64 * 1024;
+  static const _conversationChunksSchema =
+      '''CREATE TABLE conversation_message_chunks (
+    conversation_id TEXT NOT NULL,
+    chunk_index INTEGER NOT NULL,
+    data BLOB NOT NULL,
+    PRIMARY KEY (conversation_id, chunk_index)
+  )''';
 
   /// Dropped and rebuilt by the v2 → v3 upgrade. The health tables are a cache
   /// of Health Connect, so rebuilding them costs one re-sync rather than user
@@ -179,6 +187,7 @@ class SqliteStorageService implements IStorageService {
       updated_at TEXT NOT NULL,
       messages_json TEXT NOT NULL
     )''',
+    _conversationChunksSchema,
     '''CREATE TABLE settings (
       key TEXT PRIMARY KEY,
       value TEXT
@@ -339,6 +348,39 @@ class SqliteStorageService implements IStorageService {
               );
             }
             await db.execute('DROP TABLE legacy_personal_records');
+          }
+        }
+        if (oldVersion < 7) {
+          await db.execute(_conversationChunksSchema);
+          final exists = await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'conversations'",
+          );
+          if (exists.isNotEmpty) {
+            final rows = await db.rawQuery(
+              'SELECT id, length(CAST(messages_json AS BLOB)) AS bytes FROM conversations',
+            );
+            // Legacy rows may already exceed CursorWindow. Split within SQLite
+            // once during upgrade, without returning the full value to Dart.
+            for (final row in rows) {
+              final length = row['bytes'] as int;
+              for (
+                var offset = 0;
+                offset < length;
+                offset += _messageChunkBytes
+              ) {
+                await db.rawInsert(
+                  'INSERT INTO conversation_message_chunks (conversation_id, chunk_index, data) '
+                  'SELECT id, ?, substr(CAST(messages_json AS BLOB), ?, ?) FROM conversations WHERE id = ?',
+                  [
+                    offset ~/ _messageChunkBytes,
+                    offset + 1,
+                    _messageChunkBytes,
+                    row['id'],
+                  ],
+                );
+              }
+            }
+            await db.update('conversations', {'messages_json': '[]'});
           }
         }
       },
@@ -1025,16 +1067,42 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<void> saveConversation(Conversation conversation) async {
-    await _db.insert('conversations', {
-      'id': conversation.id,
-      'title': conversation.title,
-      'kind': conversation.kind,
-      'created_at': conversation.createdAt.toIso8601String(),
-      'updated_at': conversation.updatedAt.toIso8601String(),
-      'messages_json': jsonEncode(
-        conversation.messages.map((m) => m.toJson()).toList(),
-      ),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    final bytes = utf8.encode(
+      jsonEncode(conversation.messages.map((m) => m.toJson()).toList()),
+    );
+    await _db.transaction((txn) async {
+      await txn.insert('conversations', {
+        'id': conversation.id,
+        'title': conversation.title,
+        'kind': conversation.kind,
+        'created_at': conversation.createdAt.toIso8601String(),
+        'updated_at': conversation.updatedAt.toIso8601String(),
+        'messages_json': '[]',
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await txn.delete(
+        'conversation_message_chunks',
+        where: 'conversation_id = ?',
+        whereArgs: [conversation.id],
+      );
+      final batch = txn.batch();
+      for (
+        var offset = 0;
+        offset < bytes.length;
+        offset += _messageChunkBytes
+      ) {
+        final end = offset + _messageChunkBytes;
+        batch.insert('conversation_message_chunks', {
+          'conversation_id': conversation.id,
+          'chunk_index': offset ~/ _messageChunkBytes,
+          'data': Uint8List.sublistView(
+            bytes,
+            offset,
+            end < bytes.length ? end : bytes.length,
+          ),
+        });
+      }
+      await batch.commit(noResult: true);
+    });
   }
 
   Conversation _conversationFromRow(Map<String, Object?> row) => Conversation(
@@ -1048,23 +1116,22 @@ class SqliteStorageService implements IStorageService {
         .toList(),
   );
 
-  // Android CursorWindow cannot hold a multi-megabyte messages_json row.
-  // Read bytes in bounded chunks, then decode once so split UTF-8 characters
-  // survive. Use one transaction to keep metadata and chunks consistent.
+  // Read independently stored chunks in one transaction, decoding only after
+  // joining bytes so UTF-8 characters can span chunk boundaries safely.
   Future<Conversation> _readConversation(
     Transaction txn,
     Map<String, Object?> metadata,
   ) async {
-    const chunkBytes = 64 * 1024;
     final bytes = BytesBuilder(copy: false);
-    final length = metadata['message_bytes'] as int;
-    for (var offset = 0; offset < length; offset += chunkBytes) {
-      final rows = await txn.rawQuery(
-        'SELECT substr(CAST(messages_json AS BLOB), ?, ?) AS chunk '
-        'FROM conversations WHERE id = ?',
-        [offset + 1, chunkBytes, metadata['id']],
-      );
-      bytes.add(rows.single['chunk'] as List<int>);
+    final rows = await txn.query(
+      'conversation_message_chunks',
+      columns: ['data'],
+      where: 'conversation_id = ?',
+      whereArgs: [metadata['id']],
+      orderBy: 'chunk_index',
+    );
+    for (final row in rows) {
+      bytes.add(row['data'] as List<int>);
     }
     return _conversationFromRow({
       ...metadata,
@@ -1078,7 +1145,6 @@ class SqliteStorageService implements IStorageService {
     'kind',
     'created_at',
     'updated_at',
-    'length(CAST(messages_json AS BLOB)) AS message_bytes',
   ];
 
   @override
@@ -1110,12 +1176,29 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<void> deleteConversation(String id) async {
-    await _db.delete('conversations', where: 'id = ?', whereArgs: [id]);
-    final tables = await _db.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'repforge_ai_runs'");
+    await _db.transaction((txn) async {
+      await txn.delete(
+        'conversation_message_chunks',
+        where: 'conversation_id = ?',
+        whereArgs: [id],
+      );
+      await txn.delete('conversations', where: 'id = ?', whereArgs: [id]);
+    });
+    final tables = await _db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'repforge_ai_runs'",
+    );
     if (tables.isNotEmpty) {
-      await _db.delete('repforge_ai_runs', where: 'thread_id IN (?, ?)', whereArgs: ['coach:$id', 'optimizer:$id']);
+      await _db.delete(
+        'repforge_ai_runs',
+        where: 'thread_id IN (?, ?)',
+        whereArgs: ['coach:$id', 'optimizer:$id'],
+      );
     }
-    await _db.delete('settings', where: 'key IN (?, ?)', whereArgs: ['aiCheckpoint:coach:$id', 'aiCheckpoint:optimizer:$id']);
+    await _db.delete(
+      'settings',
+      where: 'key IN (?, ?)',
+      whereArgs: ['aiCheckpoint:coach:$id', 'aiCheckpoint:optimizer:$id'],
+    );
   }
 
   // ==================== STATS ====================

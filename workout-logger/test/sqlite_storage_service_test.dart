@@ -1016,6 +1016,51 @@ void main() {
   });
 
   group('SqliteStorageService — conversations', () {
+    test('v6 upgrade preserves oversized legacy messages and attachments', () async {
+      final text = List.filled(200000, '🏋️ café ').join();
+      final conversation = Conversation(id: 'legacy', title: 'Legacy', messages: [
+        ChatMessage(role: 'user', text: text, imageBytesBase64: 'aW1hZ2U=', imageMimeType: 'image/png'),
+      ]);
+      await storage.saveConversation(conversation);
+      final path = storage.databasePath;
+      await storage.close();
+      final legacy = await openDatabase(path);
+      await legacy.update('conversations', {
+        'messages_json': jsonEncode(conversation.messages.map((m) => m.toJson()).toList()),
+      });
+      await legacy.execute('DROP TABLE conversation_message_chunks');
+      await legacy.execute('PRAGMA user_version = 6');
+      await legacy.close();
+      storage = SqliteStorageService(databasePathOverride: path);
+      await storage.init();
+      final restored = (await storage.getConversation('legacy'))!;
+      expect(restored.messages.single.text, text);
+      expect(restored.messages.single.imageBytesBase64, 'aW1hZ2U=');
+      expect(restored.messages.single.imageMimeType, 'image/png');
+      final rows = await rawQuery(storage, 'SELECT length(data) AS bytes FROM conversation_message_chunks');
+      expect(rows.length, greaterThan(1));
+      expect(rows.every((row) => (row['bytes'] as int) <= 65536), isTrue);
+      expect((await rawQuery(storage, 'SELECT messages_json FROM conversations')).single['messages_json'], '[]');
+      await storage.close();
+      storage = SqliteStorageService(databasePathOverride: path);
+      await storage.init();
+      expect((await storage.getConversation('legacy'))!.messages.single.text, text);
+    });
+
+    test('replacing and deleting a chat removes obsolete chunks', () async {
+      await storage.saveConversation(Conversation(id: 'replace', title: 'Large', messages: [
+        ChatMessage(role: 'user', text: List.filled(100000, 'hello').join()),
+      ]));
+      await storage.saveConversation(Conversation(id: 'replace', title: 'Small', messages: [
+        ChatMessage(role: 'user', text: 'short'),
+      ]));
+      expect((await storage.getConversation('replace'))!.messages.single.text, 'short');
+      expect(await rawQuery(storage, 'SELECT * FROM conversation_message_chunks'), hasLength(1));
+      await storage.deleteConversation('replace');
+      expect(await rawQuery(storage, 'SELECT * FROM conversation_message_chunks'), isEmpty);
+      expect(await storage.getConversation('replace'), isNull);
+    });
+
     test(
       'large UTF-8 conversation survives reads and backup round-trip',
       () async {
