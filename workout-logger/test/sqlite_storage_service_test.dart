@@ -1016,6 +1016,41 @@ void main() {
   });
 
   group('SqliteStorageService — conversations', () {
+    test(
+      'large UTF-8 conversation survives reads and backup round-trip',
+      () async {
+        final text = List.filled(300000, '🏋️ café ').join();
+        final original = Conversation(
+          id: 'large',
+          title: 'Large chat',
+          messages: [ChatMessage(role: 'user', text: text)],
+        );
+        await storage.saveConversation(original);
+        expect(
+          (await storage.getConversation('large'))!.messages.single.text,
+          text,
+        );
+        expect(
+          (await storage.getAllConversations()).single.messages.single.text,
+          text,
+        );
+        await storage.saveSetting('aiCheckpoint:coach:large', text);
+        final backup = await storage.exportAllData();
+        expect(
+          (jsonDecode(backup)['settings'] as Map).containsKey(
+            'aiCheckpoint:coach:large',
+          ),
+          isFalse,
+        );
+        await storage.deleteConversation('large');
+        await storage.importData(backup);
+        expect(
+          (await storage.getConversation('large'))!.messages.single.text,
+          text,
+        );
+      },
+    );
+
     test('saveConversation + getConversation round-trips messages', () async {
       final conversation = Conversation(
         id: 'c1',

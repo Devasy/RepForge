@@ -4,6 +4,18 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.2.1]
+
+### Fixes
+
+- Load and export large AI conversations without exceeding Android database row limits, preserving existing messages and attachments.
+- Exclude internal AI checkpoints before reading backup settings and avoid reporting a dismissed share sheet as a successful export.
+- Clarify readiness diagnostics when current health measurements are missing despite sufficient baseline history.
+
+### Changes
+
+- Add backup export diagnostics for data reads, encoding, file writing, sharing, and failures, including counts and elapsed time without logging backup contents.
+
 ## [2.2.0]
 
 ### Features added

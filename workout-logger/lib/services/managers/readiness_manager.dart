@@ -186,7 +186,7 @@ class ReadinessManager extends ChangeNotifier implements IReadinessManager {
 
       if (snapshot.score == null) {
         debugPrint('[Readiness] refresh: score null → noData '
-            '(need ${ReadinessCalculator.minBaselineSamples}+ baseline days; '
+            '(each component needs current data AND ${ReadinessCalculator.minBaselineSamples}+ baseline days; '
             'have sleep=${baseline.sleepNights} rhr=${baseline.rhrDays} hrv=${baseline.hrvDays})');
         _setNoData();
         return;

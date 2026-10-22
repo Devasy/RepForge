@@ -3,8 +3,10 @@
 // for the schema and migration design this implements.
 
 import 'dart:convert';
+import 'dart:typed_data';
 import 'backup_codec.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/models.dart';
@@ -1046,21 +1048,65 @@ class SqliteStorageService implements IStorageService {
         .toList(),
   );
 
-  @override
-  Future<List<Conversation>> getAllConversations() async {
-    final rows = await _db.query('conversations', orderBy: 'updated_at DESC');
-    return rows.map(_conversationFromRow).toList();
+  // Android CursorWindow cannot hold a multi-megabyte messages_json row.
+  // Read bytes in bounded chunks, then decode once so split UTF-8 characters
+  // survive. Use one transaction to keep metadata and chunks consistent.
+  Future<Conversation> _readConversation(
+    Transaction txn,
+    Map<String, Object?> metadata,
+  ) async {
+    const chunkBytes = 64 * 1024;
+    final bytes = BytesBuilder(copy: false);
+    final length = metadata['message_bytes'] as int;
+    for (var offset = 0; offset < length; offset += chunkBytes) {
+      final rows = await txn.rawQuery(
+        'SELECT substr(CAST(messages_json AS BLOB), ?, ?) AS chunk '
+        'FROM conversations WHERE id = ?',
+        [offset + 1, chunkBytes, metadata['id']],
+      );
+      bytes.add(rows.single['chunk'] as List<int>);
+    }
+    return _conversationFromRow({
+      ...metadata,
+      'messages_json': utf8.decode(bytes.takeBytes()),
+    });
   }
 
+  static const _conversationMetadata = [
+    'id',
+    'title',
+    'kind',
+    'created_at',
+    'updated_at',
+    'length(CAST(messages_json AS BLOB)) AS message_bytes',
+  ];
+
   @override
-  Future<Conversation?> getConversation(String id) async {
-    final rows = await _db.query(
-      'conversations',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    return rows.isEmpty ? null : _conversationFromRow(rows.first);
-  }
+  Future<List<Conversation>> getAllConversations() =>
+      _db.transaction((txn) async {
+        final rows = await txn.query(
+          'conversations',
+          columns: _conversationMetadata,
+          orderBy: 'updated_at DESC',
+        );
+        final conversations = <Conversation>[];
+        for (final row in rows) {
+          conversations.add(await _readConversation(txn, row));
+        }
+        return conversations;
+      });
+
+  @override
+  Future<Conversation?> getConversation(String id) =>
+      _db.transaction((txn) async {
+        final rows = await txn.query(
+          'conversations',
+          columns: _conversationMetadata,
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        return rows.isEmpty ? null : await _readConversation(txn, rows.first);
+      });
 
   @override
   Future<void> deleteConversation(String id) async {
@@ -1176,38 +1222,99 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<String> exportAllData() async {
-    final sessions = await getAllWorkoutSessions();
-    final routines = await getAllRoutines();
-    final targets = await getAllTargets();
-    final muscleGroups = await getAllMuscleGroups();
-    final customExercises = await getCustomExercises();
-    final exerciseOverrides = await getBuiltInExerciseOverrides();
-    final conversations = await getAllConversations();
-    final settingsRows = await _db.query('settings');
-    final settingsMap = <String, String>{
-      for (final row in settingsRows)
-        if (row['value'] != null && !(row['key']! as String).startsWith('aiCheckpoint:')) row['key'] as String: row['value'] as String,
-    };
+    final watch = Stopwatch()..start();
+    var stage = 'start';
+    debugPrint('[Backup] data export started');
+    try {
+      stage = 'sessions';
+      final sessions = await getAllWorkoutSessions();
+      debugPrint(
+        '[Backup] read sessions: count=${sessions.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'routines';
+      final routines = await getAllRoutines();
+      debugPrint(
+        '[Backup] read routines: count=${routines.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'targets';
+      final targets = await getAllTargets();
+      debugPrint(
+        '[Backup] read targets: count=${targets.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'muscleGroups';
+      final muscleGroups = await getAllMuscleGroups();
+      debugPrint(
+        '[Backup] read muscleGroups: count=${muscleGroups.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'customExercises';
+      final customExercises = await getCustomExercises();
+      debugPrint(
+        '[Backup] read customExercises: count=${customExercises.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'exerciseOverrides';
+      final exerciseOverrides = await getBuiltInExerciseOverrides();
+      debugPrint(
+        '[Backup] read exerciseOverrides: count=${exerciseOverrides.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'conversations';
+      final conversations = await getAllConversations();
+      debugPrint(
+        '[Backup] read conversations: count=${conversations.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'settingsRows';
+      final settingsRows = await _db.query(
+        'settings',
+        where: "substr(key, 1, 13) != 'aiCheckpoint:'",
+      );
+      debugPrint(
+        '[Backup] read settingsRows: count=${settingsRows.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      final settingsMap = <String, String>{
+        for (final row in settingsRows)
+          if (row['value'] != null &&
+              !(row['key']! as String).startsWith('aiCheckpoint:'))
+            row['key'] as String: row['value'] as String,
+      };
 
-    final programs = await getAllTrainingPrograms();
-    final records = await getAllPersonalRecords();
+      stage = 'programs';
+      final programs = await getAllTrainingPrograms();
+      debugPrint(
+        '[Backup] read programs: count=${programs.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'records';
+      final records = await getAllPersonalRecords();
+      debugPrint(
+        '[Backup] read records: count=${records.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
 
-    final data = {
-      'backupFormatVersion': 1,
-      'trainingPrograms': programs.map((p) => p.toJson()).toList(),
-      'personalRecords': records.map((r) => r.toJson()).toList(),
-      'sessions': sessions.map((s) => s.toJson()).toList(),
-      'routines': routines.map((r) => r.toJson()).toList(),
-      'targets': targets.map((t) => t.toJson()).toList(),
-      'muscleGroups': muscleGroups.map((m) => m.toJson()).toList(),
-      'customExercises': customExercises.map((e) => e.toJson()).toList(),
-      'exerciseOverrides': exerciseOverrides.map((e) => e.toJson()).toList(),
-      'conversations': conversations.map((c) => c.toJson()).toList(),
-      'settings': settingsMap,
-      'exportDate': DateTime.now().toIso8601String(),
-      'appVersion': _appVersion,
-    };
-    return jsonEncode(data);
+      final data = {
+        'backupFormatVersion': 1,
+        'trainingPrograms': programs.map((p) => p.toJson()).toList(),
+        'personalRecords': records.map((r) => r.toJson()).toList(),
+        'sessions': sessions.map((s) => s.toJson()).toList(),
+        'routines': routines.map((r) => r.toJson()).toList(),
+        'targets': targets.map((t) => t.toJson()).toList(),
+        'muscleGroups': muscleGroups.map((m) => m.toJson()).toList(),
+        'customExercises': customExercises.map((e) => e.toJson()).toList(),
+        'exerciseOverrides': exerciseOverrides.map((e) => e.toJson()).toList(),
+        'conversations': conversations.map((c) => c.toJson()).toList(),
+        'settings': settingsMap,
+        'exportDate': DateTime.now().toIso8601String(),
+        'appVersion': _appVersion,
+      };
+      stage = 'encode';
+      final encoded = jsonEncode(data);
+      debugPrint(
+        '[Backup] data encoded: characters=${encoded.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      return encoded;
+    } catch (error, stack) {
+      debugPrint(
+        '[Backup] data export failed: stage=$stage elapsedMs=${watch.elapsedMilliseconds} type=${error.runtimeType}',
+      );
+      debugPrintStack(stackTrace: stack);
+      rethrow;
+    }
   }
 
   @override
