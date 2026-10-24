@@ -34,6 +34,9 @@ class SqlQueryService {
   ];
 
   static const _forbiddenIdentifiers = [
+    'CONVERSATIONS',
+    'MESSAGES_JSON',
+    'CONVERSATION_MESSAGE_CHUNKS',
     'REPFORGE_AI_RUNS',
     'REPFORGE_AI_META',
     'REPFORGE_AI_OPERATIONS',

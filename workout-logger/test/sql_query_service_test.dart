@@ -60,6 +60,19 @@ void main() {
     expect(result['error'], isNotNull);
   });
 
+  for (final query in const [
+    'SELECT messages_json FROM conversations',
+    'SELECT * FROM "Conversations"',
+    'WITH chats AS (SELECT * FROM conversations) SELECT * FROM chats',
+    'SELECT data FROM conversation_message_chunks',
+    'SELECT messages_json FROM widgets',
+  ]) {
+    test('rejects direct conversation storage access: $query', () async {
+      final result = await SqlQueryService(dbPath).runQuery(query);
+      expect(result['error'], contains('restricted table'));
+    });
+  }
+
   test('rejects queries reading the settings table', () async {
     final service = SqlQueryService(dbPath);
     final result = await service.runQuery('SELECT * FROM settings');

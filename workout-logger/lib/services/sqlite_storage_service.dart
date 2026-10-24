@@ -359,8 +359,7 @@ class SqliteStorageService implements IStorageService {
             final rows = await db.rawQuery(
               'SELECT id, length(CAST(messages_json AS BLOB)) AS bytes FROM conversations',
             );
-            // Legacy rows may already exceed CursorWindow. Split within SQLite
-            // once during upgrade, without returning the full value to Dart.
+            // Split inside SQLite so oversized legacy values never reach Dart.
             for (final row in rows) {
               final length = row['bytes'] as int;
               for (
@@ -1116,8 +1115,7 @@ class SqliteStorageService implements IStorageService {
         .toList(),
   );
 
-  // Read independently stored chunks in one transaction, decoding only after
-  // joining bytes so UTF-8 characters can span chunk boundaries safely.
+  // Decode after joining chunks so UTF-8 characters can span boundaries.
   Future<Conversation> _readConversation(
     Transaction txn,
     Map<String, Object?> metadata,
