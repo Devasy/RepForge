@@ -255,24 +255,40 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _exportToFile() async {
+    if (_isExporting) return;
     setState(() => _isExporting = true);
+    final watch = Stopwatch()..start();
+    var stage = 'collect';
+    debugPrint('[Backup] export started');
     try {
       final provider = context.read<WorkoutProvider>();
       final jsonString = await provider.exportAllData();
+      stage = 'temporaryDirectory';
       final tempDir = await getTemporaryDirectory();
       final dateStr = DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now());
       final file = File('${tempDir.path}/repforge_backup_$dateStr.json');
-      await file.writeAsString(jsonString);
+      stage = 'writeFile';
+      await file.writeAsString(jsonString, flush: true);
+      debugPrint(
+        '[Backup] file written: bytes=${await file.length()} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'share';
       // ignore: deprecated_member_use
       final result = await Share.shareXFiles([
         XFile(file.path),
       ], subject: 'RepForge Backup');
+      debugPrint(
+        '[Backup] share finished: status=${result.status.name} elapsedMs=${watch.elapsedMilliseconds}',
+      );
       if (!mounted) return;
-      if (result.status == ShareResultStatus.success ||
-          result.status == ShareResultStatus.dismissed) {
+      if (result.status == ShareResultStatus.success) {
         _showSnack('Backup exported successfully!', AppColors.success);
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint(
+        '[Backup] export failed: stage=$stage elapsedMs=${watch.elapsedMilliseconds} type=${e.runtimeType}',
+      );
+      debugPrintStack(stackTrace: stack);
       if (mounted) {
         _showSnack('Export failed. Please try again.', AppColors.error);
       }

@@ -3,8 +3,10 @@
 // for the schema and migration design this implements.
 
 import 'dart:convert';
+import 'dart:typed_data';
 import 'backup_codec.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/models.dart';
@@ -17,7 +19,15 @@ class SqliteStorageService implements IStorageService {
       _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 6;
+  static const int _dbVersion = 7;
+  static const _messageChunkBytes = 64 * 1024;
+  static const _conversationChunksSchema =
+      '''CREATE TABLE conversation_message_chunks (
+    conversation_id TEXT NOT NULL,
+    chunk_index INTEGER NOT NULL,
+    data BLOB NOT NULL,
+    PRIMARY KEY (conversation_id, chunk_index)
+  )''';
 
   /// Dropped and rebuilt by the v2 → v3 upgrade. The health tables are a cache
   /// of Health Connect, so rebuilding them costs one re-sync rather than user
@@ -177,6 +187,7 @@ class SqliteStorageService implements IStorageService {
       updated_at TEXT NOT NULL,
       messages_json TEXT NOT NULL
     )''',
+    _conversationChunksSchema,
     '''CREATE TABLE settings (
       key TEXT PRIMARY KEY,
       value TEXT
@@ -337,6 +348,38 @@ class SqliteStorageService implements IStorageService {
               );
             }
             await db.execute('DROP TABLE legacy_personal_records');
+          }
+        }
+        if (oldVersion < 7) {
+          await db.execute(_conversationChunksSchema);
+          final exists = await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'conversations'",
+          );
+          if (exists.isNotEmpty) {
+            final rows = await db.rawQuery(
+              'SELECT id, length(CAST(messages_json AS BLOB)) AS bytes FROM conversations',
+            );
+            // Split inside SQLite so oversized legacy values never reach Dart.
+            for (final row in rows) {
+              final length = row['bytes'] as int;
+              for (
+                var offset = 0;
+                offset < length;
+                offset += _messageChunkBytes
+              ) {
+                await db.rawInsert(
+                  'INSERT INTO conversation_message_chunks (conversation_id, chunk_index, data) '
+                  'SELECT id, ?, substr(CAST(messages_json AS BLOB), ?, ?) FROM conversations WHERE id = ?',
+                  [
+                    offset ~/ _messageChunkBytes,
+                    offset + 1,
+                    _messageChunkBytes,
+                    row['id'],
+                  ],
+                );
+              }
+            }
+            await db.update('conversations', {'messages_json': '[]'});
           }
         }
       },
@@ -1023,16 +1066,42 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<void> saveConversation(Conversation conversation) async {
-    await _db.insert('conversations', {
-      'id': conversation.id,
-      'title': conversation.title,
-      'kind': conversation.kind,
-      'created_at': conversation.createdAt.toIso8601String(),
-      'updated_at': conversation.updatedAt.toIso8601String(),
-      'messages_json': jsonEncode(
-        conversation.messages.map((m) => m.toJson()).toList(),
-      ),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    final bytes = utf8.encode(
+      jsonEncode(conversation.messages.map((m) => m.toJson()).toList()),
+    );
+    await _db.transaction((txn) async {
+      await txn.insert('conversations', {
+        'id': conversation.id,
+        'title': conversation.title,
+        'kind': conversation.kind,
+        'created_at': conversation.createdAt.toIso8601String(),
+        'updated_at': conversation.updatedAt.toIso8601String(),
+        'messages_json': '[]',
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await txn.delete(
+        'conversation_message_chunks',
+        where: 'conversation_id = ?',
+        whereArgs: [conversation.id],
+      );
+      final batch = txn.batch();
+      for (
+        var offset = 0;
+        offset < bytes.length;
+        offset += _messageChunkBytes
+      ) {
+        final end = offset + _messageChunkBytes;
+        batch.insert('conversation_message_chunks', {
+          'conversation_id': conversation.id,
+          'chunk_index': offset ~/ _messageChunkBytes,
+          'data': Uint8List.sublistView(
+            bytes,
+            offset,
+            end < bytes.length ? end : bytes.length,
+          ),
+        });
+      }
+      await batch.commit(noResult: true);
+    });
   }
 
   Conversation _conversationFromRow(Map<String, Object?> row) => Conversation(
@@ -1046,30 +1115,88 @@ class SqliteStorageService implements IStorageService {
         .toList(),
   );
 
-  @override
-  Future<List<Conversation>> getAllConversations() async {
-    final rows = await _db.query('conversations', orderBy: 'updated_at DESC');
-    return rows.map(_conversationFromRow).toList();
+  // Decode after joining chunks so UTF-8 characters can span boundaries.
+  Future<Conversation> _readConversation(
+    Transaction txn,
+    Map<String, Object?> metadata,
+  ) async {
+    final bytes = BytesBuilder(copy: false);
+    final rows = await txn.query(
+      'conversation_message_chunks',
+      columns: ['data'],
+      where: 'conversation_id = ?',
+      whereArgs: [metadata['id']],
+      orderBy: 'chunk_index',
+    );
+    for (final row in rows) {
+      bytes.add(row['data'] as List<int>);
+    }
+    return _conversationFromRow({
+      ...metadata,
+      'messages_json': utf8.decode(bytes.takeBytes()),
+    });
   }
 
+  static const _conversationMetadata = [
+    'id',
+    'title',
+    'kind',
+    'created_at',
+    'updated_at',
+  ];
+
   @override
-  Future<Conversation?> getConversation(String id) async {
-    final rows = await _db.query(
-      'conversations',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    return rows.isEmpty ? null : _conversationFromRow(rows.first);
-  }
+  Future<List<Conversation>> getAllConversations() =>
+      _db.transaction((txn) async {
+        final rows = await txn.query(
+          'conversations',
+          columns: _conversationMetadata,
+          orderBy: 'updated_at DESC',
+        );
+        final conversations = <Conversation>[];
+        for (final row in rows) {
+          conversations.add(await _readConversation(txn, row));
+        }
+        return conversations;
+      });
+
+  @override
+  Future<Conversation?> getConversation(String id) =>
+      _db.transaction((txn) async {
+        final rows = await txn.query(
+          'conversations',
+          columns: _conversationMetadata,
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        return rows.isEmpty ? null : await _readConversation(txn, rows.first);
+      });
 
   @override
   Future<void> deleteConversation(String id) async {
-    await _db.delete('conversations', where: 'id = ?', whereArgs: [id]);
-    final tables = await _db.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'repforge_ai_runs'");
+    await _db.transaction((txn) async {
+      await txn.delete(
+        'conversation_message_chunks',
+        where: 'conversation_id = ?',
+        whereArgs: [id],
+      );
+      await txn.delete('conversations', where: 'id = ?', whereArgs: [id]);
+    });
+    final tables = await _db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'repforge_ai_runs'",
+    );
     if (tables.isNotEmpty) {
-      await _db.delete('repforge_ai_runs', where: 'thread_id IN (?, ?)', whereArgs: ['coach:$id', 'optimizer:$id']);
+      await _db.delete(
+        'repforge_ai_runs',
+        where: 'thread_id IN (?, ?)',
+        whereArgs: ['coach:$id', 'optimizer:$id'],
+      );
     }
-    await _db.delete('settings', where: 'key IN (?, ?)', whereArgs: ['aiCheckpoint:coach:$id', 'aiCheckpoint:optimizer:$id']);
+    await _db.delete(
+      'settings',
+      where: 'key IN (?, ?)',
+      whereArgs: ['aiCheckpoint:coach:$id', 'aiCheckpoint:optimizer:$id'],
+    );
   }
 
   // ==================== STATS ====================
@@ -1176,38 +1303,99 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<String> exportAllData() async {
-    final sessions = await getAllWorkoutSessions();
-    final routines = await getAllRoutines();
-    final targets = await getAllTargets();
-    final muscleGroups = await getAllMuscleGroups();
-    final customExercises = await getCustomExercises();
-    final exerciseOverrides = await getBuiltInExerciseOverrides();
-    final conversations = await getAllConversations();
-    final settingsRows = await _db.query('settings');
-    final settingsMap = <String, String>{
-      for (final row in settingsRows)
-        if (row['value'] != null && !(row['key']! as String).startsWith('aiCheckpoint:')) row['key'] as String: row['value'] as String,
-    };
+    final watch = Stopwatch()..start();
+    var stage = 'start';
+    debugPrint('[Backup] data export started');
+    try {
+      stage = 'sessions';
+      final sessions = await getAllWorkoutSessions();
+      debugPrint(
+        '[Backup] read sessions: count=${sessions.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'routines';
+      final routines = await getAllRoutines();
+      debugPrint(
+        '[Backup] read routines: count=${routines.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'targets';
+      final targets = await getAllTargets();
+      debugPrint(
+        '[Backup] read targets: count=${targets.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'muscleGroups';
+      final muscleGroups = await getAllMuscleGroups();
+      debugPrint(
+        '[Backup] read muscleGroups: count=${muscleGroups.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'customExercises';
+      final customExercises = await getCustomExercises();
+      debugPrint(
+        '[Backup] read customExercises: count=${customExercises.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'exerciseOverrides';
+      final exerciseOverrides = await getBuiltInExerciseOverrides();
+      debugPrint(
+        '[Backup] read exerciseOverrides: count=${exerciseOverrides.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'conversations';
+      final conversations = await getAllConversations();
+      debugPrint(
+        '[Backup] read conversations: count=${conversations.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'settingsRows';
+      final settingsRows = await _db.query(
+        'settings',
+        where: "substr(key, 1, 13) != 'aiCheckpoint:'",
+      );
+      debugPrint(
+        '[Backup] read settingsRows: count=${settingsRows.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      final settingsMap = <String, String>{
+        for (final row in settingsRows)
+          if (row['value'] != null &&
+              !(row['key']! as String).startsWith('aiCheckpoint:'))
+            row['key'] as String: row['value'] as String,
+      };
 
-    final programs = await getAllTrainingPrograms();
-    final records = await getAllPersonalRecords();
+      stage = 'programs';
+      final programs = await getAllTrainingPrograms();
+      debugPrint(
+        '[Backup] read programs: count=${programs.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      stage = 'records';
+      final records = await getAllPersonalRecords();
+      debugPrint(
+        '[Backup] read records: count=${records.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
 
-    final data = {
-      'backupFormatVersion': 1,
-      'trainingPrograms': programs.map((p) => p.toJson()).toList(),
-      'personalRecords': records.map((r) => r.toJson()).toList(),
-      'sessions': sessions.map((s) => s.toJson()).toList(),
-      'routines': routines.map((r) => r.toJson()).toList(),
-      'targets': targets.map((t) => t.toJson()).toList(),
-      'muscleGroups': muscleGroups.map((m) => m.toJson()).toList(),
-      'customExercises': customExercises.map((e) => e.toJson()).toList(),
-      'exerciseOverrides': exerciseOverrides.map((e) => e.toJson()).toList(),
-      'conversations': conversations.map((c) => c.toJson()).toList(),
-      'settings': settingsMap,
-      'exportDate': DateTime.now().toIso8601String(),
-      'appVersion': _appVersion,
-    };
-    return jsonEncode(data);
+      final data = {
+        'backupFormatVersion': 1,
+        'trainingPrograms': programs.map((p) => p.toJson()).toList(),
+        'personalRecords': records.map((r) => r.toJson()).toList(),
+        'sessions': sessions.map((s) => s.toJson()).toList(),
+        'routines': routines.map((r) => r.toJson()).toList(),
+        'targets': targets.map((t) => t.toJson()).toList(),
+        'muscleGroups': muscleGroups.map((m) => m.toJson()).toList(),
+        'customExercises': customExercises.map((e) => e.toJson()).toList(),
+        'exerciseOverrides': exerciseOverrides.map((e) => e.toJson()).toList(),
+        'conversations': conversations.map((c) => c.toJson()).toList(),
+        'settings': settingsMap,
+        'exportDate': DateTime.now().toIso8601String(),
+        'appVersion': _appVersion,
+      };
+      stage = 'encode';
+      final encoded = jsonEncode(data);
+      debugPrint(
+        '[Backup] data encoded: characters=${encoded.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      return encoded;
+    } catch (error, stack) {
+      debugPrint(
+        '[Backup] data export failed: stage=$stage elapsedMs=${watch.elapsedMilliseconds} type=${error.runtimeType}',
+      );
+      debugPrintStack(stackTrace: stack);
+      rethrow;
+    }
   }
 
   @override
