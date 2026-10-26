@@ -1,18 +1,20 @@
 // editable_exercise_card.dart — Editable exercise card + set/drop rows for edit screen
 
+import 'rf_form_fields.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/models.dart';
 import '../../theme/app_theme.dart';
 
-typedef OnSetChanged = void Function({
-  required int setIndex,
-  required double weight,
-  required int reps,
-  required bool isDropset,
-  List<DropsetEntry>? drops,
-});
+typedef OnSetChanged =
+    void Function({
+      required int setIndex,
+      required double weight,
+      required int reps,
+      required bool isDropset,
+      List<DropsetEntry>? drops,
+    });
 
 // ── Shared mutable data classes ───────────────────────────────────────────────
 class EditableExerciseLog {
@@ -135,14 +137,33 @@ class EditableExerciseCard extends StatelessWidget {
                   isDropset: set.isDropset,
                   drops: set.drops,
                   onWeightChanged: (w) => onSetChanged(
-                      setIndex: i, weight: w, reps: set.reps, isDropset: set.isDropset, drops: set.drops),
+                    setIndex: i,
+                    weight: w,
+                    reps: set.reps,
+                    isDropset: set.isDropset,
+                    drops: set.drops,
+                  ),
                   onRepsChanged: (r) => onSetChanged(
-                      setIndex: i, weight: set.weight, reps: r, isDropset: set.isDropset, drops: set.drops),
+                    setIndex: i,
+                    weight: set.weight,
+                    reps: r,
+                    isDropset: set.isDropset,
+                    drops: set.drops,
+                  ),
                   onIsDropsetChanged: (d) => onSetChanged(
-                      setIndex: i, weight: set.weight, reps: set.reps, isDropset: d,
-                      drops: d ? (set.drops ?? []) : set.drops),
+                    setIndex: i,
+                    weight: set.weight,
+                    reps: set.reps,
+                    isDropset: d,
+                    drops: d ? (set.drops ?? []) : set.drops,
+                  ),
                   onDropsChanged: (drops) => onSetChanged(
-                      setIndex: i, weight: set.weight, reps: set.reps, isDropset: set.isDropset, drops: drops),
+                    setIndex: i,
+                    weight: set.weight,
+                    reps: set.reps,
+                    isDropset: set.isDropset,
+                    drops: drops,
+                  ),
                   onDelete: () => onDeleteSet(i),
                 );
               }).toList(),
@@ -348,16 +369,14 @@ class _EditableSetRowState extends State<EditableSetRow> {
                 focusNode: _repsFocus,
                 suffix: 'reps',
                 width: 72,
-                onChanged: (v) =>
-                    widget.onRepsChanged(int.tryParse(v) ?? 0),
+                onChanged: (v) => widget.onRepsChanged(int.tryParse(v) ?? 0),
               ),
 
               const Spacer(),
 
               // Dropset toggle
               GestureDetector(
-                onTap: () =>
-                    widget.onIsDropsetChanged(!widget.isDropset),
+                onTap: () => widget.onIsDropsetChanged(!widget.isDropset),
                 child: Icon(
                   widget.isDropset
                       ? Icons.layers_rounded
@@ -394,12 +413,20 @@ class _EditableSetRowState extends State<EditableSetRow> {
                 reps: drop.reps,
                 onWeightChanged: (w) {
                   final updated = List<DropsetEntry>.from(widget.drops!);
-                  updated[i] = DropsetEntry(id: drop.id, weight: w, reps: drop.reps);
+                  updated[i] = DropsetEntry(
+                    id: drop.id,
+                    weight: w,
+                    reps: drop.reps,
+                  );
                   widget.onDropsChanged(updated);
                 },
                 onRepsChanged: (r) {
                   final updated = List<DropsetEntry>.from(widget.drops!);
-                  updated[i] = DropsetEntry(id: drop.id, weight: drop.weight, reps: r);
+                  updated[i] = DropsetEntry(
+                    id: drop.id,
+                    weight: drop.weight,
+                    reps: r,
+                  );
                   widget.onDropsChanged(updated);
                 },
                 onDelete: () {
@@ -535,8 +562,7 @@ class _EditableDropRowState extends State<EditableDropRow> {
             decimal: true,
             width: 68,
             height: 30,
-            onChanged: (v) =>
-                widget.onWeightChanged(double.tryParse(v) ?? 0),
+            onChanged: (v) => widget.onWeightChanged(double.tryParse(v) ?? 0),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 6),
@@ -592,8 +618,8 @@ class _NumField extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: width,
-      height: height,
-      child: TextField(
+      height: (MediaQuery.textScalerOf(context).scale(20) + 16).clamp(48, double.infinity),
+      child: RFTextField(
         controller: controller,
         focusNode: focusNode,
         keyboardType: decimal
@@ -603,26 +629,10 @@ class _NumField extends StatelessWidget {
             ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$'))]
             : [FilteringTextInputFormatter.digitsOnly],
         textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 13,
-        ),
-        decoration: InputDecoration(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-          suffixText: suffix,
-          suffixStyle: const TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 10,
-          ),
-          filled: true,
-          fillColor: AppColors.surface,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            borderSide: BorderSide.none,
-          ),
-        ),
+        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+        decoration: InputDecoration(suffixText: suffix),
         onChanged: onChanged,
+        compact: true,
       ),
     );
   }

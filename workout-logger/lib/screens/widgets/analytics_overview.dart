@@ -150,10 +150,12 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Column(
+              Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -174,7 +176,6 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                     ),
                   ],
                 ),
-              ),
               _RangeToggle(
                 value: _range,
                 onChanged: (r) => setState(() => _range = r),
@@ -363,42 +364,14 @@ class _RangeToggle extends StatelessWidget {
   final ValueChanged<_Range> onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: AppColors.glass2,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: _Range.values.map((r) {
-          final active = r == value;
-          return GestureDetector(
-            onTap: () => onChanged(r),
-            child: AnimatedContainer(
-              duration: AppDurations.fast,
-              curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: active ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(7),
-              ),
-              child: Text(
-                r.label,
-                style: TextStyle(fontFamily: 'GeistMono', 
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: active ? Colors.white : AppColors.textMuted,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => RFSelectionGroup<_Range>(
+    options: [
+      for (final range in _Range.values)
+        RFSelectionOption(value: range, label: range.label),
+    ],
+    selected: value,
+    onChanged: onChanged,
+  );
 }
 
 // ── Muscle Focus (unified volume + recovery + growth, drill-down) ──────────────

@@ -1,3 +1,5 @@
+import 'package:repforge/screens/widgets/rf_form_fields.dart';
+import 'package:repforge/screens/widgets/rf_selection_group.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -80,15 +82,19 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(Slider), findsNothing);
-      expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+      expect(find.byType(RFDropdown<String>), findsOneWidget);
       expect(find.text('Save API Key'), findsOneWidget);
       expect(
         tester.getTopLeft(find.text('Save API Key')).dy,
-        lessThan(
-          tester.getTopLeft(find.byType(DropdownButtonFormField<String>)).dy,
-        ),
+        lessThan(tester.getTopLeft(find.byType(RFDropdown<String>)).dy),
       );
-      await tester.enterText(find.byType(TextField), 'demo-key');
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(RFTextField),
+          matching: find.byType(TextField),
+        ),
+        'demo-key',
+      );
       final writes = storage.saveSettingCallCount;
       await tester.ensureVisible(find.text('Advanced coach settings'));
       await tester.tap(find.text('Advanced coach settings'));
@@ -99,7 +105,15 @@ void main() {
       expect(find.byType(Slider), findsNothing);
       expect(storage.saveSettingCallCount, writes);
       expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        tester
+            .widget<TextField>(
+              find.descendant(
+                of: find.byType(RFTextField),
+                matching: find.byType(TextField),
+              ),
+            )
+            .controller!
+            .text,
         'demo-key',
       );
       expect(settings.geminiApiKey, isEmpty);
@@ -141,21 +155,48 @@ void main() {
       _wrap(settings, gemini, (_) => const AiSettingsSection()),
     );
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'demo-key');
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(RFTextField),
+        matching: find.byType(TextField),
+      ),
+      'demo-key',
+    );
     expect(
-      tester.widget<TextField>(find.byType(TextField)).obscureText,
+      tester
+          .widget<TextField>(
+            find.descendant(
+              of: find.byType(RFTextField),
+              matching: find.byType(TextField),
+            ),
+          )
+          .obscureText,
       isTrue,
     );
     await tester.tap(find.byTooltip('Show API key'));
     await tester.pump();
     expect(
-      tester.widget<TextField>(find.byType(TextField)).obscureText,
+      tester
+          .widget<TextField>(
+            find.descendant(
+              of: find.byType(RFTextField),
+              matching: find.byType(TextField),
+            ),
+          )
+          .obscureText,
       isFalse,
     );
     await tester.tap(find.byTooltip('Hide API key'));
     await tester.pump();
     expect(
-      tester.widget<TextField>(find.byType(TextField)).obscureText,
+      tester
+          .widget<TextField>(
+            find.descendant(
+              of: find.byType(RFTextField),
+              matching: find.byType(TextField),
+            ),
+          )
+          .obscureText,
       isTrue,
     );
     expect(settings.geminiApiKey, isEmpty);
@@ -201,11 +242,11 @@ void main() {
     expect(restored.weightUnit, WeightUnit.lbs);
     expect(
       tester
-          .widget<SegmentedButton<WeightUnit>>(
-            find.byType(SegmentedButton<WeightUnit>),
+          .widget<RFSelectionGroup<WeightUnit>>(
+            find.byType(RFSelectionGroup<WeightUnit>),
           )
           .selected,
-      {WeightUnit.lbs},
+      WeightUnit.lbs,
     );
   });
 
@@ -220,13 +261,20 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final choice = find.widgetWithText(ChoiceChip, '5 kg');
+    final choice = find.widgetWithText(FilledButton, '5 kg');
     await tester.ensureVisible(choice);
     expect(tester.getSize(choice).height, greaterThanOrEqualTo(48));
     await tester.tap(choice);
     await tester.pumpAndSettle();
     expect(settings.weightIncrement, 5);
-    expect(tester.widget<ChoiceChip>(choice).selected, isTrue);
+    expect(
+      tester
+          .widget<RFSelectionGroup<double>>(
+            find.byType(RFSelectionGroup<double>),
+          )
+          .selected,
+      5,
+    );
     final restored = SettingsProvider(storage);
     await restored.init();
     expect(restored.weightIncrement, 5);

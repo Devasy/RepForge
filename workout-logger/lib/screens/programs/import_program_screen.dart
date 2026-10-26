@@ -12,6 +12,7 @@
 //   • Import button disabled until JSON is validated
 //   • Clear (×) button in AppBar
 
+import '../widgets/rf_form_fields.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -89,9 +90,9 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       child: Text(
         'Tap  to pick a .json file, or paste JSON below. '
         'Required: name · totalWeeks · phases · weeks.',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: AppTheme.textSecondary,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
       ),
     );
   }
@@ -101,10 +102,10 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
   Widget _buildTextField() {
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: TextField(
+      child: RFTextField(
         controller: _ctrl,
         scrollController: _scrollCtrl,
-        maxLines: null,  // expands to fill available height
+        maxLines: null,
         expands: true,
         textAlignVertical: TextAlignVertical.top,
         style: const TextStyle(
@@ -115,29 +116,9 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
         ),
         decoration: InputDecoration(
           hintText: '{\n  "name": "My Program",\n  "totalWeeks": 12,\n  ...\n}',
-          hintStyle: const TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 12,
-            color: AppTheme.textMuted,
-          ),
-          filled: true,
-          fillColor: AppTheme.surfaceColor,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            borderSide: BorderSide(
-              color: _borderColor,
-              width: _validationState != _ValidationState.idle ? 1.5 : 1,
-            ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            borderSide: BorderSide(color: _borderColor, width: 1.5),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            borderSide: BorderSide(color: _borderColor, width: 2),
-          ),
-          contentPadding: const EdgeInsets.all(AppSpacing.md),
+          errorText: _validationState == _ValidationState.invalid
+              ? _validationError
+              : null,
         ),
         onChanged: (_) {
           // Reset validation when user edits
@@ -153,17 +134,6 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
         },
       ),
     );
-  }
-
-  Color get _borderColor {
-    switch (_validationState) {
-      case _ValidationState.valid:
-        return AppTheme.success;
-      case _ValidationState.invalid:
-        return AppTheme.error;
-      case _ValidationState.idle:
-        return AppTheme.surfaceColor;
-    }
   }
 
   // ── Status bar (char / line count + validation message) ──────────────
@@ -225,16 +195,20 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
   // ── Action bar ────────────────────────────────────────────────────────
 
   Widget _buildActionBar() {
-    final canValidate = _ctrl.text.trim().isNotEmpty &&
+    final canValidate =
+        _ctrl.text.trim().isNotEmpty &&
         _validationState != _ValidationState.valid;
-    final canImport = _validationState == _ValidationState.valid && _parsed != null;
+    final canImport =
+        _validationState == _ValidationState.valid && _parsed != null;
 
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: const BoxDecoration(
           color: AppTheme.cardColor,
-          border: Border(top: BorderSide(color: AppTheme.surfaceColor, width: 1)),
+          border: Border(
+            top: BorderSide(color: AppTheme.surfaceColor, width: 1),
+          ),
         ),
         child: Row(
           children: [
@@ -350,13 +324,19 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       throw FormatException('Missing required field: "$key"');
     }
     if (type == int && map[key] is! int) {
-      throw FormatException('"$key" must be an integer, got ${map[key].runtimeType}');
+      throw FormatException(
+        '"$key" must be an integer, got ${map[key].runtimeType}',
+      );
     }
     if (type == String && map[key] is! String) {
-      throw FormatException('"$key" must be a string, got ${map[key].runtimeType}');
+      throw FormatException(
+        '"$key" must be a string, got ${map[key].runtimeType}',
+      );
     }
     if (type == List && map[key] is! List) {
-      throw FormatException('"$key" must be an array, got ${map[key].runtimeType}');
+      throw FormatException(
+        '"$key" must be an array, got ${map[key].runtimeType}',
+      );
     }
   }
 

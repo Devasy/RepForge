@@ -1,3 +1,4 @@
+import 'package:repforge/screens/widgets/rf_form_fields.dart';
 // Widget tests for the Gemini model dropdown + thinking-level slider in
 // AiSettingsSection.
 
@@ -31,28 +32,35 @@ void main() {
     gemini = GeminiAiService();
   });
 
-  testWidgets('model picker is a dropdown showing the current model', (tester) async {
+  testWidgets('model picker is a dropdown showing the current model', (
+    tester,
+  ) async {
     await tester.pumpWidget(_wrap(settings, gemini));
     await tester.pumpAndSettle();
 
-    expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+    expect(find.byType(RFDropdown<String>), findsOneWidget);
     expect(find.text('Gemini 3.6 Flash'), findsOneWidget);
   });
 
-  testWidgets('selecting gemini-3.7-flash from the dropdown clamps the thinking-level slider off minimal', (tester) async {
-    await settings.setGeminiThinkingLevel('minimal');
-    await tester.pumpWidget(_wrap(settings, gemini));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'selecting gemini-3.7-flash from the dropdown clamps the thinking-level slider off minimal',
+    (tester) async {
+      await settings.setGeminiThinkingLevel('minimal');
+      await tester.pumpWidget(_wrap(settings, gemini));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Gemini 3.7 Flash').last);
-    await tester.pumpAndSettle();
+      await tester.tap(find.byType(RFDropdown<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gemini 3.7 Flash').last);
+      await tester.pumpAndSettle();
 
-    expect(settings.geminiThinkingLevel, 'low');
-  });
+      expect(settings.geminiThinkingLevel, 'low');
+    },
+  );
 
-  testWidgets('thinking-level slider is hidden for gemini-2.5-flash', (tester) async {
+  testWidgets('thinking-level slider is hidden for gemini-2.5-flash', (
+    tester,
+  ) async {
     await settings.setGeminiModel('gemini-2.5-flash');
     await tester.pumpWidget(_wrap(settings, gemini));
     await tester.pumpAndSettle();

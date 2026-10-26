@@ -80,7 +80,8 @@ class TargetsTab extends StatelessWidget {
           icon: const Icon(Icons.add_rounded, color: Colors.white),
           label: Text(
             'New Target',
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: Colors.white,
               fontWeight: FontWeight.w700,
             ),
@@ -106,10 +107,7 @@ class TargetsTab extends StatelessWidget {
 // ── Summary header ─────────────────────────────────────────────────────────────
 
 class _SummaryHeader extends StatelessWidget {
-  const _SummaryHeader({
-    required this.active,
-    required this.completed,
-  });
+  const _SummaryHeader({required this.active, required this.completed});
 
   final List<Target> active;
   final List<Target> completed;
@@ -117,9 +115,11 @@ class _SummaryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onTrack = active
-        .where((t) =>
-            t.estimatedCompletionDate != null &&
-            t.estimatedCompletionDate!.isAfter(DateTime.now()))
+        .where(
+          (t) =>
+              t.estimatedCompletionDate != null &&
+              t.estimatedCompletionDate!.isAfter(DateTime.now()),
+        )
         .length;
     final stalled = active.length - onTrack;
 
@@ -131,16 +131,10 @@ class _SummaryHeader extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.sm),
         if (onTrack > 0)
-          _SummaryChip(
-            label: '$onTrack on track',
-            color: AppColors.success,
-          ),
+          _SummaryChip(label: '$onTrack on track', color: AppColors.success),
         if (stalled > 0) ...[
           const SizedBox(width: AppSpacing.sm),
-          _SummaryChip(
-            label: '$stalled stalled',
-            color: AppColors.warning,
-          ),
+          _SummaryChip(label: '$stalled stalled', color: AppColors.warning),
         ],
         if (completed.isNotEmpty) ...[
           const SizedBox(width: AppSpacing.sm),
@@ -170,7 +164,8 @@ class _SummaryChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(fontFamily: 'GeistMono', 
+        style: TextStyle(
+          fontFamily: 'GeistMono',
           color: color,
           fontSize: 11,
           fontWeight: FontWeight.w600,
@@ -239,7 +234,12 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
         'You are a concise personal trainer. Give 1–2 sentences of actionable advice to help the user get this stalled target back on track. Be specific and encouraging.';
 
     final nudge = await gemini.generateInsight(system, contextText);
-    if (mounted) setState(() { _nudge = nudge; _loadingNudge = false; });
+    if (mounted) {
+      setState(() {
+        _nudge = nudge;
+        _loadingNudge = false;
+      });
+    }
   }
 
   void _openCoach() {
@@ -279,7 +279,8 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
               Expanded(
                 child: Text(
                   widget.exerciseName,
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -298,11 +299,13 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
                   color: _statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppRadius.full),
                   border: Border.all(
-                      color: _statusColor.withValues(alpha: 0.35)),
+                    color: _statusColor.withValues(alpha: 0.35),
+                  ),
                 ),
                 child: Text(
                   _statusWord,
-                  style: TextStyle(fontFamily: 'GeistMono', 
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
                     color: _statusColor,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -329,14 +332,16 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
               Text(
                 '${settings.toDisplay(t.currentValue).toStringAsFixed(1)} / '
                 '${settings.toDisplay(t.targetValue).toStringAsFixed(1)} ${settings.unitLabel}',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textSoft,
                   fontSize: 12,
                 ),
               ),
               Text(
                 '${pct.toStringAsFixed(0)}%',
-                style: TextStyle(fontFamily: 'GeistMono', 
+                style: TextStyle(
+                  fontFamily: 'GeistMono',
                   color: AppColors.primary,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -350,12 +355,16 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.schedule_rounded,
-                    size: 11, color: AppColors.textMuted),
+                const Icon(
+                  Icons.schedule_rounded,
+                  size: 11,
+                  color: AppColors.textMuted,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   'Est. $etaStr',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
@@ -399,19 +408,24 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
                   color: AppColors.warning.withValues(alpha: 0.07),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(
-                      color: AppColors.warning.withValues(alpha: 0.25)),
+                    color: AppColors.warning.withValues(alpha: 0.25),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.auto_awesome_rounded,
-                            size: 12, color: AppColors.warning),
+                        const Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 12,
+                          color: AppColors.warning,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'AI Tip',
-                          style: TextStyle(fontFamily: 'Geist', 
+                          style: TextStyle(
+                            fontFamily: 'Geist',
                             color: AppColors.warning,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -422,7 +436,8 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
                     const SizedBox(height: 4),
                     Text(
                       _nudge!,
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.textSoft,
                         fontSize: 12,
                         height: 1.5,
@@ -433,7 +448,8 @@ class _TargetCardWithAiState extends State<_TargetCardWithAi> {
                       onTap: _openCoach,
                       child: Text(
                         'Continue in Coach →',
-                        style: TextStyle(fontFamily: 'Geist', 
+                        style: TextStyle(
+                          fontFamily: 'Geist',
                           color: AppColors.secondary,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -490,16 +506,14 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
     final growth = provider.getGrowthModel(_selectedExerciseId!);
     final oneRM = provider.getBestOneRM(_selectedExerciseId!);
 
-    String contextText =
-        'Exercise: $exerciseName\nTarget type: $_targetType\n';
+    String contextText = 'Exercise: $exerciseName\nTarget type: $_targetType\n';
     if (growth != null) {
       contextText +=
           'Growth slope: ${settings.toDisplay(growth.slope).toStringAsFixed(2)} ${settings.unitLabel}/session\n'
           'R²: ${(growth.r2 * 100).toStringAsFixed(0)}%\n';
     }
     if (oneRM != null) {
-      contextText +=
-          'Estimated 1RM: ${settings.formatWeight(oneRM)}\n';
+      contextText += 'Estimated 1RM: ${settings.formatWeight(oneRM)}\n';
     }
 
     const system =
@@ -545,7 +559,8 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
           ),
           Text(
             'New Target',
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textPrimary,
               fontSize: 20,
               fontWeight: FontWeight.w800,
@@ -555,7 +570,8 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
 
           Text(
             'EXERCISE',
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textMuted,
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -563,49 +579,24 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.glassBorder),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedExerciseId,
-                isExpanded: true,
-                dropdownColor: AppColors.cardHigh,
-                hint: Text(
-                  'Select exercise…',
-                  style: TextStyle(fontFamily: 'Geist', 
-                    color: AppColors.textMuted,
-                    fontSize: 14,
-                  ),
-                ),
-                style: TextStyle(fontFamily: 'Geist', 
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                ),
-                icon: const Icon(Icons.expand_more_rounded,
-                    color: AppColors.textMuted, size: 20),
-                items: exercises
-                    .map((e) => DropdownMenuItem(
-                          value: e.id,
-                          child: Text(e.name),
-                        ))
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  _selectedExerciseId = v;
-                  _suggestionText = null;
-                }),
-              ),
-            ),
+          RFDropdown<String>(
+            label: 'Exercise',
+            hint: 'Select exercise…',
+            value: _selectedExerciseId,
+            items: exercises.map((exercise) => exercise.id).toList(),
+            labelBuilder: (id) =>
+                exercises.firstWhere((exercise) => exercise.id == id).name,
+            onChanged: (value) => setState(() {
+              _selectedExerciseId = value;
+              _suggestionText = null;
+            }),
           ),
 
           const SizedBox(height: AppSpacing.md),
           Text(
             'TARGET TYPE',
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textMuted,
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -613,53 +604,20 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: _types.map((t) {
-              final selected = _targetType == t.$1;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() {
-                    _targetType = t.$1;
-                    _suggestionText = null;
-                  }),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? AppColors.primary.withValues(alpha: 0.15)
-                          : AppColors.card,
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                      border: Border.all(
-                        color: selected
-                            ? AppColors.primary.withValues(alpha: 0.5)
-                            : AppColors.glassBorder,
-                      ),
-                    ),
-                    child: Text(
-                      t.$2,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: 'Geist', 
-                        color: selected
-                            ? AppColors.primary
-                            : AppColors.textMuted,
-                        fontSize: 11,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w400,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+          RFSelectionGroup<String>(
+            options: _types.map((type) => RFSelectionOption(value: type.$1, label: type.$2)).toList(),
+            selected: _targetType,
+            onChanged: (type) => setState(() {
+              _targetType = type;
+              _suggestionText = null;
+            }),
           ),
 
           const SizedBox(height: AppSpacing.md),
           Text(
             'TARGET VALUE',
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textMuted,
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -667,34 +625,13 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.glassBorder),
-            ),
-            child: TextField(
-              controller: _valueController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(
-                    RegExp(r'^\d*\.?\d*$')),
-              ],
-              style: TextStyle(fontFamily: 'Geist', 
-                color: AppColors.textPrimary,
-                fontSize: 16,
-              ),
-              decoration: InputDecoration(
-                hintText: 'e.g. 100',
-                hintStyle:
-                    TextStyle(fontFamily: 'Geist', color: AppColors.textMuted),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.md,
-                ),
-              ),
-            ),
+          RFTextField(
+            controller: _valueController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+            ],
+            decoration: InputDecoration(hintText: 'e.g. 100'),
           ),
 
           // AI suggestion
@@ -705,12 +642,16 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
                 onTap: _fetchSuggestion,
                 child: Row(
                   children: [
-                    const Icon(Icons.auto_awesome_rounded,
-                        size: 13, color: AppColors.primary),
+                    const Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 13,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 5),
                     Text(
                       'Suggest a target based on my progress',
-                      style: TextStyle(fontFamily: 'Geist', 
+                      style: TextStyle(
+                        fontFamily: 'Geist',
                         color: AppColors.primary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -728,18 +669,23 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
                   color: AppColors.primary.withValues(alpha: 0.07),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.25)),
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                  ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.auto_awesome_rounded,
-                        size: 13, color: AppColors.primary),
+                    const Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 13,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         _suggestionText!,
-                        style: TextStyle(fontFamily: 'Geist', 
+                        style: TextStyle(
+                          fontFamily: 'Geist',
                           color: AppColors.textSoft,
                           fontSize: 12,
                           height: 1.4,
@@ -788,10 +734,10 @@ class _CreateTargetSheetState extends State<_CreateTargetSheet> {
     setState(() => _isSubmitting = true);
     try {
       await context.read<WorkoutProvider>().createTarget(
-            exerciseId: _selectedExerciseId!,
-            type: _targetType,
-            targetValue: value,
-          );
+        exerciseId: _selectedExerciseId!,
+        type: _targetType,
+        targetValue: value,
+      );
       if (mounted) Navigator.of(context).pop();
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

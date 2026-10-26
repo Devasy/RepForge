@@ -46,7 +46,9 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
 
     final gemini = context.read<GeminiAiService>();
     if (!gemini.isConfigured) {
-      setState(() { _error = 'Add your Gemini API key in Profile → AI Features first.'; });
+      setState(() {
+        _error = 'Add your Gemini API key in Profile → AI Features first.';
+      });
       return;
     }
 
@@ -96,9 +98,9 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save program: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to save program: $e')));
       }
     }
   }
@@ -195,7 +197,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
               children: [
                 Text(
                   'AI Program Generator',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -204,7 +207,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                 ),
                 Text(
                   'Powered by Gemini',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
@@ -232,7 +236,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
               const SizedBox(width: 8),
               Text(
                 'Describe your program',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -241,39 +246,21 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.glass,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.glassBorderStrong),
-            ),
-            child: TextField(
-              controller: _promptCtrl,
-              style: TextStyle(fontFamily: 'Geist', 
-                color: AppColors.textPrimary,
-                fontSize: 14,
-                height: 1.5,
-              ),
-              maxLines: 4,
-              minLines: 2,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(
-                hintText:
-                    'e.g. "12-week hypertrophy program, 4 days/week, push-pull split, intermediate level"',
-                hintStyle: TextStyle(fontFamily: 'Geist', 
-                  color: AppColors.textFaint,
-                  fontSize: 13,
-                  height: 1.5,
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.all(AppSpacing.md),
-              ),
+          RFTextField(
+            controller: _promptCtrl,
+            maxLines: 4,
+            minLines: 2,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              hintText:
+                  'e.g. "12-week hypertrophy program, 4 days/week, push-pull split, intermediate level"',
             ),
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
             'QUICK PROMPTS',
-            style: TextStyle(fontFamily: 'GeistMono', 
+            style: TextStyle(
+              fontFamily: 'GeistMono',
               color: AppColors.textFaint,
               fontSize: 9,
               fontWeight: FontWeight.w600,
@@ -299,7 +286,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                   ),
                   child: Text(
                     s,
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textSoft,
                       fontSize: 11,
                     ),
@@ -336,7 +324,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
           const SizedBox(height: AppSpacing.md),
           Text(
             _statusText,
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textPrimary,
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -345,7 +334,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
           const SizedBox(height: AppSpacing.xs),
           Text(
             'Gemini is designing your training block…',
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textMuted,
               fontSize: 12,
             ),
@@ -361,12 +351,17 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
       borderColor: AppColors.error.withValues(alpha: 0.4),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 20),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: AppColors.error,
+            size: 20,
+          ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               _error!,
-              style: TextStyle(fontFamily: 'Geist', 
+              style: TextStyle(
+                fontFamily: 'Geist',
                 color: AppColors.error,
                 fontSize: 13,
               ),
@@ -414,7 +409,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                       children: [
                         Text(
                           p.name,
-                          style: TextStyle(fontFamily: 'Geist', 
+                          style: TextStyle(
+                            fontFamily: 'Geist',
                             color: AppColors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -424,7 +420,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                         if (p.description != null)
                           Text(
                             p.description!,
-                            style: TextStyle(fontFamily: 'Geist', 
+                            style: TextStyle(
+                              fontFamily: 'Geist',
                               color: AppColors.textMuted,
                               fontSize: 12,
                             ),
@@ -439,10 +436,17 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
                 children: [
-                  RFChip(label: '${p.totalWeeks} weeks', color: AppColors.primary),
-                  RFChip(label: '${p.phases.length} phases', color: AppColors.secondary),
                   RFChip(
-                    label: '${p.weeks.fold(0, (s, w) => s + w.days.length)} training days',
+                    label: '${p.totalWeeks} weeks',
+                    color: AppColors.primary,
+                  ),
+                  RFChip(
+                    label: '${p.phases.length} phases',
+                    color: AppColors.secondary,
+                  ),
+                  RFChip(
+                    label:
+                        '${p.weeks.fold(0, (s, w) => s + w.days.length)} training days',
                     color: AppColors.textSoft,
                   ),
                   if (deloads > 0)
@@ -455,7 +459,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   'PHASES',
-                  style: TextStyle(fontFamily: 'GeistMono', 
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
                     color: AppColors.textFaint,
                     fontSize: 9,
                     fontWeight: FontWeight.w600,
@@ -479,7 +484,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                         const SizedBox(width: 10),
                         Text(
                           phase.name,
-                          style: TextStyle(fontFamily: 'Geist', 
+                          style: TextStyle(
+                            fontFamily: 'Geist',
                             color: AppColors.textPrimary,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -488,7 +494,8 @@ class _AiProgramGeneratorScreenState extends State<AiProgramGeneratorScreen> {
                         const Spacer(),
                         Text(
                           'Wk ${phase.startWeek}–${phase.endWeek}',
-                          style: TextStyle(fontFamily: 'GeistMono', 
+                          style: TextStyle(
+                            fontFamily: 'GeistMono',
                             color: AppColors.textMuted,
                             fontSize: 11,
                           ),

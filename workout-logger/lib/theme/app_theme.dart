@@ -8,42 +8,42 @@ class AppColors {
 
   // Backgrounds — soft-futurist dark
   static const background = Color(0xFF07070A); // --bg
-  static const surface = Color(0xFF0C0C12);    // --bg-1
-  static const card = Color(0xFF11111A);        // --bg-2
-  static const cardHigh = Color(0xFF1A1A24);   // slightly elevated
+  static const surface = Color(0xFF0C0C12); // --bg-1
+  static const card = Color(0xFF11111A); // --bg-2
+  static const cardHigh = Color(0xFF1A1A24); // slightly elevated
 
   // Glassmorphism surfaces
-  static const glass = Color(0x0AFFFFFF);           // --surface  4%
+  static const glass = Color(0x0AFFFFFF); // --surface  4%
   static const glass1 = glass;
-  static const glass2 = Color(0x0FFFFFFF);          // --surface-2 6%
-  static const glass3 = Color(0x17FFFFFF);          // --surface-3 9%
-  static const glassBorder = Color(0x12FFFFFF);     // --border 7%
+  static const glass2 = Color(0x0FFFFFFF); // --surface-2 6%
+  static const glass3 = Color(0x17FFFFFF); // --surface-3 9%
+  static const glassBorder = Color(0x12FFFFFF); // --border 7%
   static const glassBorderStrong = Color(0x21FFFFFF); // --border-strong 13%
-  static const divider = Color(0x0FFFFFFF);         // 6% white
+  static const divider = Color(0x0FFFFFFF); // 6% white
 
   // GlassCard material. The fill grades top-to-bottom and the edge grades with
   // it, so a panel reads as a surface catching light from above rather than as
   // an outline. The old fill (3.5% -> 1.6%) resolved to +9/255 and +4/255 over
   // the canvas, which left the border twice as bright as the face it wrapped.
-  static const glassFillTop = Color(0x12FFFFFF);    // 7%  -> +17.5/255
+  static const glassFillTop = Color(0x12FFFFFF); // 7%  -> +17.5/255
   static const glassFillBottom = Color(0x05FFFFFF); // 2%  ->  +4.9/255
-  static const glassEdgeTop = Color(0x24FFFFFF);    // 14% -> +34.9/255
+  static const glassEdgeTop = Color(0x24FFFFFF); // 14% -> +34.9/255
   static const glassEdgeBottom = Color(0x0AFFFFFF); // 4%  ->  +9.7/255
 
   // Ambient wash floor. A radial pool's reach is finite and a scrolling column
   // is not, so this full-height grade is the only layer that can guarantee a
   // non-zero floor everywhere. Without it the canvas below the key pool is
   // literally flat and glass has nothing to sit on.
-  static const washFloorTop = Color(0x065B21B6);    // 2.4% violet
-  static const washFloorMid = Color(0x045B21B6);    // 1.6%
+  static const washFloorTop = Color(0x065B21B6); // 2.4% violet
+  static const washFloorMid = Color(0x045B21B6); // 1.6%
   static const washFloorBottom = Color(0x055B21B6); // 2.0%
 
   // Brand — electric violet primary, cyan data
-  static const primary = Color(0xFF7C3AED);         // --accent oklch(0.68 0.18 285)
-  static const primaryDeep = Color(0xFF5B21B6);     // gradient end / ambient wash
-  static const secondary = Color(0xFF00C2D4);       // --data  oklch(0.78 0.14 200)
-  static const cyan = secondary;                    // alias for secondary
-  static const accent = Color(0xFF7C3AED);          // alias for primary
+  static const primary = Color(0xFF7C3AED); // --accent oklch(0.68 0.18 285)
+  static const primaryDeep = Color(0xFF5B21B6); // gradient end / ambient wash
+  static const secondary = Color(0xFF00C2D4); // --data  oklch(0.78 0.14 200)
+  static const cyan = secondary; // alias for secondary
+  static const accent = Color(0xFF7C3AED); // alias for primary
 
   /// The one brand gradient, so every violet surface catches the same light.
   static const primaryGradient = LinearGradient(
@@ -53,15 +53,21 @@ class AppColors {
   );
 
   // Semantic
-  static const success = Color(0xFF00C89B);         // --success oklch(0.78 0.16 155)
-  static const warning = Color(0xFFDBA520);         // --warn   oklch(0.78 0.14 60)
-  static const error = Color(0xFFE05040);           // --danger  oklch(0.68 0.20 25)
+  static const success = Color(0xFF00C89B); // --success oklch(0.78 0.16 155)
+  static const warning = Color(0xFFDBA520); // --warn   oklch(0.78 0.14 60)
+  static const error = Color(0xFFE05040); // --danger  oklch(0.68 0.20 25)
 
   // Text — opacity levels over the near-white base #F4F4F8
-  static const textPrimary = Color(0xFFF4F4F8);     // --fg
-  static const textSoft = Color(0xB8F4F4F8);        // --fg-2 72%
-  static const textMuted = Color(0x7AF4F4F8);       // --fg-3 48%
-  static const textFaint = Color(0x52F4F4F8);       // --fg-4 32%
+  static const textPrimary = Color(0xFFF4F4F8); // --fg
+  static const textSoft = Color(0xB8F4F4F8); // --fg-2 72%
+  static const textMuted = Color(0x7AF4F4F8); // --fg-3 48%
+  static const textFaint = Color(0x52F4F4F8); // --fg-4 32%
+
+  static const controlSelected = Color(0xFFE6DBFF);
+  static const onControlSelected = Color(0xFF28134F);
+  static const controlFocus = Color(0xFFC6AAFF);
+  static const controlOutline = Color(0xFF777382);
+  static const controlError = Color(0xFFFF9B90);
 
   // Glow helpers (use in BoxShadow)
   static Color primaryGlow([double opacity = 0.35]) =>
@@ -147,7 +153,8 @@ class AppTheme {
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(fontFamily: 'Geist', 
+        titleTextStyle: TextStyle(
+          fontFamily: 'Geist',
           color: AppColors.textPrimary,
           fontSize: 22,
           fontWeight: FontWeight.w700,
@@ -157,9 +164,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.card,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -170,7 +175,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
           ),
-          textStyle: TextStyle(fontFamily: 'Geist', 
+          textStyle: TextStyle(
+            fontFamily: 'Geist',
             fontSize: 14,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.2,
@@ -190,24 +196,7 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(foregroundColor: AppColors.primary),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.glass,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.glassBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: const TextStyle(color: AppColors.textFaint),
-      ),
+      inputDecorationTheme: AppControlTheme.inputDecoration(),
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,
         thickness: 1,
@@ -236,64 +225,76 @@ class AppTheme {
 
   static TextTheme _buildTextTheme() {
     return TextTheme(
-      headlineLarge: TextStyle(fontFamily: 'Geist', 
+      headlineLarge: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 32,
         fontWeight: FontWeight.w700,
         letterSpacing: -1.28,
       ),
-      headlineMedium: TextStyle(fontFamily: 'Geist', 
+      headlineMedium: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 28,
         fontWeight: FontWeight.w600,
         letterSpacing: -1.12,
       ),
-      headlineSmall: TextStyle(fontFamily: 'Geist', 
+      headlineSmall: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 22,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.88,
       ),
-      titleLarge: TextStyle(fontFamily: 'Geist', 
+      titleLarge: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 17,
         fontWeight: FontWeight.w600,
       ),
-      titleMedium: TextStyle(fontFamily: 'Geist', 
+      titleMedium: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
-      titleSmall: TextStyle(fontFamily: 'Geist', 
+      titleSmall: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textSoft,
         fontSize: 13,
         fontWeight: FontWeight.w500,
       ),
-      bodyLarge: TextStyle(fontFamily: 'Geist', 
+      bodyLarge: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 16,
       ),
-      bodyMedium: TextStyle(fontFamily: 'Geist', 
+      bodyMedium: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textSoft,
         fontSize: 14,
       ),
-      bodySmall: TextStyle(fontFamily: 'Geist', 
+      bodySmall: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textMuted,
         fontSize: 12,
       ),
-      labelLarge: TextStyle(fontFamily: 'Geist', 
+      labelLarge: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 11,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.4,
       ),
-      labelMedium: TextStyle(fontFamily: 'Geist', 
+      labelMedium: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textMuted,
         fontSize: 10,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.3,
       ),
-      labelSmall: TextStyle(fontFamily: 'Geist', 
+      labelSmall: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textFaint,
         fontSize: 9,
         fontWeight: FontWeight.w500,
@@ -304,6 +305,133 @@ class AppTheme {
 }
 
 // ── Spacing & Radius ────────────────────────────────────────────────────────
+class AppControlTheme {
+  const AppControlTheme._();
+
+  static const textStyle = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 16,
+    color: AppColors.textPrimary,
+    height: 1.4,
+  );
+
+  static InputDecorationTheme inputDecoration({bool compact = false, bool inline = false}) {
+    final radius = BorderRadius.circular(compact ? AppRadius.md : AppRadius.lg);
+    OutlineInputBorder border(Color color, [double width = 1]) =>
+        OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: color, width: width),
+        );
+    return InputDecorationTheme(
+      filled: !inline,
+      fillColor: AppColors.cardHigh,
+      isDense: compact || inline,
+      constraints: const BoxConstraints(minHeight: 48),
+      contentPadding: inline ? EdgeInsets.zero : EdgeInsets.symmetric(
+        horizontal: compact ? AppSpacing.sm : AppSpacing.md,
+        vertical: compact ? AppSpacing.sm : AppSpacing.md,
+      ),
+      border: border(AppColors.controlOutline),
+      enabledBorder: inline ? InputBorder.none : border(AppColors.controlOutline),
+      focusedBorder: border(AppColors.controlFocus, 2),
+      errorBorder: border(AppColors.controlError),
+      focusedErrorBorder: border(AppColors.controlError, 2),
+      disabledBorder: border(AppColors.glassBorderStrong),
+      labelStyle: textStyle.copyWith(color: AppColors.textSoft),
+      floatingLabelStyle: textStyle.copyWith(color: AppColors.controlFocus),
+      hintStyle: textStyle.copyWith(color: AppColors.textSoft),
+      helperStyle: textStyle.copyWith(fontSize: 12, color: AppColors.textSoft),
+      errorStyle: textStyle.copyWith(fontSize: 12, color: AppColors.controlError),
+      errorMaxLines: 3,
+      helperMaxLines: 3,
+      prefixIconColor: AppColors.textSoft,
+      suffixIconColor: AppColors.textSoft,
+      prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      suffixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+    );
+  }
+
+  static MenuStyle get menuStyle => MenuStyle(
+    backgroundColor: const WidgetStatePropertyAll(AppColors.cardHigh),
+    surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+    padding: const WidgetStatePropertyAll(EdgeInsets.all(AppSpacing.sm)),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+      ),
+    ),
+  );
+
+  static ButtonStyle menuItemStyle({required bool selected}) => ButtonStyle(
+    iconColor: WidgetStatePropertyAll(selected ? AppColors.onControlSelected : AppColors.textPrimary),
+    minimumSize: const WidgetStatePropertyAll(Size(48, 56)),
+    foregroundColor: WidgetStatePropertyAll(
+      selected ? AppColors.onControlSelected : AppColors.textPrimary,
+    ),
+    backgroundColor: WidgetStatePropertyAll(
+      selected ? AppColors.controlSelected : Colors.transparent,
+    ),
+    textStyle: const WidgetStatePropertyAll(textStyle),
+    padding: const WidgetStatePropertyAll(
+      EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
+    ),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+    ),
+  );
+
+  static ButtonStyle selectionStyle({
+    required bool selected,
+    required bool first,
+    required bool last,
+    required bool reduceMotion,
+  }) => ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size(48, 52)),
+    padding: const WidgetStatePropertyAll(
+      EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
+    ),
+    tapTargetSize: MaterialTapTargetSize.padded,
+    animationDuration: reduceMotion ? Duration.zero : AppDurations.normal,
+    textStyle: WidgetStatePropertyAll(
+      textStyle.copyWith(fontWeight: FontWeight.w600),
+    ),
+    backgroundColor: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.disabled)
+          ? AppColors.glass2
+          : selected
+          ? AppColors.controlSelected
+          : AppColors.cardHigh,
+    ),
+    foregroundColor: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.disabled)
+          ? AppColors.textMuted
+          : selected
+          ? AppColors.onControlSelected
+          : AppColors.textPrimary,
+    ),
+    side: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.focused)
+          ? const BorderSide(color: AppColors.controlFocus, width: 2)
+          : BorderSide.none,
+    ),
+    shape: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.pressed)) {
+        return RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        );
+      }
+      return RoundedRectangleBorder(
+        borderRadius: selected
+            ? BorderRadius.circular(AppRadius.full)
+            : BorderRadiusDirectional.horizontal(
+                  start: Radius.circular(first ? AppRadius.controlEnd : AppRadius.sm),
+                  end: Radius.circular(last ? AppRadius.controlEnd : AppRadius.sm),
+              ),
+      );
+    }),
+  );
+}
+
 class AppSpacing {
   const AppSpacing._();
   static const double xs = 4;
@@ -316,33 +444,41 @@ class AppSpacing {
 
 class AppRadius {
   const AppRadius._();
-  static const double xs = 6;     // micro pill, small inner accents
+  static const double xs = 6; // micro pill, small inner accents
   static const double sm = 8;
   static const double md = 12;
   static const double lg = 16;
   static const double button = 14; // standard button shape radius
-  static const double xl = 18;    // glass card radius
-  static const double xxl = 22;   // nav pill radius
+  static const double xl = 18; // glass card radius
+  static const double xxl = 22; // nav pill radius
   static const double full = 999;
+  static const double controlEnd = 28;
 }
 
 // ── Animation Durations ──────────────────────────────────────────────────────
 class AppDurations {
   const AppDurations._();
+
   /// 100ms — instant toggles, checkbox presses
-  static const micro  = Duration(milliseconds: 100);
+  static const micro = Duration(milliseconds: 100);
+
   /// 150ms — press state feedback, chip selection
-  static const fast   = Duration(milliseconds: 150);
+  static const fast = Duration(milliseconds: 150);
+
   /// 200ms — standard UI transitions (tab switches, card expands)
   static const normal = Duration(milliseconds: 200);
+
   /// 250ms — slightly heavier containers
   static const moderate = Duration(milliseconds: 250);
+
   /// 300ms — page & modal slide transitions
   static const medium = Duration(milliseconds: 300);
+
   /// 600ms — progress rings, loading fills
-  static const slow   = Duration(milliseconds: 600);
+  static const slow = Duration(milliseconds: 600);
+
   /// 800ms — counter roll-up animations
-  static const xslow  = Duration(milliseconds: 800);
+  static const xslow = Duration(milliseconds: 800);
 }
 
 class AppBreakpoints {

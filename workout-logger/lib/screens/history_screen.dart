@@ -430,25 +430,13 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      decoration: BoxDecoration(
-        color: AppColors.glass2,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        autofocus: true,
-        style: TextStyle(fontFamily: 'Geist', color: AppColors.textPrimary, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: 'Search by date or exercise…',
-          hintStyle: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 14),
-          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 18),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
+    return RFTextField(
+      controller: controller,
+      onChanged: onChanged,
+      autofocus: true,
+      decoration: InputDecoration(
+        hintText: 'Search by date or exercise…',
+        prefixIcon: Icon(Icons.search_rounded, size: 22),
       ),
     );
   }

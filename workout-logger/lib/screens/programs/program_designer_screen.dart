@@ -5,6 +5,7 @@
 //   Step 2: Week structure (mark deload weeks, add days per week)
 //   Step 3: Exercise slots per day (sets, rep range, rest, tempo, weight%, notes)
 
+import '../widgets/rf_form_fields.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -82,11 +83,7 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
       ),
       body: IndexedStack(
         index: _step,
-        children: [
-          _buildStep1(),
-          _buildStep2(),
-          _buildStep3(),
-        ],
+        children: [_buildStep1(), _buildStep2(), _buildStep3()],
       ),
       bottomNavigationBar: _buildNavBar(),
     );
@@ -106,10 +103,7 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
             const Spacer(),
             Text(
               'Step ${_step + 1} of 3',
-              style: const TextStyle(
-                color: AppTheme.textMuted,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
             ),
             const Spacer(),
             ElevatedButton(
@@ -144,10 +138,9 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
           onChanged: (v) {
             final error = _validatePhases(v);
             if (error != null) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(error),
-                backgroundColor: AppTheme.error,
-              ));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(error), backgroundColor: AppTheme.error),
+              );
             } else {
               setState(() {
                 _totalWeeks = v;
@@ -203,9 +196,9 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
+              RFTextField(
                 controller: nameCtrl,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Phase Name',
                   hintText: 'e.g. Foundation',
                 ),
@@ -256,10 +249,12 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
                   } else {
                     _phases.removeLast();
                   }
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(error),
-                    backgroundColor: AppTheme.error,
-                  ));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(error),
+                      backgroundColor: AppTheme.error,
+                    ),
+                  );
                   return; // Prevent closing
                 }
 
@@ -314,7 +309,9 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
           ),
         ),
         title: Text(
-          week.isDeload ? 'Week ${week.weekNumber} — Deload' : 'Week ${week.weekNumber}',
+          week.isDeload
+              ? 'Week ${week.weekNumber} — Deload'
+              : 'Week ${week.weekNumber}',
           style: TextStyle(
             fontWeight: FontWeight.w600,
             color: week.isDeload ? Colors.amber : AppTheme.textPrimary,
@@ -417,29 +414,24 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                RFTextField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Day Name',
                     hintText: 'e.g. Push, Pull, Legs',
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<int?>(
-                  decoration: const InputDecoration(
-                    labelText: 'Day of Week (optional)',
-                  ),
-                  initialValue: dow,
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('Unscheduled')),
-                    ...List.generate(7, (i) => i + 1).map((d) => DropdownMenuItem(
-                          value: d,
-                          child: Text(
-                            ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d - 1],
-                          ),
-                        )),
-                  ],
-                  onChanged: (v) => setDlg(() => dow = v),
+                RFDropdown<int>(
+                  label: 'Day of week (optional)',
+                  value: dow ?? 0,
+                  items: List.generate(8, (index) => index),
+                  labelBuilder: (day) => day == 0
+                      ? 'Unscheduled'
+                      : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day -
+                            1],
+                  onChanged: (value) =>
+                      setDlg(() => dow = value == 0 ? null : value),
                 ),
               ],
             ),
@@ -481,17 +473,24 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
 
     for (int wi = 0; wi < _weeks.length; wi++) {
       final week = _weeks[wi];
-      items.add(Padding(
-        padding: const EdgeInsets.fromLTRB(0, AppSpacing.md, 0, AppSpacing.sm),
-        child: Text(
-          'Week ${week.weekNumber}${week.isDeload ? ' — Deload' : ''}',
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
+      items.add(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            0,
+            AppSpacing.md,
+            0,
+            AppSpacing.sm,
+          ),
+          child: Text(
+            'Week ${week.weekNumber}${week.isDeload ? ' — Deload' : ''}',
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
           ),
         ),
-      ));
+      );
       for (int di = 0; di < week.days.length; di++) {
         items.add(_buildDayExerciseEditor(wi, di, week.days[di], allExercises));
       }
@@ -536,11 +535,8 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 OutlinedButton.icon(
-                  onPressed: () => _addExerciseSlot(
-                    weekIdx,
-                    dayIdx,
-                    allExercises,
-                  ),
+                  onPressed: () =>
+                      _addExerciseSlot(weekIdx, dayIdx, allExercises),
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('Add Exercise'),
                 ),
@@ -560,7 +556,9 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
     ProgramExerciseSlot slot,
     List<Exercise> allExercises,
   ) {
-    final exercise = allExercises.where((e) => e.id == slot.exerciseId).firstOrNull;
+    final exercise = allExercises
+        .where((e) => e.id == slot.exerciseId)
+        .firstOrNull;
     final name = exercise?.name ?? slot.exerciseId;
 
     return Card(
@@ -580,10 +578,15 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
           children: [
             IconButton(
               icon: const Icon(Icons.edit_outlined, size: 18),
-              onPressed: () => _editSlot(weekIdx, dayIdx, slotIdx, slot, allExercises),
+              onPressed: () =>
+                  _editSlot(weekIdx, dayIdx, slotIdx, slot, allExercises),
             ),
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 18),
+              icon: const Icon(
+                Icons.delete_outline,
+                color: AppTheme.error,
+                size: 18,
+              ),
               onPressed: () => setState(() {
                 final exercises = List<ProgramExerciseSlot>.from(
                   _weeks[weekIdx].days[dayIdx].exercises,
@@ -636,7 +639,8 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
         builder: (ctx, setDlg) {
           final filtered = allExercises
               .where(
-                (e) => e.name.toLowerCase().contains(exerciseSearch.toLowerCase()),
+                (e) =>
+                    e.name.toLowerCase().contains(exerciseSearch.toLowerCase()),
               )
               .take(20)
               .toList();
@@ -648,11 +652,10 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
-                    decoration: const InputDecoration(
+                  RFTextField(
+                    decoration: InputDecoration(
                       labelText: 'Search exercise',
-                      prefixIcon: Icon(Icons.search, size: 18),
-                      isDense: true,
+                      prefixIcon: Icon(Icons.search, size: 22),
                     ),
                     onChanged: (v) => setDlg(() => exerciseSearch = v),
                   ),
@@ -667,10 +670,14 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
                       itemCount: filtered.length,
                       itemBuilder: (_, i) => ListTile(
                         dense: true,
-                        title: Text(filtered[i].name, style: const TextStyle(fontSize: 13)),
+                        title: Text(
+                          filtered[i].name,
+                          style: const TextStyle(fontSize: 13),
+                        ),
                         selected: selectedExerciseId == filtered[i].id,
                         selectedColor: AppTheme.primaryColor,
-                        onTap: () => setDlg(() => selectedExerciseId = filtered[i].id),
+                        onTap: () =>
+                            setDlg(() => selectedExerciseId = filtered[i].id),
                       ),
                     ),
                   ),
@@ -705,29 +712,24 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
                     onChanged: (v) => setDlg(() => restSec = v),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  TextField(
+                  RFTextField(
                     controller: tempoCtrl,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Tempo (e.g. 3-1-1)',
-                      isDense: true,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  TextField(
+                  RFTextField(
                     controller: weightPctCtrl,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Weight % (e.g. 70)',
-                      isDense: true,
                     ),
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  TextField(
+                  RFTextField(
                     controller: notesCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Notes',
-                      isDense: true,
-                    ),
+                    decoration: InputDecoration(labelText: 'Notes'),
                     maxLines: 2,
                   ),
                 ],
@@ -804,9 +806,7 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
     if (_weeks.length < _totalWeeks) {
       final phaseId = _phases.isNotEmpty ? _phases.first.id : null;
       for (int i = _weeks.length + 1; i <= _totalWeeks; i++) {
-        _weeks.add(
-          ProgramWeek(weekNumber: i, phaseId: phaseId, days: []),
-        );
+        _weeks.add(ProgramWeek(weekNumber: i, phaseId: phaseId, days: []));
       }
     } else if (_weeks.length > _totalWeeks) {
       _weeks = _weeks.sublist(0, _totalWeeks);
@@ -829,9 +829,9 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
 
   Future<void> _save() async {
     if (_nameCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Program name is required')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Program name is required')));
       return;
     }
 
@@ -858,9 +858,7 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('Empty Days'),
-          content: const Text(
-            'Some days have no exercises. Save anyway?',
-          ),
+          content: const Text('Some days have no exercises. Save anyway?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -910,7 +908,8 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
     }
 
     // Detect overlapping
-    final sortedPhases = List<TrainingPhase>.from(_phases)..sort((a, b) => a.startWeek.compareTo(b.startWeek));
+    final sortedPhases = List<TrainingPhase>.from(_phases)
+      ..sort((a, b) => a.startWeek.compareTo(b.startWeek));
     for (int i = 0; i < sortedPhases.length - 1; i++) {
       if (sortedPhases[i].endWeek >= sortedPhases[i + 1].startWeek) {
         return 'Phases "${sortedPhases[i].name}" and "${sortedPhases[i + 1].name}" overlap.';
@@ -926,7 +925,7 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
     String? hint,
     int maxLines = 1,
   }) {
-    return TextField(
+    return RFTextField(
       controller: ctrl,
       maxLines: maxLines,
       decoration: InputDecoration(labelText: label, hintText: hint),

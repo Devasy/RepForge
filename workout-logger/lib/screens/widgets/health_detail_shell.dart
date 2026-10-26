@@ -160,45 +160,12 @@ class _GranularityToggle extends StatelessWidget {
   final ValueChanged<HealthGranularity> onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: AppColors.glass2,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: Row(
-        children: HealthGranularity.values.map((g) {
-          final active = g == value;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(g),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: active ? AppColors.primary.withValues(alpha: 0.16) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  border: active
-                      ? Border.all(color: AppColors.primary.withValues(alpha: 0.5))
-                      : Border.all(color: Colors.transparent),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  g.label,
-                  style: TextStyle(fontFamily: 'Geist', 
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: active ? AppColors.textPrimary : AppColors.textMuted,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => RFSelectionGroup<HealthGranularity>(
+    options: [
+      for (final granularity in HealthGranularity.values)
+        RFSelectionOption(value: granularity, label: granularity.label),
+    ],
+    selected: value,
+    onChanged: onChanged,
+  );
 }

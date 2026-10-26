@@ -1,3 +1,4 @@
+import 'package:repforge/screens/widgets/rf_form_fields.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -83,16 +84,14 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.byType(DropdownButton<UserGender>));
+      await tester.tap(find.byType(RFDropdown<UserGender>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Female').last);
       await tester.pumpAndSettle();
       expect(settings.userGender, UserGender.preferNotToSay);
       expect(
         tester
-            .widget<DropdownButton<UserGender>>(
-              find.byType(DropdownButton<UserGender>),
-            )
+            .widget<RFDropdown<UserGender>>(find.byType(RFDropdown<UserGender>))
             .value,
         UserGender.preferNotToSay,
       );
@@ -124,22 +123,18 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester
-            .widget<DropdownButton<UserGender>>(
-              find.byType(DropdownButton<UserGender>),
-            )
+            .widget<RFDropdown<UserGender>>(find.byType(RFDropdown<UserGender>))
             .value,
         UserGender.female,
       );
-      await tester.tap(find.byType(DropdownButton<UserGender>));
+      await tester.tap(find.byType(RFDropdown<UserGender>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Male').last);
       await tester.pumpAndSettle();
       expect(settings.userGender, UserGender.male);
       expect(
         tester
-            .widget<DropdownButton<UserGender>>(
-              find.byType(DropdownButton<UserGender>),
-            )
+            .widget<RFDropdown<UserGender>>(find.byType(RFDropdown<UserGender>))
             .value,
         UserGender.male,
       );
@@ -305,7 +300,7 @@ void main() {
         ),
       ),
     );
-    await tester.enterText(find.byType(TextField), 'Lifter');
+    await tester.enterText(find.byType(RFTextField), 'Lifter');
     expect(
       tester.widget<GenderPicker>(find.byType(GenderPicker)).value,
       UserGender.preferNotToSay,

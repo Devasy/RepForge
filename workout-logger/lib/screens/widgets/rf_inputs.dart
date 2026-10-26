@@ -6,98 +6,8 @@ import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 
-// ── RFTextField ───────────────────────────────────────────────────────────────
-// Styled text input using AppColors tokens.
-class RFTextField extends StatelessWidget {
-  const RFTextField({
-    super.key,
-    this.controller,
-    this.hint,
-    this.label,
-    this.prefixIcon,
-    this.suffixIcon,
-    this.maxLines = 1,
-    this.minLines,
-    this.keyboardType,
-    this.inputFormatters,
-    this.onChanged,
-    this.onSubmitted,
-    this.autofocus = false,
-    this.enabled = true,
-    this.errorText,
-    this.textCapitalization = TextCapitalization.none,
-  });
-
-  final TextEditingController? controller;
-  final String? hint;
-  final String? label;
-  final IconData? prefixIcon;
-  final Widget? suffixIcon;
-  final int? maxLines;
-  final int? minLines;
-  final TextInputType? keyboardType;
-  final List<TextInputFormatter>? inputFormatters;
-  final ValueChanged<String>? onChanged;
-  final ValueChanged<String>? onSubmitted;
-  final bool autofocus;
-  final bool enabled;
-  final String? errorText;
-  final TextCapitalization textCapitalization;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      minLines: minLines,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      onChanged: onChanged,
-      onSubmitted: onSubmitted,
-      autofocus: autofocus,
-      enabled: enabled,
-      textCapitalization: textCapitalization,
-      style: const TextStyle(
-        color: AppColors.textPrimary,
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-      ),
-      decoration: InputDecoration(
-        hintText: hint,
-        labelText: label,
-        labelStyle: const TextStyle(color: AppColors.textSoft),
-        errorText: errorText,
-        errorStyle: const TextStyle(color: AppColors.error, fontSize: 11),
-        prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: AppColors.textMuted, size: 20)
-            : null,
-        suffixIcon: suffixIcon,
-        filled: true,
-        fillColor: AppColors.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.glassBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.error),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.md,
-        ),
-      ),
-    );
-  }
-}
+export 'rf_form_fields.dart';
+export 'rf_selection_group.dart';
 
 // ── RFNumberField ─────────────────────────────────────────────────────────────
 // Large monospace tap-to-edit number for weights and reps.
@@ -160,8 +70,9 @@ class _RFNumberFieldState extends State<RFNumberField> {
     super.dispose();
   }
 
-  String _format(double v) =>
-      widget.decimals > 0 ? v.toStringAsFixed(widget.decimals) : v.toInt().toString();
+  String _format(double v) => widget.decimals > 0
+      ? v.toStringAsFixed(widget.decimals)
+      : v.toInt().toString();
 
   void _startIncrement(double dir) {
     _step(dir);
@@ -176,7 +87,10 @@ class _RFNumberFieldState extends State<RFNumberField> {
   }
 
   void _step(double dir) {
-    final next = (widget.value + dir * widget.step).clamp(widget.min, widget.max);
+    final next = (widget.value + dir * widget.step).clamp(
+      widget.min,
+      widget.max,
+    );
     HapticFeedback.selectionClick();
     widget.onChanged(next);
   }
@@ -245,7 +159,8 @@ class _RFNumberFieldState extends State<RFNumberField> {
                   ),
                 ),
                 child: _editing
-                    ? TextField(
+                    ? RFTextField(
+                        inline: true,
                         controller: _ctrl,
                         focusNode: _focusNode,
                         autofocus: true,
@@ -258,11 +173,6 @@ class _RFNumberFieldState extends State<RFNumberField> {
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
                           fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                          isDense: true,
                         ),
                         onSubmitted: (_) => _commitEdit(),
                         onEditingComplete: _commitEdit,
@@ -335,103 +245,14 @@ class RFToggle extends StatelessWidget {
   final Color? color;
 
   @override
-  Widget build(BuildContext context) {
-    final c = color ?? AppColors.primary;
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: List.generate(options.length, (i) {
-          final selected = i == selectedIndex;
-          return GestureDetector(
-            onTap: () => onChanged(i),
-            child: AnimatedContainer(
-              duration: AppDurations.fast,
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              decoration: BoxDecoration(
-                color: selected ? c : Colors.transparent,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: c.withValues(alpha: 0.35),
-                          blurRadius: 8,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Text(
-                options[i],
-                style: TextStyle(
-                  color: selected ? Colors.white : AppColors.textSoft,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-// ── RFDropdown ────────────────────────────────────────────────────────────────
-class RFDropdown<T> extends StatelessWidget {
-  const RFDropdown({
-    super.key,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-    this.hint,
-    this.labelBuilder,
-  });
-
-  final T? value;
-  final List<T> items;
-  final ValueChanged<T?> onChanged;
-  final String? hint;
-  final String Function(T)? labelBuilder;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: DropdownButton<T>(
-        value: value,
-        onChanged: onChanged,
-        isExpanded: true,
-        underline: const SizedBox.shrink(),
-        dropdownColor: AppColors.cardHigh,
-        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-        hint: hint != null
-            ? Text(hint!, style: const TextStyle(color: AppColors.textMuted))
-            : null,
-        icon: const Icon(Icons.keyboard_arrow_down_rounded,
-            color: AppColors.textSoft),
-        items: items.map((item) {
-          final label =
-              labelBuilder != null ? labelBuilder!(item) : item.toString();
-          return DropdownMenuItem<T>(value: item, child: Text(label));
-        }).toList(),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => RFSelectionGroup<int>(
+    options: [
+      for (var i = 0; i < options.length; i++)
+        RFSelectionOption(value: i, label: options[i]),
+    ],
+    selected: selectedIndex,
+    onChanged: onChanged,
+  );
 }
 
 // ── NumberPickerSheet ─────────────────────────────────────────────────────────
@@ -552,7 +373,9 @@ class _NumberPickerSheetState extends State<NumberPickerSheet> {
                     _holdTimer?.cancel();
                     _holdTimer = Timer.periodic(
                       const Duration(milliseconds: 100),
-                      (_) { if (mounted) _step(-1); },
+                      (_) {
+                        if (mounted) _step(-1);
+                      },
                     );
                   },
                   onLongPressEnd: () {
@@ -578,7 +401,9 @@ class _NumberPickerSheetState extends State<NumberPickerSheet> {
                     _holdTimer?.cancel();
                     _holdTimer = Timer.periodic(
                       const Duration(milliseconds: 100),
-                      (_) { if (mounted) _step(1); },
+                      (_) {
+                        if (mounted) _step(1);
+                      },
                     );
                   },
                   onLongPressEnd: () {

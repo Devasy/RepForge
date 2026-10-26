@@ -87,13 +87,15 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
       ),
     );
     if (picked != null) {
-      setState(() => _selectedDate = DateTime(
-            picked.year,
-            picked.month,
-            picked.day,
-            _selectedTime.hour,
-            _selectedTime.minute,
-          ));
+      setState(
+        () => _selectedDate = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _selectedTime.hour,
+          _selectedTime.minute,
+        ),
+      );
       _markChanged();
     }
   }
@@ -132,11 +134,13 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
       final last = _exercises[exerciseIndex].sets.isNotEmpty
           ? _exercises[exerciseIndex].sets.last
           : null;
-      _exercises[exerciseIndex].sets.add(EditableSet(
-        weight: last?.weight ?? 0,
-        reps: last?.reps ?? 0,
-        timestamp: DateTime.now(),
-      ));
+      _exercises[exerciseIndex].sets.add(
+        EditableSet(
+          weight: last?.weight ?? 0,
+          reps: last?.reps ?? 0,
+          timestamp: DateTime.now(),
+        ),
+      );
     });
     _markChanged();
   }
@@ -159,7 +163,10 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
     }
     final withSets = _exercises.where((e) => e.sets.isNotEmpty).toList();
     if (withSets.isEmpty) {
-      _snack('Workout must have at least one exercise with sets', isError: true);
+      _snack(
+        'Workout must have at least one exercise with sets',
+        isError: true,
+      );
       return;
     }
 
@@ -276,16 +283,20 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _sectionLabel(icon: Icons.calendar_today_rounded,
-                      color: AppColors.primary, label: 'Date & Time'),
+                  _sectionLabel(
+                    icon: Icons.calendar_today_rounded,
+                    color: AppColors.primary,
+                    label: 'Date & Time',
+                  ),
                   const SizedBox(height: AppSpacing.md),
                   Row(
                     children: [
                       Expanded(
                         child: _TapField(
                           label: 'Date',
-                          value: DateFormat('EEE, MMM d, yyyy')
-                              .format(_selectedDate),
+                          value: DateFormat(
+                            'EEE, MMM d, yyyy',
+                          ).format(_selectedDate),
                           onTap: _selectDate,
                         ),
                       ),
@@ -308,8 +319,11 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _sectionLabel(icon: Icons.timer_outlined,
-                      color: AppColors.secondary, label: 'Duration (minutes)'),
+                  _sectionLabel(
+                    icon: Icons.timer_outlined,
+                    color: AppColors.secondary,
+                    label: 'Duration (minutes)',
+                  ),
                   const SizedBox(height: AppSpacing.sm),
                   _StyledField(
                     controller: _durationCtrl,
@@ -319,8 +333,11 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
                     onChanged: (_) => _markChanged(),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  _sectionLabel(icon: Icons.notes_rounded,
-                      color: AppColors.warning, label: 'Notes'),
+                  _sectionLabel(
+                    icon: Icons.notes_rounded,
+                    color: AppColors.warning,
+                    label: 'Notes',
+                  ),
                   const SizedBox(height: AppSpacing.sm),
                   _StyledField(
                     controller: _notesCtrl,
@@ -358,15 +375,22 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
                 key: ValueKey('exercise_$i'),
                 exerciseName: ex?.name ?? 'Unknown Exercise',
                 editableLog: log,
-                onSetChanged: ({required int setIndex, required double weight, required int reps, required bool isDropset, List<DropsetEntry>? drops}) {
-                  setState(() {
-                    log.sets[setIndex].weight = weight;
-                    log.sets[setIndex].reps = reps;
-                    log.sets[setIndex].isDropset = isDropset;
-                    if (drops != null) log.sets[setIndex].drops = drops;
-                  });
-                  _markChanged();
-                },
+                onSetChanged:
+                    ({
+                      required int setIndex,
+                      required double weight,
+                      required int reps,
+                      required bool isDropset,
+                      List<DropsetEntry>? drops,
+                    }) {
+                      setState(() {
+                        log.sets[setIndex].weight = weight;
+                        log.sets[setIndex].reps = reps;
+                        log.sets[setIndex].isDropset = isDropset;
+                        if (drops != null) log.sets[setIndex].drops = drops;
+                      });
+                      _markChanged();
+                    },
                 onAddSet: () => _addSet(i),
                 onDeleteSet: (si) => _deleteSet(i, si),
                 onDeleteExercise: () => _deleteExercise(i),
@@ -387,7 +411,11 @@ class _EditWorkoutSessionScreenState extends State<EditWorkoutSessionScreen> {
     );
   }
 
-  Widget _sectionLabel({required IconData icon, required Color color, required String label}) {
+  Widget _sectionLabel({
+    required IconData icon,
+    required Color color,
+    required String label,
+  }) {
     return Row(
       children: [
         Icon(icon, size: 16, color: color),
@@ -493,29 +521,13 @@ class _StyledField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        inputFormatters: inputFormatters,
-        maxLines: maxLines,
-        onChanged: onChanged,
-        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm + 2,
-          ),
-        ),
-      ),
+    return RFTextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      maxLines: maxLines,
+      onChanged: onChanged,
+      decoration: InputDecoration(hintText: hint),
     );
   }
 }

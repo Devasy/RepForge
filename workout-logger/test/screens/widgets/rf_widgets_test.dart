@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/screens/widgets/rf_widgets.dart';
-import 'package:repforge/theme/app_theme.dart';
 
 void main() {
   testWidgets('slideRoute creates valid PageRouteBuilder', (tester) async {
@@ -33,11 +32,7 @@ void main() {
   testWidgets('AmbientGlow renders glow effect', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(
-          body: Stack(
-            children: [AmbientGlow()],
-          ),
-        ),
+        home: Scaffold(body: Stack(children: [AmbientGlow()])),
       ),
     );
 
@@ -57,10 +52,7 @@ void main() {
                 small: true,
                 onPressed: () => tapped = true,
               ),
-              const GlowButton(
-                label: 'Disabled Button',
-                onPressed: null,
-              ),
+              const GlowButton(label: 'Disabled Button', onPressed: null),
             ],
           ),
         ),
@@ -96,7 +88,9 @@ void main() {
     expect(tapped, isTrue);
   });
 
-  testWidgets('RFChip, RFSectionHeader, RFStatBox render correctly', (tester) async {
+  testWidgets('RFChip, RFSectionHeader, RFStatBox render correctly', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -118,78 +112,80 @@ void main() {
     expect(find.text('50'), findsOneWidget);
   });
 
-  testWidgets('AnimatedCounter, MetricHero, RFDivider, RFEmptyState render correctly', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Column(
-            children: [
-              const AnimatedCounter(value: 42.5, decimals: 1, suffix: 'kg'),
-              const MetricHero(value: '100', unit: 'kg'),
-              const RFDivider(indent: 16),
-              RFEmptyState(
-                icon: Icons.fitness_center,
-                title: 'No Workouts',
-                subtitle: 'Add a workout to get started',
-                action: ElevatedButton(onPressed: () {}, child: const Text('Add')),
-              ),
-            ],
+  testWidgets(
+    'AnimatedCounter, MetricHero, RFDivider, RFEmptyState render correctly',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                const AnimatedCounter(value: 42.5, decimals: 1, suffix: 'kg'),
+                const MetricHero(value: '100', unit: 'kg'),
+                const RFDivider(indent: 16),
+                RFEmptyState(
+                  icon: Icons.fitness_center,
+                  title: 'No Workouts',
+                  subtitle: 'Add a workout to get started',
+                  action: ElevatedButton(
+                    onPressed: () {},
+                    child: const Text('Add'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpAndSettle();
-    expect(find.text('100'), findsOneWidget);
-    expect(find.text('No Workouts'), findsOneWidget);
-  });
+      await tester.pumpAndSettle();
+      expect(find.text('100'), findsOneWidget);
+      expect(find.text('No Workouts'), findsOneWidget);
+    },
+  );
 
-  testWidgets('RFLoadingDots, RFProgressBar, RestTimerRing, SkeletonBox, RFTextField render correctly', (tester) async {
-    final controller = TextEditingController();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Column(
-            children: [
-              const RFLoadingDots(color: Colors.blue),
-              const RFProgressBar(value: 0.75, height: 8),
-              const RestTimerRing(remaining: 90, total: 120),
-              const SkeletonBox(width: 100, height: 20),
-              RFTextField(
-                controller: controller,
-                hint: 'Enter text',
-                label: 'Field Label',
-                prefixIcon: Icons.search,
-              ),
-            ],
+  testWidgets(
+    'RFLoadingDots, RFProgressBar, RestTimerRing, SkeletonBox, RFTextField render correctly',
+    (tester) async {
+      final controller = TextEditingController();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                const RFLoadingDots(color: Colors.blue),
+                const RFProgressBar(value: 0.75, height: 8),
+                const RestTimerRing(remaining: 90, total: 120),
+                const SkeletonBox(width: 100, height: 20),
+                RFTextField(
+                  controller: controller,
+                  hint: 'Enter text',
+                  label: 'Field Label',
+                  prefixIcon: Icons.search,
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    expect(find.byType(RFLoadingDots), findsOneWidget);
-    expect(find.byType(RFProgressBar), findsOneWidget);
-    expect(find.byType(RestTimerRing), findsOneWidget);
-    expect(find.text('Field Label'), findsOneWidget);
+      expect(find.byType(RFLoadingDots), findsOneWidget);
+      expect(find.byType(RFProgressBar), findsOneWidget);
+      expect(find.byType(RestTimerRing), findsOneWidget);
+      expect(find.text('Field Label'), findsOneWidget);
 
-    final containerBefore = tester.widget<Container>(
-      find.descendant(of: find.byType(RFTextField), matching: find.byType(Container)).first,
-    );
-    final boxDecBefore = containerBefore.decoration as BoxDecoration;
-    final borderBefore = boxDecBefore.border as Border;
-    expect(borderBefore.top.color, AppColors.glassBorder);
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      expect(
+        tester
+            .widget<EditableText>(find.byType(EditableText))
+            .focusNode
+            .hasFocus,
+        isTrue,
+      );
 
-    await tester.tap(find.byType(TextField));
-    await tester.pump();
-
-    final containerAfter = tester.widget<Container>(
-      find.descendant(of: find.byType(RFTextField), matching: find.byType(Container)).first,
-    );
-    final boxDecAfter = containerAfter.decoration as BoxDecoration;
-    final borderAfter = boxDecAfter.border as Border;
-    expect(borderAfter.top.color, AppColors.primary);
-
-    await tester.enterText(find.byType(TextField), 'Test input');
-    expect(controller.text, 'Test input');
-  });
+      await tester.enterText(find.byType(TextField), 'Test input');
+      expect(controller.text, 'Test input');
+    },
+  );
 }

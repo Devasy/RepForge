@@ -17,6 +17,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 - Clarify screen and section heading hierarchy, improve settings-label contrast, and allow long headings and subtitles to wrap.
 - Keep basic coach setup focused: place Save API Key directly below the key field, explain which options save automatically, and group reasoning, tool limits and token usage under expandable advanced settings.
+- Use shared Material 3 Expressive inspired selection groups, Material 3 dropdown menus and consistent text fields across setup, settings, search, workout entry and program forms, with clear focus, validation and selected states.
 
 ## [2.2.1]
 

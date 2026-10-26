@@ -126,10 +126,7 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                     onTap: () => setState(() => _selectedIds.clear()),
                     child: const Text(
                       'Clear All',
-                      style: TextStyle(
-                        color: AppColors.error,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: AppColors.error, fontSize: 12),
                     ),
                   ),
               ],
@@ -146,14 +143,14 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
               ),
               itemCount: _selectedIds.length + 1,
               onReorderItem: (old, next) {
-                if (old >= _selectedIds.length ||
-                    next > _selectedIds.length) {
+                if (old >= _selectedIds.length || next > _selectedIds.length) {
                   return;
                 }
                 setState(() {
                   final item = _selectedIds.removeAt(old);
-                  final targetIndex =
-                      next > _selectedIds.length ? _selectedIds.length : next;
+                  final targetIndex = next > _selectedIds.length
+                      ? _selectedIds.length
+                      : next;
                   _selectedIds.insert(targetIndex, item);
                 });
               },
@@ -219,8 +216,7 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () =>
-                            setState(() => _selectedIds.removeAt(i)),
+                        onTap: () => setState(() => _selectedIds.removeAt(i)),
                         child: const Icon(
                           Icons.remove_circle_outline_rounded,
                           color: AppColors.error,
@@ -313,34 +309,11 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
                         ],
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      Container(
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.card,
-                          borderRadius: BorderRadius.circular(AppRadius.full),
-                          border: Border.all(color: AppColors.glassBorder),
-                        ),
-                        child: TextField(
-                          onChanged: (v) => setModal(() => query = v),
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 14,
-                          ),
-                          decoration: const InputDecoration(
-                            hintText: 'Search exercises…',
-                            hintStyle: TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 14,
-                            ),
-                            prefixIcon: Icon(
-                              Icons.search_rounded,
-                              color: AppColors.textMuted,
-                              size: 18,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding:
-                                EdgeInsets.symmetric(vertical: 10),
-                          ),
+                      RFTextField(
+                        onChanged: (v) => setModal(() => query = v),
+                        decoration: InputDecoration(
+                          hintText: 'Search exercises…',
+                          prefixIcon: Icon(Icons.search_rounded, size: 22),
                         ),
                       ),
                     ],
@@ -421,10 +394,7 @@ class _CreateRoutineScreenState extends State<CreateRoutineScreen> {
         );
         await provider.updateRoutine(updated);
       } else {
-        await provider.createRoutine(
-          _nameController.text.trim(),
-          _selectedIds,
-        );
+        await provider.createRoutine(_nameController.text.trim(), _selectedIds);
       }
       if (mounted) Navigator.of(context).pop();
     } catch (e) {

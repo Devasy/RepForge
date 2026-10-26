@@ -410,45 +410,13 @@ class _AiCoachViewState extends State<_AiCoachView> {
                 ),
               ),
               Expanded(
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  alignment: Alignment.centerLeft,
-                  decoration: BoxDecoration(
-                    color: AppColors.glass2,
-                    borderRadius: BorderRadius.circular(AppRadius.xl),
-                    border: Border.all(color: AppColors.glassBorderStrong),
-                  ),
-                  child: TextField(
-                    controller: _controller,
-                    style: const TextStyle(
-                      fontFamily: 'Geist',
-                      color: AppColors.textPrimary,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                    maxLines: 5,
-                    minLines: 1,
-                    textCapitalization: TextCapitalization.sentences,
-                    cursorColor: AppColors.primary,
-                    decoration: const InputDecoration(
-                      hintText: 'Ask your coach…',
-                      hintStyle: TextStyle(
-                        fontFamily: 'Geist',
-                        color: AppColors.textFaint,
-                        fontSize: 14,
-                      ),
-                      filled: false,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm + 4,
-                      ),
-                    ),
-                    onSubmitted: (_) => _send(),
-                  ),
+                child: RFTextField(
+                  controller: _controller,
+                  maxLines: 5,
+                  minLines: 1,
+                  textCapitalization: TextCapitalization.sentences,
+                  hint: 'Ask your coach…',
+                  onSubmitted: (_) => _send(),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),

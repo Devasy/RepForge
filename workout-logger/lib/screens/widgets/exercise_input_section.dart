@@ -1,11 +1,13 @@
 // exercise_input_section.dart — Set entry UI for WorkoutFlowScreen
 
+import 'rf_form_fields.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/models.dart';
 import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
 import 'rf_shell.dart';
+import 'rf_selection_group.dart';
 import 'time_exercise_card.dart';
 
 // ── ExerciseInputSection ──────────────────────────────────────────────────────
@@ -124,24 +126,20 @@ class ExerciseInputSection extends StatelessWidget {
 
         if (bodyweight) ...[
           if (isAssistedBodyweightExercise(exerciseId))
-            SizedBox(
-              height: 48 + (MediaQuery.textScalerOf(context).scale(24) - 24).clamp(0.0, double.infinity),
-              child: SegmentedButton<WorkoutLoadMode>(
-              segments: const [
-                ButtonSegment(
+            RFSelectionGroup<WorkoutLoadMode>(
+              width: contentWidth,
+              options: const [
+                RFSelectionOption(
                   value: WorkoutLoadMode.assisted,
-                  label: Text('Assisted'),
+                  label: 'Assisted',
                 ),
-                ButtonSegment(
+                RFSelectionOption(
                   value: WorkoutLoadMode.weighted,
-                  label: Text('Weighted'),
+                  label: 'Weighted',
                 ),
               ],
-              selected: {mode},
-              onSelectionChanged: onLoadModeChanged == null
-                  ? null
-                  : (selection) => onLoadModeChanged!(selection.single),
-              ),
+              selected: mode,
+              onChanged: onLoadModeChanged,
             ),
           const SizedBox(height: 8),
           Text(
@@ -167,6 +165,7 @@ class ExerciseInputSection extends StatelessWidget {
 
         if (isTimeBased) ...[
           TimeExerciseCard(
+            contentWidth: contentWidth,
             durationSeconds: durationSeconds,
             onDurationChanged: onDurationChanged ?? (_) {},
             currentWeight: currentWeight,
@@ -660,7 +659,7 @@ class _NumberInputCardState extends State<_NumberInputCard> {
                 // Re-fitted per keystroke: a 3-digit weight or a large system font would otherwise be clipped.
                 child: ValueListenableBuilder<TextEditingValue>(
                   valueListenable: _controller,
-                  builder: (context, value, _) => TextField(
+                  builder: (context, value, _) => RFTextField(
                     controller: _controller,
                     focusNode: _focusNode,
                     style: _NumberInputCard.valueStyle(
@@ -681,11 +680,7 @@ class _NumberInputCardState extends State<_NumberInputCard> {
                             ),
                           ]
                         : [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                      isDense: true,
-                    ),
+                    decoration: InputDecoration(),
                     onChanged: (text) {
                       final parsed = double.tryParse(text);
                       if (parsed != null) {
@@ -699,6 +694,8 @@ class _NumberInputCardState extends State<_NumberInputCard> {
                       }
                       _focusNode.unfocus();
                     },
+                    compact: true,
+                    inline: true,
                   ),
                 ),
               ),
@@ -903,16 +900,9 @@ class _DropRow extends StatelessWidget {
           ),
           Expanded(
             flex: 4,
-            child: TextField(
+            child: RFTextField(
               controller: weightController,
-              decoration: InputDecoration(
-                hintText: unitLabel,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                isDense: true,
-              ),
+              decoration: InputDecoration(hintText: unitLabel),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
@@ -924,6 +914,7 @@ class _DropRow extends StatelessWidget {
                 color: AppColors.textPrimary,
                 fontSize: 14,
               ),
+              compact: true,
             ),
           ),
           const Padding(
@@ -932,16 +923,9 @@ class _DropRow extends StatelessWidget {
           ),
           Expanded(
             flex: 3,
-            child: TextField(
+            child: RFTextField(
               controller: repsController,
-              decoration: const InputDecoration(
-                hintText: 'reps',
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                isDense: true,
-              ),
+              decoration: InputDecoration(hintText: 'reps'),
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: onRepsChanged,
@@ -949,6 +933,7 @@ class _DropRow extends StatelessWidget {
                 color: AppColors.textPrimary,
                 fontSize: 14,
               ),
+              compact: true,
             ),
           ),
           if (onDelete != null)

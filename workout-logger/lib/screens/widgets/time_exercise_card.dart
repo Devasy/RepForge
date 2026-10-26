@@ -22,6 +22,7 @@ class TimeExerciseCard extends StatefulWidget {
     this.initialWeight = 0.0,
     this.onTimerFinished,
     this.stopwatch,
+    this.contentWidth,
   });
 
   final int durationSeconds;
@@ -32,6 +33,7 @@ class TimeExerciseCard extends StatefulWidget {
   final double initialWeight;
   final VoidCallback? onTimerFinished;
   final Stopwatch? stopwatch;
+  final double? contentWidth;
 
   @override
   State<TimeExerciseCard> createState() => _TimeExerciseCardState();
@@ -60,17 +62,21 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
     super.initState();
     _stopwatchElapsed = 0;
     _stopwatchAccumulated = 0;
-    _stopwatchBaseElapsed = widget.durationSeconds > 0 ? widget.durationSeconds : 0;
+    _stopwatchBaseElapsed = widget.durationSeconds > 0
+        ? widget.durationSeconds
+        : 0;
     _timerInitialSeconds = widget.durationSeconds >= 5
         ? widget.durationSeconds
         : (widget.durationSeconds > 0 ? 5 : 60);
     _timerRemainingSeconds = _timerInitialSeconds;
-    final initialDisplay = widget.currentWeight > 0 ? widget.settings.toDisplay(widget.currentWeight) : 0.0;
+    final initialDisplay = widget.currentWeight > 0
+        ? widget.settings.toDisplay(widget.currentWeight)
+        : 0.0;
     _weightController = TextEditingController(
       text: initialDisplay > 0
           ? (initialDisplay == initialDisplay.truncateToDouble()
-              ? initialDisplay.toStringAsFixed(0)
-              : initialDisplay.toStringAsFixed(1))
+                ? initialDisplay.toStringAsFixed(0)
+                : initialDisplay.toStringAsFixed(1))
           : '',
     );
   }
@@ -80,18 +86,22 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
     super.didUpdateWidget(oldWidget);
     if (!_isRunning) {
       if (widget.durationSeconds != oldWidget.durationSeconds) {
-        _stopwatchBaseElapsed = widget.durationSeconds > 0 ? widget.durationSeconds : 0;
+        _stopwatchBaseElapsed = widget.durationSeconds > 0
+            ? widget.durationSeconds
+            : 0;
         _timerInitialSeconds = widget.durationSeconds >= 5
             ? widget.durationSeconds
             : (widget.durationSeconds > 0 ? 5 : 60);
         _timerRemainingSeconds = _timerInitialSeconds;
       }
       if (widget.currentWeight != oldWidget.currentWeight) {
-        final newDisplay = widget.currentWeight > 0 ? widget.settings.toDisplay(widget.currentWeight) : 0.0;
+        final newDisplay = widget.currentWeight > 0
+            ? widget.settings.toDisplay(widget.currentWeight)
+            : 0.0;
         _weightController.text = newDisplay > 0
             ? (newDisplay == newDisplay.truncateToDouble()
-                ? newDisplay.toStringAsFixed(0)
-                : newDisplay.toStringAsFixed(1))
+                  ? newDisplay.toStringAsFixed(0)
+                  : newDisplay.toStringAsFixed(1))
             : '';
       }
     }
@@ -124,7 +134,8 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
           timer.cancel();
           return;
         }
-        final currentElapsed = _stopwatchAccumulated + _stopwatch.elapsed.inSeconds;
+        final currentElapsed =
+            _stopwatchAccumulated + _stopwatch.elapsed.inSeconds;
         if (currentElapsed != _stopwatchElapsed) {
           setState(() {
             _stopwatchElapsed = currentElapsed;
@@ -152,7 +163,10 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
       _stopwatch.stop();
       _ticker?.cancel();
       final elapsed = _stopwatch.elapsed.inSeconds;
-      _timerRemainingSeconds = (_timerStartRemaining - elapsed).clamp(0, _timerInitialSeconds);
+      _timerRemainingSeconds = (_timerStartRemaining - elapsed).clamp(
+        0,
+        _timerInitialSeconds,
+      );
       _stopwatch.reset();
       setState(() => _isRunning = false);
       widget.onDurationChanged(_timerInitialSeconds - _timerRemainingSeconds);
@@ -180,7 +194,9 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
             setState(() {
               _timerRemainingSeconds = remaining;
             });
-            widget.onDurationChanged(_timerInitialSeconds - _timerRemainingSeconds);
+            widget.onDurationChanged(
+              _timerInitialSeconds - _timerRemainingSeconds,
+            );
           }
         } else {
           _stopwatch.stop();
@@ -247,7 +263,8 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
 
   Future<void> _editDurationManually() async {
     final controller = TextEditingController(
-      text: '${_mode == TimeTrackMode.stopwatch ? _stopwatchElapsed : _timerRemainingSeconds}',
+      text:
+          '${_mode == TimeTrackMode.stopwatch ? _stopwatchElapsed : _timerRemainingSeconds}',
     );
 
     final entered = await showDialog<int>(
@@ -261,31 +278,26 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
           'Set Duration (seconds)',
           style: TextStyle(color: AppColors.textPrimary, fontSize: 18),
         ),
-        content: TextField(
+        content: RFTextField(
           controller: controller,
           autofocus: true,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.bold),
-          decoration: InputDecoration(
-            hintText: 'e.g. 60',
-            hintStyle: const TextStyle(color: AppColors.textMuted),
-            suffixText: 'sec',
-            suffixStyle: const TextStyle(color: AppColors.primary),
-            enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: AppColors.glassBorder),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: AppColors.primary),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
           ),
+          decoration: InputDecoration(hintText: 'e.g. 60', suffixText: 'sec'),
+          compact: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSoft)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSoft),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -323,14 +335,16 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
 
   @override
   Widget build(BuildContext context) {
-    final currentSecs = _mode == TimeTrackMode.stopwatch ? _stopwatchElapsed : _timerRemainingSeconds;
+    final currentSecs = _mode == TimeTrackMode.stopwatch
+        ? _stopwatchElapsed
+        : _timerRemainingSeconds;
     final progress = _mode == TimeTrackMode.timer
         ? (_timerInitialSeconds > 0
-            ? (_timerRemainingSeconds / _timerInitialSeconds).clamp(0.0, 1.0)
-            : 1.0)
+              ? (_timerRemainingSeconds / _timerInitialSeconds).clamp(0.0, 1.0)
+              : 1.0)
         : (_stopwatchBaseElapsed > 0
-            ? (_stopwatchElapsed / _stopwatchBaseElapsed).clamp(0.0, 1.0)
-            : 1.0);
+              ? (_stopwatchElapsed / _stopwatchBaseElapsed).clamp(0.0, 1.0)
+              : 1.0);
 
     return GlassCard(
       accentBorder: _isRunning,
@@ -343,51 +357,31 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.glass1,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-                padding: const EdgeInsets.all(2),
-                child: Row(
-                  children: [
-                    _ModeChip(
-                      label: 'Stopwatch',
-                      icon: Icons.timer_outlined,
-                      active: _mode == TimeTrackMode.stopwatch,
-                      onTap: () {
-                        if (_mode != TimeTrackMode.stopwatch) {
-                          _ticker?.cancel();
-                          _stopwatch.stop();
-                          _stopwatch.reset();
-                          setState(() {
-                            _mode = TimeTrackMode.stopwatch;
-                            _isRunning = false;
-                          });
-                        }
-                      },
-                    ),
-                    _ModeChip(
-                      label: 'Countdown',
-                      icon: Icons.hourglass_bottom_rounded,
-                      active: _mode == TimeTrackMode.timer,
-                      onTap: () {
-                        if (_mode != TimeTrackMode.timer) {
-                          _ticker?.cancel();
-                          _stopwatch.stop();
-                          _stopwatch.reset();
-                          setState(() {
-                            _mode = TimeTrackMode.timer;
-                            _isRunning = false;
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
+              Expanded(child: RFSelectionGroup<TimeTrackMode>(
+                width: widget.contentWidth == null ? null : widget.contentWidth! - AppSpacing.md * 2 - 48,
+                options: const [
+                  RFSelectionOption(value: TimeTrackMode.stopwatch, label: 'Stopwatch'),
+                  RFSelectionOption(value: TimeTrackMode.timer, label: 'Countdown'),
+                ],
+                selected: _mode,
+                onChanged: (mode) {
+                  if (_mode != mode) {
+                    _ticker?.cancel();
+                    _stopwatch.stop();
+                    _stopwatch.reset();
+                    setState(() {
+                      _mode = mode;
+                      _isRunning = false;
+                    });
+                  }
+                },
+              )),
               IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.textMuted),
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  size: 20,
+                  color: AppColors.textMuted,
+                ),
                 tooltip: 'Set duration manually',
                 onPressed: _isRunning ? null : _editDurationManually,
               ),
@@ -401,17 +395,26 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.xs,
             children: [30, 45, 60, 90, 120].map((s) {
-              final isSelected = (_mode == TimeTrackMode.timer && _timerInitialSeconds == s) ||
-                  (_mode == TimeTrackMode.stopwatch && _stopwatchBaseElapsed == s);
+              final isSelected =
+                  (_mode == TimeTrackMode.timer && _timerInitialSeconds == s) ||
+                  (_mode == TimeTrackMode.stopwatch &&
+                      _stopwatchBaseElapsed == s);
               return GestureDetector(
                 onTap: () => _selectPreset(s),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary.withValues(alpha: 0.2) : AppColors.glass1,
+                    color: isSelected
+                        ? AppColors.primary.withValues(alpha: 0.2)
+                        : AppColors.glass1,
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                     border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.glassBorder,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.glassBorder,
                       width: 1,
                     ),
                   ),
@@ -419,8 +422,12 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
                     '${s}s',
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected ? AppColors.primary : AppColors.textSoft,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textSoft,
                     ),
                   ),
                 ),
@@ -469,7 +476,9 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 1.2,
-                          color: _isRunning ? AppColors.secondary : AppColors.textMuted,
+                          color: _isRunning
+                              ? AppColors.secondary
+                              : AppColors.textMuted,
                         ),
                       ),
                     ],
@@ -495,8 +504,12 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
               Expanded(
                 child: GlowButton(
                   label: _isRunning ? 'Pause' : 'Start',
-                  icon: _isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  onPressed: _mode == TimeTrackMode.stopwatch ? _toggleStopwatch : _toggleTimer,
+                  icon: _isRunning
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
+                  onPressed: _mode == TimeTrackMode.stopwatch
+                      ? _toggleStopwatch
+                      : _toggleTimer,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -511,7 +524,9 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
                 icon: Icons.replay_rounded,
                 tooltip: 'Reset',
                 size: 44,
-                onTap: _mode == TimeTrackMode.stopwatch ? _resetStopwatch : _resetTimer,
+                onTap: _mode == TimeTrackMode.stopwatch
+                    ? _resetStopwatch
+                    : _resetTimer,
               ),
             ],
           ),
@@ -521,96 +536,51 @@ class _TimeExerciseCardState extends State<TimeExerciseCard> {
           // Optional Added Weight row (for weighted holds e.g. plate on back)
           Row(
             children: [
-              const Icon(Icons.fitness_center_rounded, size: 16, color: AppColors.textMuted),
+              const Icon(
+                Icons.fitness_center_rounded,
+                size: 16,
+                color: AppColors.textMuted,
+              ),
               const SizedBox(width: AppSpacing.xs),
               const Expanded(
                 child: Text(
                   'Added Weight (Optional)',
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: AppColors.textSoft, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSoft,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               SizedBox(
                 width: 100,
-                child: TextField(
+                child: RFTextField(
                   controller: _weightController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
                   decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     suffixText: widget.settings.unitLabel,
-                    suffixStyle: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                     hintText: '0.0',
-                    hintStyle: const TextStyle(color: AppColors.textMuted),
-                    filled: true,
-                    fillColor: AppColors.glass1,
-                    border: OutlineInputBorder(
-                      borderSide: const BorderSide(color: AppColors.glassBorder),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: AppColors.primary),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
                   ),
                   onChanged: (val) {
                     final d = double.tryParse(val.trim()) ?? 0.0;
                     widget.onWeightChanged(widget.settings.toStorage(d));
                   },
+                  compact: true,
                 ),
               ),
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ModeChip extends StatelessWidget {
-  const _ModeChip({
-    required this.label,
-    required this.icon,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.xs),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: active ? Colors.white : AppColors.textMuted,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: active ? FontWeight.bold : FontWeight.w500,
-                color: active ? Colors.white : AppColors.textMuted,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

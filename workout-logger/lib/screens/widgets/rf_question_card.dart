@@ -70,12 +70,16 @@ class _RFQuestionCardState extends State<RFQuestionCard> {
         children: [
           Row(
             children: [
-              const Icon(Icons.help_outline_rounded,
-                  size: 14, color: AppColors.secondary),
+              const Icon(
+                Icons.help_outline_rounded,
+                size: 14,
+                color: AppColors.secondary,
+              ),
               const SizedBox(width: AppSpacing.xs),
               Text(
                 'QUICK QUESTIONS',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.2,
@@ -111,10 +115,7 @@ class _RFQuestionCardState extends State<RFQuestionCard> {
           const SizedBox(height: AppSpacing.md),
           SizedBox(
             width: double.infinity,
-            child: GlowButton(
-              label: 'Continue',
-              onPressed: _submit,
-            ),
+            child: GlowButton(label: 'Continue', onPressed: _submit),
           ),
         ],
       ),
@@ -142,7 +143,8 @@ class _QuestionBlock extends StatelessWidget {
       children: [
         Text(
           spec.question,
-          style: TextStyle(fontFamily: 'Geist', 
+          style: TextStyle(
+            fontFamily: 'Geist',
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
@@ -164,39 +166,9 @@ class _QuestionBlock extends StatelessWidget {
         ),
         if (spec.allowCustom) ...[
           const SizedBox(height: AppSpacing.sm),
-          TextField(
+          RFTextField(
             controller: controller,
-            style: TextStyle(fontFamily: 'Geist', 
-              fontSize: 13,
-              color: AppColors.textPrimary,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Or type your own answer…',
-              hintStyle: TextStyle(fontFamily: 'Geist', 
-                fontSize: 12,
-                color: AppColors.textFaint,
-              ),
-              filled: true,
-              fillColor: AppColors.glass2,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide: const BorderSide(color: AppColors.glassBorder),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide: const BorderSide(color: AppColors.glassBorder),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide:
-                    const BorderSide(color: AppColors.secondary, width: 1.5),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: AppSpacing.xs,
-              ),
-              isDense: true,
-            ),
+            decoration: InputDecoration(hintText: 'Or type your own answer…'),
           ),
         ],
       ],
@@ -242,7 +214,8 @@ class _OptionChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(fontFamily: 'Geist', 
+          style: TextStyle(
+            fontFamily: 'Geist',
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             color: selected ? AppColors.secondary : AppColors.textSoft,

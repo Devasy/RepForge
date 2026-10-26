@@ -1,5 +1,6 @@
 // program_week_editor.dart — Step 2 week structure editor + shared stepper widget
 
+import 'rf_form_fields.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
@@ -205,7 +206,10 @@ class _ProgramWeekEditorStepState extends State<ProgramWeekEditorStep> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text(
                     'Deload Week',
-                    style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 13,
+                    ),
                   ),
                   value: week.isDeload,
                   activeThumbColor: Colors.amber,
@@ -270,7 +274,10 @@ class _ProgramWeekEditorStepState extends State<ProgramWeekEditorStep> {
     return ListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.drag_handle_rounded, color: AppColors.textMuted),
+      leading: const Icon(
+        Icons.drag_handle_rounded,
+        color: AppColors.textMuted,
+      ),
       title: Text(
         day.name,
         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
@@ -315,31 +322,22 @@ class _ProgramWeekEditorStepState extends State<ProgramWeekEditorStep> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _styledField(nameCtrl, 'Day Name', hint: 'e.g. Push, Pull, Legs'),
+                _styledField(
+                  nameCtrl,
+                  'Day Name',
+                  hint: 'e.g. Push, Pull, Legs',
+                ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<int?>(
-                  decoration: const InputDecoration(
-                    labelText: 'Day of Week (optional)',
-                    labelStyle: TextStyle(color: AppColors.textSoft),
-                  ),
-                  dropdownColor: AppColors.cardHigh,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  initialValue: dow,
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Unscheduled'),
-                    ),
-                    ...List.generate(7, (i) => i + 1).map(
-                      (d) => DropdownMenuItem(
-                        value: d,
-                        child: Text(
-                          ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d - 1],
-                        ),
-                      ),
-                    ),
-                  ],
-                  onChanged: (v) => setDlg(() => dow = v),
+                RFDropdown<int>(
+                  label: 'Day of week (optional)',
+                  value: dow ?? 0,
+                  items: List.generate(8, (index) => index),
+                  labelBuilder: (day) => day == 0
+                      ? 'Unscheduled'
+                      : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day -
+                            1],
+                  onChanged: (value) =>
+                      setDlg(() => dow = value == 0 ? null : value),
                 ),
               ],
             ),
@@ -382,28 +380,10 @@ class _ProgramWeekEditorStepState extends State<ProgramWeekEditorStep> {
     String? hint,
     int maxLines = 1,
   }) {
-    return TextField(
+    return RFTextField(
       controller: ctrl,
       maxLines: maxLines,
-      style: const TextStyle(color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        labelStyle: const TextStyle(color: AppColors.textSoft),
-        hintStyle: const TextStyle(color: AppColors.textMuted),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: const BorderSide(color: AppColors.glassBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: const BorderSide(color: AppColors.primary),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-      ),
+      decoration: InputDecoration(labelText: label, hintText: hint),
     );
   }
 }

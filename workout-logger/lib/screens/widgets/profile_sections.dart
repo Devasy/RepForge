@@ -231,60 +231,32 @@ class PreferencesSection extends StatelessWidget {
       children: [
         const _SectionLabel('WEIGHT UNIT'),
         const SizedBox(height: AppSpacing.sm),
-        SizedBox(
-          width: double.infinity,
-          child: SegmentedButton<WeightUnit>(
-            segments: const [
-              ButtonSegment(value: WeightUnit.kg, label: Text('kg')),
-              ButtonSegment(value: WeightUnit.lbs, label: Text('lbs')),
-            ],
-            selected: {settings.weightUnit},
-            style: ButtonStyle(
-              minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
-              textStyle: WidgetStatePropertyAll(
-                Theme.of(context).textTheme.titleMedium,
-              ),
-              foregroundColor: const WidgetStatePropertyAll(
-                AppColors.textPrimary,
-              ),
-              backgroundColor: WidgetStateProperty.resolveWith(
-                (states) => states.contains(WidgetState.selected)
-                    ? AppColors.primary.withValues(alpha: 0.18)
-                    : AppColors.glass,
-              ),
-              tapTargetSize: MaterialTapTargetSize.padded,
-            ),
-            onSelectionChanged: (selection) {
-              onHaptic();
-              settings.setWeightUnit(selection.single);
-            },
-          ),
+        RFSelectionGroup<WeightUnit>(
+          options: const [
+            RFSelectionOption(value: WeightUnit.kg, label: 'kg'),
+            RFSelectionOption(value: WeightUnit.lbs, label: 'lbs'),
+          ],
+          selected: settings.weightUnit,
+          onChanged: (value) {
+            onHaptic();
+            settings.setWeightUnit(value);
+          },
         ),
         const SizedBox(height: AppSpacing.md),
         const _SectionLabel('WEIGHT INCREMENT'),
         const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: settings.availableIncrements.map((inc) {
-            final selected = settings.weightIncrement == inc;
+        RFSelectionGroup<double>(
+          options: settings.availableIncrements.map((inc) {
             final label = inc == inc.truncateToDouble()
                 ? '${inc.toStringAsFixed(0)} ${settings.unitLabel}'
                 : '${inc.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '')} ${settings.unitLabel}';
-            return ChoiceChip(
-              label: Text(label),
-              labelStyle: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
-              selected: selected,
-              showCheckmark: true,
-              materialTapTargetSize: MaterialTapTargetSize.padded,
-              onSelected: (_) {
-                HapticFeedback.selectionClick();
-                settings.setWeightIncrement(inc);
-              },
-            );
+            return RFSelectionOption(value: inc, label: label);
           }).toList(),
+          selected: settings.weightIncrement,
+          onChanged: (value) {
+            HapticFeedback.selectionClick();
+            settings.setWeightIncrement(value);
+          },
         ),
         const SizedBox(height: AppSpacing.md),
         const Divider(color: AppColors.glassBorder, height: 1),
@@ -985,53 +957,23 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.glass,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            border: Border.all(color: AppColors.glassBorderStrong),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _ctrl,
-                  obscureText: _obscure,
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  keyboardType: TextInputType.visiblePassword,
-                  style: TextStyle(
-                    fontFamily: 'GeistMono',
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Gemini API key',
-                    hintText: 'AIza…',
-                    hintStyle: TextStyle(
-                      fontFamily: 'GeistMono',
-                      color: AppColors.textFaint,
-                      fontSize: 12,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm + 4,
-                    ),
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: _obscure ? 'Show API key' : 'Hide API key',
-                onPressed: () => setState(() => _obscure = !_obscure),
-                icon: Icon(
-                  _obscure
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  color: AppColors.textSoft,
-                ),
-              ),
-            ],
+        RFTextField(
+          controller: _ctrl,
+          label: 'Gemini API key',
+          hint: 'AIza…',
+          obscureText: _obscure,
+          enableSuggestions: false,
+          autocorrect: false,
+          keyboardType: TextInputType.visiblePassword,
+          prefixIcon: Icons.key_rounded,
+          suffixIcon: IconButton(
+            tooltip: _obscure ? 'Show API key' : 'Hide API key',
+            onPressed: () => setState(() => _obscure = !_obscure),
+            icon: Icon(
+              _obscure
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -1076,51 +1018,22 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.glass,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            border: Border.all(color: AppColors.glassBorderStrong),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButtonFormField<String>(
-              key: ValueKey(settings.geminiModel),
-              initialValue: settings.geminiModel,
-              isExpanded: true,
-              isDense: false,
-              dropdownColor: AppColors.card,
-              icon: const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: AppColors.textFaint,
-              ),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
-                ),
-              ),
-              style: TextStyle(
-                fontFamily: 'GeistMono',
-                color: AppColors.textPrimary,
-                fontSize: 13,
-              ),
-              items:
-                  {
-                    ..._models,
-                    if (!_models.any(
-                      (entry) => entry.$1 == settings.geminiModel,
-                    ))
-                      (settings.geminiModel, settings.geminiModel),
-                  }.map(((String, String) entry) {
-                    final (id, label) = entry;
-                    return DropdownMenuItem(value: id, child: Text(label));
-                  }).toList(),
-              onChanged: (id) {
-                if (id != null) _selectModel(id);
-              },
-            ),
-          ),
+        RFDropdown<String>(
+          label: 'Coach model',
+          value: settings.geminiModel,
+          items: {
+            ..._models.map((entry) => entry.$1),
+            settings.geminiModel,
+          }.toList(),
+          labelBuilder: (id) =>
+              _models
+                  .where((entry) => entry.$1 == id)
+                  .map((entry) => entry.$2)
+                  .firstOrNull ??
+              id,
+          onChanged: (id) async {
+            if (id != null) await _selectModel(id);
+          },
         ),
       ],
     );

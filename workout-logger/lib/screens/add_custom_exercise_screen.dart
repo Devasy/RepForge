@@ -188,8 +188,11 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded,
-                        color: AppColors.primary, size: 18),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
@@ -211,44 +214,24 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
               // Name
               _label('EXERCISE NAME'),
               const SizedBox(height: AppSpacing.sm),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(color: AppColors.glassBorder),
+              RFTextFormField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                inputFormatters: [LengthLimitingTextInputFormatter(50)],
+                decoration: InputDecoration(
+                  labelText: 'Exercise name',
+                  hintText: 'e.g., Cable Lateral Raise',
+                  prefixIcon: Icon(Icons.fitness_center_rounded, size: 22),
                 ),
-                child: TextFormField(
-                  controller: _nameController,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 15,
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                  inputFormatters: [LengthLimitingTextInputFormatter(50)],
-                  decoration: const InputDecoration(
-                    hintText: 'e.g., Cable Lateral Raise',
-                    hintStyle: TextStyle(color: AppColors.textMuted),
-                    prefixIcon: Icon(
-                      Icons.fitness_center_rounded,
-                      color: AppColors.textMuted,
-                      size: 18,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.md,
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Please enter an exercise name';
-                    }
-                    if (v.trim().length < 3) {
-                      return 'Name must be at least 3 characters';
-                    }
-                    return null;
-                  },
-                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Please enter an exercise name';
+                  }
+                  if (v.trim().length < 3) {
+                    return 'Name must be at least 3 characters';
+                  }
+                  return null;
+                },
               ),
 
               const SizedBox(height: AppSpacing.lg),
@@ -273,9 +256,8 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                     icon: Icons.timer_rounded,
                     description: 'Holds & duration (s)',
                     selected: _exerciseType == ExerciseType.timeBased,
-                    onTap: () => setState(
-                      () => _exerciseType = ExerciseType.timeBased,
-                    ),
+                    onTap: () =>
+                        setState(() => _exerciseType = ExerciseType.timeBased),
                   ),
                 ],
               ),
@@ -320,23 +302,10 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: TextField(
+                      child: RFTextField(
                         controller: _handleInputController,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
-                        ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'e.g. Rope, V-Bar, Straight Bar',
-                          hintStyle: TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 13,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: AppSpacing.sm,
-                          ),
                         ),
                         onSubmitted: (_) => _addHandle(),
                       ),
@@ -416,12 +385,12 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                     vertical: AppSpacing.sm,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.muscle(_muscleId!)
-                        .withValues(alpha: 0.1),
+                    color: AppColors.muscle(_muscleId!).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                     border: Border.all(
-                      color: AppColors.muscle(_muscleId!)
-                          .withValues(alpha: 0.3),
+                      color: AppColors.muscle(
+                        _muscleId!,
+                      ).withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -579,9 +548,7 @@ class _MuscleGrid extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? color.withValues(alpha: 0.2)
-                  : AppColors.card,
+              color: isSelected ? color.withValues(alpha: 0.2) : AppColors.card,
               borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border.all(
                 color: isSelected

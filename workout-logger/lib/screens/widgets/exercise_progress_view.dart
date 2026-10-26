@@ -314,48 +314,19 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
               AppSpacing.lg,
               AppSpacing.sm,
             ),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: AppColors.glassBorder),
-              ),
-              child: TextField(
-                controller: _search,
-                autofocus: true,
-                style: TextStyle(
-                  fontFamily: 'Geist',
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Search…',
-                  hintStyle: TextStyle(
-                    fontFamily: 'Geist',
-                    color: AppColors.textFaint,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.search_rounded,
-                    color: AppColors.textFaint,
-                    size: 18,
-                  ),
-                  suffixIcon: _search.text.isNotEmpty
-                      ? GestureDetector(
-                          onTap: () => _search.clear(),
-                          child: const Icon(
-                            Icons.close_rounded,
-                            color: AppColors.textFaint,
-                            size: 16,
-                          ),
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: AppSpacing.sm,
-                  ),
-                ),
+            child: RFTextField(
+              controller: _search,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Search…',
+                prefixIcon: Icon(Icons.search_rounded, size: 22),
+                suffixIcon: _search.text.isNotEmpty
+                    ? IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: () => _search.clear(),
+                        icon: const Icon(Icons.close_rounded),
+                      )
+                    : null,
               ),
             ),
           ),
@@ -790,10 +761,12 @@ class _ChartSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
+              Text(
                   chartMode == _ChartMode.volume
                       ? (isTimeBased ? 'Hold Duration' : 'Volume Progression')
                       : 'Set Progression',
@@ -804,7 +777,6 @@ class _ChartSection extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
               _ChartModeToggle(
                 value: chartMode,
                 onChanged: onChartModeChanged,
@@ -841,47 +813,19 @@ class _ChartModeToggle extends StatelessWidget {
   final bool isTimeBased;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: AppColors.glass2,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final mode in _ChartMode.values)
-            GestureDetector(
-              onTap: () => onChanged(mode),
-              child: AnimatedContainer(
-                duration: AppDurations.fast,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: mode == value ? AppColors.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                child: Text(
-                  mode == _ChartMode.volume
-                      ? (isTimeBased ? 'Hold' : 'Volume')
-                      : 'Sets',
-                  style: TextStyle(
-                    fontFamily: 'GeistMono',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: mode == value ? Colors.white : AppColors.textMuted,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => RFSelectionGroup<_ChartMode>(
+    options: [
+      for (final mode in _ChartMode.values)
+        RFSelectionOption(
+          value: mode,
+          label: mode == _ChartMode.volume
+              ? (isTimeBased ? 'Hold' : 'Volume')
+              : 'Sets',
+        ),
+    ],
+    selected: value,
+    onChanged: onChanged,
+  );
 }
 
 // ── Volume progression line chart ─────────────────────────────────────────────
@@ -1446,8 +1390,10 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Controls row: tappable legend + mode toggle
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Row(
                   children: [
@@ -1648,42 +1594,17 @@ class _SetModeToggle extends StatelessWidget {
   final ValueChanged<_SetViewMode> onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: AppColors.glass2,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final mode in _SetViewMode.values)
-            GestureDetector(
-              onTap: () => onChanged(mode),
-              child: AnimatedContainer(
-                duration: AppDurations.fast,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: mode == value ? AppColors.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Text(
-                  mode == _SetViewMode.recent ? 'Recent' : 'Weekly',
-                  style: TextStyle(
-                    fontFamily: 'GeistMono',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: mode == value ? Colors.white : AppColors.textMuted,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => RFSelectionGroup<_SetViewMode>(
+    options: [
+      for (final mode in _SetViewMode.values)
+        RFSelectionOption(
+          value: mode,
+          label: mode == _SetViewMode.recent ? 'Recent' : 'Weekly',
+        ),
+    ],
+    selected: value,
+    onChanged: onChanged,
+  );
 }
 
 // ── Session history list ───────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import '../../data/exercise_muscle_motion.dart';
 import '../../models/models.dart';
 import '../../theme/app_theme.dart';
 import 'body_heatmap.dart';
+import 'rf_selection_group.dart';
 
 enum MusclePhase { stretched, contracted }
 
@@ -48,22 +49,19 @@ class _ExerciseMuscleMapState extends State<ExerciseMuscleMap> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (motion != null) ...[
-            Center(
-              child: SegmentedButton<MusclePhase>(
-                segments: const [
-                  ButtonSegment(
-                    value: MusclePhase.stretched,
-                    label: Text('Stretched'),
-                  ),
-                  ButtonSegment(
-                    value: MusclePhase.contracted,
-                    label: Text('Contracted'),
-                  ),
-                ],
-                selected: {_phase},
-                onSelectionChanged: (value) =>
-                    setState(() => _phase = value.single),
-              ),
+            RFSelectionGroup<MusclePhase>(
+              options: const [
+                RFSelectionOption(
+                  value: MusclePhase.stretched,
+                  label: 'Stretched',
+                ),
+                RFSelectionOption(
+                  value: MusclePhase.contracted,
+                  label: 'Contracted',
+                ),
+              ],
+              selected: _phase,
+              onChanged: (value) => setState(() => _phase = value),
             ),
             const SizedBox(height: 12),
             Semantics(

@@ -136,46 +136,13 @@ class _WelcomePageState extends State<WelcomePage> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  TextField(
-                    controller: _controller,
-                    autofocus: true,
-                    textCapitalization: TextCapitalization.words,
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      color: AppColors.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                  RFTextField(
+                      controller: _controller,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(labelText: 'Your name'),
+                      onSubmitted: (_) => _submit(),
                     ),
-                    decoration: InputDecoration(
-                      hintText: 'Your name',
-                      hintStyle: TextStyle(
-                        fontFamily: 'Geist',
-                        color: AppColors.textFaint,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.glass2,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: BorderSide(color: AppColors.glassBorder),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: BorderSide(color: AppColors.glassBorder),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: BorderSide(
-                          color: AppColors.primary,
-                          width: 1.5,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                    ),
-                    onSubmitted: (_) => _submit(),
-                  ),
                   const SizedBox(height: AppSpacing.md),
                   GenderPicker(value: _gender, onChanged: _saving ? null :
                     (value) => setState(() => _gender = value)),
