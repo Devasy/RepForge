@@ -57,6 +57,9 @@ void main() {
     await tester.pumpWidget(_wrap(settings, gemini));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Advanced coach settings'));
+    await tester.tap(find.text('Advanced coach settings'));
+    await tester.pumpAndSettle();
     expect(find.text('THINKING LEVEL'), findsNothing);
   });
 }

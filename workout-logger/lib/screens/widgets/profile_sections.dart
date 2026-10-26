@@ -115,39 +115,77 @@ class PreferencesSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GenderPicker(
-            value: settings.userGender,
-            onChanged: (value) async {
-              try {
-                await settings.setUserGender(value);
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Could not save gender. Try again.'),
-                    ),
-                  );
-                }
+          _buildPersonalization(context),
+          _buildRestAlerts(context),
+          _buildWeightPreferences(context),
+          _buildMetrics(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonalization(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GenderPicker(
+          value: settings.userGender,
+          onChanged: (value) async {
+            try {
+              await settings.setUserGender(value);
+            } catch (_) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Could not save gender. Try again.'),
+                  ),
+                );
               }
-            },
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const Text(
-            'Your gender selects muscle diagrams throughout the app.',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const _SectionLabel('REST ALERT'),
+            }
+          },
+        ),
+        const SizedBox(height: AppSpacing.md),
+        const Text(
+          'Your gender selects muscle diagrams throughout the app.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+        ),
+        const SizedBox(height: AppSpacing.md),
+      ],
+    );
+  }
+
+  Widget _buildRestAlerts(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('REST ALERT'),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Alert when rest ends'),
+          subtitle: const Text('Show a notification when your next set is due'),
+          value: settings.restAlertEnabled,
+          onChanged: (enabled) async {
+            try {
+              await settings.setRestAlertEnabled(enabled);
+            } catch (_) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Could not save rest alert setting.'),
+                  ),
+                );
+              }
+            }
+          },
+        ),
+        if (settings.restAlertEnabled) ...[
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Alert when rest ends'),
-            subtitle: const Text(
-              'Show a notification when your next set is due',
-            ),
-            value: settings.restAlertEnabled,
+            title: const Text('Sound'),
+            value: settings.restAlertSound,
             onChanged: (enabled) async {
               try {
-                await settings.setRestAlertEnabled(enabled);
+                await settings.setRestAlertSound(enabled);
               } catch (_) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -159,168 +197,119 @@ class PreferencesSection extends StatelessWidget {
               }
             },
           ),
-          if (settings.restAlertEnabled) ...[
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Sound'),
-              value: settings.restAlertSound,
-              onChanged: (enabled) async {
-                try {
-                  await settings.setRestAlertSound(enabled);
-                } catch (_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Could not save rest alert setting.'),
-                      ),
-                    );
-                  }
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Vibration'),
+            value: settings.restAlertVibration,
+            onChanged: (enabled) async {
+              try {
+                await settings.setRestAlertVibration(enabled);
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not save rest alert setting.'),
+                    ),
+                  );
                 }
-              },
-            ),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Vibration'),
-              value: settings.restAlertVibration,
-              onChanged: (enabled) async {
-                try {
-                  await settings.setRestAlertVibration(enabled);
-                } catch (_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Could not save rest alert setting.'),
-                      ),
-                    );
-                  }
-                }
-              },
-            ),
-          ],
-          const Text(
-            'Android may ask for notification permission when rest starts.',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const _SectionLabel('WEIGHT UNIT'),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: _UnitToggleButton(
-                  label: 'kg',
-                  selected: settings.weightUnit == WeightUnit.kg,
-                  onTap: () {
-                    onHaptic();
-                    settings.setWeightUnit(WeightUnit.kg);
-                  },
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _UnitToggleButton(
-                  label: 'lbs',
-                  selected: settings.weightUnit == WeightUnit.lbs,
-                  onTap: () {
-                    onHaptic();
-                    settings.setWeightUnit(WeightUnit.lbs);
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const _SectionLabel('WEIGHT INCREMENT'),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: settings.availableIncrements.map((inc) {
-              final selected = settings.weightIncrement == inc;
-              final label = inc == inc.truncateToDouble()
-                  ? '${inc.toStringAsFixed(0)} ${settings.unitLabel}'
-                  : '${inc.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '')} ${settings.unitLabel}';
-              return GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  settings.setWeightIncrement(inc);
-                },
-                child: AnimatedContainer(
-                  duration: AppDurations.fast,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? AppColors.primary.withValues(alpha: 0.15)
-                        : AppColors.glass,
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    border: Border.all(
-                      color: selected
-                          ? AppColors.primary.withValues(alpha: 0.5)
-                          : AppColors.glassBorder,
-                      width: selected ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontFamily: 'GeistMono',
-                      color: selected ? AppColors.primary : AppColors.textSoft,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const Divider(color: AppColors.glassBorder, height: 1),
-          const SizedBox(height: AppSpacing.md),
-          const _SectionLabel('ADVANCED METRICS'),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Show estimated 1RM',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Display 1-rep max badge on completed sets',
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        color: AppColors.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: settings.showAdvancedMetrics,
-                onChanged: (v) {
-                  onHaptic();
-                  settings.setShowAdvancedMetrics(v);
-                },
-                activeThumbColor: AppColors.primary,
-                activeTrackColor: AppColors.primary.withValues(alpha: 0.35),
-              ),
-            ],
+              }
+            },
           ),
         ],
-      ),
+        const Text(
+          'Android may ask for notification permission when rest starts.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+        ),
+        const SizedBox(height: AppSpacing.md),
+      ],
+    );
+  }
+
+  Widget _buildWeightPreferences(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('WEIGHT UNIT'),
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: double.infinity,
+          child: SegmentedButton<WeightUnit>(
+            segments: const [
+              ButtonSegment(value: WeightUnit.kg, label: Text('kg')),
+              ButtonSegment(value: WeightUnit.lbs, label: Text('lbs')),
+            ],
+            selected: {settings.weightUnit},
+            style: ButtonStyle(
+              minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+              textStyle: WidgetStatePropertyAll(
+                Theme.of(context).textTheme.titleMedium,
+              ),
+              foregroundColor: const WidgetStatePropertyAll(
+                AppColors.textPrimary,
+              ),
+              backgroundColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? AppColors.primary.withValues(alpha: 0.18)
+                    : AppColors.glass,
+              ),
+              tapTargetSize: MaterialTapTargetSize.padded,
+            ),
+            onSelectionChanged: (selection) {
+              onHaptic();
+              settings.setWeightUnit(selection.single);
+            },
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        const _SectionLabel('WEIGHT INCREMENT'),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: settings.availableIncrements.map((inc) {
+            final selected = settings.weightIncrement == inc;
+            final label = inc == inc.truncateToDouble()
+                ? '${inc.toStringAsFixed(0)} ${settings.unitLabel}'
+                : '${inc.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '')} ${settings.unitLabel}';
+            return ChoiceChip(
+              label: Text(label),
+              labelStyle: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+              selected: selected,
+              showCheckmark: true,
+              materialTapTargetSize: MaterialTapTargetSize.padded,
+              onSelected: (_) {
+                HapticFeedback.selectionClick();
+                settings.setWeightIncrement(inc);
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        const Divider(color: AppColors.glassBorder, height: 1),
+        const SizedBox(height: AppSpacing.md),
+      ],
+    );
+  }
+
+  Widget _buildMetrics(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('ADVANCED METRICS'),
+        const SizedBox(height: AppSpacing.sm),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Show estimated 1RM'),
+          subtitle: const Text('Display 1-rep max badge on completed sets'),
+          value: settings.showAdvancedMetrics,
+          onChanged: (value) {
+            onHaptic();
+            settings.setShowAdvancedMetrics(value);
+          },
+        ),
+      ],
     );
   }
 }
@@ -625,61 +614,6 @@ class _SectionLabel extends StatelessWidget {
         fontSize: 12,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.3,
-      ),
-    );
-  }
-}
-
-class _UnitToggleButton extends StatelessWidget {
-  const _UnitToggleButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppDurations.fast,
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary.withValues(alpha: 0.15)
-              : AppColors.glass,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(
-            color: selected
-                ? AppColors.primary.withValues(alpha: 0.5)
-                : AppColors.glassBorder,
-            width: selected ? 1.5 : 1,
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: AppColors.primaryGlow(0.20),
-                    blurRadius: 12,
-                    spreadRadius: -4,
-                  ),
-                ]
-              : null,
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Geist',
-              color: selected ? AppColors.primary : AppColors.textSoft,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              fontSize: 14,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -1018,241 +952,208 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionLabel('GEMINI API KEY'),
-          const SizedBox(height: AppSpacing.sm),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.glass,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(color: AppColors.glassBorderStrong),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _ctrl,
-                    obscureText: _obscure,
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    keyboardType: TextInputType.visiblePassword,
-                    style: TextStyle(
-                      fontFamily: 'GeistMono',
-                      color: AppColors.textPrimary,
-                      fontSize: 12,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'AIza…',
-                      hintStyle: TextStyle(
-                        fontFamily: 'GeistMono',
-                        color: AppColors.textFaint,
-                        fontSize: 12,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm + 4,
-                      ),
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => setState(() => _obscure = !_obscure),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                    ),
-                    child: Icon(
-                      _obscure
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      color: AppColors.textFaint,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _buildApiKeyControls(),
+          const SizedBox(height: AppSpacing.lg),
+          _buildModelControls(settings),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Get a free key at aistudio.google.com. Stored locally on-device.',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              color: AppColors.textFaint,
-              fontSize: 11,
-              fontStyle: FontStyle.italic,
-            ),
+            'Model and advanced options save automatically.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSoft),
           ),
           const SizedBox(height: AppSpacing.md),
-          Row(
+          ExpansionTile(
+            key: const PageStorageKey('advanced-coach-settings'),
+            tilePadding: EdgeInsets.zero,
+            maintainState: true,
+            title: const Text('Advanced coach settings'),
+            subtitle: const Text('Reasoning, tool limits and token usage'),
             children: [
-              const Expanded(child: _SectionLabel('GEMINI MODEL')),
-              TextButton(
-                onPressed: _discoveringModels ? null : _refreshModels,
-                child: Text(
-                  _discoveringModels ? 'Refreshing…' : 'Refresh models',
+              _buildThinkingControls(settings),
+              _buildToolControls(settings),
+              const SizedBox(height: AppSpacing.lg),
+              _buildUsageControls(gemini),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApiKeyControls() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.glass,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(color: AppColors.glassBorderStrong),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _ctrl,
+                  obscureText: _obscure,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  keyboardType: TextInputType.visiblePassword,
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Gemini API key',
+                    hintText: 'AIza…',
+                    hintStyle: TextStyle(
+                      fontFamily: 'GeistMono',
+                      color: AppColors.textFaint,
+                      fontSize: 12,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm + 4,
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: _obscure ? 'Show API key' : 'Hide API key',
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(
+                  _obscure
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: AppColors.textSoft,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.glass,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(color: AppColors.glassBorderStrong),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Get a free key at aistudio.google.com. Stored locally on-device.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSoft),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: _saving ? null : _save,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              textStyle: Theme.of(context).textTheme.titleMedium,
             ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButtonFormField<String>(
-                key: ValueKey(settings.geminiModel),
-                initialValue: settings.geminiModel,
-                isExpanded: true,
-                isDense: false,
-                dropdownColor: AppColors.card,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: AppColors.textFaint,
-                ),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm,
-                  ),
-                ),
-                style: TextStyle(
-                  fontFamily: 'GeistMono',
-                  color: AppColors.textPrimary,
-                  fontSize: 13,
-                ),
-                items:
-                    {
-                      ..._models,
-                      if (!_models.any(
-                        (entry) => entry.$1 == settings.geminiModel,
-                      ))
-                        (settings.geminiModel, settings.geminiModel),
-                    }.map(((String, String) entry) {
-                      final (id, label) = entry;
-                      return DropdownMenuItem(value: id, child: Text(label));
-                    }).toList(),
-                onChanged: (id) {
-                  if (id != null) _selectModel(id);
-                },
-              ),
-            ),
+            child: Text(_saving ? 'Saving…' : 'Save API Key'),
           ),
-          if (supportedThinkingLevels(settings.geminiModel).isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            const _SectionLabel('THINKING LEVEL'),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'How much the model reasons before replying. Lower is faster and cheaper; higher is more capable on hard problems.',
-              style: TextStyle(
-                fontFamily: 'Geist',
-                color: AppColors.textFaint,
-                fontSize: 11,
-                fontStyle: FontStyle.italic,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModelControls(SettingsProvider settings) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.sm,
+          children: [
+            const _SectionLabel('GEMINI MODEL'),
+            TextButton(
+              onPressed: _discoveringModels ? null : _refreshModels,
+              child: Text(
+                _discoveringModels ? 'Refreshing…' : 'Refresh models',
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Builder(
-              builder: (context) {
-                final levels = supportedThinkingLevels(settings.geminiModel);
-                final currentIndex = levels.indexOf(
-                  settings.geminiThinkingLevel,
-                );
-                // Clamped because a drag in progress can outlive the level list
-                // it was started against: picking a model with fewer levels
-                // leaves _draggingThinkingLevelIndex past the new max, which
-                // Slider asserts on.
-                final liveIndex =
-                    (_draggingThinkingLevelIndex ??
-                            (currentIndex >= 0 ? currentIndex.toDouble() : 0.0))
-                        .clamp(0.0, (levels.length - 1).toDouble());
-                final liveLevel =
-                    levels[liveIndex.round().clamp(0, levels.length - 1)];
-                final liveLevelLabel =
-                    liveLevel[0].toUpperCase() + liveLevel.substring(1);
-                return Row(
-                  children: [
-                    Expanded(
-                      child: SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          activeTrackColor: AppColors.primary,
-                          inactiveTrackColor: AppColors.glassBorderStrong,
-                          thumbColor: AppColors.primary,
-                          overlayColor: AppColors.primary.withValues(
-                            alpha: 0.15,
-                          ),
-                          valueIndicatorColor: AppColors.primary,
-                          trackHeight: 3,
-                        ),
-                        child: Slider(
-                          value: liveIndex,
-                          min: 0,
-                          max: (levels.length - 1).toDouble(),
-                          divisions: levels.length > 1
-                              ? levels.length - 1
-                              : null,
-                          label: liveLevelLabel,
-                          onChanged: (v) {
-                            setState(() => _draggingThinkingLevelIndex = v);
-                            context.read<GeminiAiService>().updateThinkingLevel(
-                              levels[v.round().clamp(0, levels.length - 1)],
-                            );
-                          },
-                          onChangeEnd: (v) => _commitThinkingLevel(
-                            levels[v.round().clamp(0, levels.length - 1)],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.35),
-                        ),
-                      ),
-                      child: Text(
-                        liveLevelLabel,
-                        style: TextStyle(
-                          fontFamily: 'GeistMono',
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
             ),
           ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.glass,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(color: AppColors.glassBorderStrong),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButtonFormField<String>(
+              key: ValueKey(settings.geminiModel),
+              initialValue: settings.geminiModel,
+              isExpanded: true,
+              isDense: false,
+              dropdownColor: AppColors.card,
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: AppColors.textFaint,
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+              ),
+              style: TextStyle(
+                fontFamily: 'GeistMono',
+                color: AppColors.textPrimary,
+                fontSize: 13,
+              ),
+              items:
+                  {
+                    ..._models,
+                    if (!_models.any(
+                      (entry) => entry.$1 == settings.geminiModel,
+                    ))
+                      (settings.geminiModel, settings.geminiModel),
+                  }.map(((String, String) entry) {
+                    final (id, label) = entry;
+                    return DropdownMenuItem(value: id, child: Text(label));
+                  }).toList(),
+              onChanged: (id) {
+                if (id != null) _selectModel(id);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThinkingControls(SettingsProvider settings) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (supportedThinkingLevels(settings.geminiModel).isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
-          const _SectionLabel('MAX TOOL-CALL STEPS'),
+          const _SectionLabel('THINKING LEVEL'),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'How many tool rounds the coach can take per message before it must reply. Raise this if it stops mid-task; lower it to limit token usage.',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              color: AppColors.textFaint,
-              fontSize: 11,
-              fontStyle: FontStyle.italic,
-            ),
+            'How much the model reasons before replying. Lower is faster and cheaper; higher is more capable on hard problems.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSoft),
           ),
           const SizedBox(height: AppSpacing.xs),
           Builder(
             builder: (context) {
-              final liveValue =
-                  _draggingMaxToolRounds ??
-                  settings.geminiMaxToolRounds.toDouble();
+              final levels = supportedThinkingLevels(settings.geminiModel);
+              final currentIndex = levels.indexOf(settings.geminiThinkingLevel);
+              // Keep an in-progress drag within the selected model's levels.
+              final liveIndex =
+                  (_draggingThinkingLevelIndex ??
+                          (currentIndex >= 0 ? currentIndex.toDouble() : 0.0))
+                      .clamp(0.0, (levels.length - 1).toDouble());
+              final liveLevel =
+                  levels[liveIndex.round().clamp(0, levels.length - 1)];
+              final liveLevelLabel =
+                  liveLevel[0].toUpperCase() + liveLevel.substring(1);
               return Row(
                 children: [
                   Expanded(
@@ -1266,18 +1167,20 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                         trackHeight: 3,
                       ),
                       child: Slider(
-                        value: liveValue,
-                        min: kMinMaxToolRounds.toDouble(),
-                        max: kMaxMaxToolRounds.toDouble(),
-                        divisions: kMaxMaxToolRounds - kMinMaxToolRounds,
-                        label: '${liveValue.round()}',
+                        value: liveIndex,
+                        min: 0,
+                        max: (levels.length - 1).toDouble(),
+                        divisions: levels.length > 1 ? levels.length - 1 : null,
+                        label: liveLevelLabel,
                         onChanged: (v) {
-                          setState(() => _draggingMaxToolRounds = v);
-                          context.read<GeminiAiService>().updateMaxToolRounds(
-                            v.round(),
+                          setState(() => _draggingThinkingLevelIndex = v);
+                          context.read<GeminiAiService>().updateThinkingLevel(
+                            levels[v.round().clamp(0, levels.length - 1)],
                           );
                         },
-                        onChangeEnd: (v) => _commitMaxToolRounds(v.round()),
+                        onChangeEnd: (v) => _commitThinkingLevel(
+                          levels[v.round().clamp(0, levels.length - 1)],
+                        ),
                       ),
                     ),
                   ),
@@ -1294,7 +1197,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                       ),
                     ),
                     child: Text(
-                      '${liveValue.round()}',
+                      liveLevelLabel,
                       style: TextStyle(
                         fontFamily: 'GeistMono',
                         color: AppColors.primary,
@@ -1307,111 +1210,142 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
               );
             },
           ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            width: double.infinity,
-            child: AnimatedContainer(
-              duration: AppDurations.fast,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.35),
-                ),
-              ),
-              child: TextButton(
-                onPressed: _saving ? null : _save,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                        ),
-                      )
-                    : Text(
-                        'Save API Key',
-                        style: TextStyle(
-                          fontFamily: 'Geist',
-                          color: AppColors.primary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              const _SectionLabel('TOKEN USAGE'),
-              const Spacer(),
-              if (gemini.aiRequestCount > 0)
-                GestureDetector(
-                  onTap: () => context.read<GeminiAiService>().resetUsage(),
-                  child: Text(
-                    'Reset',
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      color: AppColors.accent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+        ],
+      ],
+    );
+  }
+
+  Widget _buildToolControls(SettingsProvider settings) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: AppSpacing.md),
+        const _SectionLabel('MAX TOOL-CALL STEPS'),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'How many tool rounds the coach can take per message before it must reply. Raise this if it stops mid-task; lower it to limit token usage.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSoft),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Builder(
+          builder: (context) {
+            final liveValue =
+                _draggingMaxToolRounds ??
+                settings.geminiMaxToolRounds.toDouble();
+            return Row(
+              children: [
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: AppColors.primary,
+                      inactiveTrackColor: AppColors.glassBorderStrong,
+                      thumbColor: AppColors.primary,
+                      overlayColor: AppColors.primary.withValues(alpha: 0.15),
+                      valueIndicatorColor: AppColors.primary,
+                      trackHeight: 3,
+                    ),
+                    child: Slider(
+                      value: liveValue,
+                      min: kMinMaxToolRounds.toDouble(),
+                      max: kMaxMaxToolRounds.toDouble(),
+                      divisions: kMaxMaxToolRounds - kMinMaxToolRounds,
+                      label: '${liveValue.round()}',
+                      onChanged: (v) {
+                        setState(() => _draggingMaxToolRounds = v);
+                        context.read<GeminiAiService>().updateMaxToolRounds(
+                          v.round(),
+                        );
+                      },
+                      onChangeEnd: (v) => _commitMaxToolRounds(v.round()),
                     ),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.glass,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(color: AppColors.glassBorder),
-            ),
-            child: Column(
-              children: [
-                _UsageRow(
-                  label: 'Total tokens',
-                  value: _formatInt(gemini.totalTokensUsed),
-                ),
-                const SizedBox(height: 6),
-                _UsageRow(
-                  label: 'Input (prompt)',
-                  value: _formatInt(gemini.promptTokensUsed),
-                ),
-                const SizedBox(height: 6),
-                _UsageRow(
-                  label: 'Output (response)',
-                  value: _formatInt(gemini.responseTokensUsed),
-                ),
-                const SizedBox(height: 6),
-                _UsageRow(
-                  label: 'Requests',
-                  value: _formatInt(gemini.aiRequestCount),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Text(
+                    '${liveValue.round()}',
+                    style: TextStyle(
+                      fontFamily: 'GeistMono',
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               ],
-            ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUsageControls(GeminiAiService gemini) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: _SectionLabel('TOKEN USAGE')),
+            if (gemini.aiRequestCount > 0)
+              TextButton(
+                onPressed: () => context.read<GeminiAiService>().resetUsage(),
+                child: const Text('Reset'),
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.glass,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(color: AppColors.glassBorder),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Cumulative billable tokens across coach, program builder & insights.',
-            style: TextStyle(
-              fontFamily: 'Geist',
-              color: AppColors.textFaint,
-              fontSize: 11,
-              fontStyle: FontStyle.italic,
-            ),
+          child: Column(
+            children: [
+              _UsageRow(
+                label: 'Total tokens',
+                value: _formatInt(gemini.totalTokensUsed),
+              ),
+              const SizedBox(height: 6),
+              _UsageRow(
+                label: 'Input (prompt)',
+                value: _formatInt(gemini.promptTokensUsed),
+              ),
+              const SizedBox(height: 6),
+              _UsageRow(
+                label: 'Output (response)',
+                value: _formatInt(gemini.responseTokensUsed),
+              ),
+              const SizedBox(height: 6),
+              _UsageRow(
+                label: 'Requests',
+                value: _formatInt(gemini.aiRequestCount),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Cumulative billable tokens across coach, program builder & insights.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSoft),
+        ),
+      ],
     );
   }
 }
@@ -1427,21 +1361,27 @@ class _UsageRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Geist',
-            color: AppColors.textMuted,
-            fontSize: 12,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Geist',
+              color: AppColors.textSoft,
+              fontSize: 12,
+            ),
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontFamily: 'GeistMono',
-            color: AppColors.textPrimary,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+        const SizedBox(width: AppSpacing.sm),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontFamily: 'GeistMono',
+              color: AppColors.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],

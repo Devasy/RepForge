@@ -11,10 +11,12 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 - Replace the old startup name and blank launch backgrounds with the RepForge icon on a consistent dark background, including Android 12 and newer.
 - Use RepForge consistently in the app title, About and store description, and keep navigation-bar controls visible against dark surfaces.
 - Keep startup errors readable on small screens and with larger text, with a clear Retry action and expandable error details.
+- Make unit and increment choices accessible by keyboard, enlarge their touch targets, and let the estimated 1RM setting toggle from its whole row.
 
 ### Changes
 
 - Clarify screen and section heading hierarchy, improve settings-label contrast, and allow long headings and subtitles to wrap.
+- Keep basic coach setup focused: place Save API Key directly below the key field, explain which options save automatically, and group reasoning, tool limits and token usage under expandable advanced settings.
 
 ## [2.2.1]
 
