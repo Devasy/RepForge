@@ -90,8 +90,8 @@ void main() {
       robot.expectVisible(TargetsTab);
 
       // Verify section headers
-      expect(find.text('ACTIVE'), findsOneWidget);
-      expect(find.text('COMPLETED'), findsOneWidget);
+      expect(find.text('Active'), findsOneWidget);
+      expect(find.text('Completed'), findsOneWidget);
 
       // Tap FAB to add new target
       final fab = find.byType(FloatingActionButton);

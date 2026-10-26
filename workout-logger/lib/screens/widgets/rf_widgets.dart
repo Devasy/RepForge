@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
-import 'rf_shell.dart';
 
 // ── Route helper ──────────────────────────────────────────────────────────────
 // Right-to-left slide push, shared by the home screen and detail entry points.
@@ -703,9 +702,28 @@ class RFSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(bottom: bottomPad ? AppSpacing.sm : 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [RFLabel(title), ?trailing],
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          mainAxisSize: constraints.hasBoundedWidth
+              ? MainAxisSize.max
+              : MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Semantics(
+                header: true,
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: AppSpacing.sm),
+              trailing!,
+            ],
+          ],
+        ),
       ),
     );
   }

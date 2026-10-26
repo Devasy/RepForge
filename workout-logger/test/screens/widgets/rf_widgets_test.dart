@@ -113,7 +113,7 @@ void main() {
     );
 
     expect(find.text('Chest'), findsOneWidget);
-    expect(find.text('WORKOUTS'), findsOneWidget);
+    expect(find.text('Workouts'), findsOneWidget);
     expect(find.text('100'), findsOneWidget);
     expect(find.text('50'), findsOneWidget);
   });

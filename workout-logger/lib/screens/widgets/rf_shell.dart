@@ -195,28 +195,20 @@ class RFScreenHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
           textAlign: centreTitle ? TextAlign.center : TextAlign.start,
-          style: const TextStyle(
-            fontFamily: 'Geist',
-            color: AppColors.textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
-          ),
+          style: Theme.of(context).textTheme.headlineSmall,
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 2),
           Text(
             subtitle!,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             textAlign: centreTitle ? TextAlign.center : TextAlign.start,
-            style: const TextStyle(
-              fontFamily: 'Geist',
-              color: AppColors.textMuted,
-              fontSize: 11,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.textSoft,
             ),
           ),
         ],

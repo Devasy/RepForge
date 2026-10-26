@@ -40,11 +40,12 @@ import 'theme/app_theme.dart';
 import 'genui/a2ui.dart';
 import 'theme/a2ui_app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/app_startup_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/widgets/rf_widgets.dart';
 
 /// Resolved once in main() before runApp(). Read lazily by
-/// WorkoutLoggerApp._storageService's static initializer, which only runs
+/// RepForgeApp._storageService's static initializer, which only runs
 /// on first access (during build()) — by then this is already set.
 IStorageService? _resolvedStorageService;
 
@@ -130,17 +131,17 @@ void main() async {
       systemStatusBarContrastEnforced: false,
       systemNavigationBarColor: Colors.transparent,
       systemNavigationBarDividerColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarIconBrightness: Brightness.light,
       systemNavigationBarContrastEnforced: false,
     ),
   );
 
   await _resolveStorageBackend();
 
-  runApp(const WorkoutLoggerApp());
+  runApp(const RepForgeApp());
 }
 
-class WorkoutLoggerApp extends StatelessWidget {
+class RepForgeApp extends StatelessWidget {
   // Singleton instances created once at app startup
   // This ensures the same instances are used throughout the app lifecycle
   static final IStorageService _storageService =
@@ -200,7 +201,7 @@ class WorkoutLoggerApp extends StatelessWidget {
     modelId: () => _geminiService.currentModel,
   );
 
-  const WorkoutLoggerApp({super.key});
+  const RepForgeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +269,7 @@ class WorkoutLoggerApp extends StatelessWidget {
       child: A2UiThemeProvider(
         theme: repforgeA2UiTheme,
         child: MaterialApp(
-          title: 'Workout Logger',
+          title: 'RepForge',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.darkTheme,
           // Above the Navigator, so every route feeds the ambient glow.
@@ -403,65 +404,20 @@ class _AppInitializerState extends State<AppInitializer> {
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: AppTheme.error),
-              const SizedBox(height: 16),
-              Text(
-                'Failed to initialize app',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _error = null;
-                    _initialized = false;
-                  });
-                  _initializeApp();
-                },
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
+      return AppStartupErrorScreen(
+        error: _error!,
+        onRetry: () {
+          setState(() {
+            _error = null;
+            _initialized = false;
+          });
+          _initializeApp();
+        },
       );
     }
 
     if (!_initialized) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.fitness_center,
-                size: 64,
-                color: AppTheme.primaryColor,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Workout Logger',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 32),
-              const CircularProgressIndicator(color: AppTheme.primaryColor),
-            ],
-          ),
-        ),
-      );
+      return const AppLoadingScreen();
     }
 
     if (_needsNamePrompt) {

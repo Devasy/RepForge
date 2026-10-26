@@ -3,7 +3,7 @@
   steps:
     - goal: Open the app and verify the home screen displays
       hint: Tap the app icon to launch
-      successCriteria: Screen shows "Workout Logger" title with dashboard cards showing workout statistics
+      successCriteria: Startup shows the RepForge icon, then the dashboard shows workout statistics
 
 - displayName: View Exercise Library
   id: view_exercise_library

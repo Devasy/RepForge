@@ -61,21 +61,19 @@ class _ProfileSection extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontFamily: 'Geist',
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        letterSpacing: -0.2,
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       subtitle,
                       style: TextStyle(
                         fontFamily: 'Geist',
-                        color: AppColors.textMuted,
+                        color: AppColors.textSoft,
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
                       ),
@@ -563,7 +561,7 @@ class _AboutSectionState extends State<AboutSection> {
       icon: Icons.info_outline_rounded,
       iconColor: AppColors.textSoft,
       title: 'About',
-      subtitle: 'RepForge Workout Logger',
+      subtitle: 'RepForge',
       child: Column(
         children: [
           GestureDetector(
@@ -622,11 +620,11 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text,
       style: TextStyle(
-        fontFamily: 'GeistMono',
-        color: AppColors.textFaint,
-        fontSize: 9,
+        fontFamily: 'Geist',
+        color: AppColors.textSoft,
+        fontSize: 12,
         fontWeight: FontWeight.w600,
-        letterSpacing: 1.4,
+        letterSpacing: 0.3,
       ),
     );
   }

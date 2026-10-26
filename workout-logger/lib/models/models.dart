@@ -1,4 +1,4 @@
-// Data Models for Workout Logger App
+// Data models for RepForge.
 
 import 'dart:math' show log, max;
 import 'dart:convert';

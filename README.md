@@ -17,7 +17,7 @@
 
 ## 📖 About RepForge
 
-**RepForge** (formerly Workout-logger) is an open-source, beautifully designed workout logging mobile application built with Flutter. Whether you're a powerlifter, a casual gym-goer, or someone just starting their fitness journey, RepForge empowers you to track your workouts seamlessly, visualize your progress with detailed analytics, and stay motivated.
+**RepForge** is an open-source, beautifully designed workout logging mobile application built with Flutter. Whether you're a powerlifter, a casual gym-goer, or someone just starting their fitness journey, RepForge empowers you to track your workouts seamlessly, visualize your progress with detailed analytics, and stay motivated.
 
 Tired of subscription-heavy fitness apps? RepForge is built *by* lifters, *for* lifters. It keeps your data local, offline, and completely under your control.
 

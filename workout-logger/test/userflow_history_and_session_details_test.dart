@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/history_screen.dart';
+import 'package:repforge/screens/widgets/rf_widgets.dart';
 import 'package:repforge/services/managers/health_history_manager.dart';
 import 'package:repforge/services/managers/history_manager.dart';
 import 'package:repforge/services/managers/program_manager.dart';
@@ -110,7 +111,13 @@ void main() {
 
       // Verify SessionDetailsSheet displays details
       expect(find.textContaining('60 min'), findsOneWidget);
-      expect(find.text('Exercises'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(RFSectionHeader),
+          matching: find.text('Exercises'),
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

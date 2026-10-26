@@ -4,6 +4,18 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.2.2]
+
+### Fixes
+
+- Replace the old startup name and blank launch backgrounds with the RepForge icon on a consistent dark background, including Android 12 and newer.
+- Use RepForge consistently in the app title, About and store description, and keep navigation-bar controls visible against dark surfaces.
+- Keep startup errors readable on small screens and with larger text, with a clear Retry action and expandable error details.
+
+### Changes
+
+- Clarify screen and section heading hierarchy, improve settings-label contrast, and allow long headings and subtitles to wrap.
+
 ## [2.2.1]
 
 ### Fixes
