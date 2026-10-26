@@ -258,10 +258,25 @@ void main() {
       return a > b ? (a + 0.05) / (b + 0.05) : (b + 0.05) / (a + 0.05);
     }
 
-    expect(
-      contrast(AppColors.onControlSelected, AppColors.controlSelected),
-      greaterThanOrEqualTo(4.5),
-    );
+    final surfaces = [
+      AppColors.background,
+      AppColors.surface,
+      AppColors.cardHigh,
+      Color.alphaBlend(AppColors.glassFillTop, AppColors.background),
+      Color.alphaBlend(AppColors.glassFillBottom, AppColors.background),
+    ];
+    for (final surface in surfaces) {
+      final selectedFill = Color.alphaBlend(AppColors.controlSelected, surface);
+      final selectedEdge = Color.alphaBlend(
+        AppColors.controlSelectedBorder,
+        selectedFill,
+      );
+      expect(
+        contrast(AppColors.onControlSelected, selectedFill),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(contrast(selectedEdge, selectedFill), greaterThanOrEqualTo(3));
+    }
     expect(
       contrast(AppColors.controlOutline, AppColors.cardHigh),
       greaterThanOrEqualTo(3),

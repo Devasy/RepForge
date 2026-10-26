@@ -63,8 +63,9 @@ class AppColors {
   static const textMuted = Color(0x7AF4F4F8); // --fg-3 48%
   static const textFaint = Color(0x52F4F4F8); // --fg-4 32%
 
-  static const controlSelected = Color(0xFFE6DBFF);
-  static const onControlSelected = Color(0xFF28134F);
+  static const controlSelected = Color(0x267C3AED);
+  static const onControlSelected = textPrimary;
+  static const controlSelectedBorder = Color(0xA6C6AAFF);
   static const controlFocus = Color(0xFFC6AAFF);
   static const controlOutline = Color(0xFF777382);
   static const controlError = Color(0xFFFF9B90);
@@ -371,6 +372,7 @@ class AppControlTheme {
     backgroundColor: WidgetStatePropertyAll(
       selected ? AppColors.controlSelected : Colors.transparent,
     ),
+    side: _selectionSide(selected: selected),
     textStyle: const WidgetStatePropertyAll(textStyle),
     padding: const WidgetStatePropertyAll(
       EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
@@ -409,11 +411,7 @@ class AppControlTheme {
           ? AppColors.onControlSelected
           : AppColors.textPrimary,
     ),
-    side: WidgetStateProperty.resolveWith(
-      (states) => states.contains(WidgetState.focused)
-          ? const BorderSide(color: AppColors.controlFocus, width: 2)
-          : BorderSide.none,
-    ),
+    side: _selectionSide(selected: selected),
     shape: WidgetStateProperty.resolveWith((states) {
       if (states.contains(WidgetState.pressed)) {
         return RoundedRectangleBorder(
@@ -430,6 +428,17 @@ class AppControlTheme {
       );
     }),
   );
+
+  static WidgetStateProperty<BorderSide> _selectionSide({required bool selected}) =>
+      WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) return BorderSide.none;
+        if (states.contains(WidgetState.focused)) {
+          return const BorderSide(color: AppColors.controlFocus, width: 2);
+        }
+        return selected
+            ? const BorderSide(color: AppColors.controlSelectedBorder)
+            : BorderSide.none;
+      });
 }
 
 class AppSpacing {
