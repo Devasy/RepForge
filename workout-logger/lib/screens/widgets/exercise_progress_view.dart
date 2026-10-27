@@ -767,16 +767,16 @@ class _ChartSection extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                  chartMode == _ChartMode.volume
-                      ? (isTimeBased ? 'Hold Duration' : 'Volume Progression')
-                      : 'Set Progression',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                chartMode == _ChartMode.volume
+                    ? (isTimeBased ? 'Hold Duration' : 'Volume Progression')
+                    : 'Set Progression',
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
+              ),
               _ChartModeToggle(
                 value: chartMode,
                 onChanged: onChartModeChanged,
@@ -814,6 +814,8 @@ class _ChartModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => RFSelectionGroup<_ChartMode>(
+    compact: true,
+    expanded: false,
     options: [
       for (final mode in _ChartMode.values)
         RFSelectionOption(
@@ -910,7 +912,7 @@ class _VolumeChart extends StatelessWidget {
         isCurved: true,
         curveSmoothness: 0.3,
         color: AppColors.secondary,
-        barWidth: 2.5,
+        barWidth: AppChartStyle.strokeWidth,
         dotData: FlDotData(
           show: true,
           getDotPainter: (_, _, _, _) => FlDotCirclePainter(
@@ -989,11 +991,22 @@ class _VolumeChart extends StatelessWidget {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            getDrawingHorizontalLine: (_) =>
-                FlLine(color: AppColors.glassBorder, strokeWidth: 1),
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: AppChartStyle.gridColor,
+              strokeWidth: 0.7,
+              dashArray: [3, 5],
+            ),
           ),
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
+              fitInsideHorizontally: true,
+              fitInsideVertically: true,
+              tooltipBorderRadius: BorderRadius.circular(
+                AppChartStyle.tooltipRadius,
+              ),
+              tooltipBorder: const BorderSide(
+                color: AppColors.glassBorderStrong,
+              ),
               getTooltipColor: (_) => AppColors.cardHigh,
               getTooltipItems: (spots) => spots.map((spot) {
                 if (spot.barIndex != 0) return null;
@@ -1217,7 +1230,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                   toY: w,
                   width: 6,
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(3),
+                    top: Radius.circular(4),
                   ),
                   gradient: LinearGradient(
                     colors: [_wc, _wc.withValues(alpha: 0.55)],
@@ -1236,7 +1249,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                   toY: metricVal * scale,
                   width: 6,
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(3),
+                    top: Radius.circular(4),
                   ),
                   gradient: LinearGradient(
                     colors: [_rc, _rc.withValues(alpha: 0.50)],
@@ -1396,6 +1409,7 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     _ToggleLegend(
                       color: _wc,
@@ -1429,12 +1443,23 @@ class _SetProgressionChartState extends State<_SetProgressionChart> {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    getDrawingHorizontalLine: (_) =>
-                        FlLine(color: AppColors.glassBorder, strokeWidth: 1),
+                    getDrawingHorizontalLine: (_) => FlLine(
+                      color: AppChartStyle.gridColor,
+                      strokeWidth: 0.7,
+                      dashArray: [3, 5],
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   barTouchData: BarTouchData(
                     touchTooltipData: BarTouchTooltipData(
+                      fitInsideHorizontally: true,
+                      fitInsideVertically: true,
+                      tooltipBorderRadius: BorderRadius.circular(
+                        AppChartStyle.tooltipRadius,
+                      ),
+                      tooltipBorder: const BorderSide(
+                        color: AppColors.glassBorderStrong,
+                      ),
                       getTooltipColor: (_) => AppColors.cardHigh,
                       getTooltipItem: (group, gi, rod, ri) =>
                           _tooltip(gi, ri, sessions, settings),
@@ -1595,6 +1620,8 @@ class _SetModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => RFSelectionGroup<_SetViewMode>(
+    compact: true,
+    expanded: false,
     options: [
       for (final mode in _SetViewMode.values)
         RFSelectionOption(

@@ -322,11 +322,11 @@ class _HrDayPainter extends CustomPainter {
       final ttX = (cx - ttW / 2).clamp(_padLeft, size.width - 4 - ttW);
       const ttY = _padTop + 2.0;
       canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
+        RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(AppChartStyle.tooltipRadius)),
         Paint()..color = const Color(0xFF1E1E2E),
       );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
+        RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(AppChartStyle.tooltipRadius)),
         Paint()
           ..color = AppColors.secondary.withValues(alpha: 0.6)
           ..style = PaintingStyle.stroke
@@ -516,7 +516,7 @@ class _AggPainter extends CustomPainter {
           canvas.drawRRect(
             RRect.fromRectAndRadius(
               Rect.fromLTWH(x, yTop, barW, max(yBot - yTop, 2)),
-              const Radius.circular(2),
+              Radius.circular(rangeGradient ? barW / 2 : 2),
             ),
             paint,
           );
@@ -590,17 +590,17 @@ class _AggPainter extends CustomPainter {
     var ttY = _padTop + 2.0;
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
+      RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(AppChartStyle.tooltipRadius)),
       Paint()
         ..color = Colors.black.withValues(alpha: 0.4)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
+      RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(AppChartStyle.tooltipRadius)),
       Paint()..color = const Color(0xFF1E1E2E),
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
+      RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(AppChartStyle.tooltipRadius)),
       Paint()
         ..color = AppColors.primary.withValues(alpha: 0.6)
         ..style = PaintingStyle.stroke

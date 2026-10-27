@@ -1,16 +1,14 @@
 import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-
 import '../../theme/app_theme.dart';
 
 class RFSelectionOption<T> {
   const RFSelectionOption({required this.value, required this.label});
-
   final T value;
   final String label;
 }
 
+/// Glass choices with an intrinsic compact variant for chart toolbars.
 class RFSelectionGroup<T> extends StatelessWidget {
   const RFSelectionGroup({
     super.key,
@@ -18,12 +16,15 @@ class RFSelectionGroup<T> extends StatelessWidget {
     required this.selected,
     required this.onChanged,
     this.width,
+    this.compact = false,
+    this.expanded = true,
   }) : assert(options.length > 0);
-
   final List<RFSelectionOption<T>> options;
   final T selected;
   final ValueChanged<T>? onChanged;
   final double? width;
+  final bool compact;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) => width != null
@@ -33,95 +34,90 @@ class RFSelectionGroup<T> extends StatelessWidget {
               _buildGroup(context, constraints.maxWidth),
         );
 
-  Widget _buildGroup(BuildContext context, double availableWidth) {
-    final textScaler = MediaQuery.textScalerOf(context);
+  Widget _buildGroup(BuildContext context, double available) {
     final style = AppControlTheme.textStyle.copyWith(
+      fontSize: compact ? 12 : 14,
       fontWeight: FontWeight.w600,
     );
-    final naturalWidth = options.fold<double>(0, (width, option) {
+    final naturalWidth = options.fold<double>(48, (largest, option) {
       final painter = TextPainter(
         text: TextSpan(text: option.label, style: style),
         textDirection: Directionality.of(context),
-        textScaler: textScaler,
+        textScaler: MediaQuery.textScalerOf(context),
       )..layout();
-      final result = math.max(width, painter.width + 60);
+      final measured = math.max(largest, painter.width + (compact ? 20 : 28));
       painter.dispose();
-      return result;
+      return measured;
     });
-    final width = availableWidth.isFinite
-        ? availableWidth
-        : naturalWidth * options.length + AppSpacing.xs * (options.length - 1);
-    final columns = ((width + AppSpacing.xs) / (naturalWidth + AppSpacing.xs))
-        .floor()
-        .clamp(1, options.length);
-    final buttonWidth = (width - AppSpacing.xs * (columns - 1)) / columns;
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
-      children: [
-        for (var i = 0; i < options.length; i++)
-          SizedBox(
-            width: buttonWidth,
-            child: _SelectionButton(
-              label: options[i].label,
-              selected: selected == options[i].value,
-              first: i % columns == 0,
-              last: i % columns == columns - 1 || i == options.length - 1,
-              onPressed: onChanged == null
-                  ? null
-                  : () => onChanged!(options[i].value),
-            ),
-          ),
-      ],
+    const inset = AppSpacing.xs;
+    final desired = naturalWidth * options.length + inset * 2;
+    final groupWidth = available.isFinite
+        ? (expanded ? available : math.min(desired, available))
+        : desired;
+    final innerWidth = math.max(0.0, groupWidth - inset * 2);
+    final columns = (innerWidth / naturalWidth).floor().clamp(
+      1,
+      options.length,
     );
-  }
-}
-
-class _SelectionButton extends StatelessWidget {
-  const _SelectionButton({
-    required this.label,
-    required this.selected,
-    required this.first,
-    required this.last,
-    required this.onPressed,
-  });
-
-  final String label;
-  final bool selected;
-  final bool first;
-  final bool last;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) => MergeSemantics(
-    child: Semantics(
-      selected: selected,
-      enabled: onPressed != null,
-      inMutuallyExclusiveGroup: true,
-      child: FilledButton(
-        onPressed: onPressed,
-        style: AppControlTheme.selectionStyle(
-          selected: selected,
-          first: first,
-          last: last,
-          reduceMotion: MediaQuery.disableAnimationsOf(context),
+    final buttonWidth = innerWidth / columns;
+    return SizedBox(
+      width: groupWidth,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.glassFillTop, AppColors.glassFillBottom],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.button),
+          border: Border.all(color: AppColors.glassBorderStrong),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ExcludeSemantics(
-              child: SizedBox(
-                width: 20,
-                child: selected
-                    ? const Icon(Icons.check_rounded, size: 20)
-                    : null,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Flexible(child: Text(label, textAlign: TextAlign.center)),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(inset),
+          child: Wrap(
+            runSpacing: inset,
+            children: [
+              for (final option in options)
+                SizedBox(
+                  width: buttonWidth,
+                  child: MergeSemantics(
+                    child: Semantics(
+                      selected: selected == option.value,
+                      enabled: onChanged != null,
+                      inMutuallyExclusiveGroup: true,
+                      child: FilledButton(
+                        onPressed: onChanged == null
+                            ? null
+                            : () => onChanged!(option.value),
+                        style:
+                            AppControlTheme.selectionStyle(
+                              selected: selected == option.value,
+                              first: false,
+                              last: false,
+                              reduceMotion: MediaQuery.disableAnimationsOf(
+                                context,
+                              ),
+                            ).copyWith(
+                              minimumSize: const WidgetStatePropertyAll(
+                                Size(48, 40),
+                              ),
+                              padding: WidgetStatePropertyAll(
+                                EdgeInsets.symmetric(
+                                  horizontal: compact ? 8 : 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              textStyle: WidgetStatePropertyAll(style),
+                            ),
+                        child: Text(option.label, textAlign: TextAlign.center),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

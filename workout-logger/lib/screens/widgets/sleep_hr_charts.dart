@@ -256,7 +256,7 @@ class _BarChartPainter extends CustomPainter {
 
     final avgPaint = Paint()
       ..color = AppColors.secondary.withValues(alpha: 0.9)
-      ..strokeWidth = 1.5
+      ..strokeWidth = AppChartStyle.strokeWidth
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
@@ -336,17 +336,17 @@ class _BarChartPainter extends CustomPainter {
       if (ttY < _padTop) ttY = yBot + 6;
 
       canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
+        RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(AppChartStyle.tooltipRadius)),
         Paint()
           ..color = Colors.black.withValues(alpha: 0.4)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
       );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
+        RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(AppChartStyle.tooltipRadius)),
         Paint()..color = const Color(0xFF1E1E2E),
       );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(6)),
+        RRect.fromRectAndRadius(Rect.fromLTWH(ttX, ttY, ttW, ttH), const Radius.circular(AppChartStyle.tooltipRadius)),
         Paint()
           ..color = color.withValues(alpha: 0.7)
           ..style = PaintingStyle.stroke
@@ -450,7 +450,7 @@ class _DashLinePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = AppColors.secondary.withValues(alpha: 0.85)
-      ..strokeWidth = 1.5
+      ..strokeWidth = AppChartStyle.strokeWidth
       ..style = PaintingStyle.stroke;
     final y = size.height / 2;
     for (var x = 0.0; x < size.width; x += 4) {

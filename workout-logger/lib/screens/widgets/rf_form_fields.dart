@@ -141,6 +141,7 @@ class RFDropdown<T> extends StatefulWidget {
     this.label,
     this.hint,
     this.labelBuilder,
+    this.compact = true,
   });
 
   final T? value;
@@ -149,6 +150,7 @@ class RFDropdown<T> extends StatefulWidget {
   final String? label;
   final String? hint;
   final String Function(T)? labelBuilder;
+  final bool compact;
 
   @override
   State<RFDropdown<T>> createState() => _RFDropdownState<T>();
@@ -200,8 +202,12 @@ class _RFDropdownState<T> extends State<RFDropdown<T>> {
     selectOnly: true,
     label: widget.label == null ? null : Text(widget.label!),
     hintText: widget.hint,
-    textStyle: AppControlTheme.textStyle,
-    inputDecorationTheme: AppControlTheme.inputDecoration(),
+    textStyle: AppControlTheme.textStyle.copyWith(
+      fontSize: widget.compact ? 14 : 16,
+    ),
+    inputDecorationTheme: AppControlTheme.inputDecoration(
+      compact: widget.compact,
+    ),
     menuHeight: MediaQuery.sizeOf(context).height * 0.5,
     menuStyle: AppControlTheme.menuStyle,
     trailingIcon: const Icon(Icons.expand_more_rounded),

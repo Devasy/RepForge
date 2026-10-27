@@ -17,7 +17,7 @@ class VolumeChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? AppColors.primary;
+    final c = color ?? AppColors.secondary;
     return Column(
       children: [
         SizedBox(
@@ -32,13 +32,16 @@ class VolumeChart extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: labels
-                .map((l) => Text(
-                      l,
-                      style: TextStyle(fontFamily: 'GeistMono', 
-                        fontSize: 9,
-                        color: AppColors.textFaint,
-                      ),
-                    ))
+                .map(
+                  (l) => Text(
+                    l,
+                    style: TextStyle(
+                      fontFamily: 'GeistMono',
+                      fontSize: 9,
+                      color: AppColors.textFaint,
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ],
@@ -91,7 +94,7 @@ class _VolumeCurvePainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            color.withValues(alpha: 0.4),
+            color.withValues(alpha: AppChartStyle.areaOpacity),
             color.withValues(alpha: 0),
           ],
         ).createShader(Rect.fromLTWH(0, 0, w, h)),
@@ -104,7 +107,7 @@ class _VolumeCurvePainter extends CustomPainter {
         Offset(0, y),
         Offset(w, y),
         Paint()
-          ..color = const Color(0x0AFFFFFF)
+          ..color = AppChartStyle.gridColor
           ..strokeWidth = 1,
       );
     }
@@ -115,7 +118,7 @@ class _VolumeCurvePainter extends CustomPainter {
       Paint()
         ..color = color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
+        ..strokeWidth = AppChartStyle.strokeWidth
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
@@ -135,7 +138,7 @@ class _VolumeCurvePainter extends CustomPainter {
           Paint()
             ..color = color
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 2,
+            ..strokeWidth = AppChartStyle.strokeWidth,
         );
       }
     }

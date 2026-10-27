@@ -61,15 +61,15 @@ enum _Range { w4, w12, all }
 
 extension on _Range {
   String get label => switch (this) {
-        _Range.w4 => '4W',
-        _Range.w12 => '12W',
-        _Range.all => 'All',
-      };
+    _Range.w4 => '4W',
+    _Range.w12 => '12W',
+    _Range.all => 'All',
+  };
   int? get weeks => switch (this) {
-        _Range.w4 => 4,
-        _Range.w12 => 12,
-        _Range.all => null, // computed from history (capped)
-      };
+    _Range.w4 => 4,
+    _Range.w12 => 12,
+    _Range.all => null, // computed from history (capped)
+  };
 }
 
 class _VolumeTrendCard extends StatefulWidget {
@@ -104,16 +104,21 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
       final earliest = sessions
           .map((s) => s.date)
           .reduce((a, b) => a.isBefore(b) ? a : b);
-      final earliestWeekStart = DateTime(earliest.year, earliest.month, earliest.day)
-          .subtract(Duration(days: earliest.weekday - 1));
-      final span = currentWeekStart.difference(earliestWeekStart).inDays ~/ 7 + 1;
+      final earliestWeekStart = DateTime(
+        earliest.year,
+        earliest.month,
+        earliest.day,
+      ).subtract(Duration(days: earliest.weekday - 1));
+      final span =
+          currentWeekStart.difference(earliestWeekStart).inDays ~/ 7 + 1;
       weeks = span.clamp(1, _allCap);
     }
 
     double weeklyVolume(int weekIndex) {
       // weekIndex 0 == oldest week shown, weeks-1 == current week.
-      final wStart =
-          currentWeekStart.subtract(Duration(days: (weeks - 1 - weekIndex) * 7));
+      final wStart = currentWeekStart.subtract(
+        Duration(days: (weeks - 1 - weekIndex) * 7),
+      );
       final wEnd = wStart.add(const Duration(days: 7));
       final raw = sessions
           .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
@@ -131,15 +136,17 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
     final curSum = spots.fold<double>(0, (sum, s) => sum + s.y);
     double prevSum = 0;
     for (int i = 0; i < weeks; i++) {
-      final wStart =
-          currentWeekStart.subtract(Duration(days: (weeks + i) * 7));
+      final wStart = currentWeekStart.subtract(Duration(days: (weeks + i) * 7));
       final wEnd = wStart.add(const Duration(days: 7));
-      prevSum += settings.toDisplay(sessions
-          .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
-          .fold<double>(0, (sum, s) => sum + s.totalVolume));
+      prevSum += settings.toDisplay(
+        sessions
+            .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
+            .fold<double>(0, (sum, s) => sum + s.totalVolume),
+      );
     }
-    final double? deltaPct =
-        prevSum > 0 ? ((curSum - prevSum) / prevSum * 100) : null;
+    final double? deltaPct = prevSum > 0
+        ? ((curSum - prevSum) / prevSum * 100)
+        : null;
 
     DateTime weekStartFor(int i) =>
         currentWeekStart.subtract(Duration(days: (weeks - 1 - i) * 7));
@@ -156,26 +163,28 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Volume Trend',
-                      style: TextStyle(fontFamily: 'Geist', 
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Volume Trend',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${settings.unitLabel} · per week',
-                      style: TextStyle(fontFamily: 'Geist', 
-                        color: AppColors.textMuted,
-                        fontSize: 11,
-                      ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${settings.unitLabel} · per week',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      color: AppColors.textMuted,
+                      fontSize: 11,
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
               _RangeToggle(
                 value: _range,
                 onChanged: (r) => setState(() => _range = r),
@@ -196,7 +205,8 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                 const SizedBox(width: 2),
                 Text(
                   '${deltaPct.abs().toStringAsFixed(0)}% vs prev ${weeks}w',
-                  style: TextStyle(fontFamily: 'GeistMono', 
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
                     color: deltaPct >= 0 ? AppColors.success : AppColors.error,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -220,11 +230,22 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: false,
-                      getDrawingHorizontalLine: (_) =>
-                          FlLine(color: AppColors.glassBorder, strokeWidth: 1),
+                      getDrawingHorizontalLine: (_) => FlLine(
+                        color: AppChartStyle.gridColor,
+                        strokeWidth: 0.7,
+                        dashArray: [3, 5],
+                      ),
                     ),
                     lineTouchData: LineTouchData(
                       touchTooltipData: LineTouchTooltipData(
+                        fitInsideHorizontally: true,
+                        fitInsideVertically: true,
+                        tooltipBorderRadius: BorderRadius.circular(
+                          AppChartStyle.tooltipRadius,
+                        ),
+                        tooltipBorder: const BorderSide(
+                          color: AppColors.glassBorderStrong,
+                        ),
                         getTooltipColor: (_) => AppColors.cardHigh,
                         getTooltipItems: (touched) => touched.map((spot) {
                           final i = spot.x.toInt();
@@ -232,8 +253,9 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                           final ws = weekStartFor(i);
                           return LineTooltipItem(
                             '$volStr ${settings.unitLabel}',
-                            TextStyle(fontFamily: 'GeistMono', 
-                              color: AppColors.primary,
+                            TextStyle(
+                              fontFamily: 'GeistMono',
+                              color: AppColors.secondary,
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
@@ -241,7 +263,8 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                               TextSpan(
                                 text:
                                     '\nwk of ${DateFormat('MMM d').format(ws)}',
-                                style: TextStyle(fontFamily: 'Geist', 
+                                style: TextStyle(
+                                  fontFamily: 'Geist',
                                   color: AppColors.textMuted,
                                   fontSize: 10,
                                   fontWeight: FontWeight.normal,
@@ -254,9 +277,11 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                     ),
                     titlesData: FlTitlesData(
                       rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false)),
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                       topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false)),
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
@@ -269,7 +294,8 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                               padding: const EdgeInsets.only(top: 6),
                               child: Text(
                                 DateFormat('d/M').format(weekStartFor(i)),
-                                style: TextStyle(fontFamily: 'GeistMono', 
+                                style: TextStyle(
+                                  fontFamily: 'GeistMono',
                                   color: AppColors.textMuted,
                                   fontSize: 9,
                                 ),
@@ -284,7 +310,8 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                           reservedSize: 40,
                           getTitlesWidget: (v, _) => Text(
                             _fmtK(v),
-                            style: TextStyle(fontFamily: 'GeistMono', 
+                            style: TextStyle(
+                              fontFamily: 'GeistMono',
                               color: AppColors.textMuted,
                               fontSize: 9,
                             ),
@@ -305,8 +332,12 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                               show: true,
                               direction: LabelDirection.horizontal,
                               alignment: Alignment.topRight,
-                              padding: const EdgeInsets.only(right: 6, bottom: 2),
-                              style: TextStyle(fontFamily: 'GeistMono', 
+                              padding: const EdgeInsets.only(
+                                right: 6,
+                                bottom: 2,
+                              ),
+                              style: TextStyle(
+                                fontFamily: 'GeistMono',
                                 color: AppColors.warning,
                                 fontSize: 9,
                                 fontWeight: FontWeight.w600,
@@ -321,15 +352,14 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                         spots: spots,
                         isCurved: true,
                         curveSmoothness: 0.3,
-                        color: AppColors.primary,
-                        barWidth: 2.5,
+                        color: AppColors.secondary,
+                        barWidth: AppChartStyle.strokeWidth,
                         isStrokeCapRound: true,
                         dotData: FlDotData(
                           show: weeks <= 12,
-                          getDotPainter: (_, _, _, _) =>
-                              FlDotCirclePainter(
+                          getDotPainter: (_, _, _, _) => FlDotCirclePainter(
                             radius: 3.5,
-                            color: AppColors.primary,
+                            color: AppColors.secondary,
                             strokeWidth: 1.5,
                             strokeColor: AppColors.surface,
                           ),
@@ -338,8 +368,10 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                           show: true,
                           gradient: LinearGradient(
                             colors: [
-                              AppColors.primary.withValues(alpha: 0.25),
-                              AppColors.primary.withValues(alpha: 0.0),
+                              AppColors.secondary.withValues(
+                                alpha: AppChartStyle.areaOpacity,
+                              ),
+                              AppColors.secondary.withValues(alpha: 0.0),
                             ],
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
@@ -365,6 +397,8 @@ class _RangeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => RFSelectionGroup<_Range>(
+    compact: true,
+    expanded: false,
     options: [
       for (final range in _Range.values)
         RFSelectionOption(value: range, label: range.label),
@@ -529,7 +563,8 @@ class _MuscleFocusRow extends StatelessWidget {
                 Expanded(
                   child: Text(
                     name,
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textSoft,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -538,14 +573,18 @@ class _MuscleFocusRow extends StatelessWidget {
                 ),
                 Text(
                   '${_fmtK(displayVol)} ${settings.unitLabel}',
-                  style: TextStyle(fontFamily: 'GeistMono', 
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
                     color: AppColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.chevron_right_rounded,
-                    size: 14, color: AppColors.textFaint),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 14,
+                  color: AppColors.textFaint,
+                ),
               ],
             ),
             const SizedBox(height: 5),
@@ -563,7 +602,8 @@ class _MuscleFocusRow extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     '${recovery!.recoveryPercent}%',
-                    style: TextStyle(fontFamily: 'GeistMono', 
+                    style: TextStyle(
+                      fontFamily: 'GeistMono',
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: _recoveryColor,
@@ -615,7 +655,9 @@ class _FrequencyGrid extends StatelessWidget {
                     height: boxSize,
                     decoration: BoxDecoration(
                       color: active
-                          ? AppColors.primary.withValues(alpha: 0.12 + count * 0.06)
+                          ? AppColors.primary.withValues(
+                              alpha: 0.12 + count * 0.06,
+                            )
                           : AppColors.glass2,
                       borderRadius: BorderRadius.circular(AppRadius.button),
                       border: Border.all(
@@ -628,15 +670,18 @@ class _FrequencyGrid extends StatelessWidget {
                               BoxShadow(
                                 color: AppColors.primary.withValues(alpha: 0.2),
                                 blurRadius: 12,
-                              )
+                              ),
                             ]
                           : null,
                     ),
                     child: Center(
                       child: Text(
                         '$count',
-                        style: TextStyle(fontFamily: 'GeistMono', 
-                          color: active ? AppColors.primary : AppColors.textMuted,
+                        style: TextStyle(
+                          fontFamily: 'GeistMono',
+                          color: active
+                              ? AppColors.primary
+                              : AppColors.textMuted,
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
                         ),
@@ -646,7 +691,8 @@ class _FrequencyGrid extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     label,
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textMuted,
                       fontSize: 10,
                     ),
@@ -664,11 +710,7 @@ class _FrequencyGrid extends StatelessWidget {
 // ── Reusable chart card ────────────────────────────────────────────────────────
 
 class _ChartCard extends StatelessWidget {
-  const _ChartCard({
-    required this.title,
-    required this.child,
-    this.subtitle,
-  });
+  const _ChartCard({required this.title, required this.child, this.subtitle});
 
   final String title;
   final String? subtitle;
@@ -683,7 +725,8 @@ class _ChartCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -693,7 +736,11 @@ class _ChartCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               subtitle!,
-              style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 11),
+              style: TextStyle(
+                fontFamily: 'Geist',
+                color: AppColors.textMuted,
+                fontSize: 11,
+              ),
             ),
           ],
           const SizedBox(height: 14),
@@ -712,12 +759,28 @@ class _EmptyChart extends StatelessWidget {
     return Center(
       child: Column(
         children: [
-          const Icon(Icons.show_chart_rounded, size: 32, color: AppColors.textFaint),
+          const Icon(
+            Icons.show_chart_rounded,
+            size: 32,
+            color: AppColors.textFaint,
+          ),
           const SizedBox(height: 8),
-          Text('No data yet',
-              style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.textMuted)),
-          Text('Complete workouts to see progress',
-              style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.textFaint)),
+          Text(
+            'No data yet',
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 13,
+              color: AppColors.textMuted,
+            ),
+          ),
+          Text(
+            'Complete workouts to see progress',
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 11,
+              color: AppColors.textFaint,
+            ),
+          ),
         ],
       ),
     );

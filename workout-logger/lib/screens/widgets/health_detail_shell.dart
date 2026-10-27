@@ -76,7 +76,10 @@ class HealthDetailShell extends StatelessWidget {
         children: [
           IconButton(
             onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textSoft),
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: AppColors.textSoft,
+            ),
             tooltip: 'Back',
           ),
           Expanded(
@@ -94,7 +97,8 @@ class HealthDetailShell extends StatelessWidget {
                         const SizedBox(width: 5),
                         Text(
                           title,
-                          style: TextStyle(fontFamily: 'Geist', 
+                          style: TextStyle(
+                            fontFamily: 'Geist',
                             color: AppColors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -106,7 +110,11 @@ class HealthDetailShell extends StatelessWidget {
                     const SizedBox(height: 1),
                     Text(
                       dateLabel,
-                      style: TextStyle(fontFamily: 'GeistMono', color: AppColors.textFaint, fontSize: 11),
+                      style: TextStyle(
+                        fontFamily: 'GeistMono',
+                        color: AppColors.textFaint,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -146,7 +154,9 @@ class _NavArrow extends StatelessWidget {
         child: Icon(
           icon,
           size: 18,
-          color: enabled ? AppColors.textMuted : AppColors.textFaint.withValues(alpha: 0.4),
+          color: enabled
+              ? AppColors.textMuted
+              : AppColors.textFaint.withValues(alpha: 0.4),
         ),
       ),
     );
@@ -161,6 +171,8 @@ class _GranularityToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => RFSelectionGroup<HealthGranularity>(
+    compact: true,
+    expanded: true,
     options: [
       for (final granularity in HealthGranularity.values)
         RFSelectionOption(value: granularity, label: granularity.label),

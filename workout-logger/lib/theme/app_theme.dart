@@ -211,7 +211,7 @@ class AppTheme {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: AppColors.cardHigh,
+        backgroundColor: Colors.transparent,
         contentTextStyle: const TextStyle(color: AppColors.textPrimary),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
@@ -316,7 +316,10 @@ class AppControlTheme {
     height: 1.4,
   );
 
-  static InputDecorationTheme inputDecoration({bool compact = false, bool inline = false}) {
+  static InputDecorationTheme inputDecoration({
+    bool compact = false,
+    bool inline = false,
+  }) {
     final radius = BorderRadius.circular(compact ? AppRadius.md : AppRadius.lg);
     OutlineInputBorder border(Color color, [double width = 1]) =>
         OutlineInputBorder(
@@ -325,15 +328,19 @@ class AppControlTheme {
         );
     return InputDecorationTheme(
       filled: !inline,
-      fillColor: AppColors.cardHigh,
+      fillColor: AppColors.glass2,
       isDense: compact || inline,
       constraints: const BoxConstraints(minHeight: 48),
-      contentPadding: inline ? EdgeInsets.zero : EdgeInsets.symmetric(
-        horizontal: compact ? AppSpacing.sm : AppSpacing.md,
-        vertical: compact ? AppSpacing.sm : AppSpacing.md,
-      ),
-      border: border(AppColors.controlOutline),
-      enabledBorder: inline ? InputBorder.none : border(AppColors.controlOutline),
+      contentPadding: inline
+          ? EdgeInsets.zero
+          : EdgeInsets.symmetric(
+              horizontal: compact ? AppSpacing.sm : AppSpacing.md,
+              vertical: compact ? AppSpacing.sm : AppSpacing.md,
+            ),
+      border: border(AppColors.glassBorderStrong),
+      enabledBorder: inline
+          ? InputBorder.none
+          : border(AppColors.glassBorderStrong),
       focusedBorder: border(AppColors.controlFocus, 2),
       errorBorder: border(AppColors.controlError),
       focusedErrorBorder: border(AppColors.controlError, 2),
@@ -342,7 +349,10 @@ class AppControlTheme {
       floatingLabelStyle: textStyle.copyWith(color: AppColors.controlFocus),
       hintStyle: textStyle.copyWith(color: AppColors.textSoft),
       helperStyle: textStyle.copyWith(fontSize: 12, color: AppColors.textSoft),
-      errorStyle: textStyle.copyWith(fontSize: 12, color: AppColors.controlError),
+      errorStyle: textStyle.copyWith(
+        fontSize: 12,
+        color: AppColors.controlError,
+      ),
       errorMaxLines: 3,
       helperMaxLines: 3,
       prefixIconColor: AppColors.textSoft,
@@ -364,7 +374,9 @@ class AppControlTheme {
   );
 
   static ButtonStyle menuItemStyle({required bool selected}) => ButtonStyle(
-    iconColor: WidgetStatePropertyAll(selected ? AppColors.onControlSelected : AppColors.textPrimary),
+    iconColor: WidgetStatePropertyAll(
+      selected ? AppColors.onControlSelected : AppColors.textPrimary,
+    ),
     minimumSize: const WidgetStatePropertyAll(Size(48, 56)),
     foregroundColor: WidgetStatePropertyAll(
       selected ? AppColors.onControlSelected : AppColors.textPrimary,
@@ -402,7 +414,7 @@ class AppControlTheme {
           ? AppColors.glass2
           : selected
           ? AppColors.controlSelected
-          : AppColors.cardHigh,
+          : Colors.transparent,
     ),
     foregroundColor: WidgetStateProperty.resolveWith(
       (states) => states.contains(WidgetState.disabled)
@@ -412,33 +424,21 @@ class AppControlTheme {
           : AppColors.textPrimary,
     ),
     side: _selectionSide(selected: selected),
-    shape: WidgetStateProperty.resolveWith((states) {
-      if (states.contains(WidgetState.pressed)) {
-        return RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        );
-      }
-      return RoundedRectangleBorder(
-        borderRadius: selected
-            ? BorderRadius.circular(AppRadius.full)
-            : BorderRadiusDirectional.horizontal(
-                  start: Radius.circular(first ? AppRadius.controlEnd : AppRadius.sm),
-                  end: Radius.circular(last ? AppRadius.controlEnd : AppRadius.sm),
-              ),
-      );
-    }),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+    ),
   );
-
-  static WidgetStateProperty<BorderSide> _selectionSide({required bool selected}) =>
-      WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.disabled)) return BorderSide.none;
-        if (states.contains(WidgetState.focused)) {
-          return const BorderSide(color: AppColors.controlFocus, width: 2);
-        }
-        return selected
-            ? const BorderSide(color: AppColors.controlSelectedBorder)
-            : BorderSide.none;
-      });
+  static WidgetStateProperty<BorderSide> _selectionSide({
+    required bool selected,
+  }) => WidgetStateProperty.resolveWith((states) {
+    if (states.contains(WidgetState.disabled)) return BorderSide.none;
+    if (states.contains(WidgetState.focused)) {
+      return const BorderSide(color: AppColors.controlFocus, width: 2);
+    }
+    return selected
+        ? const BorderSide(color: AppColors.controlSelectedBorder)
+        : BorderSide.none;
+  });
 }
 
 class AppSpacing {
@@ -512,4 +512,13 @@ class AppBreakpoints {
   /// Vertical clearance needed to lift a Scaffold FAB above the custom RFNavBar.
   /// Wrap the FAB in `Padding(padding: EdgeInsets.only(bottom: navBarClearance))`.
   static const double navBarClearance = 80.0;
+}
+
+/// Shared chart geometry: expressive marks, quiet scaffolding, stable plot sizes.
+class AppChartStyle {
+  const AppChartStyle._();
+  static const strokeWidth = 3.5;
+  static const gridColor = AppColors.glassBorderStrong;
+  static const tooltipRadius = AppRadius.md;
+  static const areaOpacity = 0.16;
 }
