@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/models/web_search_result.dart';
 import 'package:repforge/services/ai/gemini_search.dart';
+import 'package:repforge/services/ai/gemini_ai_service.dart';
 import 'package:repforge/services/interfaces/web_grounding_support.dart';
 
 const suggestions =
@@ -49,6 +50,36 @@ ModelRequest request(String model, List<ModelMessage> messages) => ModelRequest(
 );
 
 void main() {
+  test('agent service enables native Google Search', () async {
+    Map<String, dynamic>? body;
+    final service = GeminiAiService(
+      modelClientFactory: () => MockClient((incoming) async {
+        body = jsonDecode(incoming.body) as Map<String, dynamic>;
+        return http.Response(
+          sse([
+            {'text': 'Summary'},
+          ]),
+          200,
+        );
+      }),
+    )..init('fake-key', model: 'gemini-3.8-flash');
+    addTearDown(service.dispose);
+    await service
+        .stream(
+          request('gemini-3.8-flash', [
+            ModelMessage(role: 'user', text: 'Research'),
+          ]),
+          CancellationToken(),
+        )
+        .toList();
+    expect(
+      (body!['tools'] as List).whereType<Map>().any(
+        (tool) => tool.containsKey('googleSearch'),
+      ),
+      isTrue,
+    );
+  });
+
   for (final model in ['gemini-3.6-flash', 'gemini-3.8-flash']) {
     test(
       '$model circulates signed built-in search alongside app tool calls',
