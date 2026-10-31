@@ -58,11 +58,24 @@ void main() {
   });
 
   group('GeminiAiService model picker', () {
-    test('offers Gemini 3.7 Flash', () {
-      expect(
-        kGeminiModels,
-        contains(('gemini-3.7-flash', 'Gemini 3.7 Flash')),
+    test('3.8 clamps minimal thinking and enables native search', () {
+      final service = GeminiAiService(storage: MockStorageService());
+      service.init(
+        'fake-key',
+        model: 'gemini-3.8-flash',
+        thinkingLevel: 'minimal',
       );
+      expect(service.thinkingLevel, 'low');
+      expect(service.supportsWebGrounding, isTrue);
+    });
+
+    test('offers Gemini 3.7 Flash', () {
+      expect(kGeminiModels, contains(('gemini-3.7-flash', 'Gemini 3.7 Flash')));
+    });
+
+    test('offers both supported native-search models', () {
+      expect(kGeminiModels, contains(('gemini-3.6-flash', 'Gemini 3.6 Flash')));
+      expect(kGeminiModels, contains(('gemini-3.8-flash', 'Gemini 3.8 Flash')));
     });
 
     test('model ids are unique and the default is one of them', () {

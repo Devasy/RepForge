@@ -13,6 +13,8 @@ import '../../settings_provider.dart';
 import '../ai_failure.dart';
 import '../coach_tool_service.dart';
 import 'repforge_tools.dart';
+import '../../interfaces/web_grounding_support.dart';
+import '../gemini_search.dart';
 import 'agent_change_review.dart';
 import '../../debug_log_buffer.dart';
 
@@ -158,14 +160,20 @@ class RepForgeAgentSession extends ChangeNotifier {
   }
 
   AgentController<ChatState> _controller({List<ModelMessage>? history}) {
+    final model = owner.model;
+    final webSearchAvailable =
+        model is WebGroundingSupport &&
+        (model as WebGroundingSupport).supportsWebGrounding;
     final prompt = optimizer
         ? GeminiContextBuilder.buildOptimizerSystemPrompt(
             userName: settings.userName,
             unitLabel: settings.unitLabel,
+            webSearchAvailable: webSearchAvailable,
           )
         : GeminiContextBuilder.buildCoachSystemPrompt(
             userName: settings.userName,
             unitLabel: settings.unitLabel,
+            webSearchAvailable: webSearchAvailable,
           );
     final rounds = owner.maxModelCalls();
     return AgentController.chat(
@@ -197,7 +205,9 @@ class RepForgeAgentSession extends ChangeNotifier {
 
   static ModelMessage _modelMessage(ChatMessage message) => ModelMessage(
     role: message.role == 'model' ? 'assistant' : 'user',
-    text: message.text,
+    text: message.webSearch == null
+        ? message.text
+        : '${message.text}\nSources:\n${message.webSearch!.sources.map((source) => '${source.title}: ${source.url}').join('\n')}',
     attachments: [
       if (message.imageBytesBase64 != null)
         {
@@ -412,8 +422,16 @@ class RepForgeAgentSession extends ChangeNotifier {
         .expand((m) => m.calls.map((call) => call.name))
         .toList();
     final pendingTools = <String, String>{};
+    JsonMap grounding = {};
     for (var index = data.turnStart; index < data.messages.length; index++) {
       final message = data.messages[index];
+      if (message.role == 'assistant') {
+        final meta = jsonObject(
+          message.providerData['gemini'] ?? const <String, Object?>{},
+        );
+        final found = meta['groundingMetadata'];
+        if (found is Map) grounding = jsonObject(found);
+      }
       for (final call in message.calls) {
         pendingTools[call.id] = call.name;
         if (call.arguments['preamble'] case final String preamble
@@ -442,9 +460,11 @@ class RepForgeAgentSession extends ChangeNotifier {
             id: '$runId:$index',
             role: 'model',
             text: message.text,
+            webSearch: parseGeminiGrounding(message.text, grounding),
             toolCalls: toolNames,
           ),
         );
+        grounding = {};
       }
     }
   }
