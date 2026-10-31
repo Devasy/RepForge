@@ -4,6 +4,7 @@ import 'dart:math' show log, max;
 import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
+import 'web_search_result.dart';
 
 // Sentinel value for copyWith methods to distinguish "not provided" from "null"
 const Object _sentinel = Object();
@@ -1222,6 +1223,7 @@ class ChatMessage {
   final List<String>? toolCalls;
   final String? imageBytesBase64;
   final String? imageMimeType;
+  final WebSearchResult? webSearch;
 
   ChatMessage({
     String? id,
@@ -1231,6 +1233,7 @@ class ChatMessage {
     this.toolCalls,
     this.imageBytesBase64,
     this.imageMimeType,
+    this.webSearch,
   }) : id = id ?? _uuid.v4(),
        timestamp = timestamp ?? DateTime.now();
 
@@ -1242,6 +1245,7 @@ class ChatMessage {
     if (toolCalls != null && toolCalls!.isNotEmpty) 'toolCalls': toolCalls,
     if (imageBytesBase64 != null) 'imageBytesBase64': imageBytesBase64,
     if (imageMimeType != null) 'imageMimeType': imageMimeType,
+    if (webSearch != null) 'webSearch': webSearch!.toJson(),
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
@@ -1252,6 +1256,11 @@ class ChatMessage {
     toolCalls: (json['toolCalls'] as List?)?.cast<String>(),
     imageBytesBase64: json['imageBytesBase64'] as String?,
     imageMimeType: json['imageMimeType'] as String?,
+    webSearch: json['webSearch'] == null
+        ? null
+        : WebSearchResult.fromJson(
+            Map<String, dynamic>.from(json['webSearch'] as Map),
+          ),
   );
 
   ChatMessage copyWith({
@@ -1261,8 +1270,12 @@ class ChatMessage {
     Object? toolCalls = _sentinel,
     Object? imageBytesBase64 = _sentinel,
     Object? imageMimeType = _sentinel,
+    Object? webSearch = _sentinel,
   }) => ChatMessage(
     id: id,
+    webSearch: webSearch == _sentinel
+        ? this.webSearch
+        : webSearch as WebSearchResult?,
     role: role == _sentinel ? this.role : role as String,
     text: text == _sentinel ? this.text : text as String,
     timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime,

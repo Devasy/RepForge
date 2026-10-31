@@ -4,6 +4,12 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+### Changes
+
+- Let AI Coach and Routine Optimizer use Gemini’s built-in Google Search for current evidence, with saved sources and Google search suggestions.
+- Improve coaching prompts to distinguish personal records, research and recommendations while preserving the app’s review of proposed changes.
+- Add Gemini 3.8 Flash to the model picker alongside Gemini 3.6 Flash.
+
 ## [2.2.1]
 
 ### Fixes

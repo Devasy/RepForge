@@ -1,3 +1,4 @@
+import 'widgets/web_search_result_card.dart';
 // routine_optimizer_screen.dart — Full-screen conversational routine optimizer UI.
 //
 // This is a lean View: all orchestration (streaming, tool calls, question
@@ -377,6 +378,9 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final search = message.webSearch;
+    if (search != null) return WebSearchResultCard(result: search);
+
     final isUser = message.role == 'user';
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
