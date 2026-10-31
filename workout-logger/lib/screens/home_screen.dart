@@ -1,4 +1,4 @@
-// home_screen.dart — Navigation shell + Dashboard tab (soft-futurist redesign)
+// home_screen.dart — Navigation shell and training dashboard
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +22,7 @@ import 'widgets/readiness_card.dart';
 import 'widgets/sleep_hr_card.dart';
 import 'widgets/heart_rate_card.dart';
 import 'widgets/rf_widgets.dart';
+import 'widgets/rf_shell.dart';
 import 'widgets/floating_nav_bar.dart';
 import 'widgets/sparkline_painter.dart';
 import 'widgets/activity_heatmap.dart';
@@ -40,9 +41,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   static const _navItems = [
-    FloatingNavItem(icon: Icons.home_rounded,      label: 'Home'),
-    FloatingNavItem(icon: Icons.layers_rounded,    label: 'Routines'),
-    FloatingNavItem(icon: Icons.history_rounded,   label: 'History'),
+    FloatingNavItem(icon: Icons.home_rounded, label: 'Home'),
+    FloatingNavItem(icon: Icons.layers_rounded, label: 'Routines'),
+    FloatingNavItem(icon: Icons.history_rounded, label: 'History'),
     FloatingNavItem(icon: Icons.bar_chart_rounded, label: 'Stats'),
   ];
 
@@ -58,12 +59,15 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: AppColors.surface,
         borderColor: AppColors.glassBorderStrong,
         // Chip colours (replaces old pill API)
-        selectedChipColor: AppColors.glass3,
-        selectedChipBorderColor: AppColors.primary.withValues(alpha: 0.25),
-        selectedChipShadowColor: AppColors.primary.withValues(alpha: 0.15),
+        selectedChipColor: AppColors.primary.withValues(alpha: 0.16),
+        selectedChipBorderColor: AppColors.accentInk.withValues(alpha: 0.25),
+        selectedChipShadowColor: Colors.transparent,
         selectedContentColor: AppColors.textPrimary,
         inactiveIconColor: AppColors.textMuted,
-        outerGlowColor: AppColors.primary.withValues(alpha: 0.08),
+        outerGlowColor: Colors.transparent,
+        outerShadowColor: Colors.transparent,
+        springDampingRatio: 1,
+        blurSigma: 0,
       ),
       items: _navItems,
       currentIndex: _currentIndex,
@@ -92,12 +96,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _resumeWorkout(BuildContext context) {
-    Navigator.push(context, _slide(const WorkoutFlowScreen(isQuickStart: true)));
+    Navigator.push(
+      context,
+      _slide(const WorkoutFlowScreen(isQuickStart: true)),
+    );
   }
 
   Future<void> _startQuickWorkout(BuildContext context) async {
     final provider = context.read<WorkoutProvider>();
-    StartWorkoutConflictAction conflictAction = StartWorkoutConflictAction.cancel;
+    StartWorkoutConflictAction conflictAction =
+        StartWorkoutConflictAction.cancel;
 
     final started = await provider.startWorkoutSafely(
       exerciseIds: const <String>[],
@@ -110,13 +118,20 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!context.mounted) return;
     if (started || conflictAction == StartWorkoutConflictAction.resume) {
       HapticFeedback.mediumImpact();
-      Navigator.push(context, _slide(const WorkoutFlowScreen(isQuickStart: true)));
+      Navigator.push(
+        context,
+        _slide(const WorkoutFlowScreen(isQuickStart: true)),
+      );
     }
   }
 
-  Future<void> startRoutineWorkout(BuildContext context, Routine routine) async {
+  Future<void> startRoutineWorkout(
+    BuildContext context,
+    Routine routine,
+  ) async {
     final provider = context.read<WorkoutProvider>();
-    StartWorkoutConflictAction conflictAction = StartWorkoutConflictAction.cancel;
+    StartWorkoutConflictAction conflictAction =
+        StartWorkoutConflictAction.cancel;
 
     final started = await provider.startWorkoutSafely(
       routine: routine,
@@ -161,13 +176,6 @@ class _HomeScreenState extends State<HomeScreen> {
 class _DashboardTab extends StatelessWidget {
   const _DashboardTab();
 
-  String _greeting() {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning,';
-    if (h < 17) return 'Good afternoon,';
-    return 'Good evening,';
-  }
-
   // Generate deterministic 14-week heatmap (98 cells, col-major)
   List<int> _buildHeatmapData(List<WorkoutSession> sessions) {
     final nowRaw = DateTime.now();
@@ -210,13 +218,17 @@ class _DashboardTab extends StatelessWidget {
                     slivers: [
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.fromLTRB(hp, 14, hp, 0),
+                          padding: EdgeInsets.fromLTRB(hp, 16, hp, 0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildHeader(context, homeState),
                               const SizedBox(height: 24),
-                              _buildStreakHero(context: context, provider: provider, homeState: homeState),
+                              _buildStreakHero(
+                                context: context,
+                                provider: provider,
+                                homeState: homeState,
+                              ),
                               const SizedBox(height: 16),
                               const ReadinessCard(),
                               const SleepHrCard(),
@@ -229,7 +241,11 @@ class _DashboardTab extends StatelessWidget {
                               const SizedBox(height: 16),
                               const _WeeklyInsightsCard(),
                               const SizedBox(height: 16),
-                              _buildRecentWorkouts(context: context, provider: provider, homeState: homeState),
+                              _buildRecentWorkouts(
+                                context: context,
+                                provider: provider,
+                                homeState: homeState,
+                              ),
                               const SizedBox(height: 100),
                             ],
                           ),
@@ -247,99 +263,44 @@ class _DashboardTab extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context, _HomeScreenState? homeState) {
-    final now = DateTime.now();
-    final dateStr = DateFormat('EEEE · MMM d').format(now);
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              dateStr.toUpperCase(),
-              style: TextStyle(fontFamily: 'Geist', 
-                fontSize: 12,
-                color: AppColors.textMuted,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.3,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Training',
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
-            ),
-            const SizedBox(height: 4),
-            RichText(
-              text: TextSpan(
-                style: TextStyle(fontFamily: 'Geist', 
-                  fontSize: 28,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -1.12,
-                  height: 1.05,
+              const SizedBox(height: 4),
+              Text(
+                DateFormat('EEEE · MMM d').format(DateTime.now()),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
                 ),
-                children: [
-                  TextSpan(text: '${_greeting()}\n'),
-                  TextSpan(
-                    text: '${context.watch<SettingsProvider>().userName ?? 'You'}.',
-                    style: const TextStyle(color: AppColors.textMuted),
-                  ),
-                ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        Row(
-          children: [
-            GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AiCoachScreen()),
-              ),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, Color(0xFF5B21B6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryGlow(0.35),
-                      blurRadius: 12,
-                      spreadRadius: -3,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 18,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              ),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: AppColors.glass2,
-                  border: Border.all(color: AppColors.glassBorder),
-                ),
-                child: const Icon(
-                  Icons.person_outline_rounded,
-                  size: 18,
-                  color: AppColors.textSoft,
-                ),
-              ),
-            ),
-          ],
+        RFIconButton(
+          icon: Icons.chat_bubble_outline_rounded,
+          tooltip: 'AI coach',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AiCoachScreen()),
+          ),
+        ),
+        const SizedBox(width: 8),
+        RFIconButton(
+          icon: Icons.person_outline_rounded,
+          tooltip: 'Profile',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProfileScreen()),
+          ),
         ),
       ],
     );
@@ -356,10 +317,12 @@ class _DashboardTab extends StatelessWidget {
     final today = DateTime.now();
     for (int i = 0; i < 60; i++) {
       final d = today.subtract(Duration(days: i));
-      final hasWorkout = sessions.any((s) =>
-          s.date.year == d.year &&
-          s.date.month == d.month &&
-          s.date.day == d.day);
+      final hasWorkout = sessions.any(
+        (s) =>
+            s.date.year == d.year &&
+            s.date.month == d.month &&
+            s.date.day == d.day,
+      );
       if (hasWorkout) {
         streak++;
       } else if (i > 0) {
@@ -372,212 +335,108 @@ class _DashboardTab extends StatelessWidget {
     final weekStart = today.subtract(Duration(days: today.weekday - 1));
     final hasWorkoutDays = List.generate(7, (i) {
       final d = weekStart.add(Duration(days: i));
-      return sessions.any((s) =>
-          s.date.year == d.year &&
-          s.date.month == d.month &&
-          s.date.day == d.day);
+      return sessions.any(
+        (s) =>
+            s.date.year == d.year &&
+            s.date.month == d.month &&
+            s.date.day == d.day,
+      );
     });
     final todayWeekday = today.weekday - 1; // 0=Mon
 
     final isActive = provider.hasActiveWorkout;
 
     return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Ambient blob top-right
-          Positioned(
-            top: -40,
-            right: -40,
-            child: IgnorePointer(
-              child: Container(
-                width: 180,
-                height: 180,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.15),
-                      Colors.transparent,
-                    ],
-                  ),
+          const Text(
+            'Streak',
+            style: TextStyle(fontSize: 14, color: AppColors.textSoft),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            children: [
+              Text(
+                '$streak',
+                style: const TextStyle(
+                  fontFamily: 'GeistMono',
+                  fontSize: 48,
+                  height: 1.2,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
               ),
-            ),
+              Text(
+                streak == 1 ? 'day' : 'days',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
+          const SizedBox(height: 8),
+          Text(
+            streak == 0
+                ? 'Start your streak today'
+                : 'Your current training streak',
+            style: const TextStyle(fontSize: 14, color: AppColors.textSoft),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: List.generate(7, (i) {
+              final done = hasWorkoutDays[i];
+              final isToday = i == todayWeekday;
+              final dayLabel = DateFormat(
+                'EEEE, MMM d',
+              ).format(weekStart.add(Duration(days: i)));
+              return Expanded(
+                child: Semantics(
+                  label:
+                      '$dayLabel: ${done ? "workout logged" : "no workout logged"}${isToday ? ", today" : ""}',
+                  excludeSemantics: true,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.local_fire_department_rounded,
-                              size: 14,
-                              color: AppColors.primary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'STREAK',
-                              style: TextStyle(fontFamily: 'Geist', 
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          weekDays[i],
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              '$streak',
-                              style: TextStyle(fontFamily: 'GeistMono', 
-                                fontSize: 56,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                                letterSpacing: -2.24,
-                                height: 1,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'days',
-                              style: TextStyle(fontFamily: 'Geist', 
-                                fontSize: 16,
-                                color: AppColors.textMuted,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          streak == 0
-                              ? 'Start your streak today'
-                              : 'Keep it going — you\'re on a roll',
-                          style: TextStyle(fontFamily: 'Geist', 
-                            fontSize: 13,
-                            color: AppColors.textMuted,
+                        Container(
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: done
+                                ? AppColors.primary
+                                : AppColors.cardHigh,
+                            borderRadius: BorderRadius.circular(4),
+                            border: isToday
+                                ? Border.all(color: AppColors.textSoft)
+                                : null,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: isActive
-                        ? () => homeState?._resumeWorkout(context)
-                        : () => homeState?._showRoutineSelector(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isActive ? AppColors.warning : AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.18),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (isActive ? AppColors.warning : AppColors.primary)
-                                .withValues(alpha: 0.35),
-                            blurRadius: 16,
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isActive
-                                ? Icons.play_arrow_rounded
-                                : Icons.flash_on_rounded,
-                            size: 12,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isActive ? 'Resume' : 'Start',
-                            style: TextStyle(fontFamily: 'Geist', 
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              // Week dots
-              Row(
-                children: List.generate(7, (i) {
-                  final done = hasWorkoutDays[i];
-                  final isToday = i == todayWeekday;
-                  final isFuture = i > todayWeekday;
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: Column(
-                        children: [
-                          Text(
-                            weekDays[i],
-                            style: TextStyle(fontFamily: 'Geist', 
-                              fontSize: 10,
-                              color: AppColors.textFaint,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          AnimatedContainer(
-                            duration: AppDurations.medium,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(3),
-                              color: done
-                                  ? AppColors.primary
-                                  : isToday
-                                      ? AppColors.primary.withValues(alpha: 0.3)
-                                      : isFuture
-                                          ? const Color(0x00000000)
-                                          : const Color(0x0FFFFFFF),
-                              border: isToday
-                                  ? Border.all(
-                                      color: AppColors.primary,
-                                      width: 1,
-                                    )
-                                  : null,
-                              boxShadow: done
-                                  ? [
-                                      BoxShadow(
-                                        color: AppColors.primary
-                                            .withValues(alpha: 0.4),
-                                        blurRadius: 6,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ],
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 20),
+          GlowButton(
+            label: isActive ? 'Resume workout' : 'Start workout',
+            icon: Icons.play_arrow_rounded,
+            onPressed: isActive
+                ? () => homeState?._resumeWorkout(context)
+                : () => homeState?._showRoutineSelector(context),
           ),
         ],
       ),
@@ -597,21 +456,30 @@ class _DashboardTab extends StatelessWidget {
     final settings = context.read<SettingsProvider>();
     final weekVol = weekSessions.fold<double>(0, (s, e) => s + e.totalVolume);
     final displayVol = settings.toDisplay(weekVol);
-    final weekSets =
-        weekSessions.fold<int>(0, (s, e) => s + e.exercises.fold(0, (a, ex) => a + ex.sets.length));
+    final weekSets = weekSessions.fold<int>(
+      0,
+      (s, e) => s + e.exercises.fold(0, (a, ex) => a + ex.sets.length),
+    );
     final avgDuration = sessions.isEmpty
         ? 0
         : sessions.take(7).fold<int>(0, (s, e) => s + e.duration) ~/
-            sessions.take(7).length;
+              sessions.take(7).length;
 
     // Sparkline data (last 7 weeks), anchored to midnight boundaries
     List<double> weeklyWorkouts = List.generate(7, (i) {
-      final wStart = today.subtract(Duration(days: (6 - i) * 7 + today.weekday - 1));
+      final wStart = today.subtract(
+        Duration(days: (6 - i) * 7 + today.weekday - 1),
+      );
       final wEnd = wStart.add(const Duration(days: 7));
-      return sessions.where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd)).length.toDouble();
+      return sessions
+          .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
+          .length
+          .toDouble();
     });
     List<double> weeklyVolumes = List.generate(7, (i) {
-      final wStart = today.subtract(Duration(days: (6 - i) * 7 + today.weekday - 1));
+      final wStart = today.subtract(
+        Duration(days: (6 - i) * 7 + today.weekday - 1),
+      );
       final wEnd = wStart.add(const Duration(days: 7));
       final rawVol = sessions
           .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
@@ -619,16 +487,25 @@ class _DashboardTab extends StatelessWidget {
       return settings.toDisplay(rawVol);
     });
     List<double> weeklySets = List.generate(7, (i) {
-      final wStart = today.subtract(Duration(days: (6 - i) * 7 + today.weekday - 1));
+      final wStart = today.subtract(
+        Duration(days: (6 - i) * 7 + today.weekday - 1),
+      );
       final wEnd = wStart.add(const Duration(days: 7));
       return sessions
           .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
-          .fold<double>(0, (s, e) => s + e.exercises.fold(0, (a, ex) => a + ex.sets.length));
+          .fold<double>(
+            0,
+            (s, e) => s + e.exercises.fold(0, (a, ex) => a + ex.sets.length),
+          );
     });
     List<double> weeklyAvgDurations = List.generate(7, (i) {
-      final wStart = today.subtract(Duration(days: (6 - i) * 7 + today.weekday - 1));
+      final wStart = today.subtract(
+        Duration(days: (6 - i) * 7 + today.weekday - 1),
+      );
       final wEnd = wStart.add(const Duration(days: 7));
-      final ws = sessions.where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd)).toList();
+      final ws = sessions
+          .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
+          .toList();
       if (ws.isEmpty) return 0;
       return ws.fold<double>(0, (s, e) => s + e.duration) / ws.length;
     });
@@ -637,8 +514,8 @@ class _DashboardTab extends StatelessWidget {
       _StatItem(
         label: 'This week',
         value: '${weekSessions.length}',
-        unit: '/ 5 goal',
-        color: AppColors.primary,
+        unit: 'workouts',
+        color: AppColors.accentInk,
         spark: weeklyWorkouts,
       ),
       _StatItem(
@@ -647,40 +524,53 @@ class _DashboardTab extends StatelessWidget {
             ? '${(displayVol / 1000).toStringAsFixed(1)}k'
             : displayVol.toStringAsFixed(0),
         unit: settings.unitLabel,
-        color: AppColors.secondary,
+        color: AppColors.textMuted,
         spark: weeklyVolumes,
       ),
       _StatItem(
         label: 'Sets',
         value: '$weekSets',
         unit: 'this week',
-        color: AppColors.success,
+        color: AppColors.textMuted,
         spark: weeklySets,
       ),
       _StatItem(
         label: 'Avg time',
         value: '$avgDuration',
-        unit: 'min',
-        color: AppColors.warning,
+        unit: sessions.isEmpty
+            ? 'min · no workouts yet'
+            : 'min · last ${sessions.take(7).length} ${sessions.length == 1 ? 'workout' : 'workouts'}',
+        color: AppColors.textMuted,
         spark: weeklyAvgDurations,
       ),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cols = AppBreakpoints.gridColumns(constraints.maxWidth);
-        final ratio = cols == 4 ? 1.8 : 1.4;
-        return GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: ratio,
-          ),
-          itemCount: stats.length,
-          itemBuilder: (_, i) => _StatCard(item: stats[i]),
+        final cols = MediaQuery.textScalerOf(context).scale(14) > 21
+            ? 1
+            : AppBreakpoints.gridColumns(constraints.maxWidth);
+        return Column(
+          children: [
+            for (var start = 0; start < stats.length; start += cols) ...[
+              if (start > 0) const SizedBox(height: 12),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (
+                      var col = 0;
+                      col < cols && start + col < stats.length;
+                      col++
+                    ) ...[
+                      if (col > 0) const SizedBox(width: 12),
+                      Expanded(child: _StatCard(item: stats[start + col])),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
         );
       },
     );
@@ -694,12 +584,14 @@ class _DashboardTab extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
             children: [
               Text(
                 'Activity',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -707,8 +599,9 @@ class _DashboardTab extends StatelessWidget {
               ),
               Text(
                 'Last 14 weeks',
-                style: TextStyle(fontFamily: 'Geist', 
-                  fontSize: 11,
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 12,
                   color: AppColors.textMuted,
                 ),
               ),
@@ -721,12 +614,17 @@ class _DashboardTab extends StatelessWidget {
     );
   }
 
-  Widget _buildMuscleVolumeCard(BuildContext context, WorkoutProvider provider) {
+  Widget _buildMuscleVolumeCard(
+    BuildContext context,
+    WorkoutProvider provider,
+  ) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final now = DateTime.now();
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
     final weekSessions = provider.sessions
-        .where((s) => s.date.isAfter(weekStart.subtract(const Duration(days: 1))))
+        .where(
+          (s) => s.date.isAfter(weekStart.subtract(const Duration(days: 1))),
+        )
         .toList();
 
     final muscleVols = <String, double>{};
@@ -737,125 +635,118 @@ class _DashboardTab extends StatelessWidget {
         final vol = settings.toDisplay(el.totalVolume);
         for (final ma in ex.muscleActivations) {
           muscleVols[ma.muscleGroupId] =
-              (muscleVols[ma.muscleGroupId] ?? 0) + vol * ma.activationPercentage / 100;
+              (muscleVols[ma.muscleGroupId] ?? 0) +
+              vol * ma.activationPercentage / 100;
         }
       }
     }
 
-    final maxVol = muscleVols.values.isEmpty ? 1.0 : muscleVols.values.reduce((a, b) => a > b ? a : b);
+    final maxVol = muscleVols.values.isEmpty
+        ? 1.0
+        : muscleVols.values.reduce((a, b) => a > b ? a : b);
     final muscleList = muscleVols.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final topMuscles = muscleList.take(5).toList();
 
     final normalizedVols = {
-      for (final e in muscleVols.entries) e.key: e.value / maxVol
+      for (final e in muscleVols.entries) e.key: e.value / maxVol,
     };
 
     return GlassCard(
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
             children: [
-              Text(
+              const Text(
                 'Weekly muscle volume',
-                style: TextStyle(fontFamily: 'Geist', 
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                style: TextStyle(
+                  fontSize: 14,
                   color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               Text(
                 settings.unitLabel,
-                style: TextStyle(fontFamily: 'Geist', 
-                  fontSize: 11,
+                style: const TextStyle(
+                  fontSize: 12,
                   color: AppColors.textMuted,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              BodyHeatmapWidget(muscleVolumes: normalizedVols),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: topMuscles.isEmpty
-                      ? [
-                          Text(
-                            'No data yet',
-                            style: TextStyle(fontFamily: 'Geist', 
-                              fontSize: 12,
-                              color: AppColors.textMuted,
-                            ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final rows = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: topMuscles.isEmpty
+                    ? [
+                        const Text(
+                          'No data yet',
+                          style: TextStyle(color: AppColors.textMuted),
+                        ),
+                      ]
+                    : topMuscles.map((e) {
+                        final volStr = e.value >= 1000
+                            ? '${(e.value / 1000).toStringAsFixed(1)}k'
+                            : e.value.toStringAsFixed(0);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  Text(
+                                    _capitalize(e.key.replaceAll('_', ' ')),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSoft,
+                                    ),
+                                  ),
+                                  Text(
+                                    volStr,
+                                    style: const TextStyle(
+                                      fontFamily: 'GeistMono',
+                                      fontSize: 12,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              RFProgressBar(
+                                value: (e.value / maxVol).clamp(0.0, 1.0),
+                                color: AppColors.muscle(e.key),
+                                height: 4,
+                              ),
+                            ],
                           ),
-                        ]
-                      : topMuscles.map((e) {
-                          final color = AppColors.muscle(e.key);
-                          final pct = (e.value / maxVol).clamp(0.0, 1.0);
-                          final volStr = e.value >= 1000
-                              ? '${(e.value / 1000).toStringAsFixed(1)}k'
-                              : e.value.toStringAsFixed(0);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      _capitalize(e.key.replaceAll('_', ' ')),
-                                      style: TextStyle(fontFamily: 'Geist', 
-                                        fontSize: 11,
-                                        color: AppColors.textSoft,
-                                      ),
-                                    ),
-                                    Text(
-                                      volStr,
-                                      style: TextStyle(fontFamily: 'GeistMono', 
-                                        fontSize: 11,
-                                        color: AppColors.textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Container(
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(2),
-                                    color: AppColors.glass2,
-                                  ),
-                                  child: FractionallySizedBox(
-                                    widthFactor: pct,
-                                    alignment: Alignment.centerLeft,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(2),
-                                        color: color,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: color.withValues(alpha: 0.4),
-                                            blurRadius: 4,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                ),
-              ),
-            ],
+                        );
+                      }).toList(),
+              );
+              final body = BodyHeatmapWidget(muscleVolumes: normalizedVols);
+              if (constraints.maxWidth < 280 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 21) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [body, const SizedBox(height: 16), rows],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  body,
+                  const SizedBox(width: 16),
+                  Expanded(child: rows),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -874,12 +765,14 @@ class _DashboardTab extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 10, left: 4, right: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 8,
             children: [
               Text(
                 'Recent workouts',
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -889,9 +782,10 @@ class _DashboardTab extends StatelessWidget {
                 onTap: () => homeState?.switchTab(2),
                 child: Text(
                   'See all',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     fontSize: 12,
-                    color: AppColors.primary,
+                    color: AppColors.accentInk,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -904,8 +798,9 @@ class _DashboardTab extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Center(
               child: Text(
-                'No workouts yet — start one!',
-                style: TextStyle(fontFamily: 'Geist', 
+                'No workouts yet',
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   fontSize: 13,
                   color: AppColors.textMuted,
                 ),
@@ -920,7 +815,10 @@ class _DashboardTab extends StatelessWidget {
                 ? '${(displayVol / 1000).toStringAsFixed(1)}k'
                 : displayVol.toStringAsFixed(0);
             final exCount = s.exercises.length;
-            final setCount = s.exercises.fold<int>(0, (a, e) => a + e.sets.length);
+            final setCount = s.exercises.fold<int>(
+              0,
+              (a, e) => a + e.sets.length,
+            );
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: GlassCard(
@@ -932,13 +830,7 @@ class _DashboardTab extends StatelessWidget {
                       height: 40,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(2),
-                        color: AppColors.primary,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.4),
-                            blurRadius: 6,
-                          ),
-                        ],
+                        color: AppColors.accentInk,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -948,9 +840,17 @@ class _DashboardTab extends StatelessWidget {
                         children: [
                           Text(
                             s.routineId != null
-                                ? (provider.routines.cast<Routine?>().firstWhere((r) => r?.id == s.routineId, orElse: () => null)?.name ?? 'Workout')
+                                ? (provider.routines
+                                          .cast<Routine?>()
+                                          .firstWhere(
+                                            (r) => r?.id == s.routineId,
+                                            orElse: () => null,
+                                          )
+                                          ?.name ??
+                                      'Workout')
                                 : 'Quick Workout',
-                            style: TextStyle(fontFamily: 'Geist', 
+                            style: TextStyle(
+                              fontFamily: 'Geist',
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
@@ -959,8 +859,9 @@ class _DashboardTab extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             '$dateStr · $exCount exercises · $setCount sets',
-                            style: TextStyle(fontFamily: 'Geist', 
-                              fontSize: 11,
+                            style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 12,
                               color: AppColors.textMuted,
                             ),
                           ),
@@ -972,7 +873,8 @@ class _DashboardTab extends StatelessWidget {
                       children: [
                         Text(
                           volStr,
-                          style: TextStyle(fontFamily: 'GeistMono', 
+                          style: TextStyle(
+                            fontFamily: 'GeistMono',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: AppColors.secondary,
@@ -980,8 +882,9 @@ class _DashboardTab extends StatelessWidget {
                         ),
                         Text(
                           '${settings.unitLabel} vol',
-                          style: TextStyle(fontFamily: 'Geist', 
-                            fontSize: 10,
+                          style: TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 12,
                             color: AppColors.textFaint,
                           ),
                         ),
@@ -1033,53 +936,44 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.label,
-                style: TextStyle(fontFamily: 'Geist', 
-                  fontSize: 11,
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.2,
-                ),
-              ),
-              Sparkline(
-                data: item.spark,
-                color: item.color,
-                width: 42,
-                height: 16,
-              ),
-            ],
+          Text(
+            item.label,
+            style: const TextStyle(fontSize: 12, color: AppColors.textSoft),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.value,
-                style: TextStyle(fontFamily: 'GeistMono', 
-                  fontSize: 26,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.52,
-                ),
-              ),
-              Text(
-                item.unit,
-                style: TextStyle(fontFamily: 'Geist', 
-                  fontSize: 11,
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
+          const SizedBox(height: 12),
+          Text(
+            item.value,
+            style: const TextStyle(
+              fontFamily: 'GeistMono',
+              fontSize: 28,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+          Text(
+            item.unit,
+            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 12),
+          Semantics(
+            label:
+                '${item.label} over the last 7 weeks: ${item.spark.map((v) => v.toStringAsFixed(1)).join(", ")}',
+            child: Sparkline(
+              data: item.spark,
+              color: item.color,
+              width: 64,
+              height: 16,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Last 7 weeks',
+            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
           ),
         ],
       ),
@@ -1135,57 +1029,70 @@ class _RoutineSelectorSheet extends StatelessWidget {
                   ),
                   child: const Icon(
                     Icons.flash_on_rounded,
-                    color: AppColors.primary,
+                    color: AppColors.accentInk,
                     size: 20,
                   ),
                 ),
                 title: Text(
                   'Quick Start',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 subtitle: Text(
                   'Empty workout, no routine',
-                  style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted),
-                ),
-                trailing: const Icon(Icons.play_arrow_rounded, color: AppColors.primary),
-                onTap: onQuickStart,
-              ),
-              ...routines.map((r) => ListTile(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    color: AppColors.textMuted,
                   ),
-                  child: const Icon(
-                    Icons.fitness_center_rounded,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
-                ),
-                title: Text(
-                  r.name,
-                  style: TextStyle(fontFamily: 'Geist', 
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  '${r.exerciseIds.length} exercises',
-                  style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted),
                 ),
                 trailing: const Icon(
                   Icons.play_arrow_rounded,
-                  color: AppColors.primary,
+                  color: AppColors.accentInk,
                 ),
-                onTap: () => onSelect(r),
-              )),
+                onTap: onQuickStart,
+              ),
+              ...routines.map(
+                (r) => ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: const Icon(
+                      Icons.fitness_center_rounded,
+                      color: AppColors.accentInk,
+                      size: 20,
+                    ),
+                  ),
+                  title: Text(
+                    r.name,
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${r.exerciseIds.length} exercises',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: AppColors.accentInk,
+                  ),
+                  onTap: () => onSelect(r),
+                ),
+              ),
             ],
           ),
         ),
@@ -1228,11 +1135,16 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
     final startOfLastWeek = startOfWeek.subtract(const Duration(days: 7));
 
     final thisWeek = wp.sessions
-        .where((s) => !s.date.isBefore(startOfWeek) && s.date.isBefore(startOfWeek.add(const Duration(days: 7))))
+        .where(
+          (s) =>
+              !s.date.isBefore(startOfWeek) &&
+              s.date.isBefore(startOfWeek.add(const Duration(days: 7))),
+        )
         .toList();
     final lastWeek = wp.sessions
         .where(
-          (s) => !s.date.isBefore(startOfLastWeek) && s.date.isBefore(startOfWeek),
+          (s) =>
+              !s.date.isBefore(startOfLastWeek) && s.date.isBefore(startOfWeek),
         )
         .toList();
 
@@ -1274,34 +1186,24 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, Color(0xFF5B21B6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: AppColors.cardHigh,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryGlow(0.4),
-                      blurRadius: 10,
-                      spreadRadius: -3,
-                    ),
-                  ],
                 ),
                 child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: Colors.white,
-                  size: 14,
+                  Icons.chat_bubble_outline_rounded,
+                  color: AppColors.textSoft,
+                  size: 20,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'This Week\'s Insights',
-                  style: TextStyle(fontFamily: 'Geist', 
+                  'Weekly insights',
+                  style: TextStyle(
+                    fontFamily: 'Geist',
                     color: AppColors.textPrimary,
                     fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w500,
                     letterSpacing: -0.2,
                   ),
                 ),
@@ -1310,7 +1212,10 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
                 onTap: _loading ? null : _refresh,
                 child: AnimatedContainer(
                   duration: AppDurations.fast,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(AppRadius.full),
@@ -1324,14 +1229,17 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
                           height: 12,
                           child: CircularProgressIndicator(
                             strokeWidth: 1.5,
-                            valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                            valueColor: AlwaysStoppedAnimation(
+                              AppColors.primary,
+                            ),
                           ),
                         )
                       : Text(
                           hasInsights ? 'Refresh' : 'Generate',
-                          style: TextStyle(fontFamily: 'Geist', 
-                            color: AppColors.primary,
-                            fontSize: 11,
+                          style: TextStyle(
+                            fontFamily: 'Geist',
+                            color: AppColors.accentInk,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1351,7 +1259,8 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
             else
               Text(
                 insights,
-                style: TextStyle(fontFamily: 'Geist', 
+                style: TextStyle(
+                  fontFamily: 'Geist',
                   color: AppColors.textSoft,
                   fontSize: 13,
                   height: 1.6,
@@ -1361,9 +1270,10 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
               const SizedBox(height: AppSpacing.sm),
               Text(
                 'Updated ${DateFormat('MMM d, h:mm a').format(updatedAt)}',
-                style: TextStyle(fontFamily: 'GeistMono', 
+                style: TextStyle(
+                  fontFamily: 'GeistMono',
                   color: AppColors.textFaint,
-                  fontSize: 10,
+                  fontSize: 12,
                 ),
               ),
             ],
@@ -1371,7 +1281,8 @@ class _WeeklyInsightsCardState extends State<_WeeklyInsightsCard> {
             const SizedBox(height: AppSpacing.sm),
             Text(
               'Tap Generate to get a personalised coaching summary for this week.',
-              style: TextStyle(fontFamily: 'Geist', 
+              style: TextStyle(
+                fontFamily: 'Geist',
                 color: AppColors.textMuted,
                 fontSize: 13,
                 height: 1.5,

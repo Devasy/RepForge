@@ -4,6 +4,12 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+### Changes
+
+- Use a green intensity scale for completed workout activity, with matching calendar cells and legend.
+- Refine the dark interface while preserving its violet identity, background lighting and glass material, with clearer workout actions, readable chart labels and large paired set-entry figures.
+- Make Home statistics and muscle summaries adapt to narrow screens and large text, and show the actual period used for average workout duration, and keep session history close to the logging controls.
+
 ## [2.2.1]
 
 ### Fixes

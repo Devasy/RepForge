@@ -125,22 +125,27 @@ class ExerciseInputSection extends StatelessWidget {
         if (bodyweight) ...[
           if (isAssistedBodyweightExercise(exerciseId))
             SizedBox(
-              height: 48 + (MediaQuery.textScalerOf(context).scale(24) - 24).clamp(0.0, double.infinity),
+              height:
+                  48 +
+                  (MediaQuery.textScalerOf(context).scale(24) - 24).clamp(
+                    0.0,
+                    double.infinity,
+                  ),
               child: SegmentedButton<WorkoutLoadMode>(
-              segments: const [
-                ButtonSegment(
-                  value: WorkoutLoadMode.assisted,
-                  label: Text('Assisted'),
-                ),
-                ButtonSegment(
-                  value: WorkoutLoadMode.weighted,
-                  label: Text('Weighted'),
-                ),
-              ],
-              selected: {mode},
-              onSelectionChanged: onLoadModeChanged == null
-                  ? null
-                  : (selection) => onLoadModeChanged!(selection.single),
+                segments: const [
+                  ButtonSegment(
+                    value: WorkoutLoadMode.assisted,
+                    label: Text('Assisted'),
+                  ),
+                  ButtonSegment(
+                    value: WorkoutLoadMode.weighted,
+                    label: Text('Weighted'),
+                  ),
+                ],
+                selected: {mode},
+                onSelectionChanged: onLoadModeChanged == null
+                    ? null
+                    : (selection) => onLoadModeChanged!(selection.single),
               ),
             ),
           const SizedBox(height: 8),
@@ -207,7 +212,7 @@ class ExerciseInputSection extends StatelessWidget {
                     const Icon(
                       Icons.fitness_center_rounded,
                       size: 14,
-                      color: AppColors.primary,
+                      color: AppColors.accentInk,
                     ),
                     const SizedBox(width: 6),
                     // Long enough to wrap on a narrow phone, more so at a large text scale.
@@ -215,7 +220,7 @@ class ExerciseInputSection extends StatelessWidget {
                       child: Text(
                         'Effective Volume Load: ${effectiveWeightDisplay.toStringAsFixed(1)} ${settings.unitLabel} (${bodyWeightDisplay.toStringAsFixed(1)} BW ${isAssistedBW ? '−' : '+'} ${currentWeightDisplay.toStringAsFixed(1)} ${isAssistedBW ? 'Assist' : 'Added'}) × $currentReps reps',
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: AppColors.textSoft,
                           fontWeight: FontWeight.w500,
                         ),
@@ -248,9 +253,6 @@ class ExerciseInputSection extends StatelessWidget {
         ],
 
         const SizedBox(height: AppSpacing.lg),
-
-        // Absorbs leftover height so the history below reads as a footer.
-        const Spacer(),
 
         if (previousSets.isNotEmpty) ...[
           _PreviousSetsSection(sets: previousSets, settings: settings),
@@ -349,16 +351,9 @@ class _RecommendationCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.18),
-            AppColors.secondary.withValues(alpha: 0.08),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppColors.suggestionSurface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.suggestionBorder),
       ),
       child: Row(
         children: [
@@ -369,8 +364,8 @@ class _RecommendationCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: const Icon(
-              Icons.auto_awesome_rounded,
-              color: AppColors.primary,
+              Icons.trending_up_rounded,
+              color: AppColors.accentInk,
               size: 18,
             ),
           ),
@@ -383,14 +378,14 @@ class _RecommendationCard extends StatelessWidget {
                   children: [
                     const Flexible(
                       child: Text(
-                        'AI Suggestion',
+                        'Suggested set',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: AppColors.textSoft,
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
+                          letterSpacing: 0,
                         ),
                       ),
                     ),
@@ -411,7 +406,7 @@ class _RecommendationCard extends StatelessWidget {
                   style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w500,
                     fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 ),
@@ -423,7 +418,7 @@ class _RecommendationCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.textMuted,
-                      fontSize: 11,
+                      fontSize: 12,
                     ),
                   ),
                 ],
@@ -436,12 +431,12 @@ class _RecommendationCard extends StatelessWidget {
               HapticFeedback.lightImpact();
             },
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
+              foregroundColor: AppColors.accentInk,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
             child: const Text(
               'Apply',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -543,25 +538,27 @@ class _NumberInputCard extends StatefulWidget {
   final ValueChanged<double> onChanged;
 
   /// Tighter than the usual `md`, to leave the value more of the row.
-  static const double hPadding = AppSpacing.sm + 2;
+  static const double hPadding = 12;
 
-  static const double maxValueFontSize = 36;
-  static const double minValueFontSize = 18;
+  static const double maxValueFontSize = 48;
+  static const double minValueFontSize = 24;
 
-  /// Room left for the value between the two steppers in a card [cardWidth] wide.
+  /// The full card width is available to digits; steppers sit beneath them.
   static double valueSlotWidth(BuildContext context, double cardWidth) =>
-      cardWidth - hPadding * 2 - _StepBtn.sizeOf(context) * 2;
+      cardWidth - hPadding * 2 - 2;
 
   /// Whether a card [cardWidth] wide still shows `100.0` legibly — [_InputRow] stacks when it does not.
   static bool valueFits(BuildContext context, double cardWidth) =>
       valueSlotWidth(context, cardWidth) >=
-      measureValue(context, '100.0', minValueFontSize);
+      measureValue(context, '100.0', minValueFontSize) + 4;
 
   static TextStyle valueStyle(double fontSize) => TextStyle(
     fontFamily: 'GeistMono',
     color: AppColors.textPrimary,
     fontSize: fontSize,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 0,
+    fontFeatures: const [FontFeature.tabularFigures()],
   );
 
   /// Width [text] paints at, honouring the reader's text scale.
@@ -644,23 +641,19 @@ class _NumberInputCardState extends State<_NumberInputCard> {
       ),
       child: Column(
         children: [
-          // Kept to one line so the two cards in a row stay the same height.
           FittedBox(fit: BoxFit.scaleDown, child: RFLabel(widget.label)),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _StepBtn(
-                icon: Icons.remove_rounded,
-                onTap: () => widget.onChanged(
-                  (widget.value - widget.step).clamp(0, 999).toDouble(),
-                ),
-              ),
-              Expanded(
-                // Re-fitted per keystroke: a 3-digit weight or a large system font would otherwise be clipped.
-                child: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _controller,
-                  builder: (context, value, _) => TextField(
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.textScalerOf(context).scale(48) * 1.3,
+            ),
+            child: Align(
+              alignment: Alignment.center,
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _controller,
+                builder: (context, value, _) => Semantics(
+                  label: widget.label,
+                  child: TextField(
                     controller: _controller,
                     focusNode: _focusNode,
                     style: _NumberInputCard.valueStyle(
@@ -682,7 +675,18 @@ class _NumberInputCardState extends State<_NumberInputCard> {
                           ]
                         : [FilteringTextInputFormatter.digitsOnly],
                     decoration: const InputDecoration(
+                      filled: false,
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(
+                          color: AppColors.accentInk,
+                          width: 2,
+                        ),
+                      ),
+                      disabledBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
                       contentPadding: EdgeInsets.zero,
                       isDense: true,
                     ),
@@ -702,8 +706,22 @@ class _NumberInputCardState extends State<_NumberInputCard> {
                   ),
                 ),
               ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _StepBtn(
+                icon: Icons.remove_rounded,
+                valueLabel: widget.label,
+                onTap: () => widget.onChanged(
+                  (widget.value - widget.step).clamp(0, 999).toDouble(),
+                ),
+              ),
               _StepBtn(
                 icon: Icons.add_rounded,
+                valueLabel: widget.label,
                 onTap: () => widget.onChanged(
                   (widget.value + widget.step).clamp(0, 999).toDouble(),
                 ),
@@ -717,31 +735,36 @@ class _NumberInputCardState extends State<_NumberInputCard> {
 }
 
 class _StepBtn extends StatelessWidget {
-  const _StepBtn({required this.icon, required this.onTap});
+  final String valueLabel;
+  const _StepBtn({
+    required this.icon,
+    required this.onTap,
+    required this.valueLabel,
+  });
   final IconData icon;
   final VoidCallback onTap;
 
-  /// Fixed: a stepper stays a thumb target, so the value beside it is what gives.
-  static double sizeOf(BuildContext context) =>
-      MediaQuery.sizeOf(context).width < AppBreakpoints.narrow ? 36.0 : 40.0;
+  /// Keep thumb targets independent of the number's display size.
+  static double sizeOf(BuildContext context) => 48;
 
   @override
   Widget build(BuildContext context) {
-    final size = sizeOf(context);
-    return GestureDetector(
-      onTap: () {
-        onTap();
-        HapticFeedback.selectionClick();
-      },
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+    return SizedBox.square(
+      dimension: sizeOf(context),
+      child: IconButton(
+        tooltip: icon == Icons.add_rounded
+            ? 'Increase $valueLabel'
+            : 'Decrease $valueLabel',
+        onPressed: () {
+          onTap();
+          HapticFeedback.selectionClick();
+        },
+        style: IconButton.styleFrom(
+          backgroundColor: AppColors.cardHigh,
+          foregroundColor: AppColors.textSoft,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        child: Icon(icon, size: 18, color: AppColors.primary),
+        icon: Icon(icon, size: 20),
       ),
     );
   }
@@ -1007,7 +1030,7 @@ class _PreviousSetsSection extends StatelessWidget {
                     '${i + 1}',
                     style: const TextStyle(
                       color: AppColors.textMuted,
-                      fontSize: 11,
+                      fontSize: 12,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -1020,7 +1043,7 @@ class _PreviousSetsSection extends StatelessWidget {
                     style: const TextStyle(
                       color: AppColors.success,
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   if (s.isDropset)
@@ -1059,8 +1082,8 @@ class _PreviousSetsSection extends StatelessWidget {
                 child: Text(
                   '~$ormStr${settings.unitLabel} 1RM',
                   style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 11,
+                    color: AppColors.accentInk,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1231,7 +1254,7 @@ class _ProgramMetaBanner extends StatelessWidget {
             Text(
               slot.notes!,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 color: AppColors.textMuted,
                 fontStyle: FontStyle.italic,
               ),
@@ -1252,7 +1275,7 @@ class _ProgramMetaBanner extends StatelessWidget {
       children: [
         Icon(icon, size: 11, color: color),
         const SizedBox(width: 3),
-        Text(label, style: TextStyle(fontSize: 11, color: color)),
+        Text(label, style: TextStyle(fontSize: 12, color: color)),
       ],
     );
   }

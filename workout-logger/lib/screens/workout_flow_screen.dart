@@ -381,7 +381,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
             ),
           ),
         Expanded(
-          // minHeight + IntrinsicHeight let the section's Spacer do its work.
+          // Keep a viewport-sized canvas while input and history groups follow naturally.
           child: LayoutBuilder(
             builder: (context, constraints) => SingleChildScrollView(
               physics: const BouncingScrollPhysics(),

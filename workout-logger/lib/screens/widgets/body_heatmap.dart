@@ -141,8 +141,9 @@ class MuscleBodyMap extends StatelessWidget {
               style: TextStyle(color: AppColors.textMuted, fontSize: 11),
             ),
             const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              alignment: WrapAlignment.center,
+              runSpacing: 8,
               children: [
                 const Text(
                   'None',

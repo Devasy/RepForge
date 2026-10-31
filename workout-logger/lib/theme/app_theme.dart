@@ -6,62 +6,69 @@ import 'package:flutter/material.dart';
 class AppColors {
   const AppColors._();
 
-  // Backgrounds — soft-futurist dark
+  // Original dark canvas and surface steps for the glass lighting treatment.
   static const background = Color(0xFF07070A); // --bg
-  static const surface = Color(0xFF0C0C12);    // --bg-1
-  static const card = Color(0xFF11111A);        // --bg-2
-  static const cardHigh = Color(0xFF1A1A24);   // slightly elevated
+  static const surface = Color(0xFF0C0C12); // --bg-1
+  static const card = Color(0xFF11111A); // --bg-2
+  static const cardHigh = Color(0xFF1A1A24); // slightly elevated
 
-  // Glassmorphism surfaces
-  static const glass = Color(0x0AFFFFFF);           // --surface  4%
+  // Translucent overlays and borders used by the original glass material.
+  static const glass = Color(0x0AFFFFFF); // --surface  4%
   static const glass1 = glass;
-  static const glass2 = Color(0x0FFFFFFF);          // --surface-2 6%
-  static const glass3 = Color(0x17FFFFFF);          // --surface-3 9%
-  static const glassBorder = Color(0x12FFFFFF);     // --border 7%
-  static const glassBorderStrong = Color(0x21FFFFFF); // --border-strong 13%
-  static const divider = Color(0x0FFFFFFF);         // 6% white
+  static const glass2 = Color(0x0FFFFFFF); // --surface-2 6%
+  static const glass3 = Color(0x17FFFFFF); // --surface-3 9%
+  static const glassBorder = Color(0x14EDEDED); // neutral hairline, 8%
+  static const glassBorderStrong = Color(
+    0x14EDEDED,
+  ); // same hairline for legacy callers
+  static const divider = Color(0x0FFFFFFF); // 6% white
 
   // GlassCard material. The fill grades top-to-bottom and the edge grades with
   // it, so a panel reads as a surface catching light from above rather than as
   // an outline. The old fill (3.5% -> 1.6%) resolved to +9/255 and +4/255 over
   // the canvas, which left the border twice as bright as the face it wrapped.
-  static const glassFillTop = Color(0x12FFFFFF);    // 7%  -> +17.5/255
+  static const glassFillTop = Color(0x12FFFFFF); // 7%  -> +17.5/255
   static const glassFillBottom = Color(0x05FFFFFF); // 2%  ->  +4.9/255
-  static const glassEdgeTop = Color(0x24FFFFFF);    // 14% -> +34.9/255
+  static const glassEdgeTop = Color(0x24FFFFFF); // 14% -> +34.9/255
   static const glassEdgeBottom = Color(0x0AFFFFFF); // 4%  ->  +9.7/255
 
   // Ambient wash floor. A radial pool's reach is finite and a scrolling column
   // is not, so this full-height grade is the only layer that can guarantee a
   // non-zero floor everywhere. Without it the canvas below the key pool is
   // literally flat and glass has nothing to sit on.
-  static const washFloorTop = Color(0x065B21B6);    // 2.4% violet
-  static const washFloorMid = Color(0x045B21B6);    // 1.6%
+  static const washFloorTop = Color(0x065B21B6); // 2.4% violet
+  static const washFloorMid = Color(0x045B21B6); // 1.6%
   static const washFloorBottom = Color(0x055B21B6); // 2.0%
 
-  // Brand — electric violet primary, cyan data
-  static const primary = Color(0xFF7C3AED);         // --accent oklch(0.68 0.18 285)
-  static const primaryDeep = Color(0xFF5B21B6);     // gradient end / ambient wash
-  static const secondary = Color(0xFF00C2D4);       // --data  oklch(0.78 0.14 200)
-  static const cyan = secondary;                    // alias for secondary
-  static const accent = Color(0xFF7C3AED);          // alias for primary
+  // Flat violet identity; lighter ink for readable accent labels.
+  static const primary = Color(0xFF7C3AED); // --accent oklch(0.68 0.18 285)
+  static const accentInk = Color(0xFFB49AF7);
+  // Completed training activity; distinct from violet actions and selection.
+  static const activity = Color(0xFF4CC38A);
+  static const suggestionSurface = Color(0xFF1C1828);
+  static const suggestionBorder = Color(0xFF3E315A);
+  static const primaryDeep = Color(0xFF5B21B6); // gradient end / ambient wash
+  static const secondary = Color(0xFF00C2D4); // --data  oklch(0.78 0.14 200)
+  static const cyan = secondary; // alias for secondary
+  static const accent = Color(0xFF7C3AED); // alias for primary
 
-  /// The one brand gradient, so every violet surface catches the same light.
+  /// Compatibility treatment for existing coach message surfaces.
   static const primaryGradient = LinearGradient(
-    colors: [primary, primaryDeep],
+    colors: [primary, primary],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   // Semantic
-  static const success = Color(0xFF00C89B);         // --success oklch(0.78 0.16 155)
-  static const warning = Color(0xFFDBA520);         // --warn   oklch(0.78 0.14 60)
-  static const error = Color(0xFFE05040);           // --danger  oklch(0.68 0.20 25)
+  static const success = Color(0xFF00C89B); // --success oklch(0.78 0.16 155)
+  static const warning = Color(0xFFDBA520); // --warn   oklch(0.78 0.14 60)
+  static const error = Color(0xFFE05040); // --danger  oklch(0.68 0.20 25)
 
-  // Text — opacity levels over the near-white base #F4F4F8
-  static const textPrimary = Color(0xFFF4F4F8);     // --fg
-  static const textSoft = Color(0xB8F4F4F8);        // --fg-2 72%
-  static const textMuted = Color(0x7AF4F4F8);       // --fg-3 48%
-  static const textFaint = Color(0x52F4F4F8);       // --fg-4 32%
+  // Three opaque text roles; textFaint is a compatibility alias.
+  static const textPrimary = Color(0xFFEDEDED); // --fg
+  static const textSoft = Color(0xFFA1A1A6);
+  static const textMuted = Color(0xFF909096);
+  static const textFaint = textMuted;
 
   // Glow helpers (use in BoxShadow)
   static Color primaryGlow([double opacity = 0.35]) =>
@@ -147,18 +154,19 @@ class AppTheme {
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(fontFamily: 'Geist', 
+        titleTextStyle: TextStyle(
+          fontFamily: 'Geist',
           color: AppColors.textPrimary,
           fontSize: 22,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.44,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
         ),
       ),
       cardTheme: CardThemeData(
         color: AppColors.card,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -170,7 +178,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
           ),
-          textStyle: TextStyle(fontFamily: 'Geist', 
+          textStyle: TextStyle(
+            fontFamily: 'Geist',
             fontSize: 14,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.2,
@@ -179,7 +188,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: AppColors.accentInk,
           side: const BorderSide(color: AppColors.primary),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
@@ -188,7 +197,7 @@ class AppTheme {
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+        style: TextButton.styleFrom(foregroundColor: AppColors.accentInk),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -205,7 +214,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         hintStyle: const TextStyle(color: AppColors.textFaint),
       ),
       dividerTheme: const DividerThemeData(
@@ -215,7 +227,11 @@ class AppTheme {
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.glass2,
         selectedColor: Color(0x267C3AED),
-        labelStyle: const TextStyle(color: AppColors.textPrimary, fontSize: 11),
+        labelStyle: const TextStyle(
+          fontFamily: 'Geist',
+          color: AppColors.textPrimary,
+          fontSize: 12,
+        ),
         side: const BorderSide(color: AppColors.glassBorder),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -236,68 +252,80 @@ class AppTheme {
 
   static TextTheme _buildTextTheme() {
     return TextTheme(
-      headlineLarge: TextStyle(fontFamily: 'Geist', 
+      headlineLarge: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 32,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -1.28,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0,
       ),
-      headlineMedium: TextStyle(fontFamily: 'Geist', 
+      headlineMedium: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 28,
         fontWeight: FontWeight.w600,
-        letterSpacing: -1.12,
+        letterSpacing: 0,
       ),
-      headlineSmall: TextStyle(fontFamily: 'Geist', 
+      headlineSmall: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 22,
         fontWeight: FontWeight.w600,
-        letterSpacing: -0.88,
+        letterSpacing: 0,
       ),
-      titleLarge: TextStyle(fontFamily: 'Geist', 
+      titleLarge: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 17,
         fontWeight: FontWeight.w600,
       ),
-      titleMedium: TextStyle(fontFamily: 'Geist', 
+      titleMedium: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
-      titleSmall: TextStyle(fontFamily: 'Geist', 
+      titleSmall: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textSoft,
         fontSize: 13,
         fontWeight: FontWeight.w500,
       ),
-      bodyLarge: TextStyle(fontFamily: 'Geist', 
+      bodyLarge: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
         fontSize: 16,
       ),
-      bodyMedium: TextStyle(fontFamily: 'Geist', 
+      bodyMedium: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textSoft,
         fontSize: 14,
       ),
-      bodySmall: TextStyle(fontFamily: 'Geist', 
+      bodySmall: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textMuted,
         fontSize: 12,
       ),
-      labelLarge: TextStyle(fontFamily: 'Geist', 
+      labelLarge: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textPrimary,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.4,
+        letterSpacing: 0,
       ),
-      labelMedium: TextStyle(fontFamily: 'Geist', 
+      labelMedium: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textMuted,
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: FontWeight.w500,
-        letterSpacing: 0.3,
+        letterSpacing: 0,
       ),
-      labelSmall: TextStyle(fontFamily: 'Geist', 
+      labelSmall: TextStyle(
+        fontFamily: 'Geist',
         color: AppColors.textFaint,
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: FontWeight.w500,
-        letterSpacing: 0.4,
+        letterSpacing: 0,
       ),
     );
   }
@@ -316,33 +344,40 @@ class AppSpacing {
 
 class AppRadius {
   const AppRadius._();
-  static const double xs = 6;     // micro pill, small inner accents
+  static const double xs = 6; // micro pill, small inner accents
   static const double sm = 8;
   static const double md = 12;
   static const double lg = 16;
-  static const double button = 14; // standard button shape radius
-  static const double xl = 18;    // glass card radius
-  static const double xxl = 22;   // nav pill radius
+  static const double button = 12; // standard button shape radius
+  static const double xl = 16; // glass card radius
+  static const double xxl = 22; // nav pill radius
   static const double full = 999;
 }
 
 // ── Animation Durations ──────────────────────────────────────────────────────
 class AppDurations {
   const AppDurations._();
+
   /// 100ms — instant toggles, checkbox presses
-  static const micro  = Duration(milliseconds: 100);
+  static const micro = Duration(milliseconds: 100);
+
   /// 150ms — press state feedback, chip selection
-  static const fast   = Duration(milliseconds: 150);
+  static const fast = Duration(milliseconds: 150);
+
   /// 200ms — standard UI transitions (tab switches, card expands)
   static const normal = Duration(milliseconds: 200);
+
   /// 250ms — slightly heavier containers
   static const moderate = Duration(milliseconds: 250);
+
   /// 300ms — page & modal slide transitions
   static const medium = Duration(milliseconds: 300);
+
   /// 600ms — progress rings, loading fills
-  static const slow   = Duration(milliseconds: 600);
+  static const slow = Duration(milliseconds: 600);
+
   /// 800ms — counter roll-up animations
-  static const xslow  = Duration(milliseconds: 800);
+  static const xslow = Duration(milliseconds: 800);
 }
 
 class AppBreakpoints {
