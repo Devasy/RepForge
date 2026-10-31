@@ -6,6 +6,7 @@ import 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart';
 import 'ai_failure.dart';
 import '../debug_log_buffer.dart';
 import 'orchestration/legacy_chat.dart';
+import '../interfaces/web_grounding_support.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
     show Content, FunctionCall, Tool;
@@ -25,6 +26,7 @@ const kGeminiModels = [
   ('gemini-3.5-flash', 'Gemini 3.5 Flash'),
   ('gemini-3.6-flash', 'Gemini 3.6 Flash'),
   ('gemini-3.7-flash', 'Gemini 3.7 Flash'),
+  ('gemini-3.8-flash', 'Gemini 3.8 Flash'),
 ];
 
 // Ordered fastest/cheapest → most thorough. Matches the Gemini API's own
@@ -115,7 +117,7 @@ List<Object?> buildGeminiChatContents(
 }
 
 class GeminiAiService extends ChangeNotifier
-    implements IAiService, ModelProvider {
+    implements IAiService, ModelProvider, WebGroundingSupport {
   // Optional storage so cumulative token usage survives restarts.
   final IStorageService? _storage;
 
@@ -351,7 +353,11 @@ class GeminiAiService extends ChangeNotifier
     imageMimeType: imageMimeType,
   );
 
+  @override
+  bool get supportsWebGrounding => supportsGeminiWebGrounding(_model);
+
   GeminiModelProvider _modelProvider() => GeminiModelProvider(
+    googleSearchEnabled: supportsGeminiWebGrounding,
     apiKey: _apiKey,
     onDiagnostic: (event) =>
         DebugLogBuffer.instance.write('[AI] ${jsonEncode(event)}'),

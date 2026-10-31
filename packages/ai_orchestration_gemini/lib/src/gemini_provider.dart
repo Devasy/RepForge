@@ -13,6 +13,7 @@ class GeminiFailure extends OrchestrationException {
 
 class GeminiModelProvider implements ModelProvider {
   final String apiKey;
+  final bool Function(String model) googleSearchEnabled;
   final http.Client Function() clientFactory;
   final JsonMap Function(String model) generationConfig;
   final String? Function(String model)? fallbackModel;
@@ -27,6 +28,7 @@ class GeminiModelProvider implements ModelProvider {
 
   GeminiModelProvider({
     required this.apiKey,
+    bool Function(String model)? googleSearchEnabled,
     http.Client Function()? clientFactory,
     JsonMap Function(String model)? generationConfig,
     this.fallbackModel,
@@ -38,7 +40,8 @@ class GeminiModelProvider implements ModelProvider {
     this.modelTimeout = const Duration(minutes: 5),
     this.maxRequestTime = const Duration(minutes: 10),
     Duration Function(int attempt)? retryDelay,
-  }) : clientFactory = clientFactory ?? http.Client.new,
+  }) : googleSearchEnabled = googleSearchEnabled ?? ((_) => false),
+       clientFactory = clientFactory ?? http.Client.new,
        generationConfig = generationConfig ?? ((_) => const {}),
        retryDelay =
            retryDelay ??
@@ -68,6 +71,7 @@ class GeminiModelProvider implements ModelProvider {
     final parts = <JsonMap>[];
     final ids = <String, Object?>{};
     var usage = <String, Object?>{};
+    final grounding = <String, Object?>{};
     String? finish;
     var bytes = 0;
     await for (final event in _request(request, contents, cancellation)) {
@@ -116,6 +120,9 @@ class GeminiModelProvider implements ModelProvider {
             canRetry: false,
           );
         }
+        if (data['groundingMetadata'] is Map) {
+          grounding.addAll(jsonObject(data['groundingMetadata']));
+        }
         final content = jsonObject(
           data['content'] ?? const <String, Object?>{},
         );
@@ -130,6 +137,32 @@ class GeminiModelProvider implements ModelProvider {
         for (final item in raw) {
           final part = jsonObject(item);
           parts.add(part);
+          final serverTool = part['toolCall'] ?? part['toolResponse'];
+          if (serverTool != null) {
+            final tool = jsonObject(serverTool);
+            final type = tool['toolType'];
+            if (!{'GOOGLE_SEARCH', 'GOOGLE_SEARCH_WEB'}.contains(type)) {
+              throw const GeminiFailure(
+                'model_capability',
+                'An unsupported built-in tool was returned.',
+                canRetry: false,
+              );
+            }
+            if (part['toolCall'] != null) {
+              final queries = jsonObject(tool['args'])['queries'];
+              if (queries is List) grounding['webSearchQueries'] = queries;
+              yield const ModelStatus('Searching the web…');
+            } else {
+              final suggestions = jsonObject(
+                tool['response'],
+              )['search_suggestions'];
+              if (suggestions is String) {
+                grounding['searchEntryPoint'] = {
+                  'renderedContent': suggestions,
+                };
+              }
+            }
+          }
           if (part['thought'] == true) continue;
           if (part['text'] case final String text) {
             if (text.isNotEmpty) yield ModelText(text);
@@ -165,6 +198,8 @@ class GeminiModelProvider implements ModelProvider {
               'thoughtSignature',
               'functionCall',
               'partMetadata',
+              'toolCall',
+              'toolResponse',
             }.contains(key),
           )) {
             throw const GeminiFailure(
@@ -203,7 +238,11 @@ class GeminiModelProvider implements ModelProvider {
       reason,
       usage: usage,
       providerData: {
-        'gemini': {'parts': parts, 'callIds': ids},
+        'gemini': {
+          'parts': parts,
+          'callIds': ids,
+          if (grounding.isNotEmpty) 'groundingMetadata': grounding,
+        },
       },
     );
   }
@@ -309,7 +348,12 @@ class GeminiModelProvider implements ModelProvider {
             failure is _HttpFailure && failure.dailyQuota;
         if (canSwitch && (immediate || retries >= maxRetries)) {
           final fallback = fallbackModel?.call(model);
-          if (fallback != null && visited.length < 8 && visited.add(fallback)) {
+          final compatible =
+              fallback != null &&
+              (body != null ||
+                  !googleSearchEnabled(request.modelId) ||
+                  googleSearchEnabled(fallback));
+          if (compatible && visited.length < 8 && visited.add(fallback)) {
             _diagnose({
               'event': 'fallback',
               'from': model,
@@ -423,21 +467,30 @@ class GeminiModelProvider implements ModelProvider {
                           {'text': request.systemPrompt},
                         ],
                       },
-                      if (request.tools.isNotEmpty)
+                      if (request.tools.isNotEmpty ||
+                          googleSearchEnabled(model))
                         'tools': [
-                          {
-                            'functionDeclarations': [
-                              for (final tool in request.tools)
-                                {
-                                  'name': tool.name,
-                                  'description': tool.description,
-                                  'parameters': geminiSchema(
-                                    tool.arguments.definition,
-                                  ),
-                                },
-                            ],
-                          },
+                          if (googleSearchEnabled(model))
+                            {'googleSearch': <String, Object?>{}},
+                          if (request.tools.isNotEmpty)
+                            {
+                              'functionDeclarations': [
+                                for (final tool in request.tools)
+                                  {
+                                    'name': tool.name,
+                                    'description': tool.description,
+                                    'parameters': geminiSchema(
+                                      tool.arguments.definition,
+                                    ),
+                                  },
+                              ],
+                            },
                         ],
+                      if (googleSearchEnabled(model))
+                        'toolConfig': {
+                          'includeServerSideToolInvocations': true,
+                          'functionCallingConfig': {'mode': 'VALIDATED'},
+                        },
                       'generationConfig': {
                         ...generationConfig(model),
                         'candidateCount': 1,
@@ -558,9 +611,8 @@ class GeminiModelProvider implements ModelProvider {
   ]).timeout(budget);
 
   Duration? _serverDelay(String body) {
-    final match = RegExp(
-      r'(?:retryDelay"\s*:\s*"|retry in\s+)([\d.]+)s',
-    ).firstMatch(body);
+    final match = RegExp(r'(?:retryDelay"\s*:\s*"|retry in\s+)([\d.]+)s')
+        .firstMatch(body);
     final seconds = double.tryParse(match?.group(1) ?? '');
     return seconds == null || !seconds.isFinite
         ? null

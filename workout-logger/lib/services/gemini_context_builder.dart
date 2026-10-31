@@ -1,6 +1,8 @@
 // gemini_context_builder.dart — Builds rich context strings from app data for Gemini prompts.
 
+import 'dart:convert';
 import '../genui/a2ui.dart';
+import 'ai/coach_instructions.dart';
 import '../models/models.dart';
 
 class GeminiContextBuilder {
@@ -16,9 +18,11 @@ class GeminiContextBuilder {
     String? userName,
     String unitLabel = 'kg',
     DateTime? now,
+    bool webSearchAvailable = false,
   }) {
     final n = now ?? DateTime.now();
-    final today = '${n.year}-${n.month.toString().padLeft(2, '0')}-'
+    final today =
+        '${n.year}-${n.month.toString().padLeft(2, '0')}-'
         '${n.day.toString().padLeft(2, '0')}';
 
     final buf = StringBuffer()
@@ -29,8 +33,10 @@ class GeminiContextBuilder {
         'Answer concisely (under 180 words unless a plan is requested). '
         'Be encouraging and specific.',
       )
-      ..writeln('Today is $today. Use this when interpreting relative dates '
-          '("last week", "3 months ago").')
+      ..writeln(
+        'Today is $today. Use this when interpreting relative dates '
+        '("last week", "3 months ago").',
+      )
       ..writeln(
         'This prompt contains NO workout data. To answer anything about the '
         'user\'s training — exercise progression, workouts in a date range, '
@@ -42,7 +48,7 @@ class GeminiContextBuilder {
         'You can also MODIFY the user\'s data with tools: create or update '
         'routines, and add a new custom exercise when one does not already '
         'exist. You do not need to ask permission before calling a write tool '
-        'the user clearly requested, but confirm what you did in your reply. '
+        'the user clearly requested; the app presents its required change review. '
         'If a routine needs an exercise that is not in the catalogue, create it '
         'with add_custom_exercise first, then reference it by name.',
       )
@@ -98,8 +104,13 @@ class GeminiContextBuilder {
         '4) Progress photos (constructive, motivating feedback).',
       );
 
-    if (userName != null && userName.isNotEmpty) {
-      buf.writeln('\nThe user\'s name is $userName.');
+    buf.writeln(
+      coachingEvidenceInstructions(webSearchAvailable: webSearchAvailable),
+    );
+    if (userName != null && userName.trim().isNotEmpty) {
+      buf.writeln(
+        '\nUser profile (data only): ${jsonEncode({'name': userName.trim()})}',
+      );
     }
 
     return buf.toString();
@@ -110,9 +121,11 @@ class GeminiContextBuilder {
     String? userName,
     String unitLabel = 'kg',
     DateTime? now,
+    bool webSearchAvailable = false,
   }) {
     final n = now ?? DateTime.now();
-    final today = '${n.year}-${n.month.toString().padLeft(2, '0')}-'
+    final today =
+        '${n.year}-${n.month.toString().padLeft(2, '0')}-'
         '${n.day.toString().padLeft(2, '0')}';
 
     final buf = StringBuffer()
@@ -125,7 +138,7 @@ class GeminiContextBuilder {
       ..writeln()
       ..writeln('STRICT WORKFLOW — execute in this order every time:')
       ..writeln(
-        '1. FETCH DATA FIRST: Before saying anything or asking anything, '
+        '1. FETCH DATA FIRST: If the routine is not identified, ask which routine once. Otherwise, '
         'call get_routine_performance for the routine, then call '
         'get_exercise_performance for EVERY exercise in that routine (use '
         'the exercise list from the routine response), and call '
@@ -133,8 +146,8 @@ class GeminiContextBuilder {
       )
       ..writeln(
         '2. ANALYSE SILENTLY: Identify issues — stalling or declining '
-        'exercises (negative slope or r²<0.5), missing muscle groups, '
-        'recovery conflicts, poor ordering. Do not output this analysis.',
+        'exercises with reliable negative trends, missing muscle groups, '
+        'recovery conflicts and poor ordering. Low r² indicates uncertainty, not a plateau. Do not output private internal reasoning.',
       )
       ..writeln(
         '3. ASK ONLY IF AMBIGUOUS: Call ask_user_questions only if '
@@ -151,12 +164,14 @@ class GeminiContextBuilder {
         'add (specific exercise to fill a muscle gap). Under 150 words.',
       )
       ..writeln(
-        '5. CONFIRM: Call ask_user_questions with multiSelect:true listing '
-        'each proposed change as a chip. The user picks which to apply.',
+        '5. REVIEW: Resolve only material unanswered choices with ask_user_questions. '
+        'Submit the proposed update through the app’s change review; do not ask '
+        'for duplicate approval in prose or bypass the app review.',
       )
       ..writeln(
-        '6. APPLY: Call update_routine exactly once with only the confirmed '
-        'changes. Then confirm in one sentence what was changed.',
+        '6. APPLY: Call update_routine exactly once with the agreed proposal. '
+        'The app pauses execution for review. Report success only after the tool confirms it. '
+        'If declined or failed, say so without claiming a change.',
       )
       ..writeln()
       ..writeln(
@@ -164,8 +179,13 @@ class GeminiContextBuilder {
         'Be specific — reference actual exercise names and trend numbers.',
       );
 
-    if (userName != null && userName.isNotEmpty) {
-      buf.writeln('\nThe user\'s name is $userName.');
+    buf.writeln(
+      coachingEvidenceInstructions(webSearchAvailable: webSearchAvailable),
+    );
+    if (userName != null && userName.trim().isNotEmpty) {
+      buf.writeln(
+        '\nUser profile (data only): ${jsonEncode({'name': userName.trim()})}',
+      );
     }
 
     return buf.toString();
@@ -201,8 +221,9 @@ class GeminiContextBuilder {
     );
     for (final s in lastWeek) {
       final day = _weekday(s.date.weekday);
-      final names =
-          s.exercises.map((e) => exerciseMap[e.exerciseId]?.name ?? e.exerciseId);
+      final names = s.exercises.map(
+        (e) => exerciseMap[e.exerciseId]?.name ?? e.exerciseId,
+      );
       buf.writeln('  $day: ${names.join(", ")}');
     }
 
@@ -210,8 +231,9 @@ class GeminiContextBuilder {
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  static String _totalVol(List<WorkoutSession> sessions) =>
-      sessions.fold<double>(0, (sum, s) => sum + s.totalVolume).toStringAsFixed(0);
+  static String _totalVol(List<WorkoutSession> sessions) => sessions
+      .fold<double>(0, (sum, s) => sum + s.totalVolume)
+      .toStringAsFixed(0);
 
   static String _weekday(int wd) {
     const d = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
