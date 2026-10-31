@@ -611,8 +611,9 @@ class GeminiModelProvider implements ModelProvider {
   ]).timeout(budget);
 
   Duration? _serverDelay(String body) {
-    final match = RegExp(r'(?:retryDelay"\s*:\s*"|retry in\s+)([\d.]+)s')
-        .firstMatch(body);
+    final match = RegExp(
+      r'(?:retryDelay"\s*:\s*"|retry in\s+)([\d.]+)s',
+    ).firstMatch(body);
     final seconds = double.tryParse(match?.group(1) ?? '');
     return seconds == null || !seconds.isFinite
         ? null
