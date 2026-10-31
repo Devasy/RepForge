@@ -26,7 +26,7 @@ import 'widgets/rf_shell.dart';
 import 'widgets/floating_nav_bar.dart';
 import 'widgets/sparkline_painter.dart';
 import 'widgets/activity_heatmap.dart';
-import 'widgets/body_heatmap.dart';
+import 'widgets/home_training_cards.dart';
 
 // ── HomeScreen ────────────────────────────────────────────────────────────────
 
@@ -266,25 +266,7 @@ class _DashboardTab extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Training',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                DateFormat('EEEE · MMM d').format(DateTime.now()),
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ],
-          ),
-        ),
+        const Expanded(child: _PersonalGreeting()),
         RFIconButton(
           icon: Icons.chat_bubble_outline_rounded,
           tooltip: 'AI coach',
@@ -330,116 +312,26 @@ class _DashboardTab extends StatelessWidget {
       }
     }
 
-    // Week dots (Mon–Sun)
-    final weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     final weekStart = today.subtract(Duration(days: today.weekday - 1));
     final hasWorkoutDays = List.generate(7, (i) {
-      final d = weekStart.add(Duration(days: i));
+      final day = weekStart.add(Duration(days: i));
       return sessions.any(
-        (s) =>
-            s.date.year == d.year &&
-            s.date.month == d.month &&
-            s.date.day == d.day,
+        (session) =>
+            session.date.year == day.year &&
+            session.date.month == day.month &&
+            session.date.day == day.day,
       );
     });
-    final todayWeekday = today.weekday - 1; // 0=Mon
-
     final isActive = provider.hasActiveWorkout;
-
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Streak',
-            style: TextStyle(fontSize: 14, color: AppColors.textSoft),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            children: [
-              Text(
-                '$streak',
-                style: const TextStyle(
-                  fontFamily: 'GeistMono',
-                  fontSize: 48,
-                  height: 1.2,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-              Text(
-                streak == 1 ? 'day' : 'days',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            streak == 0
-                ? 'Start your streak today'
-                : 'Your current training streak',
-            style: const TextStyle(fontSize: 14, color: AppColors.textSoft),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: List.generate(7, (i) {
-              final done = hasWorkoutDays[i];
-              final isToday = i == todayWeekday;
-              final dayLabel = DateFormat(
-                'EEEE, MMM d',
-              ).format(weekStart.add(Duration(days: i)));
-              return Expanded(
-                child: Semantics(
-                  label:
-                      '$dayLabel: ${done ? "workout logged" : "no workout logged"}${isToday ? ", today" : ""}',
-                  excludeSemantics: true,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: Column(
-                      children: [
-                        Text(
-                          weekDays[i],
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: done
-                                ? AppColors.primary
-                                : AppColors.cardHigh,
-                            borderRadius: BorderRadius.circular(4),
-                            border: isToday
-                                ? Border.all(color: AppColors.textSoft)
-                                : null,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 20),
-          GlowButton(
-            label: isActive ? 'Resume workout' : 'Start workout',
-            icon: Icons.play_arrow_rounded,
-            onPressed: isActive
-                ? () => homeState?._resumeWorkout(context)
-                : () => homeState?._showRoutineSelector(context),
-          ),
-        ],
-      ),
+    return TrainingStreakCard(
+      streak: streak,
+      weekStart: weekStart,
+      workoutDays: hasWorkoutDays,
+      todayIndex: today.weekday - 1,
+      isActive: isActive,
+      onStart: isActive
+          ? () => homeState?._resumeWorkout(context)
+          : () => homeState?._showRoutineSelector(context),
     );
   }
 
@@ -641,115 +533,9 @@ class _DashboardTab extends StatelessWidget {
       }
     }
 
-    final maxVol = muscleVols.values.isEmpty
-        ? 1.0
-        : muscleVols.values.reduce((a, b) => a > b ? a : b);
-    final muscleList = muscleVols.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final topMuscles = muscleList.take(5).toList();
-
-    final normalizedVols = {
-      for (final e in muscleVols.entries) e.key: e.value / maxVol,
-    };
-
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              const Text(
-                'Weekly muscle volume',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Text(
-                settings.unitLabel,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final rows = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: topMuscles.isEmpty
-                    ? [
-                        const Text(
-                          'No data yet',
-                          style: TextStyle(color: AppColors.textMuted),
-                        ),
-                      ]
-                    : topMuscles.map((e) {
-                        final volStr = e.value >= 1000
-                            ? '${(e.value / 1000).toStringAsFixed(1)}k'
-                            : e.value.toStringAsFixed(0);
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 4,
-                                children: [
-                                  Text(
-                                    _capitalize(e.key.replaceAll('_', ' ')),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSoft,
-                                    ),
-                                  ),
-                                  Text(
-                                    volStr,
-                                    style: const TextStyle(
-                                      fontFamily: 'GeistMono',
-                                      fontSize: 12,
-                                      color: AppColors.textMuted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              RFProgressBar(
-                                value: (e.value / maxVol).clamp(0.0, 1.0),
-                                color: AppColors.muscle(e.key),
-                                height: 4,
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-              );
-              final body = BodyHeatmapWidget(muscleVolumes: normalizedVols);
-              if (constraints.maxWidth < 280 ||
-                  MediaQuery.textScalerOf(context).scale(14) > 21) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [body, const SizedBox(height: 16), rows],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  body,
-                  const SizedBox(width: 16),
-                  Expanded(child: rows),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
+    return WeeklyMuscleVolumeCard(
+      volumes: muscleVols,
+      unitLabel: settings.unitLabel,
     );
   }
 
@@ -907,12 +693,41 @@ class _DashboardTab extends StatelessWidget {
     if (diff < 7) return '${diff}d ago';
     return DateFormat('MMM d').format(d);
   }
-
-  String _capitalize(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }
 
 // ── Stat helpers ──────────────────────────────────────────────────────────────
+
+class _PersonalGreeting extends StatelessWidget {
+  const _PersonalGreeting();
+
+  @override
+  Widget build(BuildContext context) {
+    final name = context
+        .select<SettingsProvider, String?>((settings) => settings.userName)
+        ?.trim();
+    final now = DateTime.now();
+    final greeting = now.hour < 12
+        ? 'Good morning'
+        : now.hour < 17
+        ? 'Good afternoon'
+        : 'Good evening';
+    final hasName = name != null && name.isNotEmpty;
+    final style = Theme.of(context).textTheme.headlineMedium;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          DateFormat('EEEE · MMM d').format(now),
+          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+        ),
+        const SizedBox(height: 4),
+        Text(hasName ? '$greeting,' : greeting, style: style),
+        if (hasName)
+          Text(name, style: style?.copyWith(color: AppColors.textSoft)),
+      ],
+    );
+  }
+}
 
 class _StatItem {
   const _StatItem({

@@ -952,7 +952,7 @@ class RFProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = color ?? AppColors.primary;
-    final clamped = value.clamp(0.0, 1.0);
+    final clamped = value.isFinite ? value.clamp(0.0, 1.0) : 0.0;
     return Semantics(
       value: '${(clamped * 100).round()}%',
       child: Container(

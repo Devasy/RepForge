@@ -594,7 +594,7 @@ class _FilterChip extends StatelessWidget {
             fontFamily: 'GeistMono',
             color: selected ? AppColors.primary : AppColors.textMuted,
             fontSize: 12,
-            fontWeight: selected ? FontWeight.w500 : FontWeight.w500,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),

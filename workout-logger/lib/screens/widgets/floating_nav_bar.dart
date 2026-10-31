@@ -586,8 +586,7 @@ class _NavCellState extends State<_NavCell>
                                         color: t.badgeColor,
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          // border matches the chip bg for a
-                                          // "punched out" halo effect
+                                          // Matches the chip background for a punched-out halo.
                                           color: widget.chipBg,
                                           width: 1.5,
                                         ),

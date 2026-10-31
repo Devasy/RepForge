@@ -426,7 +426,7 @@ class RFOptionChip extends StatelessWidget {
                     fontFamily: 'Geist',
                     color: fg,
                     fontSize: 13,
-                    fontWeight: selected ? FontWeight.w500 : FontWeight.w500,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
