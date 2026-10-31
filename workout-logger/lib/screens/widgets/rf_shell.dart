@@ -96,7 +96,7 @@ class RFIconButton extends StatelessWidget {
 }
 
 // ── RFGradientBadge ──────────────────────────────────────────────────────────
-// Small brand-gradient tile — the AI mark in headers, avatars and empty states.
+// Neutral icon tile; legacy name retained for callers.
 class RFGradientBadge extends StatelessWidget {
   const RFGradientBadge({
     super.key,
@@ -122,17 +122,16 @@ class RFGradientBadge extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
+        color: AppColors.cardHigh,
         borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryGlow(glow),
-            blurRadius: size * 0.4,
-            spreadRadius: -size * 0.12,
-          ),
-        ],
       ),
-      child: Icon(icon, color: Colors.white, size: size * 0.5),
+      child: Icon(
+        icon == Icons.auto_awesome_rounded
+            ? Icons.chat_bubble_outline_rounded
+            : icon,
+        color: AppColors.textSoft,
+        size: 20,
+      ),
     );
   }
 }
@@ -156,7 +155,7 @@ class RFScreenHeader extends StatelessWidget {
   final String title;
   final String? subtitle;
 
-  /// When set, a brand-gradient badge sits between the back button and title.
+  /// When set, a neutral icon badge sits between the back button and title.
   final IconData? badgeIcon;
 
   /// Omit to hide the leading button entirely (root-level screens).
@@ -202,7 +201,7 @@ class RFScreenHeader extends StatelessWidget {
             fontFamily: 'Geist',
             color: AppColors.textPrimary,
             fontSize: 16,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w500,
             letterSpacing: -0.3,
           ),
         ),
@@ -216,7 +215,7 @@ class RFScreenHeader extends StatelessWidget {
             style: const TextStyle(
               fontFamily: 'Geist',
               color: AppColors.textMuted,
-              fontSize: 11,
+              fontSize: 12,
             ),
           ),
         ],
@@ -313,7 +312,7 @@ class RFBottomBar extends StatelessWidget {
 }
 
 // ── RFLabel ──────────────────────────────────────────────────────────────────
-// The one uppercase micro-label: headings, captions and overlines share it.
+// Sentence-case supporting labels shared by headings and captions.
 class RFLabel extends StatelessWidget {
   const RFLabel(this.text, {super.key, this.color, this.dim = false});
 
@@ -326,13 +325,13 @@ class RFLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      text.toUpperCase(),
+      text,
       style: TextStyle(
         fontFamily: 'Geist',
         color: color ?? (dim ? AppColors.textFaint : AppColors.textMuted),
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.2,
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0,
       ),
     );
   }
@@ -427,7 +426,7 @@ class RFOptionChip extends StatelessWidget {
                     fontFamily: 'Geist',
                     color: fg,
                     fontSize: 13,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),

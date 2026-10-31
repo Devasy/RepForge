@@ -29,7 +29,6 @@
 
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
-import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,44 +83,57 @@ class FloatingNavBarTheme {
     this.backgroundOpacity = 0.82,
     this.borderColor,
     this.borderWidth = 1.2,
+
     /// Background of the selected tab chip.
     this.selectedChipColor,
+
     /// Border of the selected tab chip.
     this.selectedChipBorderColor,
+
     /// Glow shadow of the selected tab chip.
     this.selectedChipShadowColor,
+
     /// Icon + label colour inside the selected chip.
     this.selectedContentColor,
     this.inactiveIconColor,
     this.outerShadowColor,
     this.outerGlowColor,
+
     /// Colour of the unread-indicator dot on a badged item.
     this.badgeColor = const Color(0xFFE05040),
     // ── Sizes ────────────────────────────────────────────────────────────────
     this.navHeight = 60.0,
     this.chipHeight = 46.0,
+
     /// Fixed width of each icon tap cell (active and inactive).
     this.iconCellSize = 48.0,
+
     /// Extra width that slides open when a chip becomes active (label area).
     this.labelWidth = 80.0,
     this.iconSize = 22.0,
+
     /// Symmetric horizontal inset inside the container.
     this.horizontalPadding = 8.0,
+
     /// Gap between adjacent chips.
     this.itemSpacing = 4.0,
     this.blurSigma = 18.0,
     // ── Label ────────────────────────────────────────────────────────────────
     /// Set to `false` to disable label expansion (icon-only compact mode).
     this.showLabels = true,
+
     /// Override the label [TextStyle]. Colour is always resolved from theme.
     this.labelStyle,
     // ── Spring animation ─────────────────────────────────────────────────────
     /// Spring mass (heavier = slower).
     this.springMass = 1.0,
+
     /// Spring stiffness (higher = snappier).
     this.springStiffness = 500.0,
+
     /// Damping ratio: 0.5 = bouncy, 1.0 = critically damped.
     this.springDampingRatio = 0.72,
+
     /// Duration for collapsing (non-spring ease-in).
     this.collapseDuration = const Duration(milliseconds: 200),
     // ── Show / hide animation ─────────────────────────────────────────────────
@@ -132,8 +144,10 @@ class FloatingNavBarTheme {
     // ── Scroll behaviour ─────────────────────────────────────────────────────
     /// Set to false to keep the nav bar permanently visible.
     this.hideOnScroll = true,
+
     /// Cumulative downward travel, in pixels, before the bar hides.
     this.scrollDownThreshold = 48.0,
+
     /// Cumulative upward travel before it returns; smaller, so it comes back fast.
     this.scrollUpThreshold = 16.0,
     // ── Misc ─────────────────────────────────────────────────────────────────
@@ -155,6 +169,7 @@ class FloatingNavBarTheme {
     // ── Slide animation ───────────────────────────────────────────────────────
     /// Offset applied to [AnimatedSlide] when the nav bar hides.
     this.slideHideOffset = const Offset(0, 1.5),
+
     /// Fade-out duration = hideDuration × fadeOutDurationFactor.
     this.fadeOutDurationFactor = 0.75,
   });
@@ -267,22 +282,29 @@ class FloatingNavBar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final bottomPad = MediaQuery.paddingOf(context).bottom;
     // Never below bottomMargin, and always a visible gap above any inset.
-    final bottomInset =
-        bottomPad + 8 > theme.bottomMargin ? bottomPad + 8 : theme.bottomMargin;
+    final bottomInset = bottomPad + 8 > theme.bottomMargin
+        ? bottomPad + 8
+        : theme.bottomMargin;
 
     // ── Resolve colours ──────────────────────────────────────────────────────
-    final bg = theme.backgroundColor ??
+    final bg =
+        theme.backgroundColor ??
         cs.surface.withValues(alpha: theme.backgroundOpacity);
-    final border = theme.borderColor ??
+    final border =
+        theme.borderColor ??
         cs.outline.withValues(alpha: theme.defaultBorderOpacity);
-    final chipBg = theme.selectedChipColor ??
+    final chipBg =
+        theme.selectedChipColor ??
         cs.primary.withValues(alpha: theme.defaultChipOpacity);
     final chipContent = theme.selectedContentColor ?? cs.onSurface;
-    final inactiveContent = theme.inactiveIconColor ??
+    final inactiveContent =
+        theme.inactiveIconColor ??
         cs.onSurface.withValues(alpha: theme.defaultInactiveOpacity);
-    final outerShadow = theme.outerShadowColor ??
+    final outerShadow =
+        theme.outerShadowColor ??
         Colors.black.withValues(alpha: theme.defaultShadowOpacity);
-    final outerGlow = theme.outerGlowColor ??
+    final outerGlow =
+        theme.outerGlowColor ??
         cs.primary.withValues(alpha: theme.defaultGlowOpacity);
 
     return Align(
@@ -424,8 +446,7 @@ class _NavCell extends StatefulWidget {
 
 class _NavCellState extends State<_NavCell>
     with SingleTickerProviderStateMixin {
-  /// Unbounded controller so the spring can overshoot > 1.0 naturally,
-  /// producing the satisfying bounce on expansion.
+  /// Selection feedback uses one bounded, non-overshooting transition.
   late final AnimationController _ctrl;
 
   @override
@@ -440,28 +461,13 @@ class _NavCellState extends State<_NavCell>
     super.didUpdateWidget(old);
     if (old.active == widget.active) return;
 
-    if (widget.active) {
-      // Spring expand — medium bounce feel, matching DampingRatioMediumBouncy.
-      _ctrl.animateWith(
-        SpringSimulation(
-          SpringDescription.withDampingRatio(
-            mass: widget.theme.springMass,
-            stiffness: widget.theme.springStiffness,
-            ratio: widget.theme.springDampingRatio,
-          ),
-          _ctrl.value,
-          1.0,
-          0.0, // initial velocity
-        ),
-      );
-    } else {
-      // Quick ease-in collapse — no spring, feels intentional / snappy.
-      _ctrl.animateTo(
-        0.0,
-        duration: widget.theme.collapseDuration,
-        curve: Curves.easeIn,
-      );
-    }
+    _ctrl.animateTo(
+      widget.active ? 1.0 : 0.0,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : widget.theme.collapseDuration,
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -505,8 +511,7 @@ class _NavCellState extends State<_NavCell>
             final labelOpacity = ((colorP - 0.5) * 2.0).clamp(0.0, 1.0);
 
             // Extra width contributed by the label area.
-            final extraW =
-                t.showLabels ? widthP * t.labelWidth : 0.0;
+            final extraW = t.showLabels ? widthP * t.labelWidth : 0.0;
 
             // Right padding inside chip (breathing room for the label).
             final rightPad = t.showLabels ? colorP * 10.0 : 0.0;
@@ -551,75 +556,75 @@ class _NavCellState extends State<_NavCell>
                   child: OverflowBox(
                     maxWidth: double.infinity,
                     child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // ── Icon (fixed width cell) ──────────────────────────────
-                    SizedBox(
-                      width: t.iconCellSize,
-                      height: t.chipHeight,
-                      child: Center(
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          alignment: Alignment.center,
-                          children: [
-                            Icon(
-                              widget.item.iconFor(widget.active),
-                              size: t.iconSize,
-                              color: iconColor,
-                            ),
-                            // Badge dot
-                            if (widget.item.hasBadge)
-                              Positioned(
-                                right: -3,
-                                top: -3,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: t.badgeColor,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      // border matches the chip bg for a
-                                      // "punched out" halo effect
-                                      color: widget.chipBg,
-                                      width: 1.5,
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // ── Icon (fixed width cell) ──────────────────────────────
+                        SizedBox(
+                          width: t.iconCellSize,
+                          height: t.chipHeight,
+                          child: Center(
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              alignment: Alignment.center,
+                              children: [
+                                Icon(
+                                  widget.item.iconFor(widget.active),
+                                  size: t.iconSize,
+                                  color: iconColor,
+                                ),
+                                // Badge dot
+                                if (widget.item.hasBadge)
+                                  Positioned(
+                                    right: -3,
+                                    top: -3,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: t.badgeColor,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          // Matches the chip background for a punched-out halo.
+                                          color: widget.chipBg,
+                                          width: 1.5,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
-                          ],
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
 
-                    // ── Expanding label area ─────────────────────────────────
-                    if (t.showLabels && extraW > 1.0) ...[
-                      Opacity(
-                        opacity: labelOpacity,
-                        child: Text(
-                          widget.item.label,
-                          style: (t.labelStyle ??
-                                  const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.1,
-                                  ))
-                              .copyWith(color: widget.chipContent),
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.clip,
-                        ),
-                      ),
-                      SizedBox(width: rightPad),
-                    ],
-                  ],
+                        // ── Expanding label area ─────────────────────────────────
+                        if (t.showLabels && extraW > 1.0) ...[
+                          Opacity(
+                            opacity: labelOpacity,
+                            child: Text(
+                              widget.item.label,
+                              style:
+                                  (t.labelStyle ??
+                                          const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.1,
+                                          ))
+                                      .copyWith(color: widget.chipContent),
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.clip,
+                            ),
+                          ),
+                          SizedBox(width: rightPad),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          );
+            );
           },
         ),
       ),
@@ -667,9 +672,9 @@ class FloatingNavBarScaffold extends StatefulWidget {
     this.theme = const FloatingNavBarTheme(),
     this.scaffoldBackgroundColor,
   }) : assert(
-          items.length >= 2,
-          'FloatingNavBarScaffold requires at least 2 items.',
-        );
+         items.length >= 2,
+         'FloatingNavBarScaffold requires at least 2 items.',
+       );
 
   /// Tab definitions. Minimum 2.
   final List<FloatingNavItem> items;
@@ -777,19 +782,20 @@ class _FloatingNavBarScaffoldState extends State<FloatingNavBarScaffold> {
               duration: _visible
                   ? widget.theme.showDuration
                   : widget.theme.hideDuration,
-              curve:
-                  _visible ? widget.theme.showCurve : widget.theme.hideCurve,
+              curve: _visible ? widget.theme.showCurve : widget.theme.hideCurve,
               child: AnimatedOpacity(
                 opacity: _visible ? 1.0 : 0.0,
                 duration: _visible
                     ? widget.theme.showDuration
                     : Duration(
-                        milliseconds: (widget.theme.hideDuration.inMilliseconds *
-                                widget.theme.fadeOutDurationFactor)
-                            .round(),
+                        milliseconds:
+                            (widget.theme.hideDuration.inMilliseconds *
+                                    widget.theme.fadeOutDurationFactor)
+                                .round(),
                       ),
-                curve:
-                    _visible ? widget.theme.showCurve : widget.theme.hideCurve,
+                curve: _visible
+                    ? widget.theme.showCurve
+                    : widget.theme.hideCurve,
                 // Disable hit-testing when fully hidden.
                 child: IgnorePointer(
                   ignoring: !_visible,

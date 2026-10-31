@@ -41,9 +41,9 @@ class AnalyticsOverviewTab extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const _VolumeTrendCard(),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 24),
                   _MuscleFocusCard(provider: provider),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 24),
                   _FrequencyGrid(provider: provider),
                 ],
               ),
@@ -61,15 +61,15 @@ enum _Range { w4, w12, all }
 
 extension on _Range {
   String get label => switch (this) {
-        _Range.w4 => '4W',
-        _Range.w12 => '12W',
-        _Range.all => 'All',
-      };
+    _Range.w4 => '4W',
+    _Range.w12 => '12W',
+    _Range.all => 'All',
+  };
   int? get weeks => switch (this) {
-        _Range.w4 => 4,
-        _Range.w12 => 12,
-        _Range.all => null, // computed from history (capped)
-      };
+    _Range.w4 => 4,
+    _Range.w12 => 12,
+    _Range.all => null, // computed from history (capped)
+  };
 }
 
 class _VolumeTrendCard extends StatefulWidget {
@@ -104,16 +104,21 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
       final earliest = sessions
           .map((s) => s.date)
           .reduce((a, b) => a.isBefore(b) ? a : b);
-      final earliestWeekStart = DateTime(earliest.year, earliest.month, earliest.day)
-          .subtract(Duration(days: earliest.weekday - 1));
-      final span = currentWeekStart.difference(earliestWeekStart).inDays ~/ 7 + 1;
+      final earliestWeekStart = DateTime(
+        earliest.year,
+        earliest.month,
+        earliest.day,
+      ).subtract(Duration(days: earliest.weekday - 1));
+      final span =
+          currentWeekStart.difference(earliestWeekStart).inDays ~/ 7 + 1;
       weeks = span.clamp(1, _allCap);
     }
 
     double weeklyVolume(int weekIndex) {
       // weekIndex 0 == oldest week shown, weeks-1 == current week.
-      final wStart =
-          currentWeekStart.subtract(Duration(days: (weeks - 1 - weekIndex) * 7));
+      final wStart = currentWeekStart.subtract(
+        Duration(days: (weeks - 1 - weekIndex) * 7),
+      );
       final wEnd = wStart.add(const Duration(days: 7));
       final raw = sessions
           .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
@@ -131,49 +136,58 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
     final curSum = spots.fold<double>(0, (sum, s) => sum + s.y);
     double prevSum = 0;
     for (int i = 0; i < weeks; i++) {
-      final wStart =
-          currentWeekStart.subtract(Duration(days: (weeks + i) * 7));
+      final wStart = currentWeekStart.subtract(Duration(days: (weeks + i) * 7));
       final wEnd = wStart.add(const Duration(days: 7));
-      prevSum += settings.toDisplay(sessions
-          .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
-          .fold<double>(0, (sum, s) => sum + s.totalVolume));
+      prevSum += settings.toDisplay(
+        sessions
+            .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
+            .fold<double>(0, (sum, s) => sum + s.totalVolume),
+      );
     }
-    final double? deltaPct =
-        prevSum > 0 ? ((curSum - prevSum) / prevSum * 100) : null;
+    final double? deltaPct = prevSum > 0
+        ? ((curSum - prevSum) / prevSum * 100)
+        : null;
 
     DateTime weekStartFor(int i) =>
         currentWeekStart.subtract(Duration(days: (weeks - 1 - i) * 7));
-    final labelInterval = weeks <= 1 ? 1.0 : (weeks / 6).ceilToDouble();
+    final labelCount = (MediaQuery.sizeOf(context).width / 100).floor().clamp(
+      2,
+      6,
+    );
+    final labelInterval = weeks <= 1
+        ? 1.0
+        : (weeks / labelCount).ceilToDouble();
 
     return GlassCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 16,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Volume Trend',
-                      style: TextStyle(fontFamily: 'Geist', 
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Volume trend',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${settings.unitLabel} · per week',
-                      style: TextStyle(fontFamily: 'Geist', 
-                        color: AppColors.textMuted,
-                        fontSize: 11,
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${settings.unitLabel} · per week',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               _RangeToggle(
                 value: _range,
@@ -194,10 +208,11 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                 ),
                 const SizedBox(width: 2),
                 Text(
-                  '${deltaPct.abs().toStringAsFixed(0)}% vs prev ${weeks}w',
-                  style: TextStyle(fontFamily: 'GeistMono', 
+                  '${deltaPct.abs().toStringAsFixed(0)}% vs previous $weeks weeks',
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
                     color: deltaPct >= 0 ? AppColors.success : AppColors.error,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -209,13 +224,17 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
             const _EmptyChart(),
             const SizedBox(height: 8),
           ] else ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             LayoutBuilder(
               builder: (context, constraints) => SizedBox(
-                height: AppBreakpoints.chartHeight(constraints.maxWidth),
+                height: constraints.maxWidth < AppBreakpoints.narrow
+                    ? 200
+                    : 240,
                 child: LineChart(
                   LineChartData(
                     backgroundColor: Colors.transparent,
+                    minY: 0,
+                    maxY: bestVol > 0 ? bestVol * 1.15 : 1,
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: false,
@@ -231,18 +250,20 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                           final ws = weekStartFor(i);
                           return LineTooltipItem(
                             '$volStr ${settings.unitLabel}',
-                            TextStyle(fontFamily: 'GeistMono', 
-                              color: AppColors.primary,
+                            TextStyle(
+                              fontFamily: 'GeistMono',
+                              color: AppColors.accentInk,
                               fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w500,
                             ),
                             children: [
                               TextSpan(
                                 text:
                                     '\nwk of ${DateFormat('MMM d').format(ws)}',
-                                style: TextStyle(fontFamily: 'Geist', 
+                                style: TextStyle(
+                                  fontFamily: 'Geist',
                                   color: AppColors.textMuted,
-                                  fontSize: 10,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.normal,
                                 ),
                               ),
@@ -253,9 +274,11 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                     ),
                     titlesData: FlTitlesData(
                       rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false)),
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                       topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false)),
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
@@ -263,14 +286,20 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                           interval: labelInterval,
                           getTitlesWidget: (v, _) {
                             final i = v.toInt();
-                            if (i < 0 || i >= weeks) return const Text('');
+                            if (i < 0 ||
+                                i >= weeks ||
+                                v != i.toDouble() ||
+                                i % labelInterval != 0) {
+                              return const SizedBox.shrink();
+                            }
                             return Padding(
                               padding: const EdgeInsets.only(top: 6),
                               child: Text(
                                 DateFormat('d/M').format(weekStartFor(i)),
-                                style: TextStyle(fontFamily: 'GeistMono', 
+                                style: TextStyle(
+                                  fontFamily: 'GeistMono',
                                   color: AppColors.textMuted,
-                                  fontSize: 9,
+                                  fontSize: 12,
                                 ),
                               ),
                             );
@@ -280,12 +309,18 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                       leftTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          reservedSize: 40,
+                          reservedSize:
+                              48 *
+                              MediaQuery.textScalerOf(context).scale(12) /
+                              12,
+                          minIncluded: false,
+                          maxIncluded: false,
                           getTitlesWidget: (v, _) => Text(
                             _fmtK(v),
-                            style: TextStyle(fontFamily: 'GeistMono', 
+                            style: TextStyle(
+                              fontFamily: 'GeistMono',
                               color: AppColors.textMuted,
-                              fontSize: 9,
+                              fontSize: 12,
                             ),
                           ),
                         ),
@@ -297,20 +332,24 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                         if (bestVol > 0)
                           HorizontalLine(
                             y: bestVol,
-                            color: AppColors.warning.withValues(alpha: 0.55),
+                            color: AppColors.textMuted.withValues(alpha: 0.55),
                             strokeWidth: 1,
                             dashArray: [6, 4],
                             label: HorizontalLineLabel(
                               show: true,
                               direction: LabelDirection.horizontal,
                               alignment: Alignment.topRight,
-                              padding: const EdgeInsets.only(right: 6, bottom: 2),
-                              style: TextStyle(fontFamily: 'GeistMono', 
-                                color: AppColors.warning,
-                                fontSize: 9,
+                              padding: const EdgeInsets.only(
+                                right: 6,
+                                bottom: 2,
+                              ),
+                              style: TextStyle(
+                                fontFamily: 'GeistMono',
+                                color: AppColors.textMuted,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
-                              labelResolver: (_) => 'BEST ${_fmtK(bestVol)}',
+                              labelResolver: (_) => 'Best ${_fmtK(bestVol)}',
                             ),
                           ),
                       ],
@@ -318,17 +357,16 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                     lineBarsData: [
                       LineChartBarData(
                         spots: spots,
-                        isCurved: true,
+                        isCurved: false,
                         curveSmoothness: 0.3,
-                        color: AppColors.primary,
+                        color: AppColors.accentInk,
                         barWidth: 2.5,
                         isStrokeCapRound: true,
                         dotData: FlDotData(
                           show: weeks <= 12,
-                          getDotPainter: (_, _, _, _) =>
-                              FlDotCirclePainter(
+                          getDotPainter: (_, _, _, _) => FlDotCirclePainter(
                             radius: 3.5,
-                            color: AppColors.primary,
+                            color: AppColors.accentInk,
                             strokeWidth: 1.5,
                             strokeColor: AppColors.surface,
                           ),
@@ -375,23 +413,24 @@ class _RangeToggle extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: _Range.values.map((r) {
           final active = r == value;
-          return GestureDetector(
-            onTap: () => onChanged(r),
-            child: AnimatedContainer(
-              duration: AppDurations.fast,
-              curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: active ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(7),
+          return TextButton(
+            onPressed: () => onChanged(r),
+            style: TextButton.styleFrom(
+              backgroundColor: active ? AppColors.cardHigh : Colors.transparent,
+              foregroundColor: active
+                  ? AppColors.textPrimary
+                  : AppColors.textMuted,
+              minimumSize: const Size(48, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
+            ),
+            child: Semantics(
+              selected: active,
               child: Text(
                 r.label,
-                style: TextStyle(fontFamily: 'GeistMono', 
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: active ? Colors.white : AppColors.textMuted,
-                ),
+                style: const TextStyle(fontFamily: 'GeistMono', fontSize: 12),
               ),
             ),
           );
@@ -443,7 +482,7 @@ class _MuscleFocusCard extends StatelessWidget {
     };
 
     return _ChartCard(
-      title: 'Muscle Focus',
+      title: 'Muscle focus',
       subtitle: 'Weekly volume · recovery · trend — tap a muscle',
       child: Column(
         children: [
@@ -525,7 +564,7 @@ class _MuscleFocusRow extends StatelessWidget {
     if (weekly < -2) {
       return (color: AppColors.error, icon: Icons.trending_down_rounded);
     }
-    return (color: AppColors.warning, icon: Icons.trending_flat_rounded);
+    return (color: AppColors.textMuted, icon: Icons.trending_flat_rounded);
   }
 
   Color get _recoveryColor {
@@ -556,7 +595,8 @@ class _MuscleFocusRow extends StatelessWidget {
                 Expanded(
                   child: Text(
                     name,
-                    style: TextStyle(fontFamily: 'Geist', 
+                    style: TextStyle(
+                      fontFamily: 'Geist',
                       color: AppColors.textSoft,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -565,14 +605,18 @@ class _MuscleFocusRow extends StatelessWidget {
                 ),
                 Text(
                   '${_fmtK(displayVol)} ${settings.unitLabel}',
-                  style: TextStyle(fontFamily: 'GeistMono', 
+                  style: TextStyle(
+                    fontFamily: 'GeistMono',
                     color: AppColors.textMuted,
-                    fontSize: 11,
+                    fontSize: 12,
                   ),
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.chevron_right_rounded,
-                    size: 14, color: AppColors.textFaint),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 14,
+                  color: AppColors.textFaint,
+                ),
               ],
             ),
             const SizedBox(height: 5),
@@ -590,8 +634,9 @@ class _MuscleFocusRow extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     '${recovery!.recoveryPercent}%',
-                    style: TextStyle(fontFamily: 'GeistMono', 
-                      fontSize: 10,
+                    style: TextStyle(
+                      fontFamily: 'GeistMono',
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: _recoveryColor,
                     ),
@@ -624,63 +669,57 @@ class _FrequencyGrid extends StatelessWidget {
     }
 
     return _ChartCard(
-      title: 'Workout Frequency',
+      title: 'Workout frequency',
       subtitle: 'Sessions per week',
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final boxSize = ((constraints.maxWidth - 48) / 4).clamp(40.0, 64.0);
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: weeks.entries.map((e) {
-              final count = e.value;
-              final label = e.key == 0 ? 'This wk' : '${e.key} wk';
-              final active = count > 0;
-              return Column(
-                children: [
-                  Container(
-                    width: boxSize,
-                    height: boxSize,
-                    decoration: BoxDecoration(
-                      color: active
-                          ? AppColors.primary.withValues(alpha: 0.12 + count * 0.06)
-                          : AppColors.glass2,
-                      borderRadius: BorderRadius.circular(AppRadius.button),
-                      border: Border.all(
-                        color: active
-                            ? AppColors.primary.withValues(alpha: 0.4)
-                            : AppColors.glassBorder,
-                      ),
-                      boxShadow: active
-                          ? [
-                              BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.2),
-                                blurRadius: 12,
-                              )
-                            ]
-                          : null,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '$count',
-                        style: TextStyle(fontFamily: 'GeistMono', 
-                          color: active ? AppColors.primary : AppColors.textMuted,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
+          final columns = MediaQuery.textScalerOf(context).scale(14) > 21
+              ? 2
+              : 4;
+          final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
+          return Wrap(
+            spacing: 12,
+            runSpacing: 16,
+            children: [
+              for (final e in weeks.entries)
+                SizedBox(
+                  width: width,
+                  child: Column(
+                    children: [
+                      Container(
+                        constraints: const BoxConstraints(minHeight: 56),
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardHigh,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${e.value}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'GeistMono',
+                            fontSize: 24,
+                            fontWeight: FontWeight.w500,
+                            color: e.value > 0
+                                ? AppColors.textPrimary
+                                : AppColors.textMuted,
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Text(
+                        e.key == 0 ? 'This wk' : '${e.key} wk',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    label,
-                    style: TextStyle(fontFamily: 'Geist', 
-                      color: AppColors.textMuted,
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
+                ),
+            ],
           );
         },
       ),
@@ -688,14 +727,8 @@ class _FrequencyGrid extends StatelessWidget {
   }
 }
 
-// ── Reusable chart card ────────────────────────────────────────────────────────
-
 class _ChartCard extends StatelessWidget {
-  const _ChartCard({
-    required this.title,
-    required this.child,
-    this.subtitle,
-  });
+  const _ChartCard({required this.title, required this.child, this.subtitle});
 
   final String title;
   final String? subtitle;
@@ -710,7 +743,8 @@ class _ChartCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: TextStyle(fontFamily: 'Geist', 
+            style: TextStyle(
+              fontFamily: 'Geist',
               color: AppColors.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -720,10 +754,14 @@ class _ChartCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               subtitle!,
-              style: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 11),
+              style: TextStyle(
+                fontFamily: 'Geist',
+                color: AppColors.textMuted,
+                fontSize: 12,
+              ),
             ),
           ],
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           child,
         ],
       ),
@@ -739,12 +777,28 @@ class _EmptyChart extends StatelessWidget {
     return Center(
       child: Column(
         children: [
-          const Icon(Icons.show_chart_rounded, size: 32, color: AppColors.textFaint),
+          const Icon(
+            Icons.show_chart_rounded,
+            size: 32,
+            color: AppColors.textFaint,
+          ),
           const SizedBox(height: 8),
-          Text('No data yet',
-              style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.textMuted)),
-          Text('Complete workouts to see progress',
-              style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.textFaint)),
+          Text(
+            'No data yet',
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 13,
+              color: AppColors.textMuted,
+            ),
+          ),
+          Text(
+            'Complete workouts to see progress',
+            style: TextStyle(
+              fontFamily: 'Geist',
+              fontSize: 12,
+              color: AppColors.textFaint,
+            ),
+          ),
         ],
       ),
     );

@@ -112,7 +112,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify RestTimerView overlay appears via WorkoutFlowScreen production state
-      expect(find.text('REST'), findsWidgets);
+      expect(find.text('Rest'), findsWidgets);
       expect(find.text('Skip rest'), findsOneWidget);
 
       // Tap '+30s' button during rest

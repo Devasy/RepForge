@@ -82,9 +82,20 @@ class GlassCard extends StatelessWidget {
     );
 
     Widget content = Container(
-      padding: padding ?? const EdgeInsets.all(AppSpacing.md),
       decoration: decoration,
-      child: child,
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: Padding(
+            padding: padding ?? const EdgeInsets.all(20),
+            child: child,
+          ),
+        ),
+      ),
     );
 
     if (overrideColor == null) {
@@ -98,11 +109,7 @@ class GlassCard extends StatelessWidget {
     }
 
     if (onTap == null) return content;
-    return Semantics(
-      button: true,
-      label: semanticsLabel,
-      child: GestureDetector(onTap: onTap, child: content),
-    );
+    return Semantics(button: true, label: semanticsLabel, child: content);
   }
 }
 
@@ -451,8 +458,8 @@ class _Wash extends StatelessWidget {
 // Import and use FloatingNavBar / FloatingNavBarScaffold / FloatingNavItem.
 
 // ── GlowButton ──────────────────────────────────────────────────────────────
-// Full-width primary action button with glow shadow + haptic feedback.
-class GlowButton extends StatefulWidget {
+// Violet primary actions retain the brand and native pressed/focus feedback.
+class GlowButton extends StatelessWidget {
   const GlowButton({
     super.key,
     required this.label,
@@ -471,122 +478,48 @@ class GlowButton extends StatefulWidget {
   final bool small;
 
   @override
-  State<GlowButton> createState() => _GlowButtonState();
-}
-
-class _GlowButtonState extends State<GlowButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: AppDurations.micro,
-      reverseDuration: AppDurations.normal,
-      lowerBound: 0.95,
-      upperBound: 1.0,
-      value: 1.0,
-    );
-    _scale = _ctrl;
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _onTapDown(TapDownDetails _) async {
-    await _ctrl.reverse();
-  }
-
-  Future<void> _onTapUp(TapUpDetails _) async {
-    HapticFeedback.heavyImpact();
-    await _ctrl.forward();
-    if (!mounted) return;
-    widget.onPressed?.call();
-  }
-
-  Future<void> _onTapCancel() async {
-    await _ctrl.forward();
-    if (!mounted) return;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final color = widget.color ?? AppColors.primary;
-    final disabled = widget.onPressed == null;
-    final vPad = widget.small ? 12.0 : 18.0;
-
-    return AnimatedBuilder(
-      animation: _scale,
-      builder: (context, child) =>
-          Transform.scale(scale: _scale.value, child: child),
-      child: Semantics(
-        button: true,
-        label: widget.label,
-        child: GestureDetector(
-          onTapDown: disabled ? null : _onTapDown,
-          onTapUp: disabled ? null : _onTapUp,
-          onTapCancel: disabled ? null : _onTapCancel,
-          child: Container(
-            width: widget.fullWidth ? double.infinity : null,
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: vPad,
-            ),
-            decoration: BoxDecoration(
-              color: disabled ? AppColors.glass2 : color,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: disabled
-                  ? Border.all(color: AppColors.glassBorder)
-                  : Border.all(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      width: 1,
-                    ),
-              boxShadow: disabled
-                  ? null
-                  : [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.35),
-                        blurRadius: 32,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-            ),
-            child: Row(
-              mainAxisSize: widget.fullWidth
-                  ? MainAxisSize.max
-                  : MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (widget.icon != null) ...[
-                  Icon(
-                    widget.icon,
-                    color: disabled ? AppColors.textMuted : Colors.white,
-                    size: widget.small ? 18 : 20,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                ],
-                Flexible(
-                  child: Text(
-                    widget.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: disabled ? AppColors.textMuted : Colors.white,
-                      fontSize: widget.small ? 14 : 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    final fill = color ?? AppColors.primary;
+    final ink = fill.computeLuminance() > 0.179
+        ? AppColors.background
+        : AppColors.textPrimary;
+    return SizedBox(
+      width: fullWidth ? double.infinity : null,
+      child: FilledButton(
+        style: FilledButton.styleFrom(
+          backgroundColor: fill,
+          foregroundColor: ink,
+          elevation: 1,
+          shadowColor: Colors.black45,
+          disabledBackgroundColor: AppColors.cardHigh,
+          disabledForegroundColor: AppColors.textMuted,
+          minimumSize: Size(48, small ? 48 : 56),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.button),
           ),
+          textStyle: TextStyle(
+            fontFamily: 'Geist',
+            fontSize: small ? 14 : 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        onPressed: onPressed == null
+            ? null
+            : () {
+                HapticFeedback.mediumImpact();
+                onPressed!();
+              },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 20),
+              const SizedBox(width: 8),
+            ],
+            Flexible(child: Text(label, textAlign: TextAlign.center)),
+          ],
         ),
       ),
     );
@@ -740,7 +673,7 @@ class RFStatBox extends StatelessWidget {
               style: TextStyle(
                 color: c,
                 fontSize: 22,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w500,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
@@ -761,7 +694,7 @@ class RFStatBox extends StatelessWidget {
           label,
           style: const TextStyle(
             color: AppColors.textMuted,
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w500,
             letterSpacing: 0.3,
           ),
@@ -806,7 +739,7 @@ class AnimatedCounter extends StatelessWidget {
               const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 22,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w500,
                 fontFeatures: [FontFeature.tabularFigures()],
               ),
         );
@@ -842,7 +775,7 @@ class MetricHero extends StatelessWidget {
           style: TextStyle(
             color: color ?? AppColors.textPrimary,
             fontSize: size,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w500,
             fontFeatures: const [FontFeature.tabularFigures()],
             height: 1.0,
           ),
@@ -1008,7 +941,7 @@ class RFProgressBar extends StatelessWidget {
     required this.value, // 0.0 – 1.0
     this.color,
     this.height = 6,
-    this.showGlow = true,
+    this.showGlow = false,
   });
 
   final double value;
@@ -1019,40 +952,24 @@ class RFProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = color ?? AppColors.primary;
-    final clamped = value.clamp(0.0, 1.0);
-    return Container(
-      height: height,
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.full),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Stack(
-            children: [
-              AnimatedContainer(
-                duration: AppDurations.slow,
-                curve: Curves.easeOutCubic,
-                width: constraints.maxWidth * clamped,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [c, Color.lerp(c, Colors.white, 0.2)!],
-                  ),
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                  boxShadow: showGlow
-                      ? [
-                          BoxShadow(
-                            color: c.withValues(alpha: 0.5),
-                            blurRadius: 8,
-                          ),
-                        ]
-                      : null,
-                ),
-              ),
-            ],
-          );
-        },
+    final clamped = value.isFinite ? value.clamp(0.0, 1.0) : 0.0;
+    return Semantics(
+      value: '${(clamped * 100).round()}%',
+      child: Container(
+        height: height,
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: AppColors.cardHigh,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+        ),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: FractionallySizedBox(
+            widthFactor: clamped,
+            heightFactor: 1,
+            child: ColoredBox(color: c),
+          ),
+        ),
       ),
     );
   }
@@ -1095,17 +1012,17 @@ class RestTimerRing extends StatelessWidget {
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: size * 0.22,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w500,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               Text(
-                'REST',
+                'Rest',
                 style: TextStyle(
                   color: AppColors.textMuted,
                   fontSize: size * 0.08,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: 2,
+                  letterSpacing: 0,
                 ),
               ),
             ],

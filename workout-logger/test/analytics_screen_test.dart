@@ -101,7 +101,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Overview is the first visible tab.
-      expect(find.text('Volume Trend'), findsOneWidget);
+      expect(find.text('Volume trend'), findsOneWidget);
       // Both Volume Trend and Muscle Focus cards show "No data yet" when empty.
       expect(find.text('No data yet'), findsWidgets);
     });
@@ -158,7 +158,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Muscle Focus'), findsOneWidget);
+      expect(find.text('Muscle focus'), findsOneWidget);
     });
 
     testWidgets('Workout Frequency grid uses "This wk" label', (tester) async {

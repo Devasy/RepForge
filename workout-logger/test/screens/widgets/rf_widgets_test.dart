@@ -30,7 +30,7 @@ void main() {
     expect(tapped, isTrue);
   });
 
-  testWidgets('AmbientGlow renders glow effect', (tester) async {
+  testWidgets('AmbientGlow renders the glass lighting background', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -113,7 +113,7 @@ void main() {
     );
 
     expect(find.text('Chest'), findsOneWidget);
-    expect(find.text('WORKOUTS'), findsOneWidget);
+    expect(find.text('Workouts'), findsOneWidget);
     expect(find.text('100'), findsOneWidget);
     expect(find.text('50'), findsOneWidget);
   });

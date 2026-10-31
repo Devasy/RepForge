@@ -110,7 +110,7 @@ void main() {
 
       // Verify SessionDetailsSheet displays details
       expect(find.textContaining('60 min'), findsOneWidget);
-      expect(find.text('Exercises'), findsOneWidget);
+      expect(find.text('Exercises'), findsNWidgets(2));
     });
   });
 }

@@ -3,6 +3,7 @@
 // its own field and the assisted-load line run off the edge of its pill.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/widgets/exercise_input_section.dart';
@@ -21,6 +22,18 @@ const _textScales = <double>[1.0, 1.35, 2.0];
 
 void main() {
   late SettingsProvider settings;
+
+  setUpAll(() async {
+    for (final entry in {
+      'Geist': 'assets/fonts/Geist-Variable.ttf',
+      'GeistMono': 'assets/fonts/GeistMono-Variable.ttf',
+      'MaterialIcons': 'fonts/MaterialIcons-Regular.otf',
+    }.entries) {
+      await (FontLoader(
+        entry.key,
+      )..addFont(rootBundle.load(entry.value))).load();
+    }
+  });
 
   setUp(() async {
     settings = SettingsProvider(MockStorageService());
@@ -44,8 +57,7 @@ void main() {
           body: SizedBox(
             width: width,
             height: 900,
-            // Mirrors WorkoutFlowScreen: a scroll view tall enough for the
-            // section's Spacer to have something to absorb.
+            // Keeps inputs and history in reading order inside a scrollable viewport.
             child: LayoutBuilder(
               builder: (context, constraints) => SingleChildScrollView(
                 padding: const EdgeInsets.all(AppSpacing.md),
@@ -55,8 +67,7 @@ void main() {
                   ),
                   child: IntrinsicHeight(
                     child: ExerciseInputSection(
-                      contentWidth:
-                          constraints.maxWidth - AppSpacing.md * 2,
+                      contentWidth: constraints.maxWidth - AppSpacing.md * 2,
                       currentWeight: weight,
                       currentReps: 12,
                       isDropset: false,
@@ -96,22 +107,73 @@ void main() {
     );
   }
 
+  testWidgets(
+    'paired inputs keep readable figures, thumb targets and nearby history',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(width: 390, textScale: 1, weight: 50));
+      await tester.pump();
+      final weight = find.widgetWithText(TextField, '50.0');
+      final reps = find.widgetWithText(TextField, '12');
+      expect(
+        tester.getTopLeft(weight).dy,
+        closeTo(tester.getTopLeft(reps).dy, 1),
+      );
+      expect(
+        tester.widget<TextField>(weight).style!.fontSize,
+        greaterThanOrEqualTo(40),
+      );
+      final step = find.byTooltip('Increase kg');
+      expect(tester.getSize(step).width, greaterThanOrEqualTo(48));
+      expect(tester.getSize(step).height, greaterThanOrEqualTo(48));
+      final historyTop = tester
+          .getTopLeft(find.text('First time doing this exercise!'))
+          .dy;
+      final dropsetBottom = tester.getBottomLeft(find.byType(Switch)).dy;
+      expect(historyTop - dropsetBottom, lessThan(100));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'large text stacks the weight and reps inputs on a narrow phone',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(width: 360, textScale: 2, weight: 102.5));
+      await tester.pump();
+      final weight = find.widgetWithText(TextField, '102.5');
+      final reps = find.widgetWithText(TextField, '12');
+      expect(
+        tester.getTopLeft(reps).dy,
+        greaterThan(tester.getBottomLeft(weight).dy),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   group('ExerciseInputSection lays out without overflow', () {
     for (final width in _widths) {
       for (final scale in _textScales) {
-        testWidgets('${width.toInt()}dp at ${scale}x text scale',
-            (tester) async {
+        testWidgets('${width.toInt()}dp at ${scale}x text scale', (
+          tester,
+        ) async {
           tester.view.physicalSize = Size(width, 900);
           tester.view.devicePixelRatio = 1.0;
           addTearDown(tester.view.reset);
 
           // A three-digit weight is the widest the field ever has to show.
-          await tester.pumpWidget(harness(
-            width: width,
-            textScale: scale,
-            weight: 102.5,
-            exerciseId: 'pull_ups',
-          ));
+          await tester.pumpWidget(
+            harness(
+              width: width,
+              textScale: scale,
+              weight: 102.5,
+              exerciseId: 'pull_ups',
+            ),
+          );
           await tester.pump();
 
           expect(tester.takeException(), isNull);
@@ -126,11 +188,9 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(harness(
-        width: 411,
-        textScale: 1.35,
-        weight: 102.5,
-      ));
+      await tester.pumpWidget(
+        harness(width: 411, textScale: 1.35, weight: 102.5),
+      );
       await tester.pump();
 
       final field = find.widgetWithText(TextField, '102.5');
@@ -159,7 +219,7 @@ void main() {
 
       final field = find.widgetWithText(TextField, '20.0');
       expect(field, findsOneWidget);
-      expect(tester.widget<TextField>(field).style!.fontSize, 36.0);
+      expect(tester.widget<TextField>(field).style!.fontSize, 48.0);
     });
   });
 }

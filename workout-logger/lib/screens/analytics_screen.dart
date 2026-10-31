@@ -56,13 +56,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'INSIGHTS',
+                  'Training progress',
                   style: TextStyle(
                     fontFamily: 'Geist',
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textFaint,
-                    letterSpacing: 1.2,
+                    letterSpacing: 0,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -71,7 +71,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   style: TextStyle(
                     fontFamily: 'Geist',
                     fontSize: 28,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textPrimary,
                     letterSpacing: -0.6,
                   ),
@@ -88,7 +88,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Container(
-        padding: const EdgeInsets.all(3),
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           color: AppColors.glass2,
           borderRadius: BorderRadius.circular(AppRadius.button),
@@ -98,32 +98,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           children: List.generate(_tabs.length, (i) {
             final active = i == _tab;
             return Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _tab = i),
-                child: AnimatedContainer(
-                  duration: AppDurations.normal,
-                  curve: Curves.easeOut,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: active ? AppColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(11),
-                    boxShadow: active
-                        ? [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.35),
-                              blurRadius: 12,
-                            ),
-                          ]
-                        : null,
+              child: TextButton(
+                onPressed: () => setState(() => _tab = i),
+                style: TextButton.styleFrom(
+                  backgroundColor: active
+                      ? AppColors.cardHigh
+                      : Colors.transparent,
+                  foregroundColor: active
+                      ? AppColors.textPrimary
+                      : AppColors.textMuted,
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 12,
                   ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Semantics(
+                  selected: active,
                   child: Text(
                     _tabs[i],
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Geist',
+                    style: const TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: active ? Colors.white : AppColors.textMuted,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
@@ -263,7 +263,7 @@ class _RecordsTabState extends State<_RecordsTab> {
                         fontFamily: 'Geist',
                         color: AppColors.textPrimary,
                         fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     if (thisMonthCount > 0) ...[
@@ -285,7 +285,7 @@ class _RecordsTabState extends State<_RecordsTab> {
                           style: TextStyle(
                             fontFamily: 'GeistMono',
                             color: AppColors.warning,
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -373,7 +373,7 @@ class _RecordsTabState extends State<_RecordsTab> {
                               style: TextStyle(
                                 fontFamily: 'GeistMono',
                                 color: AppColors.textMuted,
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -443,13 +443,7 @@ class _NewestPRHero extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isTimeBased
-                    ? [AppColors.cyan, const Color(0xFF00B4D8)]
-                    : [AppColors.warning, const Color(0xFFFF9500)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: AppColors.cardHigh,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: Icon(
@@ -468,9 +462,9 @@ class _NewestPRHero extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Geist',
                     color: isTimeBased ? AppColors.cyan : AppColors.warning,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
                   ),
                 ),
                 Text(
@@ -479,7 +473,7 @@ class _NewestPRHero extends StatelessWidget {
                     fontFamily: 'Geist',
                     color: AppColors.textPrimary,
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
@@ -487,7 +481,7 @@ class _NewestPRHero extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Geist',
                     color: AppColors.textFaint,
-                    fontSize: 11,
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -504,7 +498,7 @@ class _NewestPRHero extends StatelessWidget {
                   fontFamily: 'GeistMono',
                   color: isTimeBased ? AppColors.cyan : AppColors.warning,
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w500,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
@@ -517,7 +511,7 @@ class _NewestPRHero extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: 'GeistMono',
                   color: AppColors.textMuted,
-                  fontSize: 11,
+                  fontSize: 12,
                 ),
               ),
             ],
@@ -554,7 +548,7 @@ class _ExercisePRGroup extends StatelessWidget {
               fontFamily: 'Geist',
               color: AppColors.textSoft,
               fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w500,
               letterSpacing: 0.4,
             ),
           ),
@@ -599,8 +593,8 @@ class _FilterChip extends StatelessWidget {
           style: TextStyle(
             fontFamily: 'GeistMono',
             color: selected ? AppColors.primary : AppColors.textMuted,
-            fontSize: 11,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),
@@ -666,7 +660,7 @@ class _PRCard extends StatelessWidget {
                       style: TextStyle(
                         fontFamily: 'Geist',
                         color: AppColors.textFaint,
-                        fontSize: 11,
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -739,7 +733,7 @@ class _PRStat extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'Geist',
                 color: AppColors.textFaint,
-                fontSize: 10,
+                fontSize: 12,
               ),
             ),
             const SizedBox(height: 2),
@@ -749,7 +743,7 @@ class _PRStat extends StatelessWidget {
                 fontFamily: 'GeistMono',
                 color: color,
                 fontSize: 13,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],

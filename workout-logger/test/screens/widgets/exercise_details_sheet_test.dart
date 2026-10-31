@@ -60,7 +60,7 @@ void main() {
 
       expect(find.text('Weighted Plank'), findsOneWidget);
       expect(find.text('Time-Based'), findsOneWidget);
-      expect(find.text('AVAILABLE ATTACHMENTS'), findsOneWidget);
+      expect(find.text('Available Attachments'), findsOneWidget);
       expect(find.text('Standard'), findsOneWidget);
       expect(find.text('Elevated Feet'), findsOneWidget);
       expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
