@@ -91,6 +91,8 @@ class GeminiModelProvider implements ModelProvider {
     var usage = <String, Object?>{};
     final grounding = <String, Object?>{};
     String? finish;
+    String model = request.modelId;
+    String? modelVersion;
     var bytes = 0;
     await for (final event in _request(request, contents, cancellation)) {
       if (event is ModelStatus) {
@@ -98,6 +100,8 @@ class GeminiModelProvider implements ModelProvider {
         continue;
       }
       final chunk = event as JsonMap;
+      model = chunk['_repforgeModel'] as String? ?? model;
+      modelVersion = chunk['modelVersion'] as String? ?? modelVersion;
       bytes += utf8.encode(jsonEncode(chunk)).length;
       if (bytes > 16 * 1024 * 1024) {
         throw const GeminiFailure(
@@ -257,6 +261,8 @@ class GeminiModelProvider implements ModelProvider {
       usage: usage,
       providerData: {
         'gemini': {
+          'model': model,
+          'modelVersion': ?modelVersion,
           'parts': parts,
           'callIds': ids,
           if (grounding.isNotEmpty) 'groundingMetadata': grounding,
@@ -459,7 +465,10 @@ class GeminiModelProvider implements ModelProvider {
     final attemptClock = Stopwatch()..start();
     var hasPacket = false;
     JsonMap decodePacket(String payload) {
-      final result = _packet(payload);
+      final result = <String, Object?>{
+        ..._packet(payload),
+        '_repforgeModel': model,
+      };
       hasPacket = true;
       return result;
     }

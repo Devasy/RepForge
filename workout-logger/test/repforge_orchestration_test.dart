@@ -7,6 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'package:repforge/services/ai/gemini_ai_service.dart';
+import 'package:repforge/services/ai/observability/langfuse_service.dart';
+import 'package:repforge/services/ai/observability/langfuse_config.dart';
+import 'package:http/testing.dart';
+import 'package:http/http.dart' as http;
 import 'package:repforge/services/ai/orchestration/app_checkpoint_store.dart';
 import 'package:repforge/services/ai/orchestration/repforge_agents.dart';
 import 'package:repforge/services/ai/orchestration/agent_change_review.dart';
@@ -213,6 +217,36 @@ void main() {
       run.dispose();
     },
   );
+
+  test('enabled tracing cannot bypass the review of workout changes', () async {
+    final storage = MockStorageService();
+    final tracing = LangfuseService(
+      write: (_) async {},
+      clientFactory: () => MockClient((_) async => http.Response('{}', 200)),
+    );
+    addTearDown(tracing.dispose);
+    await tracing.save(
+      const LangfuseConfig(
+        publicKey: 'pk-lf-test-public',
+        secretKey: 'sk-lf-test-secret',
+        enabled: true,
+      ),
+    );
+    final model = ScriptedModel([write(), done()]);
+    final host = RepForgeAgents(
+      model: model,
+      store: AppCheckpointStore(storage),
+      tracing: tracing,
+    );
+    final (_, run) = await session(storage, host, kind: 'coach');
+    addTearDown(run.dispose);
+    await run.send('Create a routine');
+    expect(run.pendingInput!.request.kind, 'tool_approval');
+    expect(await storage.getAllRoutines(), isEmpty);
+    await run.submit(run.pendingInput!, false);
+    expect(await storage.getAllRoutines(), isEmpty);
+    await tracing.flush();
+  });
 
   test(
     'retry after an approved write resumes the model without repeating the write',

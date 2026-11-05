@@ -6,12 +6,17 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ### Changes
 
+- Add opt-in Langfuse tracing in debug Developer Features, with device-secured project credentials, connection testing, model and tool traces, and separate consent for conversation content.
+
 - Let AI Coach and Routine Optimizer use Gemini’s built-in Google Search for current evidence, with saved sources and Google search suggestions.
 - Improve coaching prompts to distinguish personal records, research and recommendations while preserving the app’s review of proposed changes.
 - Add Gemini 3.8 Flash to the model picker alongside Gemini 3.6 Flash.
 
 
 ### Fixes
+
+- Keep recent exercise history separate from all-time records, label volume estimates clearly, and prevent independent PR maxima from being treated as a combined set.
+- Let the AI discover logged exercises and saved routines before asking users to repeat their training data.
 
 - Restore Gemini fallback to older models for quota failures before any native search context exists, and continue with workout tools when only the search quota is exhausted.
 - Include safe quota categories in AI debug logs so search limits and model limits can be distinguished.
