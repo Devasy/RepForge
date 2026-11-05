@@ -10,6 +10,13 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 - Improve coaching prompts to distinguish personal records, research and recommendations while preserving the app’s review of proposed changes.
 - Add Gemini 3.8 Flash to the model picker alongside Gemini 3.6 Flash.
 
+
+### Fixes
+
+- Restore Gemini fallback to older models for quota failures before any native search context exists, and continue with workout tools when only the search quota is exhausted.
+- Include safe quota categories in AI debug logs so search limits and model limits can be distinguished.
+
+
 ## [2.2.1]
 
 ### Fixes
