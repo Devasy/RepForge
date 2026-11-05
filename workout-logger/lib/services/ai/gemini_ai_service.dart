@@ -6,6 +6,7 @@ import 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart';
 import 'ai_failure.dart';
 import '../debug_log_buffer.dart';
 import 'orchestration/legacy_chat.dart';
+import '../interfaces/web_grounding_support.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
     show Content, FunctionCall, Tool;
@@ -25,6 +26,7 @@ const kGeminiModels = [
   ('gemini-3.5-flash', 'Gemini 3.5 Flash'),
   ('gemini-3.6-flash', 'Gemini 3.6 Flash'),
   ('gemini-3.7-flash', 'Gemini 3.7 Flash'),
+  ('gemini-3.8-flash', 'Gemini 3.8 Flash'),
 ];
 
 // Ordered fastest/cheapest → most thorough. Matches the Gemini API's own
@@ -115,7 +117,7 @@ List<Object?> buildGeminiChatContents(
 }
 
 class GeminiAiService extends ChangeNotifier
-    implements IAiService, ModelProvider {
+    implements IAiService, ModelProvider, WebGroundingSupport {
   // Optional storage so cumulative token usage survives restarts.
   final IStorageService? _storage;
 
@@ -131,6 +133,7 @@ class GeminiAiService extends ChangeNotifier
 
   String _apiKey = '';
   String _model = kDefaultGeminiModel;
+  final _unavailableGoogleSearchModels = <String>{};
   int _maxToolRounds = kDefaultMaxToolRounds;
   String _thinkingLevel = kDefaultThinkingLevel;
 
@@ -171,6 +174,7 @@ class GeminiAiService extends ChangeNotifier
     int maxToolRounds = kDefaultMaxToolRounds,
     String thinkingLevel = kDefaultThinkingLevel,
   }) {
+    _unavailableGoogleSearchModels.clear();
     _apiKey = apiKey.trim();
     DebugLogBuffer.instance.protect(_apiKey);
     _model = model;
@@ -351,34 +355,44 @@ class GeminiAiService extends ChangeNotifier
     imageMimeType: imageMimeType,
   );
 
-  GeminiModelProvider _modelProvider() => GeminiModelProvider(
-    apiKey: _apiKey,
-    onDiagnostic: (event) =>
-        DebugLogBuffer.instance.write('[AI] ${jsonEncode(event)}'),
-    clientFactory: _modelClientFactory,
-    generationConfig: (model) => {
-      'thinkingConfig': model.startsWith('gemini-2')
-          ? {'thinkingBudget': 0}
-          : {'thinkingLevel': clampThinkingLevel(model, _thinkingLevel)},
-    },
-    fallbackModel: getFallbackModel,
-    onModelChanged: (model) {
-      _model = model;
-      _thinkingLevel = clampThinkingLevel(model, _thinkingLevel);
-      notifyListeners();
-    },
-    onUsage: (usage) async {
-      try {
-        await recordUsage(
-          prompt: (usage['promptTokenCount'] as num?)?.toInt() ?? 0,
-          response: (usage['candidatesTokenCount'] as num?)?.toInt() ?? 0,
-          total: (usage['totalTokenCount'] as num?)?.toInt() ?? 0,
-        );
-      } catch (_) {
-        debugPrint('Could not persist AI usage.');
-      }
-    },
-  );
+  @override
+  bool get supportsWebGrounding =>
+      supportsGeminiWebGrounding(_model) &&
+      !_unavailableGoogleSearchModels.contains(_model);
+
+  GeminiModelProvider _modelProvider({bool enableWebSearch = true}) =>
+      GeminiModelProvider(
+        unavailableGoogleSearchModels: _unavailableGoogleSearchModels,
+        googleSearchEnabled: enableWebSearch
+            ? supportsGeminiWebGrounding
+            : null,
+        apiKey: _apiKey,
+        onDiagnostic: (event) =>
+            DebugLogBuffer.instance.write('[AI] ${jsonEncode(event)}'),
+        clientFactory: _modelClientFactory,
+        generationConfig: (model) => {
+          'thinkingConfig': model.startsWith('gemini-2')
+              ? {'thinkingBudget': 0}
+              : {'thinkingLevel': clampThinkingLevel(model, _thinkingLevel)},
+        },
+        fallbackModel: getFallbackModel,
+        onModelChanged: (model) {
+          _model = model;
+          _thinkingLevel = clampThinkingLevel(model, _thinkingLevel);
+          notifyListeners();
+        },
+        onUsage: (usage) async {
+          try {
+            await recordUsage(
+              prompt: (usage['promptTokenCount'] as num?)?.toInt() ?? 0,
+              response: (usage['candidatesTokenCount'] as num?)?.toInt() ?? 0,
+              total: (usage['totalTokenCount'] as num?)?.toInt() ?? 0,
+            );
+          } catch (_) {
+            debugPrint('Could not persist AI usage.');
+          }
+        },
+      );
 
   @override
   Stream<ModelEvent> stream(
@@ -404,7 +418,7 @@ class GeminiAiService extends ChangeNotifier
     String? imageBytesBase64,
     String? imageMimeType,
   }) => legacyChatReply(
-    model: this,
+    model: _modelProvider(enableWebSearch: false),
     modelId: _model,
     maxModelCalls: _maxToolRounds,
     userMessage: userMessage,

@@ -6,6 +6,10 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ### Changes
 
+- Let AI Coach and Routine Optimizer use Gemini’s built-in Google Search for current evidence, with saved sources and Google search suggestions.
+- Improve coaching prompts to distinguish personal records, research and recommendations while preserving the app’s review of proposed changes.
+- Add Gemini 3.8 Flash to the model picker alongside Gemini 3.6 Flash.
+
 - Use a green intensity scale for completed workout activity, with matching calendar cells and legend.
 - Refine the dark interface while preserving its violet identity, background lighting and glass material, with clearer workout actions, readable chart labels and large paired set-entry figures.
 - Make Home statistics and muscle summaries adapt to narrow screens and large text.
@@ -13,6 +17,9 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 - Preserve the personalized Home greeting and saved name while refining its layout.
 
 ### Fixes
+
+- Restore Gemini fallback to older models for quota failures before any native search context exists, and continue with workout tools when only the search quota is exhausted.
+- Include safe quota categories in AI debug logs so search limits and model limits can be distinguished.
 
 - Show empty progress for zero-volume muscle data and non-finite progress values.
 

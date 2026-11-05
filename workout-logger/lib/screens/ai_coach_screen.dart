@@ -1,3 +1,4 @@
+import 'widgets/web_search_result_card.dart';
 // ai_coach_screen.dart — Conversational AI workout coach (View).
 //
 // This is a lean View: all orchestration (streaming, tool calls, persistence,
@@ -731,6 +732,9 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final search = message.webSearch;
+    if (search != null) return WebSearchResultCard(result: search);
+
     final isUser = message.role == 'user';
     Uint8List? decodedImageBytes;
     if (isUser &&
