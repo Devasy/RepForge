@@ -114,6 +114,22 @@ class CoachToolService {
           ),
         ),
         FunctionDeclaration(
+          'get_logged_exercises',
+          'Discover exact exercise IDs and names from the user’s logged workouts before querying performance. Filter by muscle group when requested; do not guess exercise names or ask the user to list data the app has.',
+          Schema.object(
+            properties: {
+              'muscle_group': Schema.string(
+                description: 'Optional muscle group, such as Biceps or Back.',
+                nullable: true,
+              ),
+              'days': Schema.integer(
+                description: 'History window in days; defaults to 90.',
+                nullable: true,
+              ),
+            },
+          ),
+        ),
+        FunctionDeclaration(
           'get_exercise_performance',
           'Get how a specific exercise has progressed: per-session volume '
               'trend, the full per-session weight×reps and duration set history, growth '
@@ -530,6 +546,8 @@ class CoachToolService {
         return await _analyzeHealthWorkoutCorrelation(call.args);
       case 'get_muscle_group_volume':
         return _muscleGroupVolume(call.args);
+      case 'get_logged_exercises':
+        return _loggedExercises(call.args);
       case 'get_exercise_performance':
         return _exercisePerformance(call.args);
       case 'get_workouts_in_range':
@@ -958,6 +976,45 @@ class CoachToolService {
     };
   }
 
+  Map<String, Object?> _loggedExercises(Map<String, Object?> args) {
+    final days = ((args['days'] as num?)?.toInt() ?? 90).clamp(1, 3650);
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final name = (args['muscle_group'] as String?)?.trim();
+    MuscleGroup? group;
+    if (name != null && name.isNotEmpty) {
+      try {
+        group = _resolveMuscleGroup(name);
+      } on AmbiguousMatchException catch (error) {
+        return {'error': 'Ambiguous muscle group', 'matches': error.candidates};
+      }
+      if (group == null) return {'error': 'Unknown muscle group'};
+    }
+    final result = <Map<String, Object?>>[];
+    for (final exercise in _wp.allExercises) {
+      if (group != null &&
+          !exercise.muscleActivations.any(
+            (m) => m.muscleGroupId == group!.id,
+          )) {
+        continue;
+      }
+      final history = _setHistory(exercise.id, cutoff, 500);
+      if (history.isEmpty) continue;
+      result.add({
+        'exercise_id': exercise.id,
+        'exercise': exercise.name,
+        'session_count': history.length,
+        'last_logged_date': history.first['date'],
+        'available_handles': exercise.availableHandles,
+      });
+    }
+    result.sort(
+      (a, b) => (b['last_logged_date'] as String).compareTo(
+        a['last_logged_date'] as String,
+      ),
+    );
+    return {'window_days': days, 'exercises': result};
+  }
+
   Map<String, Object?> _exercisePerformance(Map<String, Object?> args) {
     final name = (args['exercise_name'] as String?)?.trim() ?? '';
     final days = (args['days'] as num?)?.toInt();
@@ -1004,7 +1061,8 @@ class CoachToolService {
         .toList();
 
     final growth = _wp.getGrowthModel(exercise.id);
-    final lastLog = _wp.getLastSessionForExercise(exercise.id);
+    final recentHistory = _setHistory(exercise.id, cutoff, 40);
+    final lastLoggedHistory = _setHistory(exercise.id, null, 1);
     final pr = _pr.getRecord(exercise.id);
 
     // Optional model-supplied cap; defaults preserve prior behaviour
@@ -1027,36 +1085,45 @@ class CoachToolService {
       // Per-session weight×reps breakdown (most recent first), so the model can
       // answer "what weight/reps did I do" rather than only volume totals.
       'set_history': _setHistory(exercise.id, cutoff, setCap),
-      'growth': growth == null
+      'growth': growth == null || progression.length < 2
           ? null
           : {
+              'metric': 'session_load_times_reps',
+              'scope': 'all_time',
+              'requested_window_applied': false,
+              'interpretation':
+                  'Training volume, not measured muscle growth or strength; changes with set count.',
               'slope_per_day': _round(growth.slope),
               'weekly_growth_percent': _round(growth.weeklyGrowthPercent),
               'curve': growth.curve.name,
               'r2': _round(growth.r2),
-              'trend': growth.weeklyGrowthPercent > 0.5
-                  ? 'improving'
+              'trend': growth.r2 < 0.5
+                  ? 'uncertain'
+                  : growth.weeklyGrowthPercent > 0.5
+                  ? 'volume_increasing'
                   : growth.weeklyGrowthPercent < -2
-                  ? 'declining'
-                  : 'plateauing',
+                  ? 'volume_decreasing'
+                  : 'volume_stable',
             },
+      'best_estimated_1rm_scope': 'all_time',
       'best_estimated_1rm': _roundOrNull(_wp.getBestOneRM(exercise.id)),
-      'last_session': lastLog == null
+      'last_session': recentHistory.isEmpty
           ? null
-          : [
-              for (final s in lastLog.sets)
-                {
-                  'weight': _round(s.weight),
-                  'reps': s.reps,
-                  if (s.timeTaken != null && s.timeTaken! > 0)
-                    'duration_seconds': s.timeTaken,
-                },
-            ],
+          : recentHistory.first['sets'],
+      'last_session_date': recentHistory.isEmpty
+          ? null
+          : recentHistory.first['date'],
+      'last_session_scope': days == null ? 'all_time' : 'requested_window',
+      'last_logged_session': lastLoggedHistory.isEmpty
+          ? null
+          : lastLoggedHistory.first,
       'personal_record': pr == null
           ? null
           : {
               'handle': pr.handle,
               'load_encoding_version': pr.loadEncodingVersion,
+              'record_semantics':
+                  'Independent maxima. Never combine best_weight and best_reps into a set; use set_history for observed pairs.',
               'best_weight': _round(pr.bestWeight),
               'best_reps': pr.bestReps,
               'best_volume': _round(pr.bestVolume),
@@ -1194,6 +1261,8 @@ class CoachToolService {
             : {
                 'handle': pr.handle,
                 'load_encoding_version': pr.loadEncodingVersion,
+                'record_semantics':
+                    'Independent maxima. Never combine best_weight and best_reps into a set; use set_history for observed pairs.',
                 'best_weight': _round(pr.bestWeight),
                 'best_reps': pr.bestReps,
                 'best_volume': _round(pr.bestVolume),
@@ -1208,6 +1277,8 @@ class CoachToolService {
         for (final pr in _pr.allRecords)
           {
             'exercise': _wp.getExerciseName(pr.exerciseId),
+            'record_semantics':
+                'Independent maxima. Never combine best_weight and best_reps into a set.',
             'handle': pr.handle,
             'load_encoding_version': pr.loadEncodingVersion,
             'best_weight': _round(pr.bestWeight),
