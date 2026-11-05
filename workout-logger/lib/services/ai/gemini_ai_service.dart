@@ -133,6 +133,7 @@ class GeminiAiService extends ChangeNotifier
 
   String _apiKey = '';
   String _model = kDefaultGeminiModel;
+  final _unavailableGoogleSearchModels = <String>{};
   int _maxToolRounds = kDefaultMaxToolRounds;
   String _thinkingLevel = kDefaultThinkingLevel;
 
@@ -173,6 +174,7 @@ class GeminiAiService extends ChangeNotifier
     int maxToolRounds = kDefaultMaxToolRounds,
     String thinkingLevel = kDefaultThinkingLevel,
   }) {
+    _unavailableGoogleSearchModels.clear();
     _apiKey = apiKey.trim();
     DebugLogBuffer.instance.protect(_apiKey);
     _model = model;
@@ -354,10 +356,13 @@ class GeminiAiService extends ChangeNotifier
   );
 
   @override
-  bool get supportsWebGrounding => supportsGeminiWebGrounding(_model);
+  bool get supportsWebGrounding =>
+      supportsGeminiWebGrounding(_model) &&
+      !_unavailableGoogleSearchModels.contains(_model);
 
   GeminiModelProvider _modelProvider({bool enableWebSearch = true}) =>
       GeminiModelProvider(
+        unavailableGoogleSearchModels: _unavailableGoogleSearchModels,
         googleSearchEnabled: enableWebSearch
             ? supportsGeminiWebGrounding
             : null,

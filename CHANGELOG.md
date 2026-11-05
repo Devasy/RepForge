@@ -18,6 +18,9 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ### Fixes
 
+- Restore Gemini fallback to older models for quota failures before any native search context exists, and continue with workout tools when only the search quota is exhausted.
+- Include safe quota categories in AI debug logs so search limits and model limits can be distinguished.
+
 - Show empty progress for zero-volume muscle data and non-finite progress values.
 
 ## [2.2.1]

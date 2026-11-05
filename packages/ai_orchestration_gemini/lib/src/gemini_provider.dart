@@ -5,6 +5,7 @@ import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:http/http.dart' as http;
 
 import 'gemini_wire.dart';
+import 'gemini_quota.dart';
 
 class GeminiFailure extends OrchestrationException {
   final bool canRetry;
@@ -14,6 +15,7 @@ class GeminiFailure extends OrchestrationException {
 class GeminiModelProvider implements ModelProvider {
   final String apiKey;
   final bool Function(String model) googleSearchEnabled;
+  final Set<String> unavailableGoogleSearchModels;
   final http.Client Function() clientFactory;
   final JsonMap Function(String model) generationConfig;
   final String? Function(String model)? fallbackModel;
@@ -29,6 +31,7 @@ class GeminiModelProvider implements ModelProvider {
   GeminiModelProvider({
     required this.apiKey,
     bool Function(String model)? googleSearchEnabled,
+    Set<String>? unavailableGoogleSearchModels,
     http.Client Function()? clientFactory,
     JsonMap Function(String model)? generationConfig,
     this.fallbackModel,
@@ -40,7 +43,9 @@ class GeminiModelProvider implements ModelProvider {
     this.modelTimeout = const Duration(minutes: 5),
     this.maxRequestTime = const Duration(minutes: 10),
     Duration Function(int attempt)? retryDelay,
-  }) : googleSearchEnabled = googleSearchEnabled ?? ((_) => false),
+  }) : unavailableGoogleSearchModels =
+           unavailableGoogleSearchModels ?? <String>{},
+       googleSearchEnabled = googleSearchEnabled ?? ((_) => false),
        clientFactory = clientFactory ?? http.Client.new,
        generationConfig = generationConfig ?? ((_) => const {}),
        retryDelay =
@@ -54,6 +59,19 @@ class GeminiModelProvider implements ModelProvider {
       throw ArgumentError('Invalid request limits.');
     }
   }
+
+  bool _searchEnabled(String model) =>
+      googleSearchEnabled(model) &&
+      !unavailableGoogleSearchModels.contains(model);
+
+  bool _hasServerTools(List<JsonMap> contents) => contents.any((content) {
+    final parts = content['parts'];
+    return parts is List &&
+        parts.whereType<Map<Object?, Object?>>().any(
+          (part) =>
+              part.containsKey('toolCall') || part.containsKey('toolResponse'),
+        );
+  });
 
   @override
   Stream<ModelEvent> stream(
@@ -327,11 +345,35 @@ class GeminiModelProvider implements ModelProvider {
           'event': 'request_failed',
           'model': model,
           'code': failure.code,
-          if (failure is _HttpFailure) 'status': failure.status,
+          if (failure is _HttpFailure) ...{
+            'status': failure.status,
+            if (failure.quota != null) ...{
+              'quotaKind': failure.quota!.kind,
+              'quotaMetrics': failure.quota!.metrics,
+              'quotaIds': failure.quota!.ids,
+              'quotaZeroLimit': failure.quota!.zeroLimit,
+            },
+          },
           'partial': received,
           'elapsedMs': clock.elapsedMilliseconds,
         });
         if (received || clock.elapsed >= maxRequestTime) rethrow;
+        if (body == null &&
+            failure is _HttpFailure &&
+            failure.quota?.searchOnly == true &&
+            _searchEnabled(model) &&
+            !_hasServerTools(contents)) {
+          unavailableGoogleSearchModels.add(model);
+          _diagnose({
+            'event': 'search_unavailable',
+            'model': model,
+            'reason': 'search_quota',
+          });
+          yield const ModelStatus(
+            'Web search quota reached. Continuing with your workout tools…',
+          );
+          continue;
+        }
         final canSwitch =
             {
               'model_timeout',
@@ -351,8 +393,8 @@ class GeminiModelProvider implements ModelProvider {
           final compatible =
               fallback != null &&
               (body != null ||
-                  !googleSearchEnabled(request.modelId) ||
-                  googleSearchEnabled(fallback));
+                  !_hasServerTools(contents) ||
+                  _searchEnabled(fallback));
           if (compatible && visited.length < 8 && visited.add(fallback)) {
             _diagnose({
               'event': 'fallback',
@@ -465,12 +507,16 @@ class GeminiModelProvider implements ModelProvider {
                       'systemInstruction': {
                         'parts': [
                           {'text': request.systemPrompt},
+                          if (!_searchEnabled(model))
+                            {
+                              'text':
+                                  'Web search is unavailable for this request. Use app tools and clearly labeled general knowledge. Do not claim to have searched or verified current sources.',
+                            },
                         ],
                       },
-                      if (request.tools.isNotEmpty ||
-                          googleSearchEnabled(model))
+                      if (request.tools.isNotEmpty || _searchEnabled(model))
                         'tools': [
-                          if (googleSearchEnabled(model))
+                          if (_searchEnabled(model))
                             {'googleSearch': <String, Object?>{}},
                           if (request.tools.isNotEmpty)
                             {
@@ -486,7 +532,7 @@ class GeminiModelProvider implements ModelProvider {
                               ],
                             },
                         ],
-                      if (googleSearchEnabled(model))
+                      if (_searchEnabled(model))
                         'toolConfig': {
                           'includeServerSideToolInvocations': true,
                           'functionCallingConfig': {'mode': 'VALIDATED'},
@@ -500,15 +546,30 @@ class GeminiModelProvider implements ModelProvider {
       final response = await guard(client.send(outgoing));
       if (response.statusCode != 200) {
         final body = await guard(response.stream.bytesToString());
-        final failure = _statusFailure(response.statusCode);
+        final quota = response.statusCode == 429
+            ? GeminiQuota.parse(body)
+            : null;
+        final failure = quota?.searchOnly == true
+            ? const GeminiFailure(
+                'model_quota',
+                'Google Search quota has been reached. Check your Google AI quota before retrying this research conversation.',
+              )
+            : quota?.zeroLimit == true
+            ? const GeminiFailure(
+                'model_quota',
+                'Gemini reports no available quota for this model. Choose another model or check your Google AI quota and billing.',
+              )
+            : _statusFailure(response.statusCode);
         throw _HttpFailure(
           failure.code,
           failure.message,
           canRetry: failure.canRetry,
           status: response.statusCode,
+          quota: quota,
           dailyQuota:
               response.statusCode == 429 &&
-              (body.toLowerCase().contains('requestsperday') ||
+              (quota?.daily == true ||
+                  body.toLowerCase().contains('requestsperday') ||
                   body.toLowerCase().contains('requests_per_day')),
           retryAfter: _serverDelay(body),
         );
@@ -651,6 +712,7 @@ class GeminiModelProvider implements ModelProvider {
 
 class _HttpFailure extends GeminiFailure {
   final bool dailyQuota;
+  final GeminiQuota? quota;
   final int status;
   final Duration? retryAfter;
   const _HttpFailure(
@@ -658,6 +720,7 @@ class _HttpFailure extends GeminiFailure {
     super.message, {
     required super.canRetry,
     required this.dailyQuota,
+    this.quota,
     required this.status,
     this.retryAfter,
   });

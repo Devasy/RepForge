@@ -223,7 +223,7 @@ void main() {
   );
 
   test(
-    'search-enabled replies never silently fall back to an incompatible model',
+    'signed search history never falls back to an incompatible model',
     () async {
       var requests = 0;
       final provider = GeminiModelProvider(
@@ -241,6 +241,26 @@ void main() {
             .stream(
               request('gemini-3.6-flash', [
                 ModelMessage(role: 'user', text: 'Research'),
+                ModelMessage(
+                  role: 'assistant',
+                  text: 'Earlier research',
+                  providerData: {
+                    'gemini': {
+                      'parts': [
+                        {
+                          'toolCall': {
+                            'toolType': 'GOOGLE_SEARCH_WEB',
+                            'id': 'search-1',
+                            'args': {
+                              'queries': ['research'],
+                            },
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ),
+                ModelMessage(role: 'user', text: 'Continue'),
               ]),
               CancellationToken(),
             )
@@ -248,6 +268,141 @@ void main() {
         throwsA(isA<GeminiFailure>()),
       );
       expect(requests, 1);
+    },
+  );
+
+  test(
+    'generation quota falls through every 3.x model to ordinary 2.5 chat',
+    () async {
+      final models = <String>[];
+      Map<String, dynamic>? finalBody;
+      final service = GeminiAiService(
+        modelClientFactory: () => MockClient((incoming) async {
+          models.add(incoming.url.path.split('/').last.split(':').first);
+          if (models.last.startsWith('gemini-3')) {
+            return http.Response(
+              jsonEncode({
+                'error': {
+                  'details': [
+                    {
+                      '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+                      'violations': [
+                        {
+                          'quotaMetric':
+                              'generativelanguage.googleapis.com/generate_requests_per_model_per_day',
+                          'quotaId': 'GenerateRequestsPerDay',
+                          'quotaValue': '0',
+                        },
+                      ],
+                    },
+                  ],
+                },
+              }),
+              429,
+            );
+          }
+          finalBody = jsonDecode(incoming.body) as Map<String, dynamic>;
+          return http.Response(
+            sse([
+              {'text': 'Workout reply'},
+            ]),
+            200,
+          );
+        }),
+      )..init('fake-key', model: 'gemini-3.8-flash');
+      addTearDown(service.dispose);
+      final events = await service
+          .stream(
+            request('gemini-3.8-flash', [
+              ModelMessage(role: 'user', text: 'Hello'),
+            ]),
+            CancellationToken(),
+          )
+          .toList();
+      expect(events.whereType<ModelText>().single.text, 'Workout reply');
+      expect(models, [
+        'gemini-3.8-flash',
+        'gemini-3.7-flash',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-2.5-flash',
+      ]);
+      expect(service.currentModel, 'gemini-2.5-flash');
+      expect(service.supportsWebGrounding, isFalse);
+      expect(finalBody!.containsKey('toolConfig'), isFalse);
+      expect(
+        (finalBody!['tools'] as List).single,
+        contains('functionDeclarations'),
+      );
+      expect(
+        jsonEncode(finalBody!['systemInstruction']),
+        contains('Do not claim to have searched'),
+      );
+    },
+  );
+
+  test(
+    'search-only quota recovery is remembered across agent requests',
+    () async {
+      var count = 0;
+      final bodies = <Map<String, dynamic>>[];
+      final service = GeminiAiService(
+        modelClientFactory: () => MockClient((incoming) async {
+          bodies.add(jsonDecode(incoming.body) as Map<String, dynamic>);
+          if (count++ == 0) {
+            return http.Response(
+              jsonEncode({
+                'error': {
+                  'details': [
+                    {
+                      '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+                      'violations': [
+                        {
+                          'quotaMetric':
+                              'generativelanguage.googleapis.com/grounding_requests',
+                          'quotaId': 'GroundingRequestsPerDay',
+                          'quotaValue': '0',
+                        },
+                      ],
+                    },
+                  ],
+                },
+              }),
+              429,
+            );
+          }
+          return http.Response(
+            sse([
+              {'text': 'Local workout reply'},
+            ]),
+            200,
+          );
+        }),
+      )..init('fake-key', model: 'gemini-3.8-flash');
+      addTearDown(service.dispose);
+      for (var i = 0; i < 2; i++) {
+        await service
+            .stream(
+              request('gemini-3.8-flash', [
+                ModelMessage(role: 'user', text: 'Hello'),
+              ]),
+              CancellationToken(),
+            )
+            .toList();
+      }
+      expect(bodies, hasLength(3));
+      expect(service.currentModel, 'gemini-3.8-flash');
+      expect(service.supportsWebGrounding, isFalse);
+      for (final body in bodies.skip(1)) {
+        expect(body.containsKey('toolConfig'), isFalse);
+        expect(
+          (body['tools'] as List).single,
+          contains('functionDeclarations'),
+        );
+      }
+      service.init('another-key', model: 'gemini-3.8-flash');
+      expect(service.supportsWebGrounding, isTrue);
     },
   );
 
