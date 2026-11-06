@@ -1,5 +1,6 @@
 // Explicitly opt in: RUN_LIVE_COACH_EVAL=1 flutter test test/coach_live_eval_test.dart
 // Uses only synthetic records, environment-bound credentials and read tools.
+// COACH_EVAL_CASE=1..5 reruns one scenario; COACH_EVAL_OUTPUT saves evidence.
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
@@ -134,35 +135,60 @@ void main() {
           'Does my sleep prove recovery is good and explain my six-month progress? Check matched sleep coverage using SQL, distinguish missing data, and avoid causal claims.',
         ];
         final results = <Map<String, Object?>>[];
+        final selectedCase = int.tryParse(
+          Platform.environment['COACH_EVAL_CASE'] ?? '',
+        );
+        if (selectedCase != null) {
+          expect(selectedCase, inInclusiveRange(1, prompts.length));
+        }
         for (var index = 0; index < prompts.length; index++) {
+          if (selectedCase != null && selectedCase != index + 1) continue;
           final calls = <Map<String, Object?>>[];
           final answer = StringBuffer();
-          await for (final chunk in ai.streamCoachReply(
-            userMessage: prompts[index],
-            systemPrompt:
-                '${coachingEvidenceInstructions(webSearchAvailable: false)}\nUse plain text for this evaluation. All load is recorded in kg. Today is ${now.toIso8601String().substring(0, 10)}.',
-            history: [],
-            tools: readTools,
-            onToolCall: (call) async {
-              final result = await tools.handleCall(call);
-              calls.add({
-                'name': call.name,
-                'args': call.args,
-                'result': result,
-              });
-              return result;
-            },
-          )) {
-            answer.write(chunk);
+          Future<void> saveResult({Object? error}) async {
+            final result = <String, Object?>{
+              'case': index + 1,
+              'prompt': prompts[index],
+              'provider': ai.backend.name,
+              'resolvedModel': ai.currentModel,
+              'calls': calls,
+              'answer': answer.toString(),
+              if (error != null) 'error': error.toString(),
+            };
+            results.add(result);
+            final output = Platform.environment['COACH_EVAL_OUTPUT'];
+            if (output != null) {
+              await File(output).writeAsString(
+                const JsonEncoder.withIndent('  ').convert(results),
+              );
+            }
           }
-          results.add({
-            'case': index + 1,
-            'prompt': prompts[index],
-            'provider': ai.backend.name,
-            'resolvedModel': ai.currentModel,
-            'calls': calls,
-            'answer': answer.toString(),
-          });
+
+          try {
+            await for (final chunk in ai.streamCoachReply(
+              userMessage: prompts[index],
+              systemPrompt:
+                  '${coachingEvidenceInstructions(webSearchAvailable: false)}\nUse plain text for this evaluation. All load is recorded in kg. Today is ${now.toIso8601String().substring(0, 10)}.',
+              history: [],
+              tools: readTools,
+              onToolCall: (call) async {
+                final result = await tools.handleCall(call);
+                calls.add({
+                  'name': call.name,
+                  'args': call.args,
+                  'result': result,
+                });
+                return result;
+              },
+            )) {
+              answer.write(chunk);
+            }
+          } catch (error) {
+            await saveResult(error: error);
+            rethrow;
+          }
+          // Persist evidence before assertions so failures remain reviewable.
+          await saveResult();
           expect(answer.length, greaterThan(100));
           expect(calls, isNotEmpty);
           if ([1, 3, 4].contains(index)) {
@@ -176,12 +202,6 @@ void main() {
                     c['name'] == 'get_exercise_performance',
               ),
               isTrue,
-            );
-          }
-          final output = Platform.environment['COACH_EVAL_OUTPUT'];
-          if (output != null) {
-            await File(output).writeAsString(
-              const JsonEncoder.withIndent('  ').convert(results),
             );
           }
         }
