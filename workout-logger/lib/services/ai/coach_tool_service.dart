@@ -90,6 +90,24 @@ class CoachToolService {
     Tool(
       functionDeclarations: [
         FunctionDeclaration(
+          'get_progress_overview',
+          'Start here for overall or multi-muscle progress. Retrieves logged exercises and dated first/latest observed sets within the requested window, grouped by major muscle. Includes coverage gaps; follow up with get_exercise_performance for details. Does not infer hypertrophy from tonnage.',
+          Schema.object(
+            properties: {
+              'days': Schema.integer(
+                description:
+                    'Required requested window in days; six months is 183.',
+              ),
+              'muscle_groups': Schema.array(
+                items: Schema.string(),
+                description: 'Optional group names. Omit for all major groups.',
+                nullable: true,
+              ),
+            },
+            requiredProperties: ['days'],
+          ),
+        ),
+        FunctionDeclaration(
           'get_muscle_group_volume',
           'Get volume history over time for one or multiple muscle groups '
               '(e.g. ["Biceps", "Triceps"] or ["Chest", "Back"]). Returns dates, '
@@ -491,7 +509,7 @@ class CoachToolService {
   FunctionDeclaration get _runSqlQueryDeclaration => FunctionDeclaration(
     'run_sql_query',
     'Run a read-only SQL SELECT query directly against the workout database '
-        'for questions the other tools cannot answer (custom joins, filters, '
+        'for complex questions and to verify contradictory or incomplete tool results (custom joins, filters, '
         'or aggregations). Tables:\n'
         'sessions(id, date, routine_id, duration_min, notes, hc_synced_at, session_effort)\n'
         'exercise_logs(id, session_id, exercise_id, notes, handle)\n'
@@ -519,7 +537,7 @@ class CoachToolService {
         'When joining tables, select explicit columns with aliases (e.g. s.id AS '
         'session_id, l.id AS log_id) instead of SELECT *, since duplicate column '
         'names across joined tables will silently collide.\n'
-        'Only SELECT/WITH statements are allowed, one statement per call.',
+        'Built-ins without overrides are absent from exercises AND exercise_muscle_activations: discover group IDs with get_logged_exercises, filter exercise_logs.exercise_id IN those IDs, and LEFT JOIN names. Do not require a catalogue or activation row for built-in logs. If joining activations for custom exercises, use EXISTS to avoid duplicating sets. Explicitly filter requested dates; separate handles and load encodings. Only SELECT/WITH statements are allowed, one statement per call.',
     Schema.object(
       properties: {
         'query': Schema.string(
@@ -546,6 +564,8 @@ class CoachToolService {
         return await _analyzeHealthWorkoutCorrelation(call.args);
       case 'get_muscle_group_volume':
         return _muscleGroupVolume(call.args);
+      case 'get_progress_overview':
+        return _progressOverview(call.args);
       case 'get_logged_exercises':
         return _loggedExercises(call.args);
       case 'get_exercise_performance':
@@ -898,6 +918,87 @@ class CoachToolService {
     };
   }
 
+  Map<String, Object?> _progressOverview(Map<String, Object?> args) {
+    if (args['days'] is! num) {
+      return {'error': 'Provide the requested window in days.'};
+    }
+    final days = (args['days'] as num).toInt().clamp(1, 3650);
+    final groups =
+        (args['muscle_groups'] as List?)?.cast<String>() ??
+        [
+          'Chest',
+          'Back',
+          'Shoulders',
+          'Biceps',
+          'Triceps',
+          'Quadriceps',
+          'Hamstrings',
+          'Glutes',
+          'Calves',
+          'Core',
+        ];
+    final coverage = <Map<String, Object?>>[];
+    for (final name in groups.take(20).toSet()) {
+      final discovered = _loggedExercises({'muscle_group': name, 'days': days});
+      if (discovered['error'] != null) {
+        coverage.add({'muscle_group': name, ...discovered});
+        continue;
+      }
+      final exercises = (discovered['exercises'] as List)
+          .cast<Map<String, Object?>>();
+      // Prefer frequently logged lifts for comparisons, then recent activity.
+      exercises.sort(
+        (a, b) =>
+            (b['session_count'] as int).compareTo(a['session_count'] as int),
+      );
+      coverage.add({
+        'muscle_group': name,
+        'logged_exercise_count': exercises.length,
+        'omitted_exercise_count': math.max(0, exercises.length - 3),
+        'exercises': [
+          for (final e in exercises.take(3))
+            {
+              ...e,
+              'earliest_session_in_window': _setHistory(
+                e['exercise_id'] as String,
+                DateTime.now().subtract(Duration(days: days)),
+                1,
+                oldestFirst: true,
+              ).first,
+              'latest_session_in_window': _setHistory(
+                e['exercise_id'] as String,
+                DateTime.now().subtract(Duration(days: days)),
+                1,
+              ).first,
+            },
+        ],
+      });
+    }
+    return {
+      'window_days': days,
+      'metric':
+          'Observed external load and reps; volume is load times reps, not measured hypertrophy.',
+      'overlap':
+          'Exercises may appear in multiple groups. Do not sum group totals as unique workload.',
+      'coverage': coverage,
+      'omitted_group_count': math.max(0, groups.length - 20),
+    };
+  }
+
+  // Match parent groups explicitly; subgroup requests remain precise. A log
+  // matches once even when it activates several members of the same group.
+  Set<String> _muscleIds(String id) => switch (id) {
+    MuscleGroups.chest => {id, MuscleGroups.upperChest},
+    MuscleGroups.back => {id, MuscleGroups.lats, MuscleGroups.lowerBack},
+    MuscleGroups.shoulders => {
+      id,
+      MuscleGroups.frontDelts,
+      MuscleGroups.sideDelts,
+      MuscleGroups.rearDelts,
+    },
+    _ => {id},
+  };
+
   Map<String, Object?> _muscleGroupVolume(Map<String, Object?> args) {
     final rawGroups = (args['muscle_groups'] as List?)?.cast<String>() ?? [];
     final days = _limitArg(args, 60, key: 'days', max: 365);
@@ -932,7 +1033,9 @@ class CoachToolService {
 
       final matchingExerciseIds = allExercises
           .where(
-            (e) => e.muscleActivations.any((m) => m.muscleGroupId == targetId),
+            (e) => e.muscleActivations.any(
+              (m) => _muscleIds(targetId).contains(m.muscleGroupId),
+            ),
           )
           .map((e) => e.id)
           .toSet();
@@ -993,7 +1096,7 @@ class CoachToolService {
     for (final exercise in _wp.allExercises) {
       if (group != null &&
           !exercise.muscleActivations.any(
-            (m) => m.muscleGroupId == group!.id,
+            (m) => _muscleIds(group!.id).contains(m.muscleGroupId),
           )) {
         continue;
       }
@@ -1062,6 +1165,12 @@ class CoachToolService {
 
     final growth = _wp.getGrowthModel(exercise.id);
     final recentHistory = _setHistory(exercise.id, cutoff, 40);
+    final earliestHistory = _setHistory(
+      exercise.id,
+      cutoff,
+      1,
+      oldestFirst: true,
+    );
     final lastLoggedHistory = _setHistory(exercise.id, null, 1);
     final pr = _pr.getRecord(exercise.id);
 
@@ -1075,6 +1184,11 @@ class CoachToolService {
       'exercise': exercise.name,
       'session_count': progression.length,
       'window_days': ?days,
+      'earliest_session_in_window': earliestHistory.isEmpty
+          ? null
+          : earliestHistory.first,
+      'comparison_note':
+          'Compare observed sets at similar reps and handle. First/latest alone can be noisy; use the history before concluding a trend.',
       'volume_trend': [
         for (final p
             in progression.length > trendCap
@@ -1723,14 +1837,19 @@ class CoachToolService {
   List<Map<String, Object?>> _setHistory(
     String exerciseId,
     DateTime? cutoff,
-    int limit,
-  ) {
+    int limit, {
+    bool oldestFirst = false,
+  }) {
     final sessions =
         _wp.sessions
             .where((s) => cutoff == null || !s.date.isBefore(cutoff))
             .where((s) => s.exercises.any((e) => e.exerciseId == exerciseId))
             .toList()
-          ..sort((a, b) => b.date.compareTo(a.date));
+          ..sort(
+            (a, b) => oldestFirst
+                ? a.date.compareTo(b.date)
+                : b.date.compareTo(a.date),
+          );
 
     return [
       for (final s in sessions.take(limit))
@@ -1744,6 +1863,15 @@ class CoachToolService {
                 {
                   'weight': _round(set.weight),
                   'reps': set.reps,
+                  'handle': set.handle ?? log.handle,
+                  'weight_unit': 'kg',
+                  'load_mode': set.loadMode.name,
+                  'load_encoding_version': set.loadEncodingVersion,
+                  if (set.assistWeight != null)
+                    'assist_weight': set.assistWeight,
+                  if (set.extraWeight != null) 'extra_weight': set.extraWeight,
+                  if (set.bodyWeightAtLog != null)
+                    'body_weight_at_log': set.bodyWeightAtLog,
                   if (set.timeTaken != null && set.timeTaken! > 0)
                     'duration_seconds': set.timeTaken,
                   if (set.isDropset) 'dropset': true,

@@ -28,3 +28,17 @@ Transport retries are bounded: one retry per model for transient failures, with 
 Run `dart test` for credential-free HTTP fixtures and a complete core/model/tool loop. These tests do not call a live model.
 
 Protocol references: [Gemini API](https://ai.google.dev/api/generate-content), [thought signatures](https://ai.google.dev/gemini-api/docs/generate-content/thought-signatures).
+
+## Vertex AI Express
+
+Pass `backend: GeminiBackend.vertexExpress` with a Vertex Express API key.
+This selects `https://aiplatform.googleapis.com/v1/publishers/google/models/{model}:generateContent`
+and authenticates with `x-goog-api-key`. Chat and one-shot calls use the same
+Gemini contents, generation configuration and tool-call wire format. JSON text
+parts are emitted in order, excluding thought parts; native tool context stays
+intact. AI Studio keeps its separate endpoint and streaming transport.
+
+Retries and model fallbacks stay within the selected provider. Diagnostics
+include the provider and effective generation configuration for each attempt;
+fallback status names the replacement model. This does not implement standard
+project/location Vertex OAuth authentication or account-specific model discovery.

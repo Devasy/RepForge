@@ -368,7 +368,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         await provider.refreshAfterImport();
         await settings.init();
         gemini?.init(
-          settings.geminiApiKey,
+          settings.activeAiApiKey,
+          backend: settings.geminiBackend,
           model: settings.geminiModel,
           maxToolRounds: settings.geminiMaxToolRounds,
           thinkingLevel: settings.geminiThinkingLevel,

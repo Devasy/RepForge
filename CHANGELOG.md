@@ -6,6 +6,9 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ### Changes
 
+- Add a separate Vertex AI Express API-key provider with secure key storage, independent model selection, and visible provider/model details.
+- Give the coach a batched progress overview and clearer guidance for detailed SQL analysis and verification.
+
 - Add opt-in Langfuse tracing in debug Developer Features, with device-secured project credentials, connection testing, model and tool traces, and separate consent for conversation content.
 
 - Let AI Coach and Routine Optimizer use Gemini’s built-in Google Search for current evidence, with saved sources and Google search suggestions.
@@ -14,6 +17,9 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 
 ### Fixes
+
+- Include upper-chest, back and shoulder subgroups in major-group coaching queries while keeping subgroup requests precise.
+- Preserve early comparison sets in long training histories and disclose SQL result truncation.
 
 - Keep recent exercise history separate from all-time records, label volume estimates clearly, and prevent independent PR maxima from being treated as a combined set.
 - Let the AI discover logged exercises and saved routines before asking users to repeat their training data.

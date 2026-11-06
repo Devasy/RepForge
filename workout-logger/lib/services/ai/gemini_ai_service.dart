@@ -1,6 +1,8 @@
 // Gemini settings, usage and generation facade; execution belongs to AgentRuntime.
 
 import 'dart:convert';
+export 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart'
+    show GeminiBackend;
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart';
 import 'ai_failure.dart';
@@ -132,6 +134,9 @@ class GeminiAiService extends ChangeNotifier
   static const String _usageKey = 'aiTokenUsage';
 
   String _apiKey = '';
+  GeminiBackend _backend = GeminiBackend.aiStudio;
+  GeminiBackend get backend => _backend;
+  Map<String, dynamic> get effectiveThinkingConfig => _thinkingConfig;
   String _model = kDefaultGeminiModel;
   final _unavailableGoogleSearchModels = <String>{};
   int _maxToolRounds = kDefaultMaxToolRounds;
@@ -171,10 +176,12 @@ class GeminiAiService extends ChangeNotifier
   void init(
     String apiKey, {
     String model = kDefaultGeminiModel,
+    GeminiBackend backend = GeminiBackend.aiStudio,
     int maxToolRounds = kDefaultMaxToolRounds,
     String thinkingLevel = kDefaultThinkingLevel,
   }) {
     _unavailableGoogleSearchModels.clear();
+    _backend = backend;
     _apiKey = apiKey.trim();
     DebugLogBuffer.instance.protect(_apiKey);
     _model = model;
@@ -244,6 +251,12 @@ class GeminiAiService extends ChangeNotifier
         'requests': _requestCount,
       }),
     );
+  }
+
+  void updateBackend(GeminiBackend backend, String key) {
+    _backend = backend;
+    _unavailableGoogleSearchModels.clear();
+    updateApiKey(key);
   }
 
   void updateApiKey(String key) {
@@ -367,6 +380,7 @@ class GeminiAiService extends ChangeNotifier
     unavailableGoogleSearchModels: _unavailableGoogleSearchModels,
     googleSearchEnabled: enableWebSearch ? supportsGeminiWebGrounding : null,
     apiKey: _apiKey,
+    backend: _backend,
     onDiagnostic: (event) {
       DebugLogBuffer.instance.write('[AI] ${jsonEncode(event)}');
       onDiagnostic?.call(event);

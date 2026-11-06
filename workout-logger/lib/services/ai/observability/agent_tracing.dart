@@ -161,7 +161,12 @@ class TracedModel implements ModelProvider {
           'statuses': statuses,
           'completed': complete,
           'failure': failure,
-          'promptVersion': 'coach-evidence-v3',
+          'promptVersion': 'coach-evidence-v4',
+          if (inner is GeminiAiService)
+            'provider': (inner as GeminiAiService).backend.name,
+          if (inner is GeminiAiService)
+            'effectiveThinkingConfig':
+                (inner as GeminiAiService).effectiveThinkingConfig,
           'transport': transport,
           'toolNames': request.tools.map((tool) => tool.name).toList(),
         },
