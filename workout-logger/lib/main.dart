@@ -198,7 +198,10 @@ class WorkoutLoggerApp extends StatelessWidget {
   static final RepForgeAgents _agents = RepForgeAgents(
     model: _geminiService,
     tracing: _langfuse,
-    traceParameters: () => {'thinkingLevel': _geminiService.thinkingLevel},
+    traceParameters: () => {
+      'configuredThinkingLevel': _geminiService.thinkingLevel,
+      'provider': _geminiService.backend.name,
+    },
     store: AppCheckpointStore(_storageService),
     maxModelCalls: () => _geminiService.maxToolRounds,
     modelId: () => _geminiService.currentModel,
@@ -324,7 +327,8 @@ class _AppInitializerState extends State<AppInitializer> {
       await settings.init();
       if (kDebugMode) await langfuse?.load();
       gemini.init(
-        settings.geminiApiKey,
+        settings.activeAiApiKey,
+        backend: settings.geminiBackend,
         model: settings.geminiModel,
         maxToolRounds: settings.geminiMaxToolRounds,
         thinkingLevel: settings.geminiThinkingLevel,

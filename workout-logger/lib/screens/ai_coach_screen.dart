@@ -172,7 +172,8 @@ class _AiCoachViewState extends State<_AiCoachView> {
   Widget _buildHeader(BuildContext context, AiCoachViewModel vm) {
     return RFScreenHeader(
       title: 'AI Coach',
-      subtitle: 'Powered by Gemini',
+      subtitle:
+          '${context.watch<GeminiAiService>().backend == GeminiBackend.vertexExpress ? 'Vertex AI' : 'AI Studio'} · ${context.watch<GeminiAiService>().currentModel}',
       badgeIcon: Icons.auto_awesome_rounded,
       onBack: () => Navigator.pop(context),
       actions: [
@@ -309,7 +310,7 @@ class _AiCoachViewState extends State<_AiCoachView> {
               icon: Icons.key_rounded,
               title: 'API Key Required',
               subtitle:
-                  'Add your Gemini API key in\nProfile → AI Features to start chatting',
+                  'Choose a provider and add its API key in\nProfile → AI Features to start chatting',
             ),
             const SizedBox(height: AppSpacing.lg),
             GlowButton(
