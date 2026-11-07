@@ -40,7 +40,7 @@ void main() {
       );
 
       robot.expectVisible(ProgramsScreen);
-      robot.expectVisible('New Program');
+      robot.expectVisible('New program');
 
       // 2. Render ProgramDesignerScreen for new program
       await robot.pumpScreen(

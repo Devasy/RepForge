@@ -373,6 +373,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           model: settings.geminiModel,
           maxToolRounds: settings.geminiMaxToolRounds,
           thinkingLevel: settings.geminiThinkingLevel,
+          allowModelFallbacks: settings.allowModelFallbacks,
         );
         await prManager?.load();
         await conversations?.loadConversations();

@@ -4,29 +4,33 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
-### Changes
+## [2.2.2]
 
-- Add a separate Vertex AI Express API-key provider with secure key storage, independent model selection, and visible provider/model details.
-- Give the coach a batched progress overview and clearer guidance for detailed SQL analysis and verification.
+### Features added
 
-- Add opt-in Langfuse tracing in debug Developer Features, with device-secured project credentials, connection testing, model and tool traces, and separate consent for conversation content.
-
-- Let AI Coach and Routine Optimizer use Gemini’s built-in Google Search for current evidence, with saved sources and Google search suggestions.
-- Improve coaching prompts to distinguish personal records, research and recommendations while preserving the app’s review of proposed changes.
-- Add Gemini 3.8 Flash to the model picker alongside Gemini 3.6 Flash.
-
+- Follow a saved training program and open its next unfinished workout directly from Programs; resume an in-progress program workout without starting over.
+- Connect Gemini through a separate Vertex AI Express API key, with independent provider and model choices.
+- Let AI Coach and Routine Optimizer use Google Search evidence with saved source links and search suggestions.
+- Opt into developer Langfuse traces in debug builds, with secure credentials, separately optional content capture, and model usage and estimated cost details.
 
 ### Fixes
 
-- Include upper-chest, back and shoulder subgroups in major-group coaching queries while keeping subgroup requests precise.
-- Preserve early comparison sets in long training histories and disclose SQL result truncation.
+- Keep completed program days linked to saved workout sessions across restarts; cancelled, empty and failed saves do not advance the plan.
+- Use RepForge branding during startup and retry states, with a consistent dark native launch background.
+- Correct coaching evidence dates, early/recent comparisons, independent PR maxima and uncertain load interpretation.
+- Account separately for uncached, cached, output and thinking tokens using the resolved model for estimated pricing.
+- Recover from search-only quota failures while retaining workout tools, and preserve fallback preferences after backup import.
 
-- Keep recent exercise history separate from all-time records, label volume estimates clearly, and prevent independent PR maxima from being treated as a combined set.
-- Let the AI discover logged exercises and saved routines before asking users to repeat their training data.
+### Changes
 
-- Restore Gemini fallback to older models for quota failures before any native search context exists, and continue with workout tools when only the search quota is exhausted.
-- Include safe quota categories in AI debug logs so search limits and model limits can be distinguished.
+- Prioritize the followed program and next workout in Programs; keep labelled creation, import, optional AI generation, editing and export available as secondary actions.
+- Make automatic model fallback an explicit saved opt-in, disabled by default; same-model retries remain available.
 
+### Known limitations
+
+- Program completion tracking starts with linked workouts saved by this version; older sessions are preserved without guessing which program day they completed.
+- Programs follows the saved week/day order and displays prescribed weekdays; it does not automatically reschedule missed days.
+- Langfuse is a developer feature in debug builds; estimated model costs are separate from provider billing.
 
 ## [2.2.1]
 

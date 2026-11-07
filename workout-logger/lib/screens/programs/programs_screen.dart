@@ -7,6 +7,8 @@ import '../../models/models.dart';
 import '../../services/workout_provider.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/rf_widgets.dart';
+import '../widgets/rf_dialogs.dart';
+import 'program_workout_navigation.dart';
 import 'program_detail_screen.dart';
 import 'program_designer_screen.dart';
 import 'import_program_screen.dart';
@@ -17,112 +19,247 @@ class ProgramsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<WorkoutProvider>();
     return ListenableBuilder(
-      listenable: context.read<WorkoutProvider>().programManager,
+      listenable: provider.programManager,
       builder: (context, _) {
-        final programs =
-            context.read<WorkoutProvider>().programManager.programs;
-
+        final programs = provider.programManager.programs;
+        final followed = provider.programManager.followedProgram;
         return Scaffold(
           backgroundColor: AppColors.background,
           body: SafeArea(
             bottom: false,
-            child: programs.isEmpty
-                ? _buildEmptyState(context)
-                : _buildList(context, programs),
-          ),
-          floatingActionButton: Padding(
-            padding: const EdgeInsets.only(bottom: AppBreakpoints.navBarClearance),
-            child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              FloatingActionButton.small(
-                heroTag: 'import_json',
-                onPressed: () => _openImport(context),
-                backgroundColor: AppColors.card,
-                elevation: 0,
-                child: const Icon(
-                  Icons.download_rounded,
-                  color: AppColors.secondary,
-                ),
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.md,
+                MediaQuery.of(context).padding.bottom +
+                    AppBreakpoints.navBarClearance +
+                    90,
               ),
-              const SizedBox(height: AppSpacing.sm),
-              FloatingActionButton.small(
-                heroTag: 'ai_generate',
-                onPressed: () => _openAiGenerator(context),
-                backgroundColor: AppColors.card,
-                elevation: 0,
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              FloatingActionButton.extended(
-                heroTag: 'new_program',
-                onPressed: () => _openDesigner(context, null),
-                backgroundColor: AppColors.primary,
-                elevation: 0,
-                icon: const Icon(Icons.add_rounded, color: Colors.white),
-                label: const Text(
-                  'New Program',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
+              children: [
+                if (followed != null)
+                  _buildFollowing(context, followed, provider)
+                else if (programs.isNotEmpty) ...[
+                  Text(
+                    'Choose a program to follow',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text(
+                    'Your next unfinished workout will be ready here.',
+                    style: TextStyle(color: AppColors.textSoft),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
+                if (programs.isEmpty)
+                  _buildEmptyState(context)
+                else ...[
+                  Wrap(
+                    spacing: AppSpacing.md,
+                    runSpacing: AppSpacing.sm,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text(
+                        'Your programs',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (followed != null)
+                        TextButton.icon(
+                          onPressed: () => _chooseNewProgram(context),
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('New program'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  for (final program in programs)
+                    _ProgramCard(program: program),
+                ],
+              ],
             ),
           ),
+          floatingActionButton: followed != null
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: AppBreakpoints.navBarClearance,
+                  ),
+                  child: FloatingActionButton.extended(
+                    heroTag: 'new_program',
+                    onPressed: () => _chooseNewProgram(context),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('New program'),
+                  ),
+                ),
         );
       },
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildFollowing(
+    BuildContext context,
+    TrainingProgram program,
+    WorkoutProvider provider,
+  ) {
+    final manager = provider.programManager;
+    final next = manager.nextWorkout(program, provider.sessions);
+    final count = program.weeks.fold<int>(
+      0,
+      (sum, week) =>
+          sum +
+          week.days
+              .where(
+                (day) => manager.isDayCompleted(
+                  program,
+                  week,
+                  day,
+                  provider.sessions,
+                ),
+              )
+              .length,
+    );
+    final resume =
+        provider.hasActiveWorkout && provider.activeProgramId == program.id;
+    final day = resume ? provider.activeProgramDay : next?.day;
+    final week = resume ? provider.activeProgramWeek : next?.week;
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const RFEmptyState(
-            icon: Icons.calendar_month_rounded,
-            title: 'No Training Programs',
-            subtitle: 'Create a structured multi-week program\nor import one from JSON',
+          Text(
+            program.name,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '$count of ${program.weeks.fold<int>(0, (sum, w) => sum + w.days.where((d) => d.exercises.isNotEmpty).length)} workouts completed',
+            style: const TextStyle(color: AppColors.textSoft),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              GlowButton(
-                label: 'Create',
-                icon: Icons.add_rounded,
-                fullWidth: false,
-                onPressed: () => _openDesigner(context, null),
+          if (day != null && week != null) ...[
+            Text(
+              resume ? 'Workout in progress' : 'Next workout',
+              style: const TextStyle(color: AppColors.textSoft),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Week ${week.weekNumber} · ${day.name}',
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(width: AppSpacing.md),
-              OutlineGlowButton(
-                label: 'Import JSON',
-                icon: Icons.download_rounded,
-                onPressed: () => _openImport(context),
+            ),
+            if (day.dayOfWeek != null &&
+                day.dayOfWeek! >= 1 &&
+                day.dayOfWeek! <= 7)
+              Text(
+                'Scheduled ${const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day.dayOfWeek! - 1]}',
+                style: const TextStyle(color: AppColors.textSoft),
               ),
-            ],
+            Text(
+              '${day.exercises.length} exercises',
+              style: const TextStyle(color: AppColors.textSoft),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(56),
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                ),
+                label: Text(
+                  resume ? 'Resume workout' : 'Start next workout',
+                  textAlign: TextAlign.center,
+                ),
+                icon: const Icon(Icons.play_arrow_rounded),
+                onPressed: () => startProgramWorkout(
+                  context,
+                  programId: program.id,
+                  day: day,
+                  week: week,
+                ),
+              ),
+            ),
+          ] else
+            Text(
+              program.totalDays == 0
+                  ? 'Add training days to this program to get started.'
+                  : 'No unfinished workouts. View your program to review or repeat a day.',
+              style: const TextStyle(color: AppColors.textSoft),
+            ),
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProgramDetailScreen(program: program),
+              ),
+            ),
+            child: const Text('View program'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildList(BuildContext context, List<TrainingProgram> programs) {
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.md,
-        MediaQuery.of(context).padding.bottom + 100,
+  Future<void> _chooseNewProgram(BuildContext context) async {
+    final action = await showRFActionSheet<String>(
+      context,
+      title: 'New program',
+      actions: const [
+        RFAction(
+          label: 'Create from scratch',
+          description: 'Build your own plan offline.',
+          value: 'create',
+          icon: Icons.edit_rounded,
+        ),
+        RFAction(
+          label: 'Import JSON',
+          description: 'Use a program you already have.',
+          value: 'import',
+          icon: Icons.download_rounded,
+        ),
+        RFAction(
+          label: 'Generate with AI',
+          description: 'Optional; requires a configured AI key.',
+          value: 'ai',
+          icon: Icons.auto_awesome_rounded,
+        ),
+      ],
+    );
+    if (!context.mounted) return;
+    switch (action) {
+      case 'create':
+        _openDesigner(context, null);
+      case 'import':
+        await _openImport(context);
+      case 'ai':
+        await _openAiGenerator(context);
+    }
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+      child: RFEmptyState(
+        icon: Icons.calendar_month_rounded,
+        title: 'No Training Programs',
+        subtitle: 'Create a plan or import one to get started. AI is optional.',
       ),
-      itemCount: programs.length,
-      itemBuilder: (context, index) => _ProgramCard(program: programs[index]),
     );
   }
 
@@ -197,7 +334,8 @@ class _ProgramCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final deloadCount = program.weeks.where((w) => w.isDeload).length;
 
-    return GestureDetector(
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
@@ -262,7 +400,10 @@ class _ProgramCard extends StatelessWidget {
                       color: AppColors.textMuted,
                     ),
                   ),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted,
+                ),
               ],
             ),
             if (program.description != null) ...[
@@ -275,11 +416,14 @@ class _ProgramCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: AppSpacing.sm),
-            Row(
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
               children: [
-                _badge('${program.totalWeeks}w', AppColors.primary),
+                _badge('${program.totalWeeks} weeks', AppColors.primary),
                 const SizedBox(width: AppSpacing.xs),
-                _badge('${program.phases.length} phases', AppColors.secondary),
+                if (program.weeks.isNotEmpty)
+                  _badge(_daysPerWeek(), AppColors.secondary),
                 if (deloadCount > 0) ...[
                   const SizedBox(width: AppSpacing.xs),
                   _badge('$deloadCount deload', Colors.amber),
@@ -296,6 +440,17 @@ class _ProgramCard extends StatelessWidget {
     );
   }
 
+  String _daysPerWeek() {
+    final counts =
+        program.weeks
+            .map((w) => w.days.where((d) => d.exercises.isNotEmpty).length)
+            .toList()
+          ..sort();
+    return counts.first == counts.last
+        ? '${counts.first} days/week'
+        : '${counts.first}–${counts.last} days/week';
+  }
+
   Widget _buildMiniTimeline() {
     return SizedBox(
       height: 4,
@@ -303,7 +458,9 @@ class _ProgramCard extends StatelessWidget {
         children: program.phases.asMap().entries.map((entry) {
           final phase = entry.value;
           final color = _phaseColors[entry.key % _phaseColors.length];
-          final safeDenominator = program.totalWeeks <= 0 ? 1 : program.totalWeeks;
+          final safeDenominator = program.totalWeeks <= 0
+              ? 1
+              : program.totalWeeks;
           final fraction =
               (phase.endWeek - phase.startWeek + 1) / safeDenominator;
           return Expanded(

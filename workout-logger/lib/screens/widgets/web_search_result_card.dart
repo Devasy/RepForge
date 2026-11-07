@@ -98,7 +98,7 @@ class _SearchSources extends StatelessWidget {
           label: Text(source.title, softWrap: true),
           style: TextButton.styleFrom(
             alignment: Alignment.centerLeft,
-            foregroundColor: AppColors.accentInk,
+            foregroundColor: AppColors.textPrimary,
             minimumSize: const Size(48, 48),
           ),
         ),

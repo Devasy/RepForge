@@ -277,7 +277,7 @@ class WorkoutLoggerApp extends StatelessWidget {
       child: A2UiThemeProvider(
         theme: repforgeA2UiTheme,
         child: MaterialApp(
-          title: 'Workout Logger',
+          title: 'RepForge',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.darkTheme,
           // Above the Navigator, so every route feeds the ambient glow.
@@ -424,7 +424,7 @@ class _AppInitializerState extends State<AppInitializer> {
               const Icon(Icons.error_outline, size: 64, color: AppTheme.error),
               const SizedBox(height: 16),
               Text(
-                'Failed to initialize app',
+                'Could not start RepForge',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
@@ -466,7 +466,7 @@ class _AppInitializerState extends State<AppInitializer> {
               ),
               const SizedBox(height: 24),
               Text(
-                'Workout Logger',
+                'RepForge',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 32),

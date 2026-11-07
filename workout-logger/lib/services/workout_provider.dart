@@ -87,6 +87,8 @@ class WorkoutProvider extends ChangeNotifier {
   // Active workout state
   WorkoutSession? _activeSession;
   Routine? _activeRoutine;
+  String? _activeProgramId;
+  String? get activeProgramId => _activeProgramId;
   ProgramDay? _activeProgramDay;
   ProgramWeek? _activeProgramWeek;
   int _currentExerciseIndex = 0;
@@ -199,6 +201,7 @@ class WorkoutProvider extends ChangeNotifier {
       'schemaVersion': _draftSchemaVersion,
       'startTime': _workoutStartTime!.toIso8601String(),
       'routineId': _activeRoutine?.id,
+      'programId': _activeProgramId,
       'programDay': _activeProgramDay?.toJson(),
       'programWeek': _activeProgramWeek?.toJson(),
       'currentExerciseIndex': _currentExerciseIndex,
@@ -309,6 +312,7 @@ class WorkoutProvider extends ChangeNotifier {
       _activeSession = null;
       _workoutStartTime = DateTime.parse(startTimeRaw);
       _activeRoutine = restoredRoutine;
+      _activeProgramId = draft['programId'] as String?;
       _activeProgramDay = restoredProgramDay;
       _activeProgramWeek = restoredProgramWeek;
       _currentExerciseLogs = restoredLogs;
@@ -539,6 +543,7 @@ class WorkoutProvider extends ChangeNotifier {
   void startWorkout({
     Routine? routine,
     List<String>? exerciseIds,
+    String? programId,
     ProgramDay? programDay,
     ProgramWeek? programWeek,
   }) {
@@ -548,6 +553,7 @@ class WorkoutProvider extends ChangeNotifier {
 
     _workoutStartTime = DateTime.now();
     _activeRoutine = routine;
+    _activeProgramId = programId;
     _activeProgramDay = programDay;
     _activeProgramWeek = programWeek;
     _currentExerciseIndex = 0;
@@ -569,6 +575,7 @@ class WorkoutProvider extends ChangeNotifier {
   Future<bool> startWorkoutSafely({
     Routine? routine,
     List<String>? exerciseIds,
+    String? programId,
     ProgramDay? programDay,
     ProgramWeek? programWeek,
     required Future<StartWorkoutConflictAction> Function() onConflict,
@@ -577,6 +584,7 @@ class WorkoutProvider extends ChangeNotifier {
       startWorkout(
         routine: routine,
         exerciseIds: exerciseIds,
+        programId: programId,
         programDay: programDay,
         programWeek: programWeek,
       );
@@ -589,6 +597,7 @@ class WorkoutProvider extends ChangeNotifier {
       startWorkout(
         routine: routine,
         exerciseIds: exerciseIds,
+        programId: programId,
         programDay: programDay,
         programWeek: programWeek,
       );
@@ -721,6 +730,11 @@ class WorkoutProvider extends ChangeNotifier {
       id: _uuid.v4(),
       date: _workoutStartTime ?? DateTime.now(),
       routineId: _activeRoutine?.id,
+      programId: completedExercises.isEmpty ? null : _activeProgramId,
+      programDayId: completedExercises.isEmpty ? null : _activeProgramDay?.id,
+      programWeekNumber: completedExercises.isEmpty
+          ? null
+          : _activeProgramWeek?.weekNumber,
       exercises: completedExercises,
       duration: duration,
       notes: notes,
@@ -751,6 +765,7 @@ class WorkoutProvider extends ChangeNotifier {
     // Clear active workout state
     _activeSession = null;
     _activeRoutine = null;
+    _activeProgramId = null;
     _activeProgramDay = null;
     _activeProgramWeek = null;
     _currentExerciseIndex = 0;
@@ -765,6 +780,7 @@ class WorkoutProvider extends ChangeNotifier {
   Future<void> cancelWorkout() async {
     _activeSession = null;
     _activeRoutine = null;
+    _activeProgramId = null;
     _activeProgramDay = null;
     _activeProgramWeek = null;
     _currentExerciseIndex = 0;

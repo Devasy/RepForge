@@ -474,6 +474,9 @@ class WorkoutSession {
   final String id;
   final DateTime date;
   final String? routineId;
+  final String? programId;
+  final String? programDayId;
+  final int? programWeekNumber;
   final List<ExerciseLog> exercises;
   final int duration; // minutes
   final String? notes;
@@ -490,6 +493,9 @@ class WorkoutSession {
     required this.id,
     required this.date,
     this.routineId,
+    this.programId,
+    this.programDayId,
+    this.programWeekNumber,
     required this.exercises,
     required this.duration,
     this.notes,
@@ -504,6 +510,9 @@ class WorkoutSession {
     'id': id,
     'date': date.toIso8601String(),
     'routineId': routineId,
+    'programId': programId,
+    'programDayId': programDayId,
+    'programWeekNumber': programWeekNumber,
     'exercises': exercises.map((e) => e.toJson()).toList(),
     'duration': duration,
     'notes': notes,
@@ -515,6 +524,9 @@ class WorkoutSession {
     id: json['id'],
     date: DateTime.parse(json['date']),
     routineId: json['routineId'],
+    programId: json['programId'] as String?,
+    programDayId: json['programDayId'] as String?,
+    programWeekNumber: json['programWeekNumber'] as int?,
     exercises: (json['exercises'] as List)
         .map((e) => ExerciseLog.fromJson(e))
         .toList(),
@@ -530,6 +542,9 @@ class WorkoutSession {
     Object? id = _sentinel,
     Object? date = _sentinel,
     Object? routineId = _sentinel,
+    Object? programId = _sentinel,
+    Object? programDayId = _sentinel,
+    Object? programWeekNumber = _sentinel,
     Object? exercises = _sentinel,
     Object? duration = _sentinel,
     Object? notes = _sentinel,
@@ -539,6 +554,13 @@ class WorkoutSession {
     id: id == _sentinel ? this.id : id as String,
     date: date == _sentinel ? this.date : date as DateTime,
     routineId: routineId == _sentinel ? this.routineId : routineId as String?,
+    programId: programId == _sentinel ? this.programId : programId as String?,
+    programDayId: programDayId == _sentinel
+        ? this.programDayId
+        : programDayId as String?,
+    programWeekNumber: programWeekNumber == _sentinel
+        ? this.programWeekNumber
+        : programWeekNumber as int?,
     exercises: exercises == _sentinel
         ? this.exercises
         : exercises as List<ExerciseLog>,

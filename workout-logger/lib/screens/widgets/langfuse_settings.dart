@@ -14,7 +14,7 @@ class DeveloperFeaturesSection extends StatelessWidget {
     return GlassCard(
       child: ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.developer_mode, color: AppColors.accentInk),
+        leading: const Icon(Icons.developer_mode, color: AppColors.primary),
         title: const Text('Developer features'),
         subtitle: Text('Langfuse · ${tracing.status}'),
         trailing: const Icon(Icons.chevron_right),

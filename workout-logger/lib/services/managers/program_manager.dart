@@ -15,6 +15,50 @@ class ProgramManager extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
 
   List<TrainingProgram> _programs = [];
+  String? _followedProgramId;
+  static const _followedKey = 'programs.followedId';
+
+  TrainingProgram? get followedProgram =>
+      getProgramById(_followedProgramId ?? '');
+
+  Future<void> followProgram(String? id) async {
+    if (id != null && getProgramById(id) == null) {
+      throw ArgumentError('Program is no longer available');
+    }
+    await _storage.saveSetting(_followedKey, id ?? '');
+    _followedProgramId = id;
+    notifyListeners();
+  }
+
+  bool isDayCompleted(
+    TrainingProgram program,
+    ProgramWeek week,
+    ProgramDay day,
+    List<WorkoutSession> sessions,
+  ) => sessions.any(
+    (s) =>
+        s.programId == program.id &&
+        s.programWeekNumber == week.weekNumber &&
+        s.programDayId == day.id &&
+        s.exercises.any((e) => e.sets.isNotEmpty),
+  );
+
+  ({ProgramWeek week, ProgramDay day})? nextWorkout(
+    TrainingProgram program,
+    List<WorkoutSession> sessions,
+  ) {
+    final weeks = [...program.weeks]
+      ..sort((a, b) => a.weekNumber.compareTo(b.weekNumber));
+    for (final week in weeks) {
+      for (final day in week.days) {
+        if (day.exercises.isNotEmpty &&
+            !isDayCompleted(program, week, day, sessions)) {
+          return (week: week, day: day);
+        }
+      }
+    }
+    return null;
+  }
 
   List<TrainingProgram> get programs => List.unmodifiable(_programs);
 
@@ -24,6 +68,7 @@ class ProgramManager extends ChangeNotifier {
 
   Future<void> loadPrograms() async {
     _programs = await _storage.getAllTrainingPrograms();
+    _followedProgramId = await _storage.getSetting(_followedKey);
     notifyListeners();
   }
 

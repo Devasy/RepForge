@@ -25,6 +25,7 @@ class ProgramDesignerScreen extends StatefulWidget {
 class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
   final _uuid = const Uuid();
   int _step = 0;
+  bool _saving = false;
 
   // ── Step 1 State ─────────────────────────────────────────────────────
   final _nameCtrl = TextEditingController();
@@ -96,24 +97,23 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.sm,
           children: [
             if (_step > 0)
               OutlinedButton(
                 onPressed: () => setState(() => _step--),
                 child: const Text('Back'),
               ),
-            const Spacer(),
             Text(
               'Step ${_step + 1} of 3',
-              style: const TextStyle(
-                color: AppTheme.textMuted,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
             ),
-            const Spacer(),
             ElevatedButton(
-              onPressed: _step < 2 ? _nextStep : _save,
+              onPressed: _saving ? null : (_step < 2 ? _nextStep : _save),
               child: Text(_step < 2 ? 'Next' : 'Save'),
             ),
           ],
@@ -828,10 +828,11 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
   // ── Save ─────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
+    if (_saving) return;
     if (_nameCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Program name is required')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Program name is required')));
       return;
     }
 
@@ -858,9 +859,7 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('Empty Days'),
-          content: const Text(
-            'Some days have no exercises. Save anyway?',
-          ),
+          content: const Text('Some days have no exercises. Save anyway?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -890,8 +889,21 @@ class _ProgramDesignerScreenState extends State<ProgramDesignerScreen> {
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
     );
 
-    await provider.programManager.saveProgram(program);
-    if (mounted) Navigator.pop(context);
+    setState(() => _saving = true);
+    try {
+      await provider.programManager.saveProgram(program);
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save program. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────
