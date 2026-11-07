@@ -3,6 +3,7 @@
 // COACH_EVAL_BACKUP imports training records from a backup into a temporary DB.
 // COACH_EVAL_CASE=1..5 reruns one scenario; COACH_EVAL_OUTPUT saves evidence.
 // COACH_EVAL_MAX_ROUNDS overrides 8; COACH_EVAL_PRODUCTION_RUNTIME=1 uses app limits.
+// COACH_EVAL_LANGFUSE=1 exports usage-only traces using environment-bound keys.
 import 'dart:convert';
 import 'dart:io';
 import 'package:ai_orchestration/ai_orchestration.dart' as orchestration;
@@ -21,6 +22,9 @@ import 'package:repforge/services/ai/sql_query_service.dart';
 import 'package:repforge/services/ai/coach_instructions.dart';
 import 'package:repforge/services/ai/gemini_ai_service.dart';
 import 'package:repforge/services/ai/orchestration/repforge_tools.dart';
+import 'package:repforge/services/ai/observability/agent_tracing.dart';
+import 'package:repforge/services/ai/observability/langfuse_config.dart';
+import 'package:repforge/services/ai/observability/langfuse_service.dart';
 
 http.Client client() {
   final io = HttpClient();
@@ -60,6 +64,10 @@ void main() {
       final pr = PRManager(storage);
       final productionRuntime =
           Platform.environment['COACH_EVAL_PRODUCTION_RUNTIME'] == '1';
+      final tracingEnabled = Platform.environment['COACH_EVAL_LANGFUSE'] == '1';
+      final tracing = tracingEnabled
+          ? LangfuseService(write: (_) async {}, clientFactory: client)
+          : null;
       final ai = GeminiAiService(modelClientFactory: client)
         ..init(
           key!,
@@ -71,6 +79,22 @@ void main() {
           ),
         );
       try {
+        if (tracing != null) {
+          expect(
+            productionRuntime,
+            isTrue,
+            reason: 'Langfuse evaluation requires the core runtime.',
+          );
+          await tracing.save(
+            LangfuseConfig(
+              host: Platform.environment['LANGFUSE_BASE_URL']!,
+              publicKey: Platform.environment['LANGFUSE_PUBLIC_KEY']!,
+              secretKey: Platform.environment['LANGFUSE_SECRET_KEY']!,
+              enabled: true,
+            ),
+          );
+          await tracing.testConnection(tracing.config);
+        }
         final now = DateTime.now();
         final backupPath = Platform.environment['COACH_EVAL_BACKUP'];
         if (backupPath != null) {
@@ -186,6 +210,20 @@ void main() {
           if (selectedCase != null && selectedCase != index + 1) continue;
           final calls = <Map<String, Object?>>[];
           final answer = StringBuffer();
+          final trace = tracing == null
+              ? null
+              : AgentTracing(
+                  tracing,
+                  'coach-eval-${now.microsecondsSinceEpoch}',
+                  metadata: {
+                    'kind': 'coach_live_eval',
+                    'case': index + 1,
+                    'dataSource': backupPath == null
+                        ? 'synthetic'
+                        : 'training_backup',
+                    'maxModelCalls': ai.maxToolRounds,
+                  },
+                );
           Future<void> saveResult({Object? error}) async {
             final result = <String, Object?>{
               'case': index + 1,
@@ -194,6 +232,9 @@ void main() {
               'resolvedModel': ai.currentModel,
               'runtime': productionRuntime ? 'production_limits' : 'legacy',
               'maxModelCalls': ai.maxToolRounds,
+              if (trace != null) 'langfuseTraceId': trace.traceId,
+              if (trace != null) 'langfuseSessionId': trace.sessionId,
+              if (tracing != null) 'langfuseExportStatus': tracing.status,
               'dataSource': backupPath == null
                   ? 'synthetic'
                   : 'training_backup',
@@ -231,6 +272,7 @@ void main() {
                     prompts[index],
                     systemPrompt,
                     recordCall,
+                    trace: trace,
                   )
                 : ai.streamCoachReply(
                     userMessage: prompts[index],
@@ -243,10 +285,15 @@ void main() {
               answer.write(chunk);
             }
           } catch (error) {
+            trace?.finish(failed: true);
+            await tracing?.flush();
             await saveResult(error: error);
             failedCases.add(index + 1);
             continue;
           }
+          trace?.finish();
+          await tracing?.flush();
+          if (tracing != null) expect(tracing.status, 'Trace sent');
           // Persist evidence before assertions so failures remain reviewable.
           await saveResult();
           expect(answer.length, greaterThan(100));
@@ -271,6 +318,8 @@ void main() {
           reason: 'See saved per-case failure evidence.',
         );
       } finally {
+        await tracing?.flush();
+        tracing?.dispose();
         ai.dispose();
         wp.dispose();
         await storage.close();
@@ -290,8 +339,9 @@ Stream<String> productionReply(
   List<Tool> tools,
   String prompt,
   String systemPrompt,
-  Future<Map<String, Object?>> Function(FunctionCall) callback,
-) async* {
+  Future<Map<String, Object?>> Function(FunctionCall) callback, {
+  AgentTracing? trace,
+}) async* {
   final registry = orchestration.ToolRegistry([
     for (final tool in tools)
       for (final declaration
@@ -300,7 +350,7 @@ Stream<String> productionReply(
   ]);
   final runtime = orchestration.AgentRuntime(
     store: orchestration.MemoryCheckpointStore(),
-    model: ai,
+    model: trace == null ? ai : TracedModel(ai, trace),
     limits: orchestration.RunLimits(
       activeTimeout: Duration(minutes: ai.maxToolRounds * 10 + 1),
       maxModelCalls: ai.maxToolRounds,
@@ -313,7 +363,7 @@ Stream<String> productionReply(
       id: 'live-evaluation',
       modelId: ai.currentModel,
       systemPrompt: systemPrompt,
-      tools: registry,
+      tools: trace?.tools(registry) ?? registry,
       authorize: (_, _) => orchestration.ToolAuthorization.allow,
     ),
     threadId: orchestration.newIdentifier(),

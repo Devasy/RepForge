@@ -64,6 +64,52 @@ Map<String, String> attributes(Map<String, dynamic> span) => {
 };
 void main() {
   test(
+    'generation usage prices cached input and reasoning without double counting',
+    () async {
+      final requests = <http.Request>[];
+      final service = LangfuseService(
+        write: (_) async {},
+        clientFactory: () => MockClient((request) async {
+          requests.add(request);
+          return http.Response('{}', 200);
+        }),
+      );
+      addTearDown(service.dispose);
+      await service.save(config);
+      service.record(
+        traceId: 'a' * 32,
+        sessionId: 'usage-test',
+        name: 'reply',
+        type: 'generation',
+        started: DateTime.now(),
+        metadata: {
+          'usage': {
+            'promptTokenCount': 100,
+            'cachedContentTokenCount': 20,
+            'candidatesTokenCount': 10,
+            'thoughtsTokenCount': 5,
+            'totalTokenCount': 115,
+          },
+        },
+      );
+      await service.flush();
+      expect(
+        jsonDecode(
+          attributes(
+            span(requests.single),
+          )['langfuse.observation.usage_details']!,
+        ),
+        {
+          'input': 80,
+          'input_cached_tokens': 20,
+          'output': 10,
+          'output_reasoning_tokens': 5,
+          'total': 115,
+        },
+      );
+    },
+  );
+  test(
     'disabled tracing sends nothing and enabled export uses OTLP v4 with content off',
     () async {
       final requests = <http.Request>[];
@@ -153,7 +199,7 @@ void main() {
       expect(request.body, isNot(contains('my-private-gemini-key')));
       expect(request.body, isNot(contains(config.secretKey)));
       final attrs = attributes(span(request));
-      expect(attrs['langfuse.observation.model.name'], 'gemini-2.5-flash-001');
+      expect(attrs['langfuse.observation.model.name'], 'gemini-2.5-flash');
       expect(
         attrs['langfuse.observation.metadata'],
         contains('gemini-3.8-flash'),
@@ -310,7 +356,7 @@ void main() {
       expect(result.whereType<ModelText>().single.text, 'ok');
       await service.flush();
       final attrs = attributes(span(exports.single));
-      expect(attrs['langfuse.observation.model.name'], 'gemini-3.7-flash-001');
+      expect(attrs['langfuse.observation.model.name'], 'gemini-3.7-flash');
       final metadata =
           jsonDecode(attrs['langfuse.observation.metadata']!) as Map;
       expect(metadata['resolvedModel'], 'gemini-3.7-flash');
