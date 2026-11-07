@@ -12,8 +12,18 @@ class GeminiFailure extends OrchestrationException {
   const GeminiFailure(super.code, super.message, {this.canRetry = true});
 }
 
+/// Vertex Express uses its own API-key endpoint and ordinary JSON responses.
+enum GeminiBackend {
+  aiStudio,
+  vertexExpress;
+
+  String get label =>
+      this == vertexExpress ? 'Vertex AI Express' : 'Google AI Studio';
+}
+
 class GeminiModelProvider implements ModelProvider {
   final String apiKey;
+  final GeminiBackend backend;
   final bool Function(String model) googleSearchEnabled;
   final Set<String> unavailableGoogleSearchModels;
   final http.Client Function() clientFactory;
@@ -30,6 +40,7 @@ class GeminiModelProvider implements ModelProvider {
 
   GeminiModelProvider({
     required this.apiKey,
+    this.backend = GeminiBackend.aiStudio,
     bool Function(String model)? googleSearchEnabled,
     Set<String>? unavailableGoogleSearchModels,
     http.Client Function()? clientFactory,
@@ -91,6 +102,8 @@ class GeminiModelProvider implements ModelProvider {
     var usage = <String, Object?>{};
     final grounding = <String, Object?>{};
     String? finish;
+    String model = request.modelId;
+    String? modelVersion;
     var bytes = 0;
     await for (final event in _request(request, contents, cancellation)) {
       if (event is ModelStatus) {
@@ -98,6 +111,8 @@ class GeminiModelProvider implements ModelProvider {
         continue;
       }
       final chunk = event as JsonMap;
+      model = chunk['_repforgeModel'] as String? ?? model;
+      modelVersion = chunk['modelVersion'] as String? ?? modelVersion;
       bytes += utf8.encode(jsonEncode(chunk)).length;
       if (bytes > 16 * 1024 * 1024) {
         throw const GeminiFailure(
@@ -257,6 +272,9 @@ class GeminiModelProvider implements ModelProvider {
       usage: usage,
       providerData: {
         'gemini': {
+          'provider': backend.name,
+          'model': model,
+          'modelVersion': ?modelVersion,
           'parts': parts,
           'callIds': ids,
           if (grounding.isNotEmpty) 'groundingMetadata': grounding,
@@ -312,6 +330,7 @@ class GeminiModelProvider implements ModelProvider {
       _diagnose({
         'event': 'request',
         'model': model,
+        'effectiveGenerationConfig': generationConfig(model),
         'attempt': retries + 1,
         'elapsedMs': clock.elapsedMilliseconds,
       });
@@ -402,8 +421,8 @@ class GeminiModelProvider implements ModelProvider {
               'to': fallback,
               'code': failure.code,
             });
-            yield const ModelStatus(
-              'Gemini is unavailable. Trying another model…',
+            yield ModelStatus(
+              '$model is unavailable. Trying another model: $fallback (${backend.label})…',
             );
             model = fallback;
             retries = 0;
@@ -459,7 +478,10 @@ class GeminiModelProvider implements ModelProvider {
     final attemptClock = Stopwatch()..start();
     var hasPacket = false;
     JsonMap decodePacket(String payload) {
-      final result = _packet(payload);
+      final result = <String, Object?>{
+        ..._packet(payload),
+        '_repforgeModel': model,
+      };
       hasPacket = true;
       return result;
     }
@@ -482,9 +504,15 @@ class GeminiModelProvider implements ModelProvider {
           http.Request(
               'POST',
               Uri.https(
-                'generativelanguage.googleapis.com',
-                '/v1beta/models/$model:${body == null ? 'streamGenerateContent' : 'generateContent'}',
-                body == null ? {'alt': 'sse'} : null,
+                backend == GeminiBackend.vertexExpress
+                    ? 'aiplatform.googleapis.com'
+                    : 'generativelanguage.googleapis.com',
+                backend == GeminiBackend.vertexExpress
+                    ? '/v1/publishers/google/models/$model:generateContent'
+                    : '/v1beta/models/$model:${body == null ? 'streamGenerateContent' : 'generateContent'}',
+                body == null && backend == GeminiBackend.aiStudio
+                    ? {'alt': 'sse'}
+                    : null,
               ),
             )
             ..headers.addAll({
@@ -574,7 +602,7 @@ class GeminiModelProvider implements ModelProvider {
           retryAfter: _serverDelay(body),
         );
       }
-      if (body != null) {
+      if (body != null || backend == GeminiBackend.vertexExpress) {
         final payload = await guard(response.stream.bytesToString());
         if (utf8.encode(payload).length > 16 * 1024 * 1024) {
           throw const FormatException('Response too large');
@@ -639,7 +667,7 @@ class GeminiModelProvider implements ModelProvider {
 
   void _diagnose(JsonMap event) {
     try {
-      onDiagnostic?.call(event);
+      onDiagnostic?.call({'provider': backend.name, ...event});
     } catch (_) {}
   }
 

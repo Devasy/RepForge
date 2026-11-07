@@ -16,16 +16,22 @@ import 'repforge_tools.dart';
 import '../../interfaces/web_grounding_support.dart';
 import '../gemini_search.dart';
 import 'agent_change_review.dart';
+import '../observability/agent_tracing.dart';
+import '../observability/langfuse_service.dart';
 import '../../debug_log_buffer.dart';
 
 class RepForgeAgents {
   final ModelProvider model;
+  final LangfuseService? tracing;
+  final Map<String, Object?> Function()? traceParameters;
   final CheckpointStore store;
   final int Function() maxModelCalls;
   final String Function() modelId;
   final Map<String, RepForgeAgentSession> _sessions = {};
   RepForgeAgents({
     required this.model,
+    this.tracing,
+    this.traceParameters,
     required this.store,
     int Function()? maxModelCalls,
     String Function()? modelId,
@@ -90,6 +96,7 @@ class RepForgeAgentSession extends ChangeNotifier {
   late AgentController<ChatState> controller;
   Future<void> _projection = Future.value();
   bool _disposed = false;
+  AgentTracing? _activeTrace;
   bool _command = false;
   int? _projectedRevision;
   String? _loggedCheckpoint;
@@ -176,10 +183,25 @@ class RepForgeAgentSession extends ChangeNotifier {
             webSearchAvailable: webSearchAvailable,
           );
     final rounds = owner.maxModelCalls();
+    final tracing = owner.tracing;
+    final trace = tracing == null || !tracing.config.enabled
+        ? null
+        : AgentTracing(
+            tracing,
+            original.id,
+            metadata: {
+              'kind': original.kind,
+              'webSearchAvailable': webSearchAvailable,
+              'maxModelCalls': rounds,
+              ...?owner.traceParameters?.call(),
+            },
+          );
+    _activeTrace = trace;
+    final registry = repforgeTools(tools, optimizer: optimizer);
     return AgentController.chat(
       runtime: AgentRuntime(
         store: owner.store,
-        model: owner.model,
+        model: trace == null ? owner.model : TracedModel(owner.model, trace),
         limits: RunLimits(
           activeTimeout: Duration(minutes: rounds * 10 + 1),
           maxModelCalls: rounds,
@@ -194,7 +216,7 @@ class RepForgeAgentSession extends ChangeNotifier {
         initialMessages:
             history ??
             [for (final message in original.messages) _modelMessage(message)],
-        tools: repforgeTools(tools, optimizer: optimizer),
+        tools: trace?.tools(registry) ?? registry,
         authorize: (tool, _) => tool.effect == ToolEffect.write
             ? ToolAuthorization.requireApproval
             : ToolAuthorization.allow,
@@ -385,6 +407,13 @@ class RepForgeAgentSession extends ChangeNotifier {
   String _messageId(int index) => '${state.checkpoint!.runId}:$index';
   void _changed() {
     if (_disposed) return;
+    if ({
+      RunStatus.completed,
+      RunStatus.failed,
+      RunStatus.cancelled,
+    }.contains(state.status)) {
+      _activeTrace?.finish(failed: state.status != RunStatus.completed);
+    }
     final checkpoint = state.checkpoint;
     final logKey = checkpoint == null
         ? null

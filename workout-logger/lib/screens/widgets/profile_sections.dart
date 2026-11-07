@@ -850,10 +850,11 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   void initState() {
     super.initState();
     _ctrl = TextEditingController(
-      text: context.read<SettingsProvider>().geminiApiKey,
+      text: context.read<SettingsProvider>().activeAiApiKey,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && context.read<SettingsProvider>().geminiApiKey.isNotEmpty) {
+      if (mounted &&
+          context.read<SettingsProvider>().activeAiApiKey.isNotEmpty) {
         _refreshModels();
       }
     });
@@ -866,12 +867,17 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   }
 
   Future<void> _refreshModels() async {
+    if (context.read<SettingsProvider>().geminiBackend ==
+        GeminiBackend.vertexExpress) {
+      setState(() => _models = kGeminiModels);
+      return;
+    }
     setState(() => _discoveringModels = true);
     final catalog = GeminiModelCatalog();
     try {
       final settings = context.read<SettingsProvider>();
       final discovered = await catalog.discover(settings.geminiApiKey);
-      if (!mounted) return;
+      if (!mounted || settings.geminiBackend != GeminiBackend.aiStudio) return;
       setState(
         () => _models = [
           ...discovered,
@@ -914,7 +920,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     final settings = context.read<SettingsProvider>();
     final gemini = context.read<GeminiAiService>();
     try {
-      await settings.setGeminiApiKey(key);
+      await settings.setActiveAiApiKey(key);
       gemini.updateApiKey(key);
       _reportSaved(key.isEmpty ? 'API key cleared' : 'API key saved');
       if (mounted && key.isNotEmpty) await _refreshModels();
@@ -1020,7 +1026,47 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionLabel('GEMINI API KEY'),
+          DropdownButtonFormField<GeminiBackend>(
+            key: ValueKey('${settings.geminiBackend.name}-$_saving'),
+            initialValue: settings.geminiBackend,
+            decoration: const InputDecoration(labelText: 'Model provider'),
+            items: const [
+              DropdownMenuItem(
+                value: GeminiBackend.aiStudio,
+                child: Text('Google AI Studio'),
+              ),
+              DropdownMenuItem(
+                value: GeminiBackend.vertexExpress,
+                child: Text('Vertex AI Express'),
+              ),
+            ],
+            onChanged: _saving
+                ? null
+                : (backend) async {
+                    if (backend == null) return;
+                    setState(() => _saving = true);
+                    try {
+                      await settings.setGeminiBackend(backend);
+                      gemini.updateBackend(backend, settings.activeAiApiKey);
+                      gemini.updateModel(settings.geminiModel);
+                      gemini.updateThinkingLevel(settings.geminiThinkingLevel);
+                      _ctrl.text = settings.activeAiApiKey;
+                      if (mounted) setState(() => _models = kGeminiModels);
+                    } catch (_) {
+                      _reportSaveFailed('the provider');
+                    } finally {
+                      if (mounted) setState(() => _saving = false);
+                    }
+                  },
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text('Active: ${gemini.backend.label} / ${gemini.currentModel}'),
+          const SizedBox(height: AppSpacing.sm),
+          _SectionLabel(
+            settings.geminiBackend == GeminiBackend.vertexExpress
+                ? 'VERTEX API KEY'
+                : 'GEMINI API KEY',
+          ),
           const SizedBox(height: AppSpacing.sm),
           Container(
             decoration: BoxDecoration(
@@ -1077,7 +1123,9 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Get a free key at aistudio.google.com. Stored locally on-device.',
+            settings.geminiBackend == GeminiBackend.vertexExpress
+                ? 'Use a Vertex AI Express API key. Models listed are presets; availability depends on your account.'
+                : 'Get a free key at aistudio.google.com. Stored locally on-device.',
             style: TextStyle(
               fontFamily: 'Geist',
               color: AppColors.textFaint,
@@ -1090,7 +1138,11 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             children: [
               const Expanded(child: _SectionLabel('GEMINI MODEL')),
               TextButton(
-                onPressed: _discoveringModels ? null : _refreshModels,
+                onPressed:
+                    _discoveringModels ||
+                        settings.geminiBackend == GeminiBackend.vertexExpress
+                    ? null
+                    : _refreshModels,
                 child: Text(
                   _discoveringModels ? 'Refreshing…' : 'Refresh models',
                 ),
@@ -1143,6 +1195,29 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                 },
               ),
             ),
+          ),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Allow automatic model fallback'),
+            subtitle: const Text(
+              'If off, retries use the same model and failures are reported instead of switching models.',
+            ),
+            value: settings.allowModelFallbacks,
+            onChanged: _saving
+                ? null
+                : (enabled) async {
+                    setState(() => _saving = true);
+                    final gemini = context.read<GeminiAiService>();
+                    try {
+                      await settings.setAllowModelFallbacks(enabled);
+                      gemini.updateAllowModelFallbacks(enabled);
+                      if (!enabled) gemini.updateModel(settings.geminiModel);
+                    } catch (_) {
+                      _reportSaveFailed('the fallback preference');
+                    } finally {
+                      if (mounted) setState(() => _saving = false);
+                    }
+                  },
           ),
           if (supportedThinkingLevels(settings.geminiModel).isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),

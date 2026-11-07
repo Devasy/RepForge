@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -24,6 +25,7 @@ import '../services/managers/readiness_manager.dart';
 import '../services/health_data_sync_service.dart';
 import '../theme/app_theme.dart';
 import 'widgets/profile_sections.dart';
+import 'widgets/langfuse_settings.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.guideCache});
@@ -366,7 +368,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         await provider.refreshAfterImport();
         await settings.init();
         gemini?.init(
-          settings.geminiApiKey,
+          settings.activeAiApiKey,
+          backend: settings.geminiBackend,
           model: settings.geminiModel,
           maxToolRounds: settings.geminiMaxToolRounds,
           thinkingLevel: settings.geminiThinkingLevel,
@@ -491,6 +494,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 const AiSettingsSection(),
+                if (kDebugMode) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  const DeveloperFeaturesSection(),
+                ],
                 const SizedBox(height: AppSpacing.md),
                 AboutSection(appVersion: _appVersion),
                 const SizedBox(height: AppSpacing.xxl),

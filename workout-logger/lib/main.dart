@@ -18,6 +18,7 @@ import 'services/storage_backend_resolver.dart';
 import 'services/ai/sql_query_service.dart';
 import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
+import 'services/ai/observability/langfuse_service.dart';
 import 'services/ai/coach_tool_service.dart';
 import 'services/ai/orchestration/repforge_agents.dart';
 import 'services/ai/orchestration/app_checkpoint_store.dart';
@@ -187,6 +188,7 @@ class WorkoutLoggerApp extends StatelessWidget {
           storage: _storageService as SqliteStorageService,
         )
       : null;
+  static final LangfuseService _langfuse = LangfuseService();
   static final GeminiAiService _geminiService = GeminiAiService(
     storage: _storageService,
   );
@@ -195,6 +197,12 @@ class WorkoutLoggerApp extends StatelessWidget {
   );
   static final RepForgeAgents _agents = RepForgeAgents(
     model: _geminiService,
+    tracing: _langfuse,
+    traceParameters: () => {
+      'configuredThinkingLevel': _geminiService.thinkingLevel,
+      'provider': _geminiService.backend.name,
+      'allowModelFallbacks': _geminiService.allowModelFallbacks,
+    },
     store: AppCheckpointStore(_storageService),
     maxModelCalls: () => _geminiService.maxToolRounds,
     modelId: () => _geminiService.currentModel,
@@ -237,6 +245,7 @@ class WorkoutLoggerApp extends StatelessWidget {
         // the future firebase_ai swap point — without a separate provider.
         ChangeNotifierProvider<GeminiAiService>.value(value: _geminiService),
         Provider<RepForgeAgents>.value(value: _agents),
+        ChangeNotifierProvider<LangfuseService>.value(value: _langfuse),
         ChangeNotifierProvider<ConversationManager>.value(
           value: _conversationManager,
         ),
@@ -310,17 +319,21 @@ class _AppInitializerState extends State<AppInitializer> {
     final historyManager = context.read<HistoryManager>();
     final prManager = context.read<PRManager>();
     final gemini = context.read<GeminiAiService>();
+    final langfuse = context.read<LangfuseService?>();
     final readiness = context.read<ReadinessManager>();
     final healthDataSync = context.read<HealthDataSyncService?>();
 
     try {
       await provider.init();
       await settings.init();
+      if (kDebugMode) await langfuse?.load();
       gemini.init(
-        settings.geminiApiKey,
+        settings.activeAiApiKey,
+        backend: settings.geminiBackend,
         model: settings.geminiModel,
         maxToolRounds: settings.geminiMaxToolRounds,
         thinkingLevel: settings.geminiThinkingLevel,
+        allowModelFallbacks: settings.allowModelFallbacks,
       );
       try {
         await gemini.loadUsage();

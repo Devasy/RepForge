@@ -52,6 +52,7 @@ void main() {
     final service = SqlQueryService(dbPath);
     final result = await service.runQuery('SELECT * FROM widgets', limit: 1);
     expect(result['row_count'], 1);
+    expect(result['truncated'], isTrue);
   });
 
   test('returns error map instead of throwing on invalid SQL', () async {

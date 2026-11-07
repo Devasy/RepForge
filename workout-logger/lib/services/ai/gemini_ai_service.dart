@@ -1,6 +1,8 @@
 // Gemini settings, usage and generation facade; execution belongs to AgentRuntime.
 
 import 'dart:convert';
+export 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart'
+    show GeminiBackend;
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart';
 import 'ai_failure.dart';
@@ -132,9 +134,19 @@ class GeminiAiService extends ChangeNotifier
   static const String _usageKey = 'aiTokenUsage';
 
   String _apiKey = '';
+  GeminiBackend _backend = GeminiBackend.aiStudio;
+  GeminiBackend get backend => _backend;
+  Map<String, dynamic> get effectiveThinkingConfig => _thinkingConfig;
   String _model = kDefaultGeminiModel;
   final _unavailableGoogleSearchModels = <String>{};
   int _maxToolRounds = kDefaultMaxToolRounds;
+  bool _allowModelFallbacks = false;
+  bool get allowModelFallbacks => _allowModelFallbacks;
+  void updateAllowModelFallbacks(bool enabled) {
+    _allowModelFallbacks = enabled;
+    notifyListeners();
+  }
+
   String _thinkingLevel = kDefaultThinkingLevel;
 
   // Cumulative token usage across all AI calls (persisted).
@@ -171,14 +183,18 @@ class GeminiAiService extends ChangeNotifier
   void init(
     String apiKey, {
     String model = kDefaultGeminiModel,
+    GeminiBackend backend = GeminiBackend.aiStudio,
     int maxToolRounds = kDefaultMaxToolRounds,
     String thinkingLevel = kDefaultThinkingLevel,
+    bool allowModelFallbacks = false,
   }) {
     _unavailableGoogleSearchModels.clear();
+    _backend = backend;
     _apiKey = apiKey.trim();
     DebugLogBuffer.instance.protect(_apiKey);
     _model = model;
     _maxToolRounds = maxToolRounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
+    _allowModelFallbacks = allowModelFallbacks;
     _thinkingLevel = clampThinkingLevel(_model, thinkingLevel);
   }
 
@@ -244,6 +260,12 @@ class GeminiAiService extends ChangeNotifier
         'requests': _requestCount,
       }),
     );
+  }
+
+  void updateBackend(GeminiBackend backend, String key) {
+    _backend = backend;
+    _unavailableGoogleSearchModels.clear();
+    updateApiKey(key);
   }
 
   void updateApiKey(String key) {
@@ -360,45 +382,50 @@ class GeminiAiService extends ChangeNotifier
       supportsGeminiWebGrounding(_model) &&
       !_unavailableGoogleSearchModels.contains(_model);
 
-  GeminiModelProvider _modelProvider({bool enableWebSearch = true}) =>
-      GeminiModelProvider(
-        unavailableGoogleSearchModels: _unavailableGoogleSearchModels,
-        googleSearchEnabled: enableWebSearch
-            ? supportsGeminiWebGrounding
-            : null,
-        apiKey: _apiKey,
-        onDiagnostic: (event) =>
-            DebugLogBuffer.instance.write('[AI] ${jsonEncode(event)}'),
-        clientFactory: _modelClientFactory,
-        generationConfig: (model) => {
-          'thinkingConfig': model.startsWith('gemini-2')
-              ? {'thinkingBudget': 0}
-              : {'thinkingLevel': clampThinkingLevel(model, _thinkingLevel)},
-        },
-        fallbackModel: getFallbackModel,
-        onModelChanged: (model) {
-          _model = model;
-          _thinkingLevel = clampThinkingLevel(model, _thinkingLevel);
-          notifyListeners();
-        },
-        onUsage: (usage) async {
-          try {
-            await recordUsage(
-              prompt: (usage['promptTokenCount'] as num?)?.toInt() ?? 0,
-              response: (usage['candidatesTokenCount'] as num?)?.toInt() ?? 0,
-              total: (usage['totalTokenCount'] as num?)?.toInt() ?? 0,
-            );
-          } catch (_) {
-            debugPrint('Could not persist AI usage.');
-          }
-        },
-      );
+  GeminiModelProvider _modelProvider({
+    bool enableWebSearch = true,
+    void Function(JsonMap)? onDiagnostic,
+  }) => GeminiModelProvider(
+    unavailableGoogleSearchModels: _unavailableGoogleSearchModels,
+    googleSearchEnabled: enableWebSearch ? supportsGeminiWebGrounding : null,
+    apiKey: _apiKey,
+    backend: _backend,
+    onDiagnostic: (event) {
+      DebugLogBuffer.instance.write('[AI] ${jsonEncode(event)}');
+      onDiagnostic?.call(event);
+    },
+    clientFactory: _modelClientFactory,
+    generationConfig: (model) => {
+      'thinkingConfig': model.startsWith('gemini-2')
+          ? {'thinkingBudget': 0}
+          : {'thinkingLevel': clampThinkingLevel(model, _thinkingLevel)},
+    },
+    fallbackModel: (model) =>
+        _allowModelFallbacks ? getFallbackModel(model) : null,
+    onModelChanged: (model) {
+      _model = model;
+      _thinkingLevel = clampThinkingLevel(model, _thinkingLevel);
+      notifyListeners();
+    },
+    onUsage: (usage) async {
+      try {
+        await recordUsage(
+          prompt: (usage['promptTokenCount'] as num?)?.toInt() ?? 0,
+          response: (usage['candidatesTokenCount'] as num?)?.toInt() ?? 0,
+          total: (usage['totalTokenCount'] as num?)?.toInt() ?? 0,
+        );
+      } catch (_) {
+        debugPrint('Could not persist AI usage.');
+      }
+    },
+  );
 
   @override
   Stream<ModelEvent> stream(
     ModelRequest request,
-    CancellationToken cancellation,
-  ) => _modelProvider().stream(
+    CancellationToken cancellation, {
+    void Function(JsonMap)? onDiagnostic,
+  }) => _modelProvider(onDiagnostic: onDiagnostic).stream(
     ModelRequest(
       modelId: _model,
       systemPrompt: request.systemPrompt,
