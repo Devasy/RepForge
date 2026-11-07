@@ -166,6 +166,9 @@ class TracedModel implements ModelProvider {
           if (inner is GeminiAiService)
             'provider': (inner as GeminiAiService).backend.name,
           if (inner is GeminiAiService)
+            'allowModelFallbacks':
+                (inner as GeminiAiService).allowModelFallbacks,
+          if (inner is GeminiAiService)
             'effectiveThinkingConfig':
                 (inner as GeminiAiService).effectiveThinkingConfig,
           'transport': transport,

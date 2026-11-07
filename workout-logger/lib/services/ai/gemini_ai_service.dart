@@ -140,6 +140,13 @@ class GeminiAiService extends ChangeNotifier
   String _model = kDefaultGeminiModel;
   final _unavailableGoogleSearchModels = <String>{};
   int _maxToolRounds = kDefaultMaxToolRounds;
+  bool _allowModelFallbacks = false;
+  bool get allowModelFallbacks => _allowModelFallbacks;
+  void updateAllowModelFallbacks(bool enabled) {
+    _allowModelFallbacks = enabled;
+    notifyListeners();
+  }
+
   String _thinkingLevel = kDefaultThinkingLevel;
 
   // Cumulative token usage across all AI calls (persisted).
@@ -179,6 +186,7 @@ class GeminiAiService extends ChangeNotifier
     GeminiBackend backend = GeminiBackend.aiStudio,
     int maxToolRounds = kDefaultMaxToolRounds,
     String thinkingLevel = kDefaultThinkingLevel,
+    bool allowModelFallbacks = false,
   }) {
     _unavailableGoogleSearchModels.clear();
     _backend = backend;
@@ -186,6 +194,7 @@ class GeminiAiService extends ChangeNotifier
     DebugLogBuffer.instance.protect(_apiKey);
     _model = model;
     _maxToolRounds = maxToolRounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
+    _allowModelFallbacks = allowModelFallbacks;
     _thinkingLevel = clampThinkingLevel(_model, thinkingLevel);
   }
 
@@ -391,7 +400,8 @@ class GeminiAiService extends ChangeNotifier
           ? {'thinkingBudget': 0}
           : {'thinkingLevel': clampThinkingLevel(model, _thinkingLevel)},
     },
-    fallbackModel: getFallbackModel,
+    fallbackModel: (model) =>
+        _allowModelFallbacks ? getFallbackModel(model) : null,
     onModelChanged: (model) {
       _model = model;
       _thinkingLevel = clampThinkingLevel(model, _thinkingLevel);

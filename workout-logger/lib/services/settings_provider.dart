@@ -41,6 +41,8 @@ class SettingsProvider extends ChangeNotifier {
       : _geminiApiKey;
   String _geminiModel = kDefaultGeminiModel;
   int _geminiMaxToolRounds = kDefaultMaxToolRounds;
+  bool _allowModelFallbacks = false;
+  bool get allowModelFallbacks => _allowModelFallbacks;
   String _geminiThinkingLevel = kDefaultThinkingLevel;
   String _weeklyInsights = '';
   DateTime? _weeklyInsightsDate;
@@ -138,6 +140,8 @@ class SettingsProvider extends ChangeNotifier {
               ? 'gemini-3.8-flash'
               : kDefaultGeminiModel);
     final maxRounds = await _storage.getSetting('geminiMaxToolRounds');
+    _allowModelFallbacks =
+        await _storage.getSetting('allowModelFallbacks') == 'true';
     // Clamp on read as well as on write: a stored value from an older build or
     // a hand-edited settings row would otherwise bypass the bounds that
     // setGeminiMaxToolRounds enforces.
@@ -299,6 +303,12 @@ class SettingsProvider extends ChangeNotifier {
     final clamped = rounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
     await _storage.saveSetting('geminiMaxToolRounds', clamped.toString());
     _geminiMaxToolRounds = clamped;
+    notifyListeners();
+  }
+
+  Future<void> setAllowModelFallbacks(bool enabled) async {
+    await _storage.saveSetting('allowModelFallbacks', enabled.toString());
+    _allowModelFallbacks = enabled;
     notifyListeners();
   }
 

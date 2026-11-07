@@ -309,7 +309,7 @@ void main() {
             200,
           );
         }),
-      )..init('fake-key', model: 'gemini-3.8-flash');
+      )..init('fake-key', model: 'gemini-3.8-flash', allowModelFallbacks: true);
       addTearDown(service.dispose);
       final events = await service
           .stream(
