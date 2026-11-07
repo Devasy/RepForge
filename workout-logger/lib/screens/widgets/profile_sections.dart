@@ -1196,6 +1196,29 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
               ),
             ),
           ),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Allow automatic model fallback'),
+            subtitle: const Text(
+              'If off, retries use the same model and failures are reported instead of switching models.',
+            ),
+            value: settings.allowModelFallbacks,
+            onChanged: _saving
+                ? null
+                : (enabled) async {
+                    setState(() => _saving = true);
+                    final gemini = context.read<GeminiAiService>();
+                    try {
+                      await settings.setAllowModelFallbacks(enabled);
+                      gemini.updateAllowModelFallbacks(enabled);
+                      if (!enabled) gemini.updateModel(settings.geminiModel);
+                    } catch (_) {
+                      _reportSaveFailed('the fallback preference');
+                    } finally {
+                      if (mounted) setState(() => _saving = false);
+                    }
+                  },
+          ),
           if (supportedThinkingLevels(settings.geminiModel).isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             const _SectionLabel('THINKING LEVEL'),

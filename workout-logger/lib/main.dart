@@ -201,6 +201,7 @@ class WorkoutLoggerApp extends StatelessWidget {
     traceParameters: () => {
       'configuredThinkingLevel': _geminiService.thinkingLevel,
       'provider': _geminiService.backend.name,
+      'allowModelFallbacks': _geminiService.allowModelFallbacks,
     },
     store: AppCheckpointStore(_storageService),
     maxModelCalls: () => _geminiService.maxToolRounds,
@@ -332,6 +333,7 @@ class _AppInitializerState extends State<AppInitializer> {
         model: settings.geminiModel,
         maxToolRounds: settings.geminiMaxToolRounds,
         thinkingLevel: settings.geminiThinkingLevel,
+        allowModelFallbacks: settings.allowModelFallbacks,
       );
       try {
         await gemini.loadUsage();

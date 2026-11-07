@@ -309,29 +309,34 @@ void main() {
     () async {
       final exports = <http.Request>[];
       var attempts = 0;
-      final ai = GeminiAiService(
-        modelClientFactory: () => MockClient((_) async {
-          if (attempts++ == 0) return http.Response('{}', 404);
-          return http.Response(
-            'data: ${jsonEncode({
-              'modelVersion': 'gemini-3.7-flash-001',
-              'candidates': [
-                {
-                  'index': 0,
-                  'content': {
-                    'role': 'model',
-                    'parts': [
-                      {'text': 'ok'},
-                    ],
-                  },
-                  'finishReason': 'STOP',
-                },
-              ],
-            })}\n\n',
-            200,
+      final ai =
+          GeminiAiService(
+            modelClientFactory: () => MockClient((_) async {
+              if (attempts++ == 0) return http.Response('{}', 404);
+              return http.Response(
+                'data: ${jsonEncode({
+                  'modelVersion': 'gemini-3.7-flash-001',
+                  'candidates': [
+                    {
+                      'index': 0,
+                      'content': {
+                        'role': 'model',
+                        'parts': [
+                          {'text': 'ok'},
+                        ],
+                      },
+                      'finishReason': 'STOP',
+                    },
+                  ],
+                })}\n\n',
+                200,
+              );
+            }),
+          )..init(
+            'fixture-key',
+            model: 'gemini-3.8-flash',
+            allowModelFallbacks: true,
           );
-        }),
-      )..init('fixture-key', model: 'gemini-3.8-flash');
       addTearDown(ai.dispose);
       final service = LangfuseService(
         write: (_) async {},
