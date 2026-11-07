@@ -22,6 +22,8 @@ class RepForgeTool implements AgentTool {
   @override
   final ToolDefinition definition;
   static const writes = {
+    'create_training_program',
+    'follow_training_program',
     'create_routine',
     'update_routine',
     'add_custom_exercise',

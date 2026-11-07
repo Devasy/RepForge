@@ -16,6 +16,7 @@ import '../managers/pr_manager.dart';
 import '../managers/health_history_manager.dart';
 import '../../data/exercise_database.dart';
 import 'sql_query_service.dart';
+import 'coach_program_tools.dart';
 
 class AmbiguousMatchException implements Exception {
   const AmbiguousMatchException(this.candidates);
@@ -89,6 +90,7 @@ class CoachToolService {
   List<Tool> buildTools() => [
     Tool(
       functionDeclarations: [
+        ...CoachProgramTools.declarations,
         FunctionDeclaration(
           'get_progress_overview',
           'Start here for overall or multi-muscle progress. Retrieves logged exercises and dated first/latest observed sets within the requested window, grouped by major muscle. Includes coverage gaps; follow up with get_exercise_performance for details. Does not infer hypertrophy from tonnage.',
@@ -555,6 +557,9 @@ class CoachToolService {
   /// Dispatch a model function call to the matching query and return a
   /// JSON-serializable result map.
   Future<Map<String, Object?>> handleCall(FunctionCall call) async {
+    if (CoachProgramTools.names.contains(call.name)) {
+      return CoachProgramTools(_wp).handleCall(call);
+    }
     switch (call.name) {
       case 'get_sleeping_hr_analytics':
         return await _getSleepingHrAnalytics(call.args);

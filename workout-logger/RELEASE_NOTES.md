@@ -1,4 +1,5 @@
 ### Features added
+- Ask the coach to create a full training program using the existing conversation and training context; review exact prescriptions before saving, and separately approve following or switching programs.
 - Follow a saved training program and open its next unfinished workout directly from Programs; resume an in-progress program workout without starting over.
 - Connect Gemini through a separate Vertex AI Express API key, with independent provider and model choices.
 - Let AI Coach and Routine Optimizer use Google Search evidence with saved source links and search suggestions.
