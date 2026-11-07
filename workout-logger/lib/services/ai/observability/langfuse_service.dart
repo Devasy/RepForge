@@ -133,9 +133,17 @@ class LangfuseService extends ChangeNotifier {
 
   Map<String, num> _usage(Object? source) {
     if (source is! Map) return {};
+    final prompt = source['promptTokenCount'];
+    final cached = source['cachedContentTokenCount'];
     return {
+      // Gemini prompt tokens include cached tokens. Export disjoint categories
+      // so Langfuse can apply cache pricing without billing them twice.
+      if (prompt is num)
+        'input': cached is num ? (prompt - cached).clamp(0, prompt) : prompt,
+      if (cached is num) 'input_cached_tokens': cached,
+      if (source['thoughtsTokenCount'] is num)
+        'output_reasoning_tokens': source['thoughtsTokenCount'] as num,
       for (final entry in {
-        'input': 'promptTokenCount',
         'output': 'candidatesTokenCount',
         'total': 'totalTokenCount',
       }.entries)

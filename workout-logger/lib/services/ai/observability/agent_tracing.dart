@@ -152,7 +152,8 @@ class TracedModel implements ModelProvider {
           ],
         },
         output: {'text': text.toString(), 'calls': calls},
-        model: version ?? model,
+        // Price by the resolved model ID; keep the provider revision in metadata.
+        model: model,
         details: {
           'requestedModel': request.modelId,
           'resolvedModel': model,
