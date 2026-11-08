@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/models.dart';
+import '../../utils/program_weekday.dart';
 import '../../services/workout_provider.dart';
 
 /// Render the actual proposed tool arguments, not a separately generated summary.
@@ -53,6 +54,17 @@ class AgentChangeDetails extends StatelessWidget {
         'This program proposal is incomplete. Ask the coach to correct it before saving.',
       );
     }
+    return _ProgramPreview(plan: plan, provider: provider);
+  }
+}
+
+class _ProgramPreview extends StatelessWidget {
+  const _ProgramPreview({required this.plan, required this.provider});
+  final TrainingProgram plan;
+  final WorkoutProvider? provider;
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -81,7 +93,7 @@ class AgentChangeDetails extends StatelessWidget {
           for (final day in week.days) ...[
             const SizedBox(height: 8),
             Text(
-              '${day.name}${day.dayOfWeek != null && day.dayOfWeek! >= 1 && day.dayOfWeek! <= 7 ? ' · ${const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day.dayOfWeek! - 1]}' : ''}',
+              '${day.name}${day.dayOfWeek != null && day.dayOfWeek! >= 1 && day.dayOfWeek! <= 7 ? ' · ${programWeekday(day.dayOfWeek!)}' : ''}',
               style: Theme.of(context).textTheme.titleSmall,
             ),
             if (day.notes != null) Text(day.notes!),

@@ -49,6 +49,30 @@ void main() {
     await manager.saveProgram(program);
   });
   test(
+    'deleting a followed plan clears the choice before identical recreation',
+    () async {
+      await manager.followProgram(program.id);
+      await manager.deleteProgram(program.id);
+      expect(manager.followedProgram, isNull);
+      expect(await storage.getSetting('programs.followedId'), '');
+      await manager.saveProgram(program);
+      expect(manager.followedProgram, isNull);
+      final restarted = ProgramManager(storage);
+      await restarted.loadPrograms();
+      expect(restarted.followedProgram, isNull);
+    },
+  );
+
+  test('deleting another plan preserves the followed choice', () async {
+    await manager.followProgram(program.id);
+    final other = program.copyWith(id: 'other');
+    await manager.saveProgram(other);
+    await manager.deleteProgram(other.id);
+    expect(manager.followedProgram?.id, program.id);
+    expect(await storage.getSetting('programs.followedId'), program.id);
+  });
+
+  test(
     'follow survives restart; saved workout advances exact week/day only',
     () async {
       await manager.followProgram(program.id);

@@ -264,12 +264,12 @@ class GeminiAiService extends ChangeNotifier
 
   void updateBackend(GeminiBackend backend, String key) {
     _backend = backend;
-    _unavailableGoogleSearchModels.clear();
     updateApiKey(key);
   }
 
   void updateApiKey(String key) {
     _apiKey = key.trim();
+    _unavailableGoogleSearchModels.clear();
     DebugLogBuffer.instance.protect(_apiKey);
     notifyListeners();
   }

@@ -932,6 +932,41 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     }
   }
 
+  Future<void> _selectBackend(GeminiBackend? backend) async {
+    if (backend == null) return;
+    final settings = context.read<SettingsProvider>();
+    final gemini = context.read<GeminiAiService>();
+    setState(() => _saving = true);
+    try {
+      await settings.setGeminiBackend(backend);
+      gemini.updateBackend(backend, settings.activeAiApiKey);
+      gemini.updateModel(settings.geminiModel);
+      gemini.updateThinkingLevel(settings.geminiThinkingLevel);
+      if (!mounted) return;
+      _ctrl.text = settings.activeAiApiKey;
+      setState(() => _models = kGeminiModels);
+    } catch (_) {
+      _reportSaveFailed('the provider');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _toggleFallback(bool enabled) async {
+    final settings = context.read<SettingsProvider>();
+    final gemini = context.read<GeminiAiService>();
+    setState(() => _saving = true);
+    try {
+      await settings.setAllowModelFallbacks(enabled);
+      gemini.updateAllowModelFallbacks(enabled);
+      if (!enabled) gemini.updateModel(settings.geminiModel);
+    } catch (_) {
+      _reportSaveFailed('the fallback preference');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _selectModel(String modelId) async {
     // Same contract as _commitThinkingLevel below: the dropdown's onChanged
     // drops this Future, so a storage failure would otherwise surface as an
@@ -1026,38 +1061,10 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DropdownButtonFormField<GeminiBackend>(
-            key: ValueKey('${settings.geminiBackend.name}-$_saving'),
-            initialValue: settings.geminiBackend,
-            decoration: const InputDecoration(labelText: 'Model provider'),
-            items: const [
-              DropdownMenuItem(
-                value: GeminiBackend.aiStudio,
-                child: Text('Google AI Studio'),
-              ),
-              DropdownMenuItem(
-                value: GeminiBackend.vertexExpress,
-                child: Text('Vertex AI Express'),
-              ),
-            ],
-            onChanged: _saving
-                ? null
-                : (backend) async {
-                    if (backend == null) return;
-                    setState(() => _saving = true);
-                    try {
-                      await settings.setGeminiBackend(backend);
-                      gemini.updateBackend(backend, settings.activeAiApiKey);
-                      gemini.updateModel(settings.geminiModel);
-                      gemini.updateThinkingLevel(settings.geminiThinkingLevel);
-                      _ctrl.text = settings.activeAiApiKey;
-                      if (mounted) setState(() => _models = kGeminiModels);
-                    } catch (_) {
-                      _reportSaveFailed('the provider');
-                    } finally {
-                      if (mounted) setState(() => _saving = false);
-                    }
-                  },
+          _BackendPicker(
+            backend: settings.geminiBackend,
+            saving: _saving,
+            onChanged: _selectBackend,
           ),
           const SizedBox(height: AppSpacing.md),
           Text('Active: ${gemini.backend.label} / ${gemini.currentModel}'),
@@ -1196,28 +1203,10 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
               ),
             ),
           ),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Allow automatic model fallback'),
-            subtitle: const Text(
-              'If off, retries use the same model and failures are reported instead of switching models.',
-            ),
-            value: settings.allowModelFallbacks,
-            onChanged: _saving
-                ? null
-                : (enabled) async {
-                    setState(() => _saving = true);
-                    final gemini = context.read<GeminiAiService>();
-                    try {
-                      await settings.setAllowModelFallbacks(enabled);
-                      gemini.updateAllowModelFallbacks(enabled);
-                      if (!enabled) gemini.updateModel(settings.geminiModel);
-                    } catch (_) {
-                      _reportSaveFailed('the fallback preference');
-                    } finally {
-                      if (mounted) setState(() => _saving = false);
-                    }
-                  },
+          _FallbackSwitch(
+            enabled: settings.allowModelFallbacks,
+            saving: _saving,
+            onChanged: _toggleFallback,
           ),
           if (supportedThinkingLevels(settings.geminiModel).isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
@@ -1535,4 +1524,55 @@ String _formatInt(int n) {
     buf.write(s[i]);
   }
   return buf.toString();
+}
+
+class _BackendPicker extends StatelessWidget {
+  const _BackendPicker({
+    required this.backend,
+    required this.saving,
+    required this.onChanged,
+  });
+  final GeminiBackend backend;
+  final bool saving;
+  final ValueChanged<GeminiBackend?> onChanged;
+
+  @override
+  Widget build(BuildContext context) => DropdownButtonFormField<GeminiBackend>(
+    key: ValueKey('${backend.name}-$saving'),
+    initialValue: backend,
+    decoration: const InputDecoration(labelText: 'Model provider'),
+    items: const [
+      DropdownMenuItem(
+        value: GeminiBackend.aiStudio,
+        child: Text('Google AI Studio'),
+      ),
+      DropdownMenuItem(
+        value: GeminiBackend.vertexExpress,
+        child: Text('Vertex AI Express'),
+      ),
+    ],
+    onChanged: saving ? null : onChanged,
+  );
+}
+
+class _FallbackSwitch extends StatelessWidget {
+  const _FallbackSwitch({
+    required this.enabled,
+    required this.saving,
+    required this.onChanged,
+  });
+  final bool enabled;
+  final bool saving;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => SwitchListTile.adaptive(
+    contentPadding: EdgeInsets.zero,
+    title: const Text('Allow automatic model fallback'),
+    subtitle: const Text(
+      'If off, retries use the same model and failures are reported instead of switching models.',
+    ),
+    value: enabled,
+    onChanged: saving ? null : onChanged,
+  );
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
+import '../../utils/program_weekday.dart';
 import '../../services/workout_provider.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/rf_widgets.dart';
@@ -40,11 +41,7 @@ class ProgramsScreen extends StatelessWidget {
               ),
               children: [
                 if (followed != null)
-                  _buildFollowing(
-                    context: context,
-                    program: followed,
-                    provider: provider,
-                  )
+                  _FollowedProgramPanel(program: followed, provider: provider)
                 else if (programs.isNotEmpty) ...[
                   Text(
                     'Choose a program to follow',
@@ -60,26 +57,9 @@ class ProgramsScreen extends StatelessWidget {
                 if (programs.isEmpty)
                   _buildEmptyState(context)
                 else ...[
-                  Wrap(
-                    spacing: AppSpacing.md,
-                    runSpacing: AppSpacing.sm,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      const Text(
-                        'Your programs',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (followed != null)
-                        TextButton.icon(
-                          onPressed: () => _chooseNewProgram(context),
-                          icon: const Icon(Icons.add_rounded),
-                          label: const Text('New program'),
-                        ),
-                    ],
+                  _ProgramsHeading(
+                    followed: followed != null,
+                    onNew: () => _chooseNewProgram(context),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   for (final program in programs)
@@ -105,107 +85,6 @@ class ProgramsScreen extends StatelessWidget {
                 ),
         );
       },
-    );
-  }
-
-  Widget _buildFollowing({
-    required BuildContext context,
-    required TrainingProgram program,
-    required WorkoutProvider provider,
-  }) {
-    final manager = provider.programManager;
-    final next = manager.nextWorkout(program, provider.sessions);
-    final progress = manager.progressFor(
-      program: program,
-      sessions: provider.sessions,
-    );
-    final resume =
-        provider.hasActiveWorkout && provider.activeProgramId == program.id;
-    final day = resume ? provider.activeProgramDay : next?.day;
-    final week = resume ? provider.activeProgramWeek : next?.week;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            program.name,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            '${progress.completed} of ${progress.total} workouts completed',
-            style: const TextStyle(color: AppColors.textSoft),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          if (day != null && week != null) ...[
-            Text(
-              resume ? 'Workout in progress' : 'Next workout',
-              style: const TextStyle(color: AppColors.textSoft),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Week ${week.weekNumber} · ${day.name}',
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            if (day.dayOfWeek != null &&
-                day.dayOfWeek! >= 1 &&
-                day.dayOfWeek! <= 7)
-              Text(
-                'Scheduled ${const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day.dayOfWeek! - 1]}',
-                style: const TextStyle(color: AppColors.textSoft),
-              ),
-            Text(
-              '${day.exercises.length} exercises',
-              style: const TextStyle(color: AppColors.textSoft),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(56),
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                ),
-                label: Text(
-                  resume ? 'Resume workout' : 'Start next workout',
-                  textAlign: TextAlign.center,
-                ),
-                icon: const Icon(Icons.play_arrow_rounded),
-                onPressed: () => startProgramWorkout(
-                  context,
-                  programId: program.id,
-                  day: day,
-                  week: week,
-                ),
-              ),
-            ),
-          ] else
-            Text(
-              program.totalDays == 0
-                  ? 'Add training days to this program to get started.'
-                  : 'No unfinished workouts. View your program to review or repeat a day.',
-              style: const TextStyle(color: AppColors.textSoft),
-            ),
-          TextButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProgramDetailScreen(program: program),
-              ),
-            ),
-            child: const Text('View program'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -488,4 +367,156 @@ class _ProgramCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _FollowedProgramPanel extends StatelessWidget {
+  const _FollowedProgramPanel({required this.program, required this.provider});
+  final TrainingProgram program;
+  final WorkoutProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final manager = provider.programManager;
+    final next = manager.nextWorkout(program, provider.sessions);
+    final progress = manager.progressFor(
+      program: program,
+      sessions: provider.sessions,
+    );
+    final resume =
+        provider.hasActiveWorkout && provider.activeProgramId == program.id;
+    final day = resume ? provider.activeProgramDay : next?.day;
+    final week = resume ? provider.activeProgramWeek : next?.week;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            program.name,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '${progress.completed} of ${progress.total} workouts completed',
+            style: const TextStyle(color: AppColors.textSoft),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          if (day != null && week != null)
+            _NextWorkout(program: program, day: day, week: week, resume: resume)
+          else
+            Text(
+              program.totalDays == 0
+                  ? 'Add training days to this program to get started.'
+                  : 'No unfinished workouts. View your program to review or repeat a day.',
+              style: const TextStyle(color: AppColors.textSoft),
+            ),
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProgramDetailScreen(program: program),
+              ),
+            ),
+            child: const Text('View program'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NextWorkout extends StatelessWidget {
+  const _NextWorkout({
+    required this.program,
+    required this.day,
+    required this.week,
+    required this.resume,
+  });
+  final TrainingProgram program;
+  final ProgramDay day;
+  final ProgramWeek week;
+  final bool resume;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        resume ? 'Workout in progress' : 'Next workout',
+        style: const TextStyle(color: AppColors.textSoft),
+      ),
+      const SizedBox(height: AppSpacing.xs),
+      Text(
+        'Week ${week.weekNumber} · ${day.name}',
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      if (day.dayOfWeek != null && day.dayOfWeek! >= 1 && day.dayOfWeek! <= 7)
+        Text(
+          'Scheduled ${programWeekday(day.dayOfWeek!)}',
+          style: const TextStyle(color: AppColors.textSoft),
+        ),
+      Text(
+        '${day.exercises.length} exercises',
+        style: const TextStyle(color: AppColors.textSoft),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(56),
+            padding: const EdgeInsets.all(AppSpacing.md),
+          ),
+          label: Text(
+            resume ? 'Resume workout' : 'Start next workout',
+            textAlign: TextAlign.center,
+          ),
+          icon: const Icon(Icons.play_arrow_rounded),
+          onPressed: () => startProgramWorkout(
+            context,
+            programId: program.id,
+            day: day,
+            week: week,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _ProgramsHeading extends StatelessWidget {
+  const _ProgramsHeading({required this.followed, required this.onNew});
+  final bool followed;
+  final VoidCallback onNew;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: AppSpacing.md,
+    runSpacing: AppSpacing.sm,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      const Text(
+        'Your programs',
+        style: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      if (followed)
+        TextButton.icon(
+          onPressed: onNew,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('New program'),
+        ),
+    ],
+  );
 }

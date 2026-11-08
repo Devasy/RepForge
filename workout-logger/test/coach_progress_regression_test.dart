@@ -8,8 +8,61 @@ import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'package:repforge/services/settings_provider.dart';
 import 'package:repforge/services/ai/gemini_ai_service.dart';
 import 'test_utils/mock_storage_service.dart';
+import 'test_utils/mock_ml_service.dart';
 
 void main() {
+  test(
+    'overview counts every session once and keeps chronological endpoints',
+    () async {
+      final storage = MockStorageService();
+      final now = DateTime.now();
+      for (var i = 0; i < 501; i++) {
+        storage.addMockSession(
+          WorkoutSession(
+            id: 'indexed-$i',
+            date: now.subtract(Duration(hours: i)),
+            duration: 30,
+            exercises: [
+              ExerciseLog(
+                exerciseId: 'bench_press',
+                sets: [WorkoutSet(weight: i.toDouble(), reps: 8)],
+              ),
+              ExerciseLog(
+                exerciseId: 'bench_press',
+                sets: [WorkoutSet(weight: 1, reps: 8)],
+              ),
+            ],
+          ),
+        );
+      }
+      final wp = WorkoutProvider(
+        storage,
+        mlService: MockMLService(),
+        programManager: ProgramManager(storage),
+      );
+      await wp.init();
+      addTearDown(wp.dispose);
+      final tools = CoachToolService(
+        workoutProvider: wp,
+        prManager: PRManager(storage),
+      );
+      final result = await tools.handleCall(
+        FunctionCall('get_progress_overview', {
+          'days': 30,
+          'muscle_groups': ['Chest', 'Triceps'],
+        }),
+      );
+      final chest = (result['coverage'] as List).first as Map;
+      final lift = (chest['exercises'] as List).single as Map;
+      expect(lift['session_count'], 501);
+      expect(
+        (lift['earliest_session_in_window'] as Map)['sets'][0]['weight'],
+        500,
+      );
+      expect((lift['latest_session_in_window'] as Map)['sets'][0]['weight'], 0);
+    },
+  );
+
   test(
     'complex six-month analysis retains baseline, incline work and coverage gaps',
     () async {

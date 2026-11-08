@@ -7,6 +7,10 @@ import 'package:uuid/uuid.dart';
 import '../../debug_log_buffer.dart';
 import 'langfuse_config.dart';
 
+String newTraceId() => const Uuid().v4().replaceAll('-', '');
+
+String newSpanId() => newTraceId().substring(0, 16);
+
 class LangfuseService extends ChangeNotifier {
   LangfuseService({
     Future<String?> Function()? read,
@@ -160,7 +164,7 @@ class LangfuseService extends ChangeNotifier {
     String? parentSpanId,
   }) => {
     'traceId': traceId,
-    'spanId': spanId ?? const Uuid().v4().replaceAll('-', '').substring(0, 16),
+    'spanId': spanId ?? newSpanId(),
     'parentSpanId': ?parentSpanId,
     'name': name,
     'kind': 1,
@@ -235,7 +239,7 @@ class LangfuseService extends ChangeNotifier {
     await _send(
       candidate,
       _span(
-        traceId: const Uuid().v4().replaceAll('-', ''),
+        traceId: newTraceId(),
         name: 'RepForge connection test',
         started: DateTime.now(),
         attributes: {'langfuse.observation.type': 'span'},

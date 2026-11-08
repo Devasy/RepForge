@@ -30,89 +30,71 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<WorkoutProvider>();
+    final provider = context.read<WorkoutProvider>();
+    context.select<WorkoutProvider, int>((p) => p.sessions.length);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        iconTheme: const IconThemeData(color: AppColors.textSoft),
-        title: Text(
-          _program.name,
-          style: const TextStyle(color: AppColors.textPrimary),
+    return ListenableBuilder(
+      listenable: provider.programManager,
+      builder: (context, _) => Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          iconTheme: const IconThemeData(color: AppColors.textSoft),
+          title: Text(
+            _program.name,
+            style: const TextStyle(color: AppColors.textPrimary),
+          ),
+          actions: [
+            PopupMenuButton<String>(
+              color: AppColors.cardHigh,
+              onSelected: _handleMenuAction,
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'edit', child: Text('Edit program')),
+                const PopupMenuItem(
+                  value: 'export',
+                  child: Text(
+                    'Export JSON',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text(
+                    'Delete',
+                    style: TextStyle(color: AppColors.error),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        actions: [
-          PopupMenuButton<String>(
-            color: AppColors.cardHigh,
-            onSelected: _handleMenuAction,
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'edit', child: Text('Edit program')),
-              const PopupMenuItem(
-                value: 'export',
-                child: Text(
-                  'Export JSON',
-                  style: TextStyle(color: AppColors.textPrimary),
-                ),
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeader()),
+            if (provider.programManager.followedProgram?.id != _program.id)
+              SliverToBoxAdapter(
+                child: _FollowButton(onFollow: _followProgram),
               ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('Delete', style: TextStyle(color: AppColors.error)),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(child: _buildHeader()),
-          if (provider.programManager.followedProgram?.id != _program.id)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: FilledButton.icon(
-                  onPressed: _followProgram,
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Follow program'),
+            if (_program.phases.isNotEmpty)
+              SliverToBoxAdapter(child: _buildPhaseTimeline()),
+            const SliverToBoxAdapter(child: _WeeksHeading()),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => ProgramWeekTile(
+                  key: ValueKey('week_$index'),
+                  week: _program.weeks[index],
+                  weekIndex: index,
+                  program: _program,
+                  provider: provider,
+                  onStartDay: _startProgramDayWorkout,
                 ),
+                childCount: _program.weeks.length,
               ),
             ),
-          if (_program.phases.isNotEmpty)
-            SliverToBoxAdapter(child: _buildPhaseTimeline()),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.sm,
-              ),
-              child: const Text(
-                'WEEKS',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => ProgramWeekTile(
-                key: ValueKey('week_$index'),
-                week: _program.weeks[index],
-                weekIndex: index,
-                program: _program,
-                provider: provider,
-                onStartDay: _startProgramDayWorkout,
-              ),
-              childCount: _program.weeks.length,
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
-        ],
+            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
+          ],
+        ),
       ),
     );
   }
@@ -466,4 +448,42 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
       ),
     );
   }
+}
+
+class _FollowButton extends StatelessWidget {
+  const _FollowButton({required this.onFollow});
+  final VoidCallback onFollow;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+    child: FilledButton.icon(
+      onPressed: onFollow,
+      icon: const Icon(Icons.play_arrow_rounded),
+      label: const Text('Follow program'),
+    ),
+  );
+}
+
+class _WeeksHeading extends StatelessWidget {
+  const _WeeksHeading();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.fromLTRB(
+      AppSpacing.md,
+      AppSpacing.md,
+      AppSpacing.md,
+      AppSpacing.sm,
+    ),
+    child: Text(
+      'WEEKS',
+      style: TextStyle(
+        color: AppColors.textMuted,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.2,
+      ),
+    ),
+  );
 }

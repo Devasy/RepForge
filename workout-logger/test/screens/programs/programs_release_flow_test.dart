@@ -80,6 +80,20 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('detail follows manager changes without workout notifications', (
+    tester,
+  ) async {
+    await provider.programManager.saveProgram(program);
+    await pump(tester, ProgramDetailScreen(program: program));
+    expect(find.text('Follow program'), findsOneWidget);
+    await provider.programManager.followProgram(program.id);
+    await tester.pumpAndSettle();
+    expect(find.text('Follow program'), findsNothing);
+    await provider.programManager.followProgram(null);
+    await tester.pumpAndSettle();
+    expect(find.text('Follow program'), findsOneWidget);
+  });
+
   testWidgets('empty state has one action and labelled offline choices', (
     tester,
   ) async {

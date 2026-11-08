@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:ai_orchestration/ai_orchestration.dart';
-import 'package:uuid/uuid.dart';
 import 'langfuse_service.dart';
 import '../gemini_ai_service.dart';
 
@@ -9,8 +8,8 @@ class AgentTracing {
   final LangfuseService service;
   final String sessionId;
   final Map<String, Object?> metadata;
-  final traceId = const Uuid().v4().replaceAll('-', '');
-  final rootSpanId = const Uuid().v4().replaceAll('-', '').substring(0, 16);
+  final traceId = newTraceId();
+  final rootSpanId = newSpanId();
   final started = DateTime.now();
   Object? input, output;
   bool _finished = false;

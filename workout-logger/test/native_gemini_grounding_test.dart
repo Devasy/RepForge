@@ -401,7 +401,7 @@ void main() {
           contains('functionDeclarations'),
         );
       }
-      service.init('another-key', model: 'gemini-3.8-flash');
+      service.updateApiKey('another-key');
       expect(service.supportsWebGrounding, isTrue);
     },
   );

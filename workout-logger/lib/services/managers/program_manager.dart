@@ -134,6 +134,8 @@ class ProgramManager extends ChangeNotifier {
   }
 
   Future<void> deleteProgram(String id) async {
+    // Clear the persisted choice first so recreating this ID cannot silently follow it.
+    if (_followedProgramId == id) await followProgram(null);
     await _storage.deleteTrainingProgram(id);
     _programs.removeWhere((p) => p.id == id);
     notifyListeners();

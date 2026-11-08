@@ -53,7 +53,9 @@ class GeminiContextBuilder {
         'with add_custom_exercise first, then reference it by name.',
       )
       ..writeln(
-        'Weights are in $unitLabel. Format normal replies with Markdown (lists, '
+        'Stored workout weights and tool loads are in kilograms (kg). Convert them '
+        'to the preferred display unit ($unitLabel) in replies. '
+        'Format normal replies with Markdown (lists, '
         'bold, tables) where it aids clarity.',
       )
       ..writeln()
@@ -134,7 +136,10 @@ class GeminiContextBuilder {
         'Your only job is to analyse and improve a specific workout routine '
         'based on the user\'s real performance data and stated preferences.',
       )
-      ..writeln('Today is $today. Weights are in $unitLabel.')
+      ..writeln(
+        'Today is $today. Stored workout weights and tool loads are in kilograms (kg). '
+        'Convert them to the preferred display unit ($unitLabel) in replies.',
+      )
       ..writeln()
       ..writeln('STRICT WORKFLOW — execute in this order every time:')
       ..writeln(

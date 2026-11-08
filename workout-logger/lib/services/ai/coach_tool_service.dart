@@ -928,6 +928,8 @@ class CoachToolService {
       return {'error': 'Provide the requested window in days.'};
     }
     final days = (args['days'] as num).toInt().clamp(1, 3650);
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final sessionIndex = _indexSessions(cutoff);
     final rawGroups = args['muscle_groups'];
     final requested = [
       for (final group in rawGroups is List ? rawGroups : const [])
@@ -949,7 +951,10 @@ class CoachToolService {
           ];
     final coverage = <Map<String, Object?>>[];
     for (final name in groups.take(20).toSet()) {
-      final discovered = _loggedExercises({'muscle_group': name, 'days': days});
+      final discovered = _loggedExercises({
+        'muscle_group': name,
+        'days': days,
+      }, sessionIndex: sessionIndex);
       if (discovered['error'] != null) {
         coverage.add({'muscle_group': name, ...discovered});
         continue;
@@ -971,15 +976,17 @@ class CoachToolService {
               ...e,
               'earliest_session_in_window': _setHistory(
                 e['exercise_id'] as String,
-                DateTime.now().subtract(Duration(days: days)),
+                cutoff,
                 1,
                 oldestFirst: true,
-              ).first,
+                sessionIndex: sessionIndex,
+              ).firstOrNull,
               'latest_session_in_window': _setHistory(
                 e['exercise_id'] as String,
-                DateTime.now().subtract(Duration(days: days)),
+                cutoff,
                 1,
-              ).first,
+                sessionIndex: sessionIndex,
+              ).firstOrNull,
             },
         ],
       });
@@ -1088,26 +1095,26 @@ class CoachToolService {
     };
   }
 
-  ({int count, DateTime? latest}) _sessionSummary({
-    required String exerciseId,
-    required DateTime cutoff,
-  }) {
-    var count = 0;
-    DateTime? latest;
-    for (final session in _wp.sessions) {
-      if (session.date.isBefore(cutoff) ||
-          !session.exercises.any((log) => log.exerciseId == exerciseId)) {
-        continue;
+  Map<String, List<WorkoutSession>> _indexSessions(DateTime cutoff) {
+    final index = <String, List<WorkoutSession>>{};
+    final sessions =
+        _wp.sessions.where((s) => !s.date.isBefore(cutoff)).toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
+    for (final session in sessions) {
+      for (final id in session.exercises.map((e) => e.exerciseId).toSet()) {
+        index.putIfAbsent(id, () => []).add(session);
       }
-      count++;
-      if (latest == null || session.date.isAfter(latest)) latest = session.date;
     }
-    return (count: count, latest: latest);
+    return index;
   }
 
-  Map<String, Object?> _loggedExercises(Map<String, Object?> args) {
+  Map<String, Object?> _loggedExercises(
+    Map<String, Object?> args, {
+    Map<String, List<WorkoutSession>>? sessionIndex,
+  }) {
     final days = ((args['days'] as num?)?.toInt() ?? 90).clamp(1, 3650);
     final cutoff = DateTime.now().subtract(Duration(days: days));
+    final indexed = sessionIndex ?? _indexSessions(cutoff);
     final name = (args['muscle_group'] as String?)?.trim();
     MuscleGroup? group;
     if (name != null && name.isNotEmpty) {
@@ -1126,13 +1133,13 @@ class CoachToolService {
           )) {
         continue;
       }
-      final summary = _sessionSummary(exerciseId: exercise.id, cutoff: cutoff);
-      if (summary.count == 0) continue;
+      final sessions = indexed[exercise.id] ?? const <WorkoutSession>[];
+      if (sessions.isEmpty) continue;
       result.add({
         'exercise_id': exercise.id,
         'exercise': exercise.name,
-        'session_count': summary.count,
-        'last_logged_date': _d(summary.latest!),
+        'session_count': sessions.length,
+        'last_logged_date': _d(sessions.last.date),
         'available_handles': exercise.availableHandles,
       });
     }
@@ -1865,17 +1872,25 @@ class CoachToolService {
     DateTime? cutoff,
     int limit, {
     bool oldestFirst = false,
+    Map<String, List<WorkoutSession>>? sessionIndex,
   }) {
-    final sessions =
-        _wp.sessions
-            .where((s) => cutoff == null || !s.date.isBefore(cutoff))
-            .where((s) => s.exercises.any((e) => e.exerciseId == exerciseId))
-            .toList()
-          ..sort(
-            (a, b) => oldestFirst
-                ? a.date.compareTo(b.date)
-                : b.date.compareTo(a.date),
-          );
+    final Iterable<WorkoutSession> sessions;
+    if (sessionIndex != null) {
+      final indexed = sessionIndex[exerciseId] ?? const <WorkoutSession>[];
+      sessions = oldestFirst ? indexed : indexed.reversed;
+    } else {
+      final matching =
+          _wp.sessions
+              .where((s) => cutoff == null || !s.date.isBefore(cutoff))
+              .where((s) => s.exercises.any((e) => e.exerciseId == exerciseId))
+              .toList()
+            ..sort(
+              (a, b) => oldestFirst
+                  ? a.date.compareTo(b.date)
+                  : b.date.compareTo(a.date),
+            );
+      sessions = matching;
+    }
 
     return [
       for (final s in sessions.take(limit))

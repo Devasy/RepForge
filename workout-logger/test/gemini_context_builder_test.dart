@@ -35,7 +35,14 @@ void main() {
         );
 
         expect(prompt, contains('Today is 2026-07-23'));
-        expect(prompt, contains('Weights are in lbs'));
+        expect(prompt, contains('preferred display unit (lbs)'));
+        expect(
+          prompt,
+          contains(
+            'Stored workout weights and tool loads are in kilograms (kg)',
+          ),
+        );
+        expect(prompt, contains('Convert them'));
         expect(prompt, contains('"name":"Devasy"'));
         expect(prompt, contains('RepForge'));
       },
@@ -53,7 +60,12 @@ void main() {
 
         expect(prompt, contains('specialized routine optimizer'));
         expect(prompt, contains('Today is 2026-07-23'));
-        expect(prompt, contains('Weights are in kg'));
+        expect(
+          prompt,
+          contains(
+            'Stored workout weights and tool loads are in kilograms (kg)',
+          ),
+        );
         expect(prompt, contains('"name":"Devasy"'));
       },
     );

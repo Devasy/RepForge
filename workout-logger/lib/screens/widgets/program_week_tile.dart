@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import '../../utils/program_weekday.dart';
 import '../../services/workout_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -457,15 +458,6 @@ class _ProgramWeekTileState extends State<ProgramWeekTile> {
     );
   }
 
-  static const _dayNames = [
-    '',
-    'Mon',
-    'Tue',
-    'Wed',
-    'Thu',
-    'Fri',
-    'Sat',
-    'Sun',
-  ];
-  static String _dayName(int dow) => dow >= 1 && dow <= 7 ? _dayNames[dow] : '';
+  static String _dayName(int dow) =>
+      dow >= 1 && dow <= 7 ? programWeekday(dow).substring(0, 3) : '';
 }

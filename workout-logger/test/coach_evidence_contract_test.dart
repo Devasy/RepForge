@@ -6,6 +6,7 @@ import 'package:repforge/services/managers/pr_manager.dart';
 import 'package:repforge/services/managers/program_manager.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'test_utils/mock_storage_service.dart';
+import 'test_utils/mock_ml_service.dart';
 
 void main() {
   test(
@@ -31,6 +32,7 @@ void main() {
       );
       final provider = WorkoutProvider(
         storage,
+        mlService: MockMLService(),
         programManager: ProgramManager(storage),
       );
       await provider.init();
