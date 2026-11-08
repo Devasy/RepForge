@@ -5,6 +5,24 @@ import 'package:repforge/screens/widgets/web_search_result_card.dart';
 import 'package:repforge/theme/app_theme.dart';
 
 void main() {
+  test('suggestions only open trusted Google HTTPS hosts', () {
+    for (final url in [
+      'https://google.com/search',
+      'https://www.google.com/search',
+      'https://vertexaisearch.cloud.google.com/search',
+    ]) {
+      expect(isGoogleSearchSuggestionUrl(url), isTrue);
+    }
+    for (final url in [
+      'https://google.com.attacker.example',
+      'https://attacker.example/?next=google.com',
+      'http://www.google.com',
+      'javascript:alert(1)',
+      'https://user:password@google.com',
+    ]) {
+      expect(isGoogleSearchSuggestionUrl(url), isFalse);
+    }
+  });
   testWidgets(
     'grounded replies show source links and original Google suggestions at large text',
     (tester) async {

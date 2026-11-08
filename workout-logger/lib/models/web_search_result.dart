@@ -8,6 +8,12 @@ Uri? externalWebUri(String value) {
       : null;
 }
 
+bool isGoogleSearchSuggestionUrl(String value) {
+  final uri = externalWebUri(value);
+  return uri != null &&
+      (uri.host == 'google.com' || uri.host.endsWith('.google.com'));
+}
+
 class WebSearchSource {
   const WebSearchSource({required this.title, required this.url});
   final String title;

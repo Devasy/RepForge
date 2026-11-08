@@ -40,7 +40,11 @@ class ProgramsScreen extends StatelessWidget {
               ),
               children: [
                 if (followed != null)
-                  _buildFollowing(context, followed, provider)
+                  _buildFollowing(
+                    context: context,
+                    program: followed,
+                    provider: provider,
+                  )
                 else if (programs.isNotEmpty) ...[
                   Text(
                     'Choose a program to follow',
@@ -104,27 +108,16 @@ class ProgramsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFollowing(
-    BuildContext context,
-    TrainingProgram program,
-    WorkoutProvider provider,
-  ) {
+  Widget _buildFollowing({
+    required BuildContext context,
+    required TrainingProgram program,
+    required WorkoutProvider provider,
+  }) {
     final manager = provider.programManager;
     final next = manager.nextWorkout(program, provider.sessions);
-    final count = program.weeks.fold<int>(
-      0,
-      (sum, week) =>
-          sum +
-          week.days
-              .where(
-                (day) => manager.isDayCompleted(
-                  program,
-                  week,
-                  day,
-                  provider.sessions,
-                ),
-              )
-              .length,
+    final progress = manager.progressFor(
+      program: program,
+      sessions: provider.sessions,
     );
     final resume =
         provider.hasActiveWorkout && provider.activeProgramId == program.id;
@@ -143,7 +136,7 @@ class ProgramsScreen extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            '$count of ${program.weeks.fold<int>(0, (sum, w) => sum + w.days.where((d) => d.exercises.isNotEmpty).length)} workouts completed',
+            '${progress.completed} of ${progress.total} workouts completed',
             style: const TextStyle(color: AppColors.textSoft),
           ),
           const SizedBox(height: AppSpacing.lg),

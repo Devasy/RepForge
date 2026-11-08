@@ -41,5 +41,8 @@ void main() {
       contains('personal_records(exercise_id, handle, load_encoding_version'),
     );
     expect(decl.description, contains('session_effort'));
+    expect(decl.description, contains('program_id'));
+    expect(decl.description, contains('program_day_id'));
+    expect(decl.description, contains('program_week_number'));
   });
 }

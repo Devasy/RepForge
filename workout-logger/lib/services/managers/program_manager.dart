@@ -30,18 +30,40 @@ class ProgramManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool isDayCompleted(
-    TrainingProgram program,
-    ProgramWeek week,
-    ProgramDay day,
-    List<WorkoutSession> sessions,
-  ) => sessions.any(
+  bool isDayCompleted({
+    required TrainingProgram program,
+    required ProgramWeek week,
+    required ProgramDay day,
+    required List<WorkoutSession> sessions,
+  }) => sessions.any(
     (s) =>
         s.programId == program.id &&
         s.programWeekNumber == week.weekNumber &&
         s.programDayId == day.id &&
         s.exercises.any((e) => e.sets.isNotEmpty),
   );
+
+  ({int completed, int total}) progressFor({
+    required TrainingProgram program,
+    required List<WorkoutSession> sessions,
+  }) {
+    var completed = 0;
+    var total = 0;
+    for (final week in program.weeks) {
+      for (final day in week.days.where((day) => day.exercises.isNotEmpty)) {
+        total++;
+        if (isDayCompleted(
+          program: program,
+          week: week,
+          day: day,
+          sessions: sessions,
+        )) {
+          completed++;
+        }
+      }
+    }
+    return (completed: completed, total: total);
+  }
 
   ({ProgramWeek week, ProgramDay day})? nextWorkout(
     TrainingProgram program,
@@ -52,7 +74,12 @@ class ProgramManager extends ChangeNotifier {
     for (final week in weeks) {
       for (final day in week.days) {
         if (day.exercises.isNotEmpty &&
-            !isDayCompleted(program, week, day, sessions)) {
+            !isDayCompleted(
+              program: program,
+              week: week,
+              day: day,
+              sessions: sessions,
+            )) {
           return (week: week, day: day);
         }
       }

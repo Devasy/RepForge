@@ -129,16 +129,21 @@ class SettingsProvider extends ChangeNotifier {
         ? GeminiBackend.vertexExpress
         : GeminiBackend.aiStudio;
     if (_geminiBackend == GeminiBackend.vertexExpress) {
-      _vertexApiKey = await _readVertexKey() ?? '';
+      try {
+        _vertexApiKey = await _readVertexKey() ?? '';
+      } catch (_) {
+        _vertexApiKey = '';
+        debugPrint(
+          'Vertex API key unavailable; enter it again in AI settings.',
+        );
+      }
     }
     // Retain stable Flash IDs discovered by newer builds. The picker includes
     // the saved selection even when discovery is temporarily unavailable.
     final storedModel = await _storage.getSetting(_modelSettingKey);
     _geminiModel = _isKnownGeminiModel(storedModel)
         ? storedModel!
-        : (_geminiBackend == GeminiBackend.vertexExpress
-              ? 'gemini-3.8-flash'
-              : kDefaultGeminiModel);
+        : _defaultModelFor(_geminiBackend);
     final maxRounds = await _storage.getSetting('geminiMaxToolRounds');
     _allowModelFallbacks =
         await _storage.getSetting('allowModelFallbacks') == 'true';
@@ -260,9 +265,13 @@ class SettingsProvider extends ChangeNotifier {
   /// [setGeminiThinkingLevel]: the picker's onChanged drops this Future, so a
   /// failed write must leave the previously saved model active rather than a
   /// value that only exists in memory.
-  String get _modelSettingKey => _geminiBackend == GeminiBackend.vertexExpress
-      ? 'vertexModel'
-      : 'geminiModel';
+  static String _modelKeyFor(GeminiBackend backend) =>
+      backend == GeminiBackend.vertexExpress ? 'vertexModel' : 'geminiModel';
+  static String _defaultModelFor(GeminiBackend backend) =>
+      backend == GeminiBackend.vertexExpress
+      ? 'gemini-3.8-flash'
+      : kDefaultGeminiModel;
+  String get _modelSettingKey => _modelKeyFor(_geminiBackend);
 
   Future<void> setGeminiModel(String model) async {
     if (!_isKnownGeminiModel(model)) {
@@ -326,15 +335,11 @@ class SettingsProvider extends ChangeNotifier {
     final key = backend == GeminiBackend.vertexExpress
         ? await _readVertexKey() ?? ''
         : '';
-    final savedModel = await _storage.getSetting(
-      backend == GeminiBackend.vertexExpress ? 'vertexModel' : 'geminiModel',
-    );
+    final savedModel = await _storage.getSetting(_modelKeyFor(backend));
     await _storage.saveSetting('geminiBackend', backend.name);
     _geminiModel = _isKnownGeminiModel(savedModel)
         ? savedModel!
-        : (backend == GeminiBackend.vertexExpress
-              ? 'gemini-3.8-flash'
-              : kDefaultGeminiModel);
+        : _defaultModelFor(backend);
     _geminiThinkingLevel = clampThinkingLevel(
       _geminiModel,
       _geminiThinkingLevel,

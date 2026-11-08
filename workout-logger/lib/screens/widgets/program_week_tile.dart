@@ -204,10 +204,10 @@ class _ProgramWeekTileState extends State<ProgramWeekTile> {
 
   Widget _buildDaySection(ProgramDay day, ProgramWeek week) {
     final completed = widget.provider.programManager.isDayCompleted(
-      widget.program,
-      week,
-      day,
-      widget.provider.sessions,
+      program: widget.program,
+      week: week,
+      day: day,
+      sessions: widget.provider.sessions,
     );
     final runs = <List<ProgramExerciseSlot>>[];
     String? currentRunKey;

@@ -513,7 +513,7 @@ class CoachToolService {
     'Run a read-only SQL SELECT query directly against the workout database '
         'for complex questions and to verify contradictory or incomplete tool results (custom joins, filters, '
         'or aggregations). Tables:\n'
-        'sessions(id, date, routine_id, duration_min, notes, hc_synced_at, session_effort)\n'
+        'sessions(id, date, routine_id, duration_min, notes, hc_synced_at, session_effort, program_id, program_day_id, program_week_number)\n'
         'exercise_logs(id, session_id, exercise_id, notes, handle)\n'
         'sets(id, exercise_log_id, weight, reps, is_dropset, drops_json, '
         'time_taken, timestamp, assist_weight, extra_weight, handle, body_weight_at_log, load_mode, load_encoding_version)\n'
@@ -928,20 +928,25 @@ class CoachToolService {
       return {'error': 'Provide the requested window in days.'};
     }
     final days = (args['days'] as num).toInt().clamp(1, 3650);
-    final groups =
-        (args['muscle_groups'] as List?)?.cast<String>() ??
-        [
-          'Chest',
-          'Back',
-          'Shoulders',
-          'Biceps',
-          'Triceps',
-          'Quadriceps',
-          'Hamstrings',
-          'Glutes',
-          'Calves',
-          'Core',
-        ];
+    final rawGroups = args['muscle_groups'];
+    final requested = [
+      for (final group in rawGroups is List ? rawGroups : const [])
+        if (group is String && group.trim().isNotEmpty) group.trim(),
+    ];
+    final groups = requested.isNotEmpty
+        ? requested
+        : [
+            'Chest',
+            'Back',
+            'Shoulders',
+            'Biceps',
+            'Triceps',
+            'Quadriceps',
+            'Hamstrings',
+            'Glutes',
+            'Calves',
+            'Core',
+          ];
     final coverage = <Map<String, Object?>>[];
     for (final name in groups.take(20).toSet()) {
       final discovered = _loggedExercises({'muscle_group': name, 'days': days});
@@ -990,8 +995,7 @@ class CoachToolService {
     };
   }
 
-  // Match parent groups explicitly; subgroup requests remain precise. A log
-  // matches once even when it activates several members of the same group.
+  // Match parent groups explicitly and count each log once; subgroup requests stay precise.
   Set<String> _muscleIds(String id) => switch (id) {
     MuscleGroups.chest => {id, MuscleGroups.upperChest},
     MuscleGroups.back => {id, MuscleGroups.lats, MuscleGroups.lowerBack},
@@ -1084,6 +1088,23 @@ class CoachToolService {
     };
   }
 
+  ({int count, DateTime? latest}) _sessionSummary({
+    required String exerciseId,
+    required DateTime cutoff,
+  }) {
+    var count = 0;
+    DateTime? latest;
+    for (final session in _wp.sessions) {
+      if (session.date.isBefore(cutoff) ||
+          !session.exercises.any((log) => log.exerciseId == exerciseId)) {
+        continue;
+      }
+      count++;
+      if (latest == null || session.date.isAfter(latest)) latest = session.date;
+    }
+    return (count: count, latest: latest);
+  }
+
   Map<String, Object?> _loggedExercises(Map<String, Object?> args) {
     final days = ((args['days'] as num?)?.toInt() ?? 90).clamp(1, 3650);
     final cutoff = DateTime.now().subtract(Duration(days: days));
@@ -1105,13 +1126,13 @@ class CoachToolService {
           )) {
         continue;
       }
-      final history = _setHistory(exercise.id, cutoff, 500);
-      if (history.isEmpty) continue;
+      final summary = _sessionSummary(exerciseId: exercise.id, cutoff: cutoff);
+      if (summary.count == 0) continue;
       result.add({
         'exercise_id': exercise.id,
         'exercise': exercise.name,
-        'session_count': history.length,
-        'last_logged_date': history.first['date'],
+        'session_count': summary.count,
+        'last_logged_date': _d(summary.latest!),
         'available_handles': exercise.availableHandles,
       });
     }

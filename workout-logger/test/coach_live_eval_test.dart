@@ -1,9 +1,4 @@
-// Explicitly opt in: RUN_LIVE_COACH_EVAL=1 flutter test test/coach_live_eval_test.dart
-// Uses synthetic records by default, environment-bound credentials and read tools.
-// COACH_EVAL_BACKUP imports training records from a backup into a temporary DB.
-// COACH_EVAL_CASE=1..5 reruns one scenario; COACH_EVAL_OUTPUT saves evidence.
-// COACH_EVAL_MAX_ROUNDS overrides 8; COACH_EVAL_PRODUCTION_RUNTIME=1 uses app limits.
-// COACH_EVAL_LANGFUSE=1 exports usage-only traces using environment-bound keys.
+// Opt in with RUN_LIVE_COACH_EVAL=1; uses environment credentials and read tools.
 import 'dart:convert';
 import 'dart:io';
 import 'package:ai_orchestration/ai_orchestration.dart' as orchestration;
@@ -167,19 +162,13 @@ void main() {
           prManager: pr,
           sqlQuery: SqlQueryService(path),
         );
-        final writes = {
-          'create_routine',
-          'update_routine',
-          'add_custom_exercise',
-          'update_exercise',
-        };
         final readTools = [
           Tool(
             functionDeclarations: [
               for (final t in tools.buildTools())
                 for (final f
                     in t.functionDeclarations ?? <FunctionDeclaration>[])
-                  if (!writes.contains(f.name)) f,
+                  if (!RepForgeTool.writes.contains(f.name)) f,
             ],
           ),
         ];
@@ -266,12 +255,12 @@ void main() {
 
             final reply = productionRuntime
                 ? productionReply(
-                    ai,
-                    tools,
-                    readTools,
-                    prompts[index],
-                    systemPrompt,
-                    recordCall,
+                    ai: ai,
+                    service: tools,
+                    tools: readTools,
+                    prompt: prompts[index],
+                    systemPrompt: systemPrompt,
+                    callback: recordCall,
                     trace: trace,
                   )
                 : ai.streamCoachReply(
@@ -331,15 +320,14 @@ void main() {
   );
 }
 
-// Match the app's core runtime limits, avoiding the legacy adapter's unrelated
-// two-minute default. Keep the live suite's outer timeout and read-only registry.
-Stream<String> productionReply(
-  GeminiAiService ai,
-  CoachToolService service,
-  List<Tool> tools,
-  String prompt,
-  String systemPrompt,
-  Future<Map<String, Object?>> Function(FunctionCall) callback, {
+// Match app runtime limits while retaining the read-only evaluation registry.
+Stream<String> productionReply({
+  required GeminiAiService ai,
+  required CoachToolService service,
+  required List<Tool> tools,
+  required String prompt,
+  required String systemPrompt,
+  required Future<Map<String, Object?>> Function(FunctionCall) callback,
   AgentTracing? trace,
 }) async* {
   final registry = orchestration.ToolRegistry([
@@ -381,7 +369,11 @@ Stream<String> productionReply(
 }
 
 class ObservedReadTool extends RepForgeTool {
-  ObservedReadTool(super.service, super.declaration, this.callback);
+  ObservedReadTool(super.service, super.declaration, this.callback) {
+    if (definition.effect != orchestration.ToolEffect.read) {
+      throw ArgumentError('Live evaluation only permits read tools');
+    }
+  }
   final Future<Map<String, Object?>> Function(FunctionCall) callback;
   @override
   Future<orchestration.ToolOutcome> execute(

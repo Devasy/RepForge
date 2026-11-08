@@ -106,11 +106,11 @@ class LangfuseService extends ChangeNotifier {
       if (failed) 'langfuse.observation.level': 'ERROR',
     };
     final span = _span(
-      traceId,
-      name,
-      started,
-      attributes,
-      failed,
+      traceId: traceId,
+      name: name,
+      started: started,
+      attributes: attributes,
+      failed: failed,
       spanId: spanId,
       parentSpanId: parentSpanId,
     );
@@ -136,8 +136,7 @@ class LangfuseService extends ChangeNotifier {
     final prompt = source['promptTokenCount'];
     final cached = source['cachedContentTokenCount'];
     return {
-      // Gemini prompt tokens include cached tokens. Export disjoint categories
-      // so Langfuse can apply cache pricing without billing them twice.
+      // Export disjoint input categories so cached tokens are priced once.
       if (prompt is num)
         'input': cached is num ? (prompt - cached).clamp(0, prompt) : prompt,
       if (cached is num) 'input_cached_tokens': cached,
@@ -151,12 +150,12 @@ class LangfuseService extends ChangeNotifier {
     };
   }
 
-  Map<String, Object?> _span(
-    String traceId,
-    String name,
-    DateTime started,
-    Map<String, Object?> attributes,
-    bool failed, {
+  Map<String, Object?> _span({
+    required String traceId,
+    required String name,
+    required DateTime started,
+    required Map<String, Object?> attributes,
+    required bool failed,
     String? spanId,
     String? parentSpanId,
   }) => {
@@ -236,11 +235,11 @@ class LangfuseService extends ChangeNotifier {
     await _send(
       candidate,
       _span(
-        const Uuid().v4().replaceAll('-', ''),
-        'RepForge connection test',
-        DateTime.now(),
-        {'langfuse.observation.type': 'span'},
-        false,
+        traceId: const Uuid().v4().replaceAll('-', ''),
+        name: 'RepForge connection test',
+        started: DateTime.now(),
+        attributes: {'langfuse.observation.type': 'span'},
+        failed: false,
       ),
     );
   }

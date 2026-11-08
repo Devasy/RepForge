@@ -138,7 +138,9 @@ class _GoogleSearchSuggestionsState extends State<GoogleSearchSuggestions> {
             if (request.url == 'about:blank') {
               return NavigationDecision.navigate;
             }
-            openSearchLink(context, request.url);
+            if (isGoogleSearchSuggestionUrl(request.url)) {
+              openSearchLink(context, request.url);
+            }
             return NavigationDecision.prevent;
           },
           onPageFinished: (_) => _measure(),

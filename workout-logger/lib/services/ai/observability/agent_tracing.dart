@@ -39,10 +39,10 @@ class AgentTracing {
     }
   }
 
-  void record(
-    String name,
-    String type,
-    DateTime started, {
+  void record({
+    required String name,
+    required String type,
+    required DateTime started,
     Object? input,
     Object? output,
     Map<String, Object?> details = const {},
@@ -135,9 +135,9 @@ class TracedModel implements ModelProvider {
         }
       }
       trace.record(
-        'Gemini reply',
-        'generation',
-        started,
+        name: 'Gemini reply',
+        type: 'generation',
+        started: started,
         input: {
           'systemPrompt': request.systemPrompt,
           'messages': [
@@ -206,9 +206,9 @@ class _TracedTool implements AgentTool {
       rethrow;
     } finally {
       trace.record(
-        definition.name,
-        'tool',
-        started,
+        name: definition.name,
+        type: 'tool',
+        started: started,
         input: context.call.arguments,
         output: output,
         details: {
