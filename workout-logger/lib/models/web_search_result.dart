@@ -42,7 +42,6 @@ class WebSearchResult {
     'query': query,
     'text': text,
     'sources': sources.map((source) => source.toJson()).toList(),
-    'suggestionsHtml': suggestionsHtml,
   };
 
   factory WebSearchResult.fromJson(Map<String, dynamic> json) =>
@@ -56,6 +55,7 @@ class WebSearchResult {
               ),
             )
             .toList(),
-        suggestionsHtml: json['suggestionsHtml'] as String,
+        // Suggestions are live-only; discard them from older saved chats too.
+        suggestionsHtml: '',
       );
 }

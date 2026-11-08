@@ -5,6 +5,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/programs/programs_screen.dart';
 import 'package:repforge/services/settings_provider.dart';
+import 'package:repforge/services/ai/gemini_ai_service.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'package:repforge/services/managers/pr_manager.dart';
 import 'package:repforge/services/managers/program_manager.dart';
@@ -14,6 +15,31 @@ import 'test_utils/mock_ml_service.dart';
 import 'test_utils/test_harness.dart';
 
 void main() {
+  test(
+    'unreadable Vertex key allows provider selection and replacement',
+    () async {
+      final storage = MockStorageService();
+      String? written;
+      final settings = SettingsProvider(
+        storage,
+        readVertexKey: () async => throw StateError('Keystore unavailable'),
+        writeVertexKey: (key) {
+          written = key;
+          return Future.value();
+        },
+      );
+      addTearDown(settings.dispose);
+      await settings.init();
+      expect(settings.geminiBackend, GeminiBackend.aiStudio);
+      await settings.setGeminiBackend(GeminiBackend.vertexExpress);
+      expect(settings.geminiBackend, GeminiBackend.vertexExpress);
+      expect(settings.activeAiApiKey, isEmpty);
+      expect(await storage.getSetting('geminiBackend'), 'vertexExpress');
+      await settings.setActiveAiApiKey('replacement');
+      expect(written, 'replacement');
+      expect(settings.activeAiApiKey, 'replacement');
+    },
+  );
   test('read-only evaluator rejects every mutating coach tool', () {
     final storage = MockStorageService();
     final provider = WorkoutProvider(

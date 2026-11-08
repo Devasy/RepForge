@@ -407,7 +407,7 @@ void main() {
   );
 
   test(
-    'grounding survives chat persistence with original suggestions and safe source links',
+    'grounding history keeps sources while suggestions remain live-only',
     () {
       final result = parseGeminiGrounding('Evidence summary', {
         ...grounding,
@@ -437,6 +437,14 @@ void main() {
         text: result.text,
         webSearch: result,
       );
+      final encoded = jsonEncode(message.toJson());
+      expect(encoded, isNot(contains('suggestionsHtml')));
+      expect(encoded, isNot(contains(suggestions)));
+      final legacy = WebSearchResult.fromJson({
+        ...result.toJson(),
+        'suggestionsHtml': suggestions,
+      });
+      expect(legacy.suggestionsHtml, isEmpty);
       final saved = ChatMessage.fromJson(
         jsonDecode(jsonEncode(message.toJson())) as Map<String, dynamic>,
       );
@@ -446,7 +454,7 @@ void main() {
       );
       expect(
         saved.copyWith(text: 'Updated').webSearch!.suggestionsHtml,
-        suggestions,
+        isEmpty,
       );
       expect(saved.copyWith(webSearch: null).webSearch, isNull);
       expect(parseGeminiGrounding('Local data only', {}), isNull);

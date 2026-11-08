@@ -129,14 +129,7 @@ class SettingsProvider extends ChangeNotifier {
         ? GeminiBackend.vertexExpress
         : GeminiBackend.aiStudio;
     if (_geminiBackend == GeminiBackend.vertexExpress) {
-      try {
-        _vertexApiKey = await _readVertexKey() ?? '';
-      } catch (_) {
-        _vertexApiKey = '';
-        debugPrint(
-          'Vertex API key unavailable; enter it again in AI settings.',
-        );
-      }
+      _vertexApiKey = await _readVertexKeyOrEmpty();
     }
     // Retain stable Flash IDs discovered by newer builds. The picker includes
     // the saved selection even when discovery is temporarily unavailable.
@@ -331,9 +324,18 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<String> _readVertexKeyOrEmpty() async {
+    try {
+      return await _readVertexKey() ?? '';
+    } catch (_) {
+      debugPrint('Vertex API key unavailable; enter it again in AI settings.');
+      return '';
+    }
+  }
+
   Future<void> setGeminiBackend(GeminiBackend backend) async {
     final key = backend == GeminiBackend.vertexExpress
-        ? await _readVertexKey() ?? ''
+        ? await _readVertexKeyOrEmpty()
         : '';
     final savedModel = await _storage.getSetting(_modelKeyFor(backend));
     await _storage.saveSetting('geminiBackend', backend.name);

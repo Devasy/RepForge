@@ -195,6 +195,10 @@ void main() {
         (m) => m.webSearch != null,
       );
       expect(answer.webSearch!.sources.single.url, 'https://example.org/study');
+      expect(
+        answer.webSearch!.suggestionsHtml,
+        '<div>Google suggestions</div>',
+      );
       await run.send('Create a routine');
       expect(run.pendingInput!.request.kind, 'tool_approval');
       expect(await storage.getAllRoutines(), isEmpty);
@@ -208,11 +212,8 @@ void main() {
         hasLength(1),
       );
       expect(
-        restored.activeMessages
-            .singleWhere((m) => m.webSearch != null)
-            .webSearch!
-            .suggestionsHtml,
-        '<div>Google suggestions</div>',
+        jsonEncode(restored.active!.toJson()),
+        isNot(contains('suggestionsHtml')),
       );
       run.dispose();
     },
