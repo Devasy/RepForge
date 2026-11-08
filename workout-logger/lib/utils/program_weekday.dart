@@ -8,4 +8,5 @@ const programWeekdays = [
   'Sunday',
 ];
 
-String programWeekday(int day) => programWeekdays[day - 1];
+String? programWeekday(int? day) =>
+    day != null && day >= 1 && day <= 7 ? programWeekdays[day - 1] : null;

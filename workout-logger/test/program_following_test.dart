@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/managers/program_manager.dart';
@@ -5,13 +7,31 @@ import 'package:repforge/services/workout_provider.dart';
 import 'test_utils/mock_storage_service.dart';
 import 'test_utils/mock_ml_service.dart';
 
+class _DraftStorage extends MockStorageService {
+  final draftSaved = Completer<void>();
+  @override
+  Future<void> saveSetting(String key, String value) async {
+    await super.saveSetting(key, value);
+    if (key != 'active_workout_draft' ||
+        value.isEmpty ||
+        draftSaved.isCompleted) {
+      return;
+    }
+    final draft = jsonDecode(value) as Map;
+    final logs = draft['currentExerciseLogs'] as List;
+    if (logs.any((log) => (log['sets'] as List).isNotEmpty)) {
+      draftSaved.complete();
+    }
+  }
+}
+
 void main() {
   late MockStorageService storage;
   late WorkoutProvider provider;
   late ProgramManager manager;
   late TrainingProgram program;
   setUp(() async {
-    storage = MockStorageService();
+    storage = _DraftStorage();
     manager = ProgramManager(storage);
     provider = WorkoutProvider(
       storage,
@@ -166,14 +186,20 @@ void main() {
         exerciseIds: ['bench_press'],
       );
       provider.addSet(WorkoutSet(weight: 40, reps: 8));
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      final other = program.copyWith(id: 'other');
+      await manager.saveProgram(other);
+      await manager.followProgram(other.id);
+      await (storage as _DraftStorage).draftSaved.future;
       final restored = WorkoutProvider(
         storage,
         mlService: MockMLService(),
         programManager: ProgramManager(storage),
       );
       await restored.init();
+      addTearDown(restored.dispose);
       expect(restored.activeProgramId, program.id);
+      expect(manager.followedProgram?.id, other.id);
+      expect(restored.programManager.followedProgram?.id, other.id);
       await restored.finishWorkout();
       expect(
         manager.nextWorkout(program, restored.sessions)!.week.weekNumber,

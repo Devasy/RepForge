@@ -93,7 +93,7 @@ class _ProgramPreview extends StatelessWidget {
           for (final day in week.days) ...[
             const SizedBox(height: 8),
             Text(
-              '${day.name}${day.dayOfWeek != null && day.dayOfWeek! >= 1 && day.dayOfWeek! <= 7 ? ' · ${programWeekday(day.dayOfWeek!)}' : ''}',
+              '${day.name}${programWeekday(day.dayOfWeek) != null ? ' · ${programWeekday(day.dayOfWeek)}' : ''}',
               style: Theme.of(context).textTheme.titleSmall,
             ),
             if (day.notes != null) Text(day.notes!),

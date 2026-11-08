@@ -458,6 +458,5 @@ class _ProgramWeekTileState extends State<ProgramWeekTile> {
     );
   }
 
-  static String _dayName(int dow) =>
-      dow >= 1 && dow <= 7 ? programWeekday(dow).substring(0, 3) : '';
+  static String _dayName(int dow) => programWeekday(dow)?.substring(0, 3) ?? '';
 }

@@ -407,8 +407,8 @@ class _FollowedProgramPanel extends StatelessWidget {
             _NextWorkout(program: program, day: day, week: week, resume: resume)
           else
             Text(
-              program.totalDays == 0
-                  ? 'Add training days to this program to get started.'
+              progress.total == 0
+                  ? 'Add training days with exercises to this program to get started.'
                   : 'No unfinished workouts. View your program to review or repeat a day.',
               style: const TextStyle(color: AppColors.textSoft),
             ),
@@ -456,9 +456,9 @@ class _NextWorkout extends StatelessWidget {
           fontWeight: FontWeight.w700,
         ),
       ),
-      if (day.dayOfWeek != null && day.dayOfWeek! >= 1 && day.dayOfWeek! <= 7)
+      if (programWeekday(day.dayOfWeek) case final weekday?)
         Text(
-          'Scheduled ${programWeekday(day.dayOfWeek!)}',
+          'Scheduled $weekday',
           style: const TextStyle(color: AppColors.textSoft),
         ),
       Text(

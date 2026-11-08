@@ -181,6 +181,18 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('0 of 0 workouts completed'), findsOneWidget);
+      expect(
+        find.text(
+          'Add training days with exercises to this program to get started.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'No unfinished workouts. View your program to review or repeat a day.',
+        ),
+        findsNothing,
+      );
     },
   );
 }

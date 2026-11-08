@@ -118,9 +118,11 @@ void main() {
       );
       final wp = WorkoutProvider(
         storage,
+        mlService: MockMLService(),
         programManager: ProgramManager(storage),
       );
       await wp.init();
+      addTearDown(wp.dispose);
       final pr = PRManager(storage);
       await pr.backfillFromSessions(wp.sessions);
       final tools = CoachToolService(workoutProvider: wp, prManager: pr);
@@ -197,7 +199,6 @@ void main() {
         ((recent['coverage'] as List).first as Map)['logged_exercise_count'],
         0,
       );
-      wp.dispose();
     },
   );
 
