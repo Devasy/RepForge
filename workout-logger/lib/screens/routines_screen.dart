@@ -23,7 +23,7 @@ class RoutinesScreen extends StatelessWidget {
         final manager = provider.programManager;
         final followed = manager.followedProgram;
         final programs = [
-          if (followed != null) followed,
+          ?followed,
           ...manager.programs.where((p) => p.id != followed?.id),
         ];
         final routines = provider.routines;
@@ -55,70 +55,7 @@ class RoutinesScreen extends StatelessWidget {
               const AmbientGlow(),
               SafeArea(
                 bottom: false,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final width = constraints.maxWidth - AppSpacing.md * 2;
-                    final columns =
-                        width >= MediaQuery.textScalerOf(context).scale(160) * 2
-                        ? 2
-                        : 1;
-                    return CustomScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      slivers: [
-                        SliverToBoxAdapter(child: _header(context)),
-                        if (cards.isEmpty)
-                          const SliverToBoxAdapter(
-                            child: Padding(
-                              padding: EdgeInsets.all(24),
-                              child: RFEmptyState(
-                                icon: Icons.fitness_center_rounded,
-                                title: 'No training plans yet',
-                                subtitle:
-                                    'Add a routine or program to get started.',
-                              ),
-                            ),
-                          )
-                        else
-                          SliverPadding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                            ),
-                            sliver: SliverList.separated(
-                              itemCount: (cards.length / columns).ceil(),
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: AppSpacing.md),
-                              itemBuilder: (_, row) => IntrinsicHeight(
-                                child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    for (
-                                      var column = 0;
-                                      column < columns;
-                                      column++
-                                    ) ...[
-                                      if (column > 0)
-                                        const SizedBox(width: AppSpacing.md),
-                                      Expanded(
-                                        child:
-                                            row * columns + column <
-                                                cards.length
-                                            ? cards[row * columns + column]
-                                            : const SizedBox(),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        const SliverPadding(
-                          padding: EdgeInsets.only(bottom: 110),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                child: _TrainingGrid(cards: cards, header: _header(context)),
               ),
             ],
           ),
@@ -296,6 +233,79 @@ class RoutinesScreen extends StatelessWidget {
   );
 }
 
+class _TrainingGrid extends StatelessWidget {
+  const _TrainingGrid({required this.cards, required this.header});
+  final List<Widget> cards;
+  final Widget header;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final width = constraints.maxWidth - AppSpacing.md * 2;
+      final columns = width >= MediaQuery.textScalerOf(context).scale(160) * 2
+          ? 2
+          : 1;
+      return CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(child: header),
+          if (cards.isEmpty)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: RFEmptyState(
+                  icon: Icons.fitness_center_rounded,
+                  title: 'No training plans yet',
+                  subtitle: 'Add a routine or program to get started.',
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              sliver: SliverList.separated(
+                itemCount: (cards.length / columns).ceil(),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: AppSpacing.md),
+                itemBuilder: (_, row) => _TrainingRow(
+                  cards: cards,
+                  start: row * columns,
+                  columns: columns,
+                ),
+              ),
+            ),
+          const SliverPadding(padding: EdgeInsets.only(bottom: 110)),
+        ],
+      );
+    },
+  );
+}
+
+class _TrainingRow extends StatelessWidget {
+  const _TrainingRow({
+    required this.cards,
+    required this.start,
+    required this.columns,
+  });
+  final List<Widget> cards;
+  final int start, columns;
+  @override
+  Widget build(BuildContext context) => IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var column = 0; column < columns; column++) ...[
+          if (column > 0) const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: start + column < cards.length
+                ? cards[start + column]
+                : const SizedBox(),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
 class _TrainingCard extends StatelessWidget {
   const _TrainingCard({
     super.key,
@@ -329,31 +339,11 @@ class _TrainingCard extends StatelessWidget {
           children: [
             Icon(icon, color: AppColors.primary, size: 24),
             const Spacer(),
-            PopupMenuButton<String>(
-              tooltip: 'Options for $title',
-              icon: const Icon(
-                Icons.more_horiz_rounded,
-                color: AppColors.textSoft,
-              ),
-              onSelected: (value) {
-                switch (value) {
-                  case 'view':
-                    onOpen();
-                  case 'edit':
-                    onEdit();
-                  case 'optimize':
-                    onOptimize?.call();
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'view', child: Text('View details')),
-                const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                if (onOptimize != null)
-                  const PopupMenuItem(
-                    value: 'optimize',
-                    child: Text('Optimize'),
-                  ),
-              ],
+            _TrainingOptions(
+              title: title,
+              onOpen: onOpen,
+              onEdit: onEdit,
+              onOptimize: onOptimize,
             ),
           ],
         ),
@@ -399,5 +389,38 @@ class _TrainingCard extends StatelessWidget {
         ),
       ],
     ),
+  );
+}
+
+class _TrainingOptions extends StatelessWidget {
+  const _TrainingOptions({
+    required this.title,
+    required this.onOpen,
+    required this.onEdit,
+    this.onOptimize,
+  });
+  final String title;
+  final VoidCallback onOpen, onEdit;
+  final VoidCallback? onOptimize;
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<String>(
+    tooltip: 'Options for $title',
+    icon: const Icon(Icons.more_horiz_rounded, color: AppColors.textSoft),
+    onSelected: (value) {
+      switch (value) {
+        case 'view':
+          onOpen();
+        case 'edit':
+          onEdit();
+        case 'optimize':
+          onOptimize?.call();
+      }
+    },
+    itemBuilder: (_) => [
+      const PopupMenuItem(value: 'view', child: Text('View details')),
+      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+      if (onOptimize != null)
+        const PopupMenuItem(value: 'optimize', child: Text('Optimize')),
+    ],
   );
 }

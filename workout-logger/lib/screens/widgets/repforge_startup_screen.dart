@@ -26,69 +26,12 @@ class RepForgeStartupScreen extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          ClipRect(
-                            child: Align(
-                              heightFactor: 0.6,
-                              child: Image.asset(
-                                'assets/icon/repforge_signal_foreground_v7.png',
-                                width: 240,
-                                height: 240,
-                                excludeFromSemantics: true,
-                              ),
-                            ),
-                          ),
-                          const FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              'RepForge',
-                              style: TextStyle(
-                                fontFamily: 'Geist',
-                                fontSize: 36,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -1.2,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
+                          const _StartupBrand(),
                           const SizedBox(height: 12),
-                          if (error == null) ...[
-                            const Text(
-                              'Preparing your training',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: AppColors.textSoft,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 28),
-                            const SizedBox(
-                              width: 160,
-                              child: LinearProgressIndicator(
-                                minHeight: 3,
-                                color: AppColors.primary,
-                                backgroundColor: AppColors.glass3,
-                                semanticsLabel: 'Loading RepForge',
-                              ),
-                            ),
-                          ] else ...[
-                            Text(
-                              'Could not start RepForge',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              error!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: AppColors.textSoft),
-                            ),
-                            const SizedBox(height: 24),
-                            FilledButton.icon(
-                              onPressed: onRetry,
-                              icon: const Icon(Icons.refresh_rounded),
-                              label: const Text('Retry'),
-                            ),
-                          ],
+                          if (error == null)
+                            const _StartupLoading()
+                          else
+                            _StartupError(error: error!, onRetry: onRetry),
                         ],
                       ),
                     ),
@@ -100,5 +43,96 @@ class RepForgeStartupScreen extends StatelessWidget {
         ),
       ],
     ),
+  );
+}
+
+class _StartupBrand extends StatelessWidget {
+  const _StartupBrand();
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      ClipRect(
+        child: Align(
+          heightFactor: 0.6,
+          child: Image.asset(
+            'assets/icon/repforge_signal_foreground_v7.png',
+            width: 240,
+            height: 240,
+            excludeFromSemantics: true,
+          ),
+        ),
+      ),
+      const FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          'RepForge',
+          style: TextStyle(
+            fontFamily: 'Geist',
+            fontSize: 36,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -1.2,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _StartupLoading extends StatelessWidget {
+  const _StartupLoading();
+
+  @override
+  Widget build(BuildContext context) => const Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        'Preparing your training',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: AppColors.textSoft, fontSize: 14),
+      ),
+      SizedBox(height: 28),
+      SizedBox(
+        width: 160,
+        child: LinearProgressIndicator(
+          minHeight: 3,
+          color: AppColors.primary,
+          backgroundColor: AppColors.glass3,
+          semanticsLabel: 'Loading RepForge',
+        ),
+      ),
+    ],
+  );
+}
+
+class _StartupError extends StatelessWidget {
+  const _StartupError({required this.error, this.onRetry});
+  final String error;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        'Could not start RepForge',
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      const SizedBox(height: 8),
+      Text(
+        error,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: AppColors.textSoft),
+      ),
+      const SizedBox(height: 24),
+      FilledButton.icon(
+        onPressed: onRetry,
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Retry'),
+      ),
+    ],
   );
 }
