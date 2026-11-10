@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/ai/orchestration/agent_change_review.dart';
 import '../../theme/app_theme.dart';
 import 'agent_change_queue.dart';
+import 'agent_change_details.dart';
 
 class AgentRunControls extends StatelessWidget {
   final PendingAgentInput? pending;
@@ -44,11 +45,11 @@ class AgentRunControls extends StatelessWidget {
               title: agentChangeTitle(
                 target.request.payload['tool']! as String,
               ),
-              details: Text(
-                (target.request.payload['arguments']! as Map<String, Object?>)
-                    .entries
-                    .map((e) => '${e.key.replaceAll('_', ' ')}: ${e.value}')
-                    .join('\n'),
+              details: AgentChangeDetails(
+                tool: target.request.payload['tool']! as String,
+                arguments:
+                    target.request.payload['arguments']!
+                        as Map<String, Object?>,
               ),
               onSubmit: (value) => onSubmit(target, value),
             ),

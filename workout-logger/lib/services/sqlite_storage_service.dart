@@ -19,7 +19,7 @@ class SqliteStorageService implements IStorageService {
       _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 7;
+  static const int _dbVersion = 8;
   static const _messageChunkBytes = 64 * 1024;
   static const _conversationChunksSchema =
       '''CREATE TABLE conversation_message_chunks (
@@ -132,7 +132,10 @@ class SqliteStorageService implements IStorageService {
       duration_min INTEGER NOT NULL,
       notes TEXT,
       hc_synced_at TEXT,
-      session_effort INTEGER
+      session_effort INTEGER,
+      program_id TEXT,
+      program_day_id TEXT,
+      program_week_number INTEGER
     )''',
     '''CREATE TABLE exercise_logs (
       id TEXT PRIMARY KEY,
@@ -350,6 +353,27 @@ class SqliteStorageService implements IStorageService {
             await db.execute('DROP TABLE legacy_personal_records');
           }
         }
+        if (oldVersion < 8) {
+          final hasSessions = (await db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sessions'",
+          )).isNotEmpty;
+          if (hasSessions) {
+            final columns = (await db.rawQuery(
+              'PRAGMA table_info(sessions)',
+            )).map((row) => row['name']).toSet();
+            for (final column in const {
+              'program_id': 'TEXT',
+              'program_day_id': 'TEXT',
+              'program_week_number': 'INTEGER',
+            }.entries) {
+              if (!columns.contains(column.key)) {
+                await db.execute(
+                  'ALTER TABLE sessions ADD COLUMN ${column.key} ${column.value}',
+                );
+              }
+            }
+          }
+        }
         if (oldVersion < 7) {
           await db.execute(_conversationChunksSchema);
           final exists = await db.rawQuery(
@@ -439,6 +463,9 @@ class SqliteStorageService implements IStorageService {
         'id': session.id,
         'date': session.date.toIso8601String(),
         'routine_id': session.routineId,
+        'program_id': session.programId,
+        'program_day_id': session.programDayId,
+        'program_week_number': session.programWeekNumber,
         'duration_min': session.duration,
         'notes': session.notes,
         'hc_synced_at': session.hcSyncedAt?.toIso8601String(),
@@ -554,6 +581,9 @@ class SqliteStorageService implements IStorageService {
           id: sessionId,
           date: DateTime.parse(row['date'] as String),
           routineId: row['routine_id'] as String?,
+          programId: row['program_id'] as String?,
+          programDayId: row['program_day_id'] as String?,
+          programWeekNumber: row['program_week_number'] as int?,
           exercises: exerciseLogs,
           duration: row['duration_min'] as int,
           notes: row['notes'] as String?,

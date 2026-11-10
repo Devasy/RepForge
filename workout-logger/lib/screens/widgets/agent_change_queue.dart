@@ -2,8 +2,11 @@ import 'package:ai_orchestration_flutter/ai_orchestration_flutter.dart';
 import 'package:flutter/material.dart';
 import '../../services/ai/orchestration/agent_change_review.dart';
 import '../../theme/app_theme.dart';
+import 'agent_change_details.dart';
 
 String agentChangeTitle(String tool) => switch (tool) {
+  'create_training_program' => 'Create training program',
+  'follow_training_program' => 'Follow training program',
   'create_routine' => 'Create routine',
   'update_routine' => 'Update routine',
   'add_custom_exercise' => 'Create exercise',
@@ -88,14 +91,9 @@ class _ChangeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final target = pending;
-    final details = Text(
-      change.call.arguments.entries
-          .where((e) => e.value != null)
-          .map(
-            (e) =>
-                '${e.key.replaceAll('_', ' ')}: ${e.value is List ? (e.value! as List).join(', ') : e.value}',
-          )
-          .join('\n'),
+    final details = AgentChangeDetails(
+      tool: change.call.name,
+      arguments: change.call.arguments,
     );
     final title = agentChangeTitle(change.call.name);
     final active =

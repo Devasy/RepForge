@@ -7,12 +7,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/ai/coach_tool_service.dart';
 import 'package:repforge/services/ai/gemini_ai_service.dart';
+import 'package:repforge/services/ai/observability/langfuse_service.dart';
+import 'package:repforge/services/ai/observability/langfuse_config.dart';
+import 'package:http/testing.dart';
+import 'package:http/http.dart' as http;
 import 'package:repforge/services/ai/orchestration/app_checkpoint_store.dart';
 import 'package:repforge/services/ai/orchestration/repforge_agents.dart';
 import 'package:repforge/services/ai/orchestration/agent_change_review.dart';
 import 'package:repforge/services/ai/sql_query_service.dart';
 import 'package:repforge/services/backup_codec.dart';
 import 'package:repforge/services/interfaces/storage_service_interface.dart';
+import 'package:repforge/services/interfaces/web_grounding_support.dart';
 import 'package:repforge/services/managers/conversation_manager.dart';
 import 'package:repforge/services/managers/pr_manager.dart';
 import 'package:repforge/services/managers/program_manager.dart';
@@ -44,6 +49,13 @@ class ScriptedModel implements ModelProvider {
     }
     yield* Stream.fromIterable(replies.removeAt(0));
   }
+}
+
+class GroundedScriptedModel extends ScriptedModel
+    implements WebGroundingSupport {
+  GroundedScriptedModel(super.replies);
+  @override
+  bool get supportsWebGrounding => true;
 }
 
 List<ModelEvent> question() => [
@@ -135,6 +147,106 @@ void main() {
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+  });
+
+  test(
+    'grounded answers persist while proposed writes still require review',
+    () async {
+      final storage = MockStorageService();
+      final model = GroundedScriptedModel([
+        [
+          const ModelText('Research supports gradual progression.'),
+          ModelFinished(
+            ModelFinishReason.stop,
+            providerData: {
+              'gemini': {
+                'groundingMetadata': {
+                  'webSearchQueries': ['progressive overload review'],
+                  'groundingChunks': [
+                    {
+                      'web': {
+                        'uri': 'https://example.org/study',
+                        'title': 'Study',
+                      },
+                    },
+                  ],
+                  'searchEntryPoint': {
+                    'renderedContent': '<div>Google suggestions</div>',
+                  },
+                },
+              },
+            },
+          ),
+        ],
+        write(),
+        done(),
+      ]);
+      final host = RepForgeAgents(
+        model: model,
+        store: AppCheckpointStore(storage),
+      );
+      final (conversations, run) = await session(storage, host, kind: 'coach');
+      await run.send('Find evidence');
+      expect(
+        model.requests.first.systemPrompt,
+        contains('built-in Gemini tool'),
+      );
+      final answer = conversations.activeMessages.singleWhere(
+        (m) => m.webSearch != null,
+      );
+      expect(answer.webSearch!.sources.single.url, 'https://example.org/study');
+      expect(
+        answer.webSearch!.suggestionsHtml,
+        '<div>Google suggestions</div>',
+      );
+      await run.send('Create a routine');
+      expect(run.pendingInput!.request.kind, 'tool_approval');
+      expect(await storage.getAllRoutines(), isEmpty);
+      await run.submit(run.pendingInput!, false);
+      expect(await storage.getAllRoutines(), isEmpty);
+      final restored = ConversationManager(storage, kind: 'coach');
+      await restored.loadConversations();
+      restored.selectConversation(conversations.active!.id);
+      expect(
+        restored.activeMessages.where((m) => m.webSearch != null),
+        hasLength(1),
+      );
+      expect(
+        jsonEncode(restored.active!.toJson()),
+        isNot(contains('suggestionsHtml')),
+      );
+      run.dispose();
+    },
+  );
+
+  test('enabled tracing cannot bypass the review of workout changes', () async {
+    final storage = MockStorageService();
+    final tracing = LangfuseService(
+      write: (_) async {},
+      clientFactory: () => MockClient((_) async => http.Response('{}', 200)),
+    );
+    addTearDown(tracing.dispose);
+    await tracing.save(
+      const LangfuseConfig(
+        publicKey: 'pk-lf-test-public',
+        secretKey: 'sk-lf-test-secret',
+        enabled: true,
+      ),
+    );
+    final model = ScriptedModel([write(), done()]);
+    final host = RepForgeAgents(
+      model: model,
+      store: AppCheckpointStore(storage),
+      tracing: tracing,
+    );
+    final (_, run) = await session(storage, host, kind: 'coach');
+    addTearDown(run.dispose);
+    await run.send('Create a routine');
+    expect(run.pendingInput!.request.kind, 'tool_approval');
+    expect(await storage.getAllRoutines(), isEmpty);
+    await run.submit(run.pendingInput!, false);
+    expect(await storage.getAllRoutines(), isEmpty);
+    await tracing.flush();
   });
 
   test(

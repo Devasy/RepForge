@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import '../../utils/program_weekday.dart';
 import '../../services/workout_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -203,6 +204,12 @@ class _ProgramWeekTileState extends State<ProgramWeekTile> {
   }
 
   Widget _buildDaySection(ProgramDay day, ProgramWeek week) {
+    final completed = widget.provider.programManager.isDayCompleted(
+      program: widget.program,
+      week: week,
+      day: day,
+      sessions: widget.provider.sessions,
+    );
     final runs = <List<ProgramExerciseSlot>>[];
     String? currentRunKey;
     List<ProgramExerciseSlot> currentRun = [];
@@ -235,7 +242,10 @@ class _ProgramWeekTileState extends State<ProgramWeekTile> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -256,11 +266,19 @@ class _ProgramWeekTileState extends State<ProgramWeekTile> {
                   ),
                 ),
               ),
+              if (completed)
+                const Text(
+                  'Completed',
+                  style: TextStyle(color: AppColors.secondary),
+                ),
               if (day.dayOfWeek != null) ...[
                 const SizedBox(width: AppSpacing.sm),
                 Text(
                   _dayName(day.dayOfWeek!),
-                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                  ),
                 ),
               ],
             ],
@@ -341,8 +359,9 @@ class _ProgramWeekTileState extends State<ProgramWeekTile> {
   }) {
     final exercise = widget.provider.getExercise(slot.exerciseId);
     final name = exercise?.name ?? slot.exerciseId;
-    final displaySets =
-        week.isDeload ? (slot.sets - week.deloadSetReduction).clamp(1, 99) : slot.sets;
+    final displaySets = week.isDeload
+        ? (slot.sets - week.deloadSetReduction).clamp(1, 99)
+        : slot.sets;
     final displayIntensity = week.isDeload ? week.deloadIntensityFactor : 1.0;
     final repRange = slot.minReps == slot.maxReps
         ? '${slot.minReps}'
@@ -431,11 +450,13 @@ class _ProgramWeekTileState extends State<ProgramWeekTile> {
       children: [
         Icon(icon, size: 11, color: AppColors.textMuted),
         const SizedBox(width: 2),
-        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+        ),
       ],
     );
   }
 
-  static const _dayNames = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  static String _dayName(int dow) => dow >= 1 && dow <= 7 ? _dayNames[dow] : '';
+  static String _dayName(int dow) => programWeekday(dow)?.substring(0, 3) ?? '';
 }

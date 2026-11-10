@@ -71,11 +71,15 @@ class SqlQueryService {
     }
     for (final id in _forbiddenIdentifiers) {
       if (RegExp('\\b$id\\b').hasMatch(upper)) {
-        throw SqlValidationException('Query references a restricted table: $id');
+        throw SqlValidationException(
+          'Query references a restricted table: $id',
+        );
       }
     }
     if (upper.contains('PRAGMA_')) {
-      throw SqlValidationException('Query references a restricted table: PRAGMA_*');
+      throw SqlValidationException(
+        'Query references a restricted table: PRAGMA_*',
+      );
     }
     return q;
   }
@@ -101,11 +105,17 @@ class SqlQueryService {
       // app's live connection just returns that shared instance. Closing
       // it below would then close the app's only database connection.
       db = await openReadOnlyDatabase(databasePath, singleInstance: false);
-      final rows = await db.rawQuery(
-        'SELECT * FROM (\n$safeQuery\n) LIMIT ?',
-        [cappedLimit],
-      );
-      return {'row_count': rows.length, 'rows': rows};
+      final rows = await db.rawQuery('SELECT * FROM (\n$safeQuery\n) LIMIT ?', [
+        cappedLimit + 1,
+      ]);
+      final truncated = rows.length > cappedLimit;
+      final returned = rows.take(cappedLimit).toList();
+      return {
+        'row_count': returned.length,
+        'rows': returned,
+        'truncated': truncated,
+        'row_limit': cappedLimit,
+      };
     } catch (e) {
       return {'error': 'Query failed: $e'};
     } finally {

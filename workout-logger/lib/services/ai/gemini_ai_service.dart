@@ -1,11 +1,14 @@
 // Gemini settings, usage and generation facade; execution belongs to AgentRuntime.
 
 import 'dart:convert';
+export 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart'
+    show GeminiBackend;
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:ai_orchestration_gemini/ai_orchestration_gemini.dart';
 import 'ai_failure.dart';
 import '../debug_log_buffer.dart';
 import 'orchestration/legacy_chat.dart';
+import '../interfaces/web_grounding_support.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
     show Content, FunctionCall, Tool;
@@ -25,6 +28,7 @@ const kGeminiModels = [
   ('gemini-3.5-flash', 'Gemini 3.5 Flash'),
   ('gemini-3.6-flash', 'Gemini 3.6 Flash'),
   ('gemini-3.7-flash', 'Gemini 3.7 Flash'),
+  ('gemini-3.8-flash', 'Gemini 3.8 Flash'),
 ];
 
 // Ordered fastest/cheapest → most thorough. Matches the Gemini API's own
@@ -115,7 +119,7 @@ List<Object?> buildGeminiChatContents(
 }
 
 class GeminiAiService extends ChangeNotifier
-    implements IAiService, ModelProvider {
+    implements IAiService, ModelProvider, WebGroundingSupport {
   // Optional storage so cumulative token usage survives restarts.
   final IStorageService? _storage;
 
@@ -130,8 +134,19 @@ class GeminiAiService extends ChangeNotifier
   static const String _usageKey = 'aiTokenUsage';
 
   String _apiKey = '';
+  GeminiBackend _backend = GeminiBackend.aiStudio;
+  GeminiBackend get backend => _backend;
+  Map<String, dynamic> get effectiveThinkingConfig => _thinkingConfig;
   String _model = kDefaultGeminiModel;
+  final _unavailableGoogleSearchModels = <String>{};
   int _maxToolRounds = kDefaultMaxToolRounds;
+  bool _allowModelFallbacks = false;
+  bool get allowModelFallbacks => _allowModelFallbacks;
+  void updateAllowModelFallbacks(bool enabled) {
+    _allowModelFallbacks = enabled;
+    notifyListeners();
+  }
+
   String _thinkingLevel = kDefaultThinkingLevel;
 
   // Cumulative token usage across all AI calls (persisted).
@@ -168,13 +183,18 @@ class GeminiAiService extends ChangeNotifier
   void init(
     String apiKey, {
     String model = kDefaultGeminiModel,
+    GeminiBackend backend = GeminiBackend.aiStudio,
     int maxToolRounds = kDefaultMaxToolRounds,
     String thinkingLevel = kDefaultThinkingLevel,
+    bool allowModelFallbacks = false,
   }) {
+    _unavailableGoogleSearchModels.clear();
+    _backend = backend;
     _apiKey = apiKey.trim();
     DebugLogBuffer.instance.protect(_apiKey);
     _model = model;
     _maxToolRounds = maxToolRounds.clamp(kMinMaxToolRounds, kMaxMaxToolRounds);
+    _allowModelFallbacks = allowModelFallbacks;
     _thinkingLevel = clampThinkingLevel(_model, thinkingLevel);
   }
 
@@ -242,8 +262,14 @@ class GeminiAiService extends ChangeNotifier
     );
   }
 
+  void updateBackend(GeminiBackend backend, String key) {
+    _backend = backend;
+    updateApiKey(key);
+  }
+
   void updateApiKey(String key) {
     _apiKey = key.trim();
+    _unavailableGoogleSearchModels.clear();
     DebugLogBuffer.instance.protect(_apiKey);
     notifyListeners();
   }
@@ -351,17 +377,31 @@ class GeminiAiService extends ChangeNotifier
     imageMimeType: imageMimeType,
   );
 
-  GeminiModelProvider _modelProvider() => GeminiModelProvider(
+  @override
+  bool get supportsWebGrounding =>
+      supportsGeminiWebGrounding(_model) &&
+      !_unavailableGoogleSearchModels.contains(_model);
+
+  GeminiModelProvider _modelProvider({
+    bool enableWebSearch = true,
+    void Function(JsonMap)? onDiagnostic,
+  }) => GeminiModelProvider(
+    unavailableGoogleSearchModels: _unavailableGoogleSearchModels,
+    googleSearchEnabled: enableWebSearch ? supportsGeminiWebGrounding : null,
     apiKey: _apiKey,
-    onDiagnostic: (event) =>
-        DebugLogBuffer.instance.write('[AI] ${jsonEncode(event)}'),
+    backend: _backend,
+    onDiagnostic: (event) {
+      DebugLogBuffer.instance.write('[AI] ${jsonEncode(event)}');
+      onDiagnostic?.call(event);
+    },
     clientFactory: _modelClientFactory,
     generationConfig: (model) => {
       'thinkingConfig': model.startsWith('gemini-2')
           ? {'thinkingBudget': 0}
           : {'thinkingLevel': clampThinkingLevel(model, _thinkingLevel)},
     },
-    fallbackModel: getFallbackModel,
+    fallbackModel: (model) =>
+        _allowModelFallbacks ? getFallbackModel(model) : null,
     onModelChanged: (model) {
       _model = model;
       _thinkingLevel = clampThinkingLevel(model, _thinkingLevel);
@@ -383,8 +423,9 @@ class GeminiAiService extends ChangeNotifier
   @override
   Stream<ModelEvent> stream(
     ModelRequest request,
-    CancellationToken cancellation,
-  ) => _modelProvider().stream(
+    CancellationToken cancellation, {
+    void Function(JsonMap)? onDiagnostic,
+  }) => _modelProvider(onDiagnostic: onDiagnostic).stream(
     ModelRequest(
       modelId: _model,
       systemPrompt: request.systemPrompt,
@@ -404,7 +445,7 @@ class GeminiAiService extends ChangeNotifier
     String? imageBytesBase64,
     String? imageMimeType,
   }) => legacyChatReply(
-    model: this,
+    model: _modelProvider(enableWebSearch: false),
     modelId: _model,
     maxModelCalls: _maxToolRounds,
     userMessage: userMessage,

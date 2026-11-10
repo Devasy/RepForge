@@ -1,11 +1,13 @@
 // Settings Provider - User preferences (weight unit, increments, user profile)
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../data/body_figure.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'ai/gemini_model_catalog.dart';
 import 'ai/gemini_ai_service.dart'
     show
+        GeminiBackend,
         kDefaultMaxToolRounds,
         kMinMaxToolRounds,
         kMaxMaxToolRounds,
@@ -31,8 +33,16 @@ class SettingsProvider extends ChangeNotifier {
   bool _hasSavedGender = false;
   String? _lastSeenVersion;
   String _geminiApiKey = '';
+  String _vertexApiKey = '';
+  GeminiBackend _geminiBackend = GeminiBackend.aiStudio;
+  GeminiBackend get geminiBackend => _geminiBackend;
+  String get activeAiApiKey => _geminiBackend == GeminiBackend.vertexExpress
+      ? _vertexApiKey
+      : _geminiApiKey;
   String _geminiModel = kDefaultGeminiModel;
   int _geminiMaxToolRounds = kDefaultMaxToolRounds;
+  bool _allowModelFallbacks = false;
+  bool get allowModelFallbacks => _allowModelFallbacks;
   String _geminiThinkingLevel = kDefaultThinkingLevel;
   String _weeklyInsights = '';
   DateTime? _weeklyInsightsDate;
@@ -63,7 +73,23 @@ class SettingsProvider extends ChangeNotifier {
   bool get showAdvancedMetrics => _showAdvancedMetrics;
   double get userBodyWeight => _userBodyWeight;
 
-  SettingsProvider(this._storage);
+  SettingsProvider(
+    this._storage, {
+    Future<String?> Function()? readVertexKey,
+    Future<void> Function(String)? writeVertexKey,
+  }) : _readVertexKey =
+           readVertexKey ??
+           (() => const FlutterSecureStorage().read(
+             key: 'repforge.vertex.apiKey',
+           )),
+       _writeVertexKey =
+           writeVertexKey ??
+           ((key) => const FlutterSecureStorage().write(
+             key: 'repforge.vertex.apiKey',
+             value: key,
+           ));
+  final Future<String?> Function() _readVertexKey;
+  final Future<void> Function(String) _writeVertexKey;
 
   Future<void> init() async {
     final unit = await _storage.getSetting('weightUnit');
@@ -98,13 +124,22 @@ class SettingsProvider extends ChangeNotifier {
     _hasSavedGender = UserGender.values.any((value) => value.name == gender);
     _lastSeenVersion = await _storage.getSetting('lastSeenVersion');
     _geminiApiKey = await _storage.getSetting('geminiApiKey') ?? '';
+    _geminiBackend =
+        await _storage.getSetting('geminiBackend') == 'vertexExpress'
+        ? GeminiBackend.vertexExpress
+        : GeminiBackend.aiStudio;
+    if (_geminiBackend == GeminiBackend.vertexExpress) {
+      _vertexApiKey = await _readVertexKeyOrEmpty();
+    }
     // Retain stable Flash IDs discovered by newer builds. The picker includes
     // the saved selection even when discovery is temporarily unavailable.
-    final storedModel = await _storage.getSetting('geminiModel');
+    final storedModel = await _storage.getSetting(_modelSettingKey);
     _geminiModel = _isKnownGeminiModel(storedModel)
         ? storedModel!
-        : kDefaultGeminiModel;
+        : _defaultModelFor(_geminiBackend);
     final maxRounds = await _storage.getSetting('geminiMaxToolRounds');
+    _allowModelFallbacks =
+        await _storage.getSetting('allowModelFallbacks') == 'true';
     // Clamp on read as well as on write: a stored value from an older build or
     // a hand-edited settings row would otherwise bypass the bounds that
     // setGeminiMaxToolRounds enforces.
@@ -223,6 +258,14 @@ class SettingsProvider extends ChangeNotifier {
   /// [setGeminiThinkingLevel]: the picker's onChanged drops this Future, so a
   /// failed write must leave the previously saved model active rather than a
   /// value that only exists in memory.
+  static String _modelKeyFor(GeminiBackend backend) =>
+      backend == GeminiBackend.vertexExpress ? 'vertexModel' : 'geminiModel';
+  static String _defaultModelFor(GeminiBackend backend) =>
+      backend == GeminiBackend.vertexExpress
+      ? 'gemini-3.8-flash'
+      : kDefaultGeminiModel;
+  String get _modelSettingKey => _modelKeyFor(_geminiBackend);
+
   Future<void> setGeminiModel(String model) async {
     if (!_isKnownGeminiModel(model)) {
       throw ArgumentError.value(
@@ -232,7 +275,7 @@ class SettingsProvider extends ChangeNotifier {
       );
     }
     final previousModel = _geminiModel;
-    await _storage.saveSetting('geminiModel', model);
+    await _storage.saveSetting(_modelSettingKey, model);
     final clamped = clampThinkingLevel(model, _geminiThinkingLevel);
     if (clamped != _geminiThinkingLevel) {
       try {
@@ -242,7 +285,7 @@ class SettingsProvider extends ChangeNotifier {
         // above survives, so a selection the UI reported as failed would come
         // back as the active model on the next launch.
         try {
-          await _storage.saveSetting('geminiModel', previousModel);
+          await _storage.saveSetting(_modelSettingKey, previousModel);
         } catch (e, st) {
           debugPrint('Failed to roll back Gemini model: $e\n$st');
         }
@@ -265,6 +308,12 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setAllowModelFallbacks(bool enabled) async {
+    await _storage.saveSetting('allowModelFallbacks', enabled.toString());
+    _allowModelFallbacks = enabled;
+    notifyListeners();
+  }
+
   /// Persists before committing in memory: the slider's onChangeEnd swallows
   /// a throw from here, so assigning first would leave the provider showing a
   /// level that was never written and never notified.
@@ -272,6 +321,41 @@ class SettingsProvider extends ChangeNotifier {
     final clamped = clampThinkingLevel(_geminiModel, level);
     await _storage.saveSetting('geminiThinkingLevel', clamped);
     _geminiThinkingLevel = clamped;
+    notifyListeners();
+  }
+
+  Future<String> _readVertexKeyOrEmpty() async {
+    try {
+      return await _readVertexKey() ?? '';
+    } catch (_) {
+      debugPrint('Vertex API key unavailable; enter it again in AI settings.');
+      return '';
+    }
+  }
+
+  Future<void> setGeminiBackend(GeminiBackend backend) async {
+    final key = backend == GeminiBackend.vertexExpress
+        ? await _readVertexKeyOrEmpty()
+        : '';
+    final savedModel = await _storage.getSetting(_modelKeyFor(backend));
+    await _storage.saveSetting('geminiBackend', backend.name);
+    _geminiModel = _isKnownGeminiModel(savedModel)
+        ? savedModel!
+        : _defaultModelFor(backend);
+    _geminiThinkingLevel = clampThinkingLevel(
+      _geminiModel,
+      _geminiThinkingLevel,
+    );
+    if (backend == GeminiBackend.vertexExpress) _vertexApiKey = key;
+    _geminiBackend = backend;
+    notifyListeners();
+  }
+
+  Future<void> setActiveAiApiKey(String key) async {
+    if (_geminiBackend == GeminiBackend.aiStudio) return setGeminiApiKey(key);
+    final trimmed = key.trim();
+    await _writeVertexKey(trimmed);
+    _vertexApiKey = trimmed;
     notifyListeners();
   }
 

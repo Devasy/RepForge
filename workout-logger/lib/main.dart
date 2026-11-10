@@ -18,6 +18,7 @@ import 'services/storage_backend_resolver.dart';
 import 'services/ai/sql_query_service.dart';
 import 'services/ml_service.dart';
 import 'services/ai/gemini_ai_service.dart';
+import 'services/ai/observability/langfuse_service.dart';
 import 'services/ai/coach_tool_service.dart';
 import 'services/ai/orchestration/repforge_agents.dart';
 import 'services/ai/orchestration/app_checkpoint_store.dart';
@@ -40,6 +41,7 @@ import 'theme/app_theme.dart';
 import 'genui/a2ui.dart';
 import 'theme/a2ui_app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/widgets/repforge_startup_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/widgets/rf_widgets.dart';
 
@@ -187,6 +189,7 @@ class WorkoutLoggerApp extends StatelessWidget {
           storage: _storageService as SqliteStorageService,
         )
       : null;
+  static final LangfuseService _langfuse = LangfuseService();
   static final GeminiAiService _geminiService = GeminiAiService(
     storage: _storageService,
   );
@@ -195,6 +198,12 @@ class WorkoutLoggerApp extends StatelessWidget {
   );
   static final RepForgeAgents _agents = RepForgeAgents(
     model: _geminiService,
+    tracing: _langfuse,
+    traceParameters: () => {
+      'configuredThinkingLevel': _geminiService.thinkingLevel,
+      'provider': _geminiService.backend.name,
+      'allowModelFallbacks': _geminiService.allowModelFallbacks,
+    },
     store: AppCheckpointStore(_storageService),
     maxModelCalls: () => _geminiService.maxToolRounds,
     modelId: () => _geminiService.currentModel,
@@ -237,6 +246,7 @@ class WorkoutLoggerApp extends StatelessWidget {
         // the future firebase_ai swap point — without a separate provider.
         ChangeNotifierProvider<GeminiAiService>.value(value: _geminiService),
         Provider<RepForgeAgents>.value(value: _agents),
+        ChangeNotifierProvider<LangfuseService>.value(value: _langfuse),
         ChangeNotifierProvider<ConversationManager>.value(
           value: _conversationManager,
         ),
@@ -268,7 +278,7 @@ class WorkoutLoggerApp extends StatelessWidget {
       child: A2UiThemeProvider(
         theme: repforgeA2UiTheme,
         child: MaterialApp(
-          title: 'Workout Logger',
+          title: 'RepForge',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.darkTheme,
           // Above the Navigator, so every route feeds the ambient glow.
@@ -310,17 +320,21 @@ class _AppInitializerState extends State<AppInitializer> {
     final historyManager = context.read<HistoryManager>();
     final prManager = context.read<PRManager>();
     final gemini = context.read<GeminiAiService>();
+    final langfuse = context.read<LangfuseService?>();
     final readiness = context.read<ReadinessManager>();
     final healthDataSync = context.read<HealthDataSyncService?>();
 
     try {
       await provider.init();
       await settings.init();
+      if (kDebugMode) await langfuse?.load();
       gemini.init(
-        settings.geminiApiKey,
+        settings.activeAiApiKey,
+        backend: settings.geminiBackend,
         model: settings.geminiModel,
         maxToolRounds: settings.geminiMaxToolRounds,
         thinkingLevel: settings.geminiThinkingLevel,
+        allowModelFallbacks: settings.allowModelFallbacks,
       );
       try {
         await gemini.loadUsage();
@@ -402,65 +416,16 @@ class _AppInitializerState extends State<AppInitializer> {
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: AppTheme.error),
-              const SizedBox(height: 16),
-              Text(
-                'Failed to initialize app',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _error = null;
-                    _initialized = false;
-                  });
-                  _initializeApp();
-                },
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (!_initialized) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.fitness_center,
-                size: 64,
-                color: AppTheme.primaryColor,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Workout Logger',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 32),
-              const CircularProgressIndicator(color: AppTheme.primaryColor),
-            ],
-          ),
-        ),
+    if (_error != null || !_initialized) {
+      return RepForgeStartupScreen(
+        error: _error,
+        onRetry: () {
+          setState(() {
+            _error = null;
+            _initialized = false;
+          });
+          _initializeApp();
+        },
       );
     }
 

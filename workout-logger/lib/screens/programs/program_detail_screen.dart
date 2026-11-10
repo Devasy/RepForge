@@ -7,8 +7,8 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../services/workout_provider.dart';
 import '../../theme/app_theme.dart';
-import '../workout_flow_screen.dart';
-import '../widgets/workout_conflict_dialog.dart';
+import 'program_designer_screen.dart';
+import 'program_workout_navigation.dart';
 import '../widgets/program_week_tile.dart';
 
 class ProgramDetailScreen extends StatefulWidget {
@@ -31,116 +31,111 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.read<WorkoutProvider>();
+    context.select<WorkoutProvider, int>((p) => p.sessions.length);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        iconTheme: const IconThemeData(color: AppColors.textSoft),
-        title: Text(
-          _program.name,
-          style: const TextStyle(color: AppColors.textPrimary),
+    return ListenableBuilder(
+      listenable: provider.programManager,
+      builder: (context, _) => Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          iconTheme: const IconThemeData(color: AppColors.textSoft),
+          title: Text(
+            _program.name,
+            style: const TextStyle(color: AppColors.textPrimary),
+          ),
+          actions: [
+            PopupMenuButton<String>(
+              color: AppColors.cardHigh,
+              onSelected: _handleMenuAction,
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'edit', child: Text('Edit program')),
+                const PopupMenuItem(
+                  value: 'export',
+                  child: Text(
+                    'Export JSON',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text(
+                    'Delete',
+                    style: TextStyle(color: AppColors.error),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        actions: [
-          PopupMenuButton<String>(
-            color: AppColors.cardHigh,
-            onSelected: _handleMenuAction,
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'export',
-                child: Text(
-                  'Export JSON',
-                  style: TextStyle(color: AppColors.textPrimary),
-                ),
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeader()),
+            if (provider.programManager.followedProgram?.id != _program.id)
+              SliverToBoxAdapter(
+                child: _FollowButton(onFollow: _followProgram),
               ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text(
-                  'Delete',
-                  style: TextStyle(color: AppColors.error),
+            if (_program.phases.isNotEmpty)
+              SliverToBoxAdapter(child: _buildPhaseTimeline()),
+            const SliverToBoxAdapter(child: _WeeksHeading()),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => ProgramWeekTile(
+                  key: ValueKey('week_$index'),
+                  week: _program.weeks[index],
+                  weekIndex: index,
+                  program: _program,
+                  provider: provider,
+                  onStartDay: _startProgramDayWorkout,
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(child: _buildHeader()),
-          if (_program.phases.isNotEmpty)
-            SliverToBoxAdapter(child: _buildPhaseTimeline()),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.sm,
-              ),
-              child: const Text(
-                'WEEKS',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
+                childCount: _program.weeks.length,
               ),
             ),
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => ProgramWeekTile(
-                key: ValueKey('week_$index'),
-                week: _program.weeks[index],
-                weekIndex: index,
-                program: _program,
-                provider: provider,
-                onStartDay: _startProgramDayWorkout,
-              ),
-              childCount: _program.weeks.length,
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
-        ],
+            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
+          ],
+        ),
       ),
     );
   }
 
   Future<void> _startProgramDayWorkout(ProgramDay day, ProgramWeek week) async {
-    final provider = context.read<WorkoutProvider>();
-    StartWorkoutConflictAction conflictAction = StartWorkoutConflictAction.cancel;
-
-    final started = await provider.startWorkoutSafely(
-      exerciseIds: day.exercises.map((slot) => slot.exerciseId).toList(),
-      programDay: day,
-      programWeek: week,
-      onConflict: () async {
-        final action = await showWorkoutConflictDialog(
-          context,
-          workoutStartTime: provider.workoutStartTime ?? DateTime.now(),
-        );
-        conflictAction = action ?? StartWorkoutConflictAction.cancel;
-        return conflictAction;
-      },
+    await startProgramWorkout(
+      context,
+      programId: _program.id,
+      day: day,
+      week: week,
     );
+  }
 
+  Future<void> _editProgram() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProgramDesignerScreen(existing: _program),
+      ),
+    );
     if (!mounted) return;
-    if (started || conflictAction == StartWorkoutConflictAction.resume) {
-      final resumeDay =
-          provider.hasActiveWorkout ? provider.activeProgramDay : day;
-      final resumeWeek =
-          provider.hasActiveWorkout ? provider.activeProgramWeek : week;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => WorkoutFlowScreen(
-            programDay: resumeDay,
-            programWeek: resumeWeek,
-          ),
-        ),
+    final saved = context.read<WorkoutProvider>().programManager.getProgramById(
+      _program.id,
+    );
+    if (saved != null) setState(() => _program = saved);
+  }
+
+  Future<void> _followProgram() async {
+    try {
+      await context.read<WorkoutProvider>().programManager.followProgram(
+        _program.id,
       );
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not follow program. Please try again.'),
+          ),
+        );
+      }
     }
   }
 
@@ -200,7 +195,11 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
             const SizedBox(height: AppSpacing.xs),
             const Row(
               children: [
-                Icon(Icons.download_done_rounded, size: 12, color: AppColors.textMuted),
+                Icon(
+                  Icons.download_done_rounded,
+                  size: 12,
+                  color: AppColors.textMuted,
+                ),
                 SizedBox(width: 4),
                 Text(
                   'Imported',
@@ -334,6 +333,9 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
 
   void _handleMenuAction(String action) {
     switch (action) {
+      case 'edit':
+        _editProgram();
+        break;
       case 'export':
         _exportProgram();
         break;
@@ -446,4 +448,42 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
       ),
     );
   }
+}
+
+class _FollowButton extends StatelessWidget {
+  const _FollowButton({required this.onFollow});
+  final VoidCallback onFollow;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+    child: FilledButton.icon(
+      onPressed: onFollow,
+      icon: const Icon(Icons.play_arrow_rounded),
+      label: const Text('Follow program'),
+    ),
+  );
+}
+
+class _WeeksHeading extends StatelessWidget {
+  const _WeeksHeading();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.fromLTRB(
+      AppSpacing.md,
+      AppSpacing.md,
+      AppSpacing.md,
+      AppSpacing.sm,
+    ),
+    child: Text(
+      'WEEKS',
+      style: TextStyle(
+        color: AppColors.textMuted,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.2,
+      ),
+    ),
+  );
 }

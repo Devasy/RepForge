@@ -9,6 +9,6 @@ void main() {
     await tester.pumpWidget(const WorkoutLoggerApp());
 
     // Verify that our app shows the loading screen
-    expect(find.text('Workout Logger'), findsOneWidget);
+    expect(find.text('RepForge'), findsOneWidget);
   });
 }

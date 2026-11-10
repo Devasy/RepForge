@@ -81,6 +81,11 @@ void main() {
       expect(text, 'Saved.');
       expect(calls, 1);
       expect(bodies, hasLength(2));
+      expect(
+        (bodies.first['tools'] as List).single,
+        contains('functionDeclarations'),
+      );
+      expect(bodies.first.containsKey('toolConfig'), isFalse);
       expect(jsonEncode(bodies.first['contents']), contains('AQID'));
       expect(jsonEncode(bodies.first['contents']), contains('Earlier'));
       final contents = bodies.last['contents'] as List<dynamic>;

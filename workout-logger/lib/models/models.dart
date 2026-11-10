@@ -4,6 +4,7 @@ import 'dart:math' show log, max;
 import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
+import 'web_search_result.dart';
 
 // Sentinel value for copyWith methods to distinguish "not provided" from "null"
 const Object _sentinel = Object();
@@ -473,6 +474,9 @@ class WorkoutSession {
   final String id;
   final DateTime date;
   final String? routineId;
+  final String? programId;
+  final String? programDayId;
+  final int? programWeekNumber;
   final List<ExerciseLog> exercises;
   final int duration; // minutes
   final String? notes;
@@ -489,6 +493,9 @@ class WorkoutSession {
     required this.id,
     required this.date,
     this.routineId,
+    this.programId,
+    this.programDayId,
+    this.programWeekNumber,
     required this.exercises,
     required this.duration,
     this.notes,
@@ -503,6 +510,9 @@ class WorkoutSession {
     'id': id,
     'date': date.toIso8601String(),
     'routineId': routineId,
+    'programId': programId,
+    'programDayId': programDayId,
+    'programWeekNumber': programWeekNumber,
     'exercises': exercises.map((e) => e.toJson()).toList(),
     'duration': duration,
     'notes': notes,
@@ -514,6 +524,9 @@ class WorkoutSession {
     id: json['id'],
     date: DateTime.parse(json['date']),
     routineId: json['routineId'],
+    programId: json['programId'] as String?,
+    programDayId: json['programDayId'] as String?,
+    programWeekNumber: json['programWeekNumber'] as int?,
     exercises: (json['exercises'] as List)
         .map((e) => ExerciseLog.fromJson(e))
         .toList(),
@@ -529,6 +542,9 @@ class WorkoutSession {
     Object? id = _sentinel,
     Object? date = _sentinel,
     Object? routineId = _sentinel,
+    Object? programId = _sentinel,
+    Object? programDayId = _sentinel,
+    Object? programWeekNumber = _sentinel,
     Object? exercises = _sentinel,
     Object? duration = _sentinel,
     Object? notes = _sentinel,
@@ -538,6 +554,13 @@ class WorkoutSession {
     id: id == _sentinel ? this.id : id as String,
     date: date == _sentinel ? this.date : date as DateTime,
     routineId: routineId == _sentinel ? this.routineId : routineId as String?,
+    programId: programId == _sentinel ? this.programId : programId as String?,
+    programDayId: programDayId == _sentinel
+        ? this.programDayId
+        : programDayId as String?,
+    programWeekNumber: programWeekNumber == _sentinel
+        ? this.programWeekNumber
+        : programWeekNumber as int?,
     exercises: exercises == _sentinel
         ? this.exercises
         : exercises as List<ExerciseLog>,
@@ -1222,6 +1245,7 @@ class ChatMessage {
   final List<String>? toolCalls;
   final String? imageBytesBase64;
   final String? imageMimeType;
+  final WebSearchResult? webSearch;
 
   ChatMessage({
     String? id,
@@ -1231,6 +1255,7 @@ class ChatMessage {
     this.toolCalls,
     this.imageBytesBase64,
     this.imageMimeType,
+    this.webSearch,
   }) : id = id ?? _uuid.v4(),
        timestamp = timestamp ?? DateTime.now();
 
@@ -1242,6 +1267,7 @@ class ChatMessage {
     if (toolCalls != null && toolCalls!.isNotEmpty) 'toolCalls': toolCalls,
     if (imageBytesBase64 != null) 'imageBytesBase64': imageBytesBase64,
     if (imageMimeType != null) 'imageMimeType': imageMimeType,
+    if (webSearch != null) 'webSearch': webSearch!.toJson(),
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
@@ -1252,6 +1278,11 @@ class ChatMessage {
     toolCalls: (json['toolCalls'] as List?)?.cast<String>(),
     imageBytesBase64: json['imageBytesBase64'] as String?,
     imageMimeType: json['imageMimeType'] as String?,
+    webSearch: json['webSearch'] == null
+        ? null
+        : WebSearchResult.fromJson(
+            Map<String, dynamic>.from(json['webSearch'] as Map),
+          ),
   );
 
   ChatMessage copyWith({
@@ -1261,8 +1292,12 @@ class ChatMessage {
     Object? toolCalls = _sentinel,
     Object? imageBytesBase64 = _sentinel,
     Object? imageMimeType = _sentinel,
+    Object? webSearch = _sentinel,
   }) => ChatMessage(
     id: id,
+    webSearch: webSearch == _sentinel
+        ? this.webSearch
+        : webSearch as WebSearchResult?,
     role: role == _sentinel ? this.role : role as String,
     text: text == _sentinel ? this.text : text as String,
     timestamp: timestamp == _sentinel ? this.timestamp : timestamp as DateTime,

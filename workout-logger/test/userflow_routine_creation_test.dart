@@ -45,7 +45,7 @@ void main() {
   });
 
   group('Userflow 3: Routine Creation & Management Flow', () {
-    testWidgets('RoutinesScreen renders title, empty state, and new routine button', (tester) async {
+    testWidgets('Training renders its empty state and opens new routine creation', (tester) async {
       await tester.pumpWidget(_buildTestApp(
         workoutProvider: workoutProvider,
         settingsProvider: settingsProvider,
@@ -53,7 +53,14 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Routines'), findsWidgets);
+      expect(find.text('Training'), findsOneWidget);
+      expect(find.text('No training plans yet'), findsOneWidget);
+      await tester.tap(find.text('New'));
+      await tester.pumpAndSettle();
+      expect(find.text('New program'), findsOneWidget);
+      await tester.tap(find.text('New routine'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CreateRoutineScreen), findsOneWidget);
     });
 
     testWidgets('CreateRoutineScreen renders input fields, selects exercise, and saves new routine', (tester) async {

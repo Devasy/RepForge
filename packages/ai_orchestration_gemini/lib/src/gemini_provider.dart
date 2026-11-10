@@ -5,14 +5,27 @@ import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:http/http.dart' as http;
 
 import 'gemini_wire.dart';
+import 'gemini_quota.dart';
 
 class GeminiFailure extends OrchestrationException {
   final bool canRetry;
   const GeminiFailure(super.code, super.message, {this.canRetry = true});
 }
 
+/// Vertex Express uses its own API-key endpoint and ordinary JSON responses.
+enum GeminiBackend {
+  aiStudio,
+  vertexExpress;
+
+  String get label =>
+      this == vertexExpress ? 'Vertex AI Express' : 'Google AI Studio';
+}
+
 class GeminiModelProvider implements ModelProvider {
   final String apiKey;
+  final GeminiBackend backend;
+  final bool Function(String model) googleSearchEnabled;
+  final Set<String> unavailableGoogleSearchModels;
   final http.Client Function() clientFactory;
   final JsonMap Function(String model) generationConfig;
   final String? Function(String model)? fallbackModel;
@@ -27,6 +40,9 @@ class GeminiModelProvider implements ModelProvider {
 
   GeminiModelProvider({
     required this.apiKey,
+    this.backend = GeminiBackend.aiStudio,
+    bool Function(String model)? googleSearchEnabled,
+    Set<String>? unavailableGoogleSearchModels,
     http.Client Function()? clientFactory,
     JsonMap Function(String model)? generationConfig,
     this.fallbackModel,
@@ -38,7 +54,10 @@ class GeminiModelProvider implements ModelProvider {
     this.modelTimeout = const Duration(minutes: 5),
     this.maxRequestTime = const Duration(minutes: 10),
     Duration Function(int attempt)? retryDelay,
-  }) : clientFactory = clientFactory ?? http.Client.new,
+  }) : unavailableGoogleSearchModels =
+           unavailableGoogleSearchModels ?? <String>{},
+       googleSearchEnabled = googleSearchEnabled ?? ((_) => false),
+       clientFactory = clientFactory ?? http.Client.new,
        generationConfig = generationConfig ?? ((_) => const {}),
        retryDelay =
            retryDelay ??
@@ -51,6 +70,19 @@ class GeminiModelProvider implements ModelProvider {
       throw ArgumentError('Invalid request limits.');
     }
   }
+
+  bool _searchEnabled(String model) =>
+      googleSearchEnabled(model) &&
+      !unavailableGoogleSearchModels.contains(model);
+
+  bool _hasServerTools(List<JsonMap> contents) => contents.any((content) {
+    final parts = content['parts'];
+    return parts is List &&
+        parts.whereType<Map<Object?, Object?>>().any(
+          (part) =>
+              part.containsKey('toolCall') || part.containsKey('toolResponse'),
+        );
+  });
 
   @override
   Stream<ModelEvent> stream(
@@ -68,7 +100,10 @@ class GeminiModelProvider implements ModelProvider {
     final parts = <JsonMap>[];
     final ids = <String, Object?>{};
     var usage = <String, Object?>{};
+    final grounding = <String, Object?>{};
     String? finish;
+    String model = request.modelId;
+    String? modelVersion;
     var bytes = 0;
     await for (final event in _request(request, contents, cancellation)) {
       if (event is ModelStatus) {
@@ -76,6 +111,8 @@ class GeminiModelProvider implements ModelProvider {
         continue;
       }
       final chunk = event as JsonMap;
+      model = chunk['_repforgeModel'] as String? ?? model;
+      modelVersion = chunk['modelVersion'] as String? ?? modelVersion;
       bytes += utf8.encode(jsonEncode(chunk)).length;
       if (bytes > 16 * 1024 * 1024) {
         throw const GeminiFailure(
@@ -116,6 +153,9 @@ class GeminiModelProvider implements ModelProvider {
             canRetry: false,
           );
         }
+        if (data['groundingMetadata'] is Map) {
+          grounding.addAll(jsonObject(data['groundingMetadata']));
+        }
         final content = jsonObject(
           data['content'] ?? const <String, Object?>{},
         );
@@ -130,6 +170,32 @@ class GeminiModelProvider implements ModelProvider {
         for (final item in raw) {
           final part = jsonObject(item);
           parts.add(part);
+          final serverTool = part['toolCall'] ?? part['toolResponse'];
+          if (serverTool != null) {
+            final tool = jsonObject(serverTool);
+            final type = tool['toolType'];
+            if (!{'GOOGLE_SEARCH', 'GOOGLE_SEARCH_WEB'}.contains(type)) {
+              throw const GeminiFailure(
+                'model_capability',
+                'An unsupported built-in tool was returned.',
+                canRetry: false,
+              );
+            }
+            if (part['toolCall'] != null) {
+              final queries = jsonObject(tool['args'])['queries'];
+              if (queries is List) grounding['webSearchQueries'] = queries;
+              yield const ModelStatus('Searching the web…');
+            } else {
+              final suggestions = jsonObject(
+                tool['response'],
+              )['search_suggestions'];
+              if (suggestions is String) {
+                grounding['searchEntryPoint'] = {
+                  'renderedContent': suggestions,
+                };
+              }
+            }
+          }
           if (part['thought'] == true) continue;
           if (part['text'] case final String text) {
             if (text.isNotEmpty) yield ModelText(text);
@@ -165,6 +231,8 @@ class GeminiModelProvider implements ModelProvider {
               'thoughtSignature',
               'functionCall',
               'partMetadata',
+              'toolCall',
+              'toolResponse',
             }.contains(key),
           )) {
             throw const GeminiFailure(
@@ -203,7 +271,14 @@ class GeminiModelProvider implements ModelProvider {
       reason,
       usage: usage,
       providerData: {
-        'gemini': {'parts': parts, 'callIds': ids},
+        'gemini': {
+          'provider': backend.name,
+          'model': model,
+          'modelVersion': ?modelVersion,
+          'parts': parts,
+          'callIds': ids,
+          if (grounding.isNotEmpty) 'groundingMetadata': grounding,
+        },
       },
     );
   }
@@ -255,6 +330,7 @@ class GeminiModelProvider implements ModelProvider {
       _diagnose({
         'event': 'request',
         'model': model,
+        'effectiveGenerationConfig': generationConfig(model),
         'attempt': retries + 1,
         'elapsedMs': clock.elapsedMilliseconds,
       });
@@ -288,11 +364,35 @@ class GeminiModelProvider implements ModelProvider {
           'event': 'request_failed',
           'model': model,
           'code': failure.code,
-          if (failure is _HttpFailure) 'status': failure.status,
+          if (failure is _HttpFailure) ...{
+            'status': failure.status,
+            if (failure.quota != null) ...{
+              'quotaKind': failure.quota!.kind,
+              'quotaMetrics': failure.quota!.metrics,
+              'quotaIds': failure.quota!.ids,
+              'quotaZeroLimit': failure.quota!.zeroLimit,
+            },
+          },
           'partial': received,
           'elapsedMs': clock.elapsedMilliseconds,
         });
         if (received || clock.elapsed >= maxRequestTime) rethrow;
+        if (body == null &&
+            failure is _HttpFailure &&
+            failure.quota?.searchOnly == true &&
+            _searchEnabled(model) &&
+            !_hasServerTools(contents)) {
+          unavailableGoogleSearchModels.add(model);
+          _diagnose({
+            'event': 'search_unavailable',
+            'model': model,
+            'reason': 'search_quota',
+          });
+          yield const ModelStatus(
+            'Web search quota reached. Continuing with your workout tools…',
+          );
+          continue;
+        }
         final canSwitch =
             {
               'model_timeout',
@@ -309,15 +409,20 @@ class GeminiModelProvider implements ModelProvider {
             failure is _HttpFailure && failure.dailyQuota;
         if (canSwitch && (immediate || retries >= maxRetries)) {
           final fallback = fallbackModel?.call(model);
-          if (fallback != null && visited.length < 8 && visited.add(fallback)) {
+          final compatible =
+              fallback != null &&
+              (body != null ||
+                  !_hasServerTools(contents) ||
+                  _searchEnabled(fallback));
+          if (compatible && visited.length < 8 && visited.add(fallback)) {
             _diagnose({
               'event': 'fallback',
               'from': model,
               'to': fallback,
               'code': failure.code,
             });
-            yield const ModelStatus(
-              'Gemini is unavailable. Trying another model…',
+            yield ModelStatus(
+              '$model is unavailable. Trying another model: $fallback (${backend.label})…',
             );
             model = fallback;
             retries = 0;
@@ -373,7 +478,10 @@ class GeminiModelProvider implements ModelProvider {
     final attemptClock = Stopwatch()..start();
     var hasPacket = false;
     JsonMap decodePacket(String payload) {
-      final result = _packet(payload);
+      final result = <String, Object?>{
+        ..._packet(payload),
+        '_repforgeModel': model,
+      };
       hasPacket = true;
       return result;
     }
@@ -396,9 +504,15 @@ class GeminiModelProvider implements ModelProvider {
           http.Request(
               'POST',
               Uri.https(
-                'generativelanguage.googleapis.com',
-                '/v1beta/models/$model:${body == null ? 'streamGenerateContent' : 'generateContent'}',
-                body == null ? {'alt': 'sse'} : null,
+                backend == GeminiBackend.vertexExpress
+                    ? 'aiplatform.googleapis.com'
+                    : 'generativelanguage.googleapis.com',
+                backend == GeminiBackend.vertexExpress
+                    ? '/v1/publishers/google/models/$model:generateContent'
+                    : '/v1beta/models/$model:${body == null ? 'streamGenerateContent' : 'generateContent'}',
+                body == null && backend == GeminiBackend.aiStudio
+                    ? {'alt': 'sse'}
+                    : null,
               ),
             )
             ..headers.addAll({
@@ -421,23 +535,36 @@ class GeminiModelProvider implements ModelProvider {
                       'systemInstruction': {
                         'parts': [
                           {'text': request.systemPrompt},
+                          if (!_searchEnabled(model))
+                            {
+                              'text':
+                                  'Web search is unavailable for this request. Use app tools and clearly labeled general knowledge. Do not claim to have searched or verified current sources.',
+                            },
                         ],
                       },
-                      if (request.tools.isNotEmpty)
+                      if (request.tools.isNotEmpty || _searchEnabled(model))
                         'tools': [
-                          {
-                            'functionDeclarations': [
-                              for (final tool in request.tools)
-                                {
-                                  'name': tool.name,
-                                  'description': tool.description,
-                                  'parameters': geminiSchema(
-                                    tool.arguments.definition,
-                                  ),
-                                },
-                            ],
-                          },
+                          if (_searchEnabled(model))
+                            {'googleSearch': <String, Object?>{}},
+                          if (request.tools.isNotEmpty)
+                            {
+                              'functionDeclarations': [
+                                for (final tool in request.tools)
+                                  {
+                                    'name': tool.name,
+                                    'description': tool.description,
+                                    'parameters': geminiSchema(
+                                      tool.arguments.definition,
+                                    ),
+                                  },
+                              ],
+                            },
                         ],
+                      if (_searchEnabled(model))
+                        'toolConfig': {
+                          'includeServerSideToolInvocations': true,
+                          'functionCallingConfig': {'mode': 'VALIDATED'},
+                        },
                       'generationConfig': {
                         ...generationConfig(model),
                         'candidateCount': 1,
@@ -447,20 +574,35 @@ class GeminiModelProvider implements ModelProvider {
       final response = await guard(client.send(outgoing));
       if (response.statusCode != 200) {
         final body = await guard(response.stream.bytesToString());
-        final failure = _statusFailure(response.statusCode);
+        final quota = response.statusCode == 429
+            ? GeminiQuota.parse(body)
+            : null;
+        final failure = quota?.searchOnly == true
+            ? const GeminiFailure(
+                'model_quota',
+                'Google Search quota has been reached. Check your Google AI quota before retrying this research conversation.',
+              )
+            : quota?.zeroLimit == true
+            ? const GeminiFailure(
+                'model_quota',
+                'Gemini reports no available quota for this model. Choose another model or check your Google AI quota and billing.',
+              )
+            : _statusFailure(response.statusCode);
         throw _HttpFailure(
           failure.code,
           failure.message,
           canRetry: failure.canRetry,
           status: response.statusCode,
+          quota: quota,
           dailyQuota:
               response.statusCode == 429 &&
-              (body.toLowerCase().contains('requestsperday') ||
+              (quota?.daily == true ||
+                  body.toLowerCase().contains('requestsperday') ||
                   body.toLowerCase().contains('requests_per_day')),
           retryAfter: _serverDelay(body),
         );
       }
-      if (body != null) {
+      if (body != null || backend == GeminiBackend.vertexExpress) {
         final payload = await guard(response.stream.bytesToString());
         if (utf8.encode(payload).length > 16 * 1024 * 1024) {
           throw const FormatException('Response too large');
@@ -525,7 +667,7 @@ class GeminiModelProvider implements ModelProvider {
 
   void _diagnose(JsonMap event) {
     try {
-      onDiagnostic?.call(event);
+      onDiagnostic?.call({'provider': backend.name, ...event});
     } catch (_) {}
   }
 
@@ -598,6 +740,7 @@ class GeminiModelProvider implements ModelProvider {
 
 class _HttpFailure extends GeminiFailure {
   final bool dailyQuota;
+  final GeminiQuota? quota;
   final int status;
   final Duration? retryAfter;
   const _HttpFailure(
@@ -605,6 +748,7 @@ class _HttpFailure extends GeminiFailure {
     super.message, {
     required super.canRetry,
     required this.dailyQuota,
+    this.quota,
     required this.status,
     this.retryAfter,
   });

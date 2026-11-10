@@ -1,103 +1,25 @@
-# 🎉 RepForge - Build Complete!
+### Features added
+- Find your saved routines and programs together as matching cards in Training, with your followed program first.
+- Start the next unfinished workout from a program card, or resume an in-progress program workout with your logged sets intact.
+- Ask Coach to build a complete program from your conversation and training history. Review the weeks, exercises, sets, reps and rest times before saving; following or switching programs is a separate choice.
+- See Google Search evidence and source links in Coach and Routine Optimizer replies, with Search suggestions on live replies.
+- Connect Gemini using your own Vertex AI Express key, with provider and model settings separate from Google AI Studio.
+- For developers: optionally enable Langfuse traces in debug builds, with secure credentials, usage details and separately optional conversation capture.
 
-## ✅ Build Summary
+### Fixes
+- Update program progress only after a workout with logged sets is saved; deleting that workout makes its program day available again. Cancelled, empty or failed saves do not advance the plan.
+- Clear the followed-program selection when that program is deleted, so recreating it does not silently follow it again.
+- Improve coaching comparisons using the requested dates and actual logged sets; distinguish strength evidence from workout volume and flag missing information.
+- Recover from Search quota failures while keeping workout tools available, and let users replace an unreadable Vertex key without blocking app startup or provider selection.
+- Report uncached, cached, response and thinking-token usage separately when estimating model costs.
 
-Your workout logging app has been successfully built and configured with the following details:
+### Changes
+- The Routines navigation item is now Training. Tap New to add a routine or program; each card's menu keeps details, editing and routine optimization available.
+- A refreshed loading and retry screen uses the RepForge signal mark, dark theme and violet accents.
+- Automatic AI model fallback is optional and off by default; retries using the selected model remain available.
 
-### 📱 App Details
-- **Name:** RepForge
-- **Tagline:** Your personal workout companion to forge strength and track progress
-- **Package ID:** com.devasy.repforge
-- **Version:** 2.0.0 (Build 21)
-
-### 👨‍💻 Developer Information
-- **Name:** Devasy Patel
-- **Email:** patel.devasy.23@gmail.com
-
-### 🎨 Branding
-- **Icon:** Custom minimal dumbbell design
-- **Color Palette:** Modern blue-to-purple gradient (#00D4FF → #8B5CF6)
-- **Style:** Clean, minimal, and professional
-
-### 📦 Build Artifacts
-
-#### Main Release APK
-- **Location:** `RepForge-v2.0.0-release.apk` (root directory)
-- **Type:** Universal APK (all architectures)
-- **Also available at:** `build/app/outputs/flutter-apk/app-release.apk`
-
-### 🚀 Installation Instructions
-
-1. **Transfer the APK** to your Android device:
-   - Use USB cable, email, cloud storage, or any file transfer method
-   - File to transfer: `RepForge-v2.0.0-release.apk`
-
-2. **Enable Installation from Unknown Sources** (if needed):
-   - Go to Settings → Security
-   - Enable "Unknown Sources" or "Install Unknown Apps"
-
-3. **Install the APK**:
-   - Locate the APK file on your device
-   - Tap to install
-   - Follow the on-screen prompts
-
-4. **Launch RepForge** and start your fitness journey! 💪
-
-### 🛠️ What Was Changed
-
-1. **Major UI Refresh:** Cleaner layouts and improved spacing across key screens
-2. **Workout Summary Screen:** Added a recap view for completed sessions
-3. **Theme Enhancements:** Refined color palette for stronger contrast
-4. **Visual Consistency:** Standardized component styling across the app
-5. **Release Metadata:** Version bumped to 2.0.0 (Build 21)
-
-### 📋 Areas Updated
-
-- ✅ UI layouts and component styling
-- ✅ Workout summary flow and post-workout recap
-- ✅ Theme palette and visual hierarchy
-- ✅ Release metadata and versioning
-
-### 🎯 Key Features
-
-Your RepForge app includes:
-- 📊 Comprehensive workout tracking
-- 📈 Progress analytics with beautiful charts
-- 🎯 Goal setting and monitoring
-- 🤖 ML-powered insights
-- 💾 Local storage with Hive
-- 🎨 Modern custom theme
-- 📱 Smooth user experience
-
-### 📚 Documentation
-
-- `README.md` - Full app documentation
-- `BUILD_INFO.md` - Detailed build specifications
-- This file - Quick reference guide
-
-### 🔥 Next Steps
-
-You're all set! Your app is ready for:
-1. ✅ Personal use
-2. ✅ Testing with friends/family
-3. ✅ Further development
-4. 📱 Potential Play Store submission (requires additional setup)
-
-### 💡 Tips
-
-- **Smaller APK?** Build architecture-specific APKs:
-  ```bash
-  flutter build apk --split-per-abi
-  ```
-  
-- **Testing?** Install on multiple devices to ensure compatibility
-
-- **Distribution?** Consider setting up proper signing keys for Play Store release
-
----
-
-**Built on:** May 23, 2026
-**Built with:** Flutter 💙
-**Made by:** Devasy Patel
-
-Enjoy your new workout tracking companion! 🏋️‍♂️💪
+### Known limitations
+- Older workouts are kept, but are not retroactively assigned to program days. Completion tracking uses linked workouts saved by this version.
+- Programs follow their saved week/day order; missed workouts are not automatically rescheduled.
+- Saved chat history keeps answer text and source links; live Google Search suggestion chips are not saved with messages.
+- Langfuse is available only in debug builds. Estimated costs are informational and separate from provider billing.
