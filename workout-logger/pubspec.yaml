@@ -91,6 +91,7 @@ flutter:
   uses-material-design: true
   assets:
     - THIRD_PARTY_NOTICES.md
+    - assets/icon/repforge_signal_foreground_v7.png
 
 
   fonts:

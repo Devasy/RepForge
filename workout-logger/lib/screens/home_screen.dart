@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static const _navItems = [
     FloatingNavItem(icon: Icons.home_rounded,      label: 'Home'),
-    FloatingNavItem(icon: Icons.layers_rounded,    label: 'Routines'),
+    FloatingNavItem(icon: Icons.layers_rounded,    label: 'Training'),
     FloatingNavItem(icon: Icons.history_rounded,   label: 'History'),
     FloatingNavItem(icon: Icons.bar_chart_rounded, label: 'Stats'),
   ];

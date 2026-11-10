@@ -59,7 +59,7 @@ class ProgramsScreen extends StatelessWidget {
                 else ...[
                   _ProgramsHeading(
                     followed: followed != null,
-                    onNew: () => _chooseNewProgram(context),
+                    onNew: () => showCreationOptions(context),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   for (final program in programs)
@@ -76,7 +76,7 @@ class ProgramsScreen extends StatelessWidget {
                   ),
                   child: FloatingActionButton.extended(
                     heroTag: 'new_program',
-                    onPressed: () => _chooseNewProgram(context),
+                    onPressed: () => showCreationOptions(context),
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     icon: const Icon(Icons.add_rounded),
@@ -88,7 +88,7 @@ class ProgramsScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _chooseNewProgram(BuildContext context) async {
+  static Future<void> showCreationOptions(BuildContext context) async {
     final action = await showRFActionSheet<String>(
       context,
       title: 'New program',
@@ -135,7 +135,7 @@ class ProgramsScreen extends StatelessWidget {
     );
   }
 
-  void _openDesigner(BuildContext context, TrainingProgram? existing) {
+  static void _openDesigner(BuildContext context, TrainingProgram? existing) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -144,7 +144,7 @@ class ProgramsScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _openAiGenerator(BuildContext context) async {
+  static Future<void> _openAiGenerator(BuildContext context) async {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const AiProgramGeneratorScreen()),
@@ -166,7 +166,7 @@ class ProgramsScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _openImport(BuildContext context) async {
+  static Future<void> _openImport(BuildContext context) async {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const ImportProgramScreen()),

@@ -41,6 +41,7 @@ import 'theme/app_theme.dart';
 import 'genui/a2ui.dart';
 import 'theme/a2ui_app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/widgets/repforge_startup_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/widgets/rf_widgets.dart';
 
@@ -415,65 +416,16 @@ class _AppInitializerState extends State<AppInitializer> {
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: AppTheme.error),
-              const SizedBox(height: 16),
-              Text(
-                'Could not start RepForge',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _error = null;
-                    _initialized = false;
-                  });
-                  _initializeApp();
-                },
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (!_initialized) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.fitness_center,
-                size: 64,
-                color: AppTheme.primaryColor,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'RepForge',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 32),
-              const CircularProgressIndicator(color: AppTheme.primaryColor),
-            ],
-          ),
-        ),
+    if (_error != null || !_initialized) {
+      return RepForgeStartupScreen(
+        error: _error,
+        onRetry: () {
+          setState(() {
+            _error = null;
+            _initialized = false;
+          });
+          _initializeApp();
+        },
       );
     }
 

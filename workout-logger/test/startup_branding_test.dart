@@ -1,8 +1,11 @@
+import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:repforge/screens/onboarding_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/main.dart';
+import 'package:repforge/screens/widgets/repforge_startup_screen.dart';
+import 'package:repforge/theme/app_theme.dart';
 import 'test_utils/mock_storage_service.dart';
 import 'test_utils/test_harness.dart';
 
@@ -14,6 +17,30 @@ class _WaitingStorage extends MockStorageService {
 }
 
 void main() {
+  testWidgets('branded startup fits narrow large text and landscape', (
+    tester,
+  ) async {
+    for (final size in [const Size(320, 640), const Size(640, 320)]) {
+      await TestHarness.prepareTester(tester, size: size);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: MediaQuery(
+            data: MediaQueryData(
+              size: size,
+              textScaler: const TextScaler.linear(1.8),
+            ),
+            child: const RepForgeStartupScreen(),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('RepForge'), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets('loading and failed startup keep RepForge branding and retry', (
     tester,
   ) async {
@@ -30,6 +57,9 @@ void main() {
     );
     await tester.pump();
     expect(find.text('RepForge'), findsOneWidget);
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.text('Preparing your training'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.text('Workout Logger'), findsNothing);
     storage.ready.completeError(StateError('Storage unavailable'));
     await tester.pumpAndSettle();
