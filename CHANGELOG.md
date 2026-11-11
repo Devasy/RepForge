@@ -9,6 +9,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 ### Features added
 
 - Read skin-temperature deltas and optional baselines written to Health Connect by bridge apps, preserving their source for sleep and workout analysis by the AI coach.
+- Ask Coach to create or edit custom exercises with primary and secondary muscle involvement estimates, with validation of muscle names and weights and clear labelling that these are estimates.
 
 ### Known limitations
 

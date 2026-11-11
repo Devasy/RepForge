@@ -39,6 +39,28 @@ class CoachToolService {
        _hh = healthHistory,
        _sql = sqlQuery;
 
+  static Schema get _muscleActivationsSchema => Schema.array(
+    description:
+        'Optional complete primary and secondary muscle involvement estimates. '
+        'Each muscle must be a known group, appear once, and have an integer '
+        'weight from 1 to 100. Include primary_muscle with the unique highest '
+        'weight. Weights are independent, do not have to sum to 100, and are '
+        'not measured EMG or muscle growth. Omit to retain existing assignments '
+        'on update or use the legacy primary-only default on creation.',
+    nullable: true,
+    items: Schema.object(
+      properties: {
+        'muscle': Schema.string(
+          description: 'Existing muscle group name or ID.',
+        ),
+        'activation_percentage': Schema.integer(
+          description: 'Estimated independent involvement weight, 1 to 100.',
+        ),
+      },
+      requiredProperties: ['muscle', 'activation_percentage'],
+    ),
+  );
+
   /// Tool declaration for the optimizer screen's `ask_user_questions` flow.
   /// NOT included in the coach's tool list — only the optimizer adds it.
   static FunctionDeclaration
@@ -368,7 +390,8 @@ class CoachToolService {
               'wants does not already exist. Match the muscle to an existing '
               'muscle group (call get_muscle_recovery or list routines first '
               'if unsure of the available muscle names). After creating it you '
-              'can reference it by name in create_routine / update_routine.',
+              'can reference it by name in create_routine / update_routine. '
+              'Use muscle_activations for primary and secondary involvement estimates.',
           Schema.object(
             properties: {
               'name': Schema.string(
@@ -384,6 +407,7 @@ class CoachToolService {
                     'Primary muscle group this exercise targets, e.g. "Chest" '
                     'or "Biceps". Must match an existing muscle group.',
               ),
+              'muscle_activations': _muscleActivationsSchema,
               'exercise_type': Schema.string(
                 description:
                     'Optional. Either "weightAndReps" (standard sets/reps) or "timeBased" (duration holds). Defaults to "weightAndReps".',
@@ -404,7 +428,7 @@ class CoachToolService {
           'Modify an existing exercise in the catalogue (both custom exercises and '
               'library exercises). You can update its name, exercise type '
               '("weightAndReps" or "timeBased"), category ("compound" or "isolation"), '
-              'primary muscle group, or available attachments/handles '
+              'primary and secondary muscle involvement, or available attachments/handles '
               '(e.g. ["Rope", "V-Bar", "D-Handles"]).',
           Schema.object(
             properties: {
@@ -428,6 +452,7 @@ class CoachToolService {
                     'Optional. Primary muscle group name (e.g. "Chest", "Biceps").',
                 nullable: true,
               ),
+              'muscle_activations': _muscleActivationsSchema,
               'available_handles': Schema.array(
                 items: Schema.string(),
                 description:
@@ -1693,7 +1718,8 @@ class CoachToolService {
   Future<Map<String, Object?>> _addCustomExercise(
     Map<String, Object?> args,
   ) async {
-    final name = (args['name'] as String?)?.trim() ?? '';
+    final name =
+        (args['name'] as String?)?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
     if (name.isEmpty) return {'error': 'Exercise name cannot be empty.'};
 
     // Reject duplicates so the model reuses the existing exercise instead.
@@ -1759,6 +1785,7 @@ class CoachToolService {
         name: name,
         category: category,
         primaryMuscleGroupId: muscle.id,
+        muscleActivations: _readMuscleActivations(args),
         exerciseType: exerciseType,
         availableHandles: handles?.isEmpty == true ? null : handles,
       );
@@ -1766,11 +1793,16 @@ class CoachToolService {
       return {'error': 'Could not create exercise: $e'};
     }
 
+    final created = _wp.allExercises.firstWhere((e) => e.name == name);
     return {
       'created': true,
+      'exercise_id': created.id,
       'exercise_name': name,
       'category': category,
       'primary_muscle': muscle.name,
+      'muscle_activations': _activationSummary(created),
+      'activation_interpretation':
+          'Estimated involvement, not measured activation or growth.',
       'exercise_type': exerciseType.name,
       if (handles != null && handles.isNotEmpty) 'available_handles': handles,
     };
@@ -1860,6 +1892,7 @@ class CoachToolService {
         name: (newName != null && newName.isNotEmpty) ? newName : null,
         category: (category != null && category.isNotEmpty) ? category : null,
         primaryMuscleGroupId: primaryMuscleId,
+        muscleActivations: _readMuscleActivations(args),
         exerciseType: exerciseType,
         availableHandles: availableHandles,
       );
@@ -1871,6 +1904,9 @@ class CoachToolService {
         'category': updated.category,
         'primary_muscle':
             primaryMuscleName ?? _wp.getMuscleGroupName(updated.primaryMuscle),
+        'muscle_activations': _activationSummary(updated),
+        'activation_interpretation':
+            'Estimated involvement, not measured activation or growth.',
         'exercise_type': updated.exerciseType.name,
         'available_handles': updated.availableHandles,
       };
@@ -1880,6 +1916,52 @@ class CoachToolService {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  List<MuscleActivation>? _readMuscleActivations(Map<String, Object?> args) {
+    if (!args.containsKey('muscle_activations')) return null;
+    final raw = args['muscle_activations'];
+    if (raw == null) return null;
+    if (raw is! List || raw.isEmpty) {
+      throw ArgumentError('muscle_activations must be a nonempty list');
+    }
+    return raw.map((entry) {
+      if (entry is! Map ||
+          entry['muscle'] is! String ||
+          entry['activation_percentage'] is! int) {
+        throw ArgumentError(
+          'Each activation requires a muscle and an integer weight',
+        );
+      }
+      final name = (entry['muscle'] as String).trim();
+      final MuscleGroup? muscle;
+      try {
+        muscle = _resolveMuscleGroup(name);
+      } on AmbiguousMatchException catch (e) {
+        throw ArgumentError(
+          'Ambiguous muscle "$name": ${e.candidates.join(", ")}',
+        );
+      }
+      if (muscle == null) throw ArgumentError('Unknown muscle "$name"');
+      return MuscleActivation(
+        muscleGroupId: muscle.id,
+        activationPercentage: entry['activation_percentage'] as int,
+      );
+    }).toList();
+  }
+
+  List<Map<String, Object?>> _activationSummary(Exercise exercise) => [
+    for (final activation in exercise.muscleActivations)
+      {
+        'muscle_id': activation.muscleGroupId,
+        'muscle':
+            MuscleGroups.names[activation.muscleGroupId] ??
+            _wp.getMuscleGroupName(activation.muscleGroupId),
+        'role': activation.muscleGroupId == exercise.primaryMuscle
+            ? 'primary'
+            : 'secondary',
+        'activation_percentage': activation.activationPercentage,
+      },
+  ];
 
   /// Per-session weight×reps breakdown for [exerciseId], newest first.
   /// Bounded to the most recent [limit] sessions (after the optional [cutoff])

@@ -349,6 +349,61 @@ class WorkoutProvider extends ChangeNotifier {
   /// Allowed category values for exercises
   static const Set<String> _allowedCategories = {'compound', 'isolation'};
 
+  List<MuscleActivation> _validateMuscleActivations(
+    String primaryId,
+    List<MuscleActivation> proposed,
+  ) {
+    if (proposed.isEmpty) {
+      throw ArgumentError('At least one muscle activation is required');
+    }
+    final knownIds = {
+      for (final muscle in MuscleGroups.getAll()) muscle.id,
+      for (final muscle in _muscleGroups) muscle.id,
+    };
+    final seen = <String>{};
+    for (final activation in proposed) {
+      if (!knownIds.contains(activation.muscleGroupId)) {
+        throw ArgumentError(
+          'Unknown muscle group: ${activation.muscleGroupId}',
+        );
+      }
+      if (!seen.add(activation.muscleGroupId)) {
+        throw ArgumentError(
+          'Duplicate muscle group: ${activation.muscleGroupId}',
+        );
+      }
+      if (activation.activationPercentage < 1 ||
+          activation.activationPercentage > 100) {
+        throw ArgumentError(
+          'Muscle activation weights must be integers from 1 to 100',
+        );
+      }
+    }
+    final primary = proposed
+        .where((a) => a.muscleGroupId == primaryId)
+        .firstOrNull;
+    if (primary == null) {
+      throw ArgumentError(
+        'The activation list must include the primary muscle',
+      );
+    }
+    if (proposed.any(
+      (a) =>
+          a.muscleGroupId != primaryId &&
+          a.activationPercentage >= primary.activationPercentage,
+    )) {
+      throw ArgumentError(
+        'The primary muscle must have the highest activation weight',
+      );
+    }
+    // Independent involvement weights, matching the built-in catalogue. They
+    // are not a partition of effort and do not have to sum to 100.
+    return List.unmodifiable([
+      primary,
+      ...proposed.where((a) => a.muscleGroupId != primaryId),
+    ]);
+  }
+
   /// Add a custom exercise created by the user
   ///
   /// Throws [ArgumentError] if inputs are invalid.
@@ -356,6 +411,7 @@ class WorkoutProvider extends ChangeNotifier {
     required String name,
     required String category,
     required String primaryMuscleGroupId,
+    List<MuscleActivation>? muscleActivations,
     ExerciseType exerciseType = ExerciseType.weightAndReps,
     List<String>? availableHandles,
   }) async {
@@ -381,19 +437,22 @@ class WorkoutProvider extends ChangeNotifier {
     // Generate unique ID
     final id = 'custom_${_uuid.v4()}';
 
-    // Create muscle activation (100% for primary muscle in v1)
-    final muscleActivations = [
-      MuscleActivation(
-        muscleGroupId: primaryMuscleGroupId,
-        activationPercentage: 100,
-      ),
-    ];
+    final resolvedActivations = _validateMuscleActivations(
+      primaryMuscleGroupId,
+      muscleActivations ??
+          [
+            MuscleActivation(
+              muscleGroupId: primaryMuscleGroupId,
+              activationPercentage: 100,
+            ),
+          ],
+    );
 
     // Create exercise with isCustom flag using normalized values
     final exercise = Exercise(
       id: id,
       name: normalizedName,
-      muscleActivations: muscleActivations,
+      muscleActivations: resolvedActivations,
       category: normalizedCategory,
       isCustom: true,
       availableHandles: availableHandles,
@@ -418,6 +477,7 @@ class WorkoutProvider extends ChangeNotifier {
     List<String>? availableHandles,
     String? category,
     String? primaryMuscleGroupId,
+    List<MuscleActivation>? muscleActivations,
   }) async {
     final existing = getExercise(id);
     if (existing == null) {
@@ -441,13 +501,23 @@ class WorkoutProvider extends ChangeNotifier {
     }
 
     List<MuscleActivation> activations = existing.muscleActivations;
-    if (primaryMuscleGroupId != null && primaryMuscleGroupId.isNotEmpty) {
-      activations = [
+    final primaryId = primaryMuscleGroupId ?? existing.primaryMuscle;
+    if (muscleActivations != null) {
+      activations = _validateMuscleActivations(primaryId, muscleActivations);
+    } else if (primaryMuscleGroupId != null &&
+        primaryMuscleGroupId.isNotEmpty &&
+        primaryMuscleGroupId != existing.primaryMuscle) {
+      if (activations.length > 1) {
+        throw ArgumentError(
+          'Provide the full muscle activation list when changing the primary muscle',
+        );
+      }
+      activations = _validateMuscleActivations(primaryMuscleGroupId, [
         MuscleActivation(
           muscleGroupId: primaryMuscleGroupId,
           activationPercentage: 100,
         ),
-      ];
+      ]);
     }
 
     final updated = existing.copyWith(

@@ -129,7 +129,7 @@ void main() {
         // Arrange
         const name = 'Category Test';
         const category = 'COMPOUND'; // Uppercase
-        const muscleGroup = 'legs';
+        const muscleGroup = 'quads';
 
         // Act
         await provider.addCustomExercise(

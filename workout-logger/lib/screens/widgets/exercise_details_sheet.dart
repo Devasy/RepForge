@@ -216,6 +216,11 @@ class ExerciseDetailsSheet extends StatelessWidget {
           // Muscle activations
           const RFSectionHeader('Muscle Activation'),
           const SizedBox(height: AppSpacing.sm),
+          const Text(
+            'Estimated muscle involvement, not measured activation or growth.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           ...exercise.muscleActivations.map((a) {
             final muscleColor = AppColors.muscle(a.muscleGroupId);
             final name = MuscleGroups.names[a.muscleGroupId] ?? a.muscleGroupId;
