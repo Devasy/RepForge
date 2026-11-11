@@ -1,3 +1,4 @@
+import 'package:repforge/models/skin_temperature_sample.dart';
 // Unit tests for the workout HR analysis builder (rest recovery + guards).
 
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +7,9 @@ import 'package:repforge/services/interfaces/health_connect_service_interface.da
 import 'package:repforge/services/utils/workout_hr_builder.dart';
 
 class _Hc implements IHealthConnectService {
+  @override
+  Future<List<SkinTemperatureSample>> readSkinTemperature(DateTime start, DateTime end) async => const [];
+
   final List<HealthSample> hr;
   _Hc(this.hr);
 

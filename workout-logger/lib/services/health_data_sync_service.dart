@@ -68,7 +68,7 @@ class HealthDataSyncService {
 
   /// Pulls any new sleep/HR data since the last sync into SQLite. Skipped if
   /// the last sync ran under 30 minutes ago, unless [force] is true. Each of
-  /// the 4 underlying data streams fails independently and best-effort —
+  /// the underlying data streams fails independently and best-effort —
   /// one stream throwing never blocks the others or this call. Streams whose
   /// permission hasn't been granted yet are skipped entirely — their
   /// watermark is left untouched so the first sync after granting permission
@@ -104,6 +104,17 @@ class HealthDataSyncService {
       final stream = entry.value;
       if (!granted.contains(stream.readType)) continue;
       await _syncSamples(type: entry.key, now: now, stream: stream);
+    }
+    if (granted.contains(HealthReadType.skinTemperature)) {
+      const key = 'health_sync.skin_temperature';
+      try {
+        final from = await _windowStart(key, now);
+        final samples = await _hc.readSkinTemperature(from, now);
+        await _storage.upsertSkinTemperatureSamples(samples);
+        await _storage.saveSetting(key, now.toIso8601String());
+      } catch (_) {
+        // Unsupported modules, denied permissions and failed pages are retried.
+      }
     }
 
     await _storage.saveSetting(_lastRunKey, now.toIso8601String());

@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/models.dart';
+import '../models/skin_temperature_sample.dart';
 import '../data/exercise_database.dart';
 import 'interfaces/storage_service_interface.dart';
 
@@ -19,7 +20,20 @@ class SqliteStorageService implements IStorageService {
       _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 8;
+  static const int _dbVersion = 9;
+  static const _skinTemperatureSchema =
+      '''CREATE TABLE IF NOT EXISTS skin_temperature_samples (
+    record_id TEXT NOT NULL,
+    source_package TEXT NOT NULL,
+    measurement_location TEXT NOT NULL,
+    record_start_ts TEXT NOT NULL,
+    record_end_ts TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    utc_ts TEXT NOT NULL,
+    delta_c REAL NOT NULL,
+    baseline_c REAL,
+    PRIMARY KEY (source_package, record_id, utc_ts)
+  )''';
   static const _messageChunkBytes = 64 * 1024;
   static const _conversationChunksSchema =
       '''CREATE TABLE conversation_message_chunks (
@@ -95,6 +109,7 @@ class SqliteStorageService implements IStorageService {
   )''';
 
   static const List<String> _schemaStatements = [
+    _skinTemperatureSchema,
     '''CREATE TABLE exercises (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -256,6 +271,9 @@ class SqliteStorageService implements IStorageService {
         }
       },
       onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 9) {
+          await db.execute(_skinTemperatureSchema);
+        }
         if (oldVersion < 2) {
           for (final statement in _healthSchemaStatements) {
             await db.execute(statement);
@@ -1277,6 +1295,27 @@ class SqliteStorageService implements IStorageService {
         'end_ts': localIso,
         'utc_ts': utcIso,
         'value': s.value,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> upsertSkinTemperatureSamples(
+    List<SkinTemperatureSample> samples,
+  ) async {
+    if (samples.isEmpty) return;
+    final batch = _db.batch();
+    for (final sample in samples) {
+      batch.insert('skin_temperature_samples', {
+        'record_id': sample.recordId,
+        'source_package': sample.sourcePackage,
+        'measurement_location': sample.measurementLocation,
+        'record_start_ts': sample.recordStart.toLocal().toIso8601String(),
+        'record_end_ts': sample.recordEnd.toLocal().toIso8601String(),
+        'timestamp': sample.time.toLocal().toIso8601String(),
+        'utc_ts': sample.time.toUtc().toIso8601String(),
+        'delta_c': sample.deltaCelsius,
+        'baseline_c': sample.baselineCelsius,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);

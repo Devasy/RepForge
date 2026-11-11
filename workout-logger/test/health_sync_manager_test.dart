@@ -1,3 +1,4 @@
+import 'package:repforge/models/skin_temperature_sample.dart';
 // Unit tests for HealthSyncManager
 
 
@@ -11,6 +12,9 @@ import 'test_utils/mock_storage_service.dart';
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
 class _MockHcService implements IHealthConnectService {
+  @override
+  Future<List<SkinTemperatureSample>> readSkinTemperature(DateTime start, DateTime end) async => const [];
+
   int syncCallCount = 0;
   WorkoutSession? lastSession;
   String? lastTitle;

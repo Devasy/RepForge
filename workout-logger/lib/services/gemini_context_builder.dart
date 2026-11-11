@@ -68,6 +68,17 @@ class GeminiContextBuilder {
       ..writeln()
       ..writeln(buildA2UiPromptSection(defaultA2UiRegistry))
       ..writeln(
+        'For sleeping skin temperature, query skin_temperature_samples with '
+        'run_sql_query and match samples to recorded sleep intervals. Compare '
+        'nightly trends within the same source and measurement location, with '
+        'HRV, resting HR, sleep and subsequent workout performance. Report '
+        'coverage and sample size. Temperature deltas reflect the source baseline, '
+        'which may change; do not invent an absolute temperature when baseline '
+        'is absent. Skin temperature is affected by room conditions, sensor fit '
+        'and other factors. Associations do not establish causation or diagnose '
+        'illness; do not change readiness scores based on skin temperature.',
+      )
+      ..writeln(
         'WHICH COMPONENT TO REACH FOR, given this app is a workout tracker: '
         '1) Sleeping HR analytics (e.g. "how is my sleeping hr varying over 14 '
         'days") — call get_sleeping_hr_analytics, then a DynamicChart line plot '

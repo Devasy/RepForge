@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:health_connector/health_connector.dart';
 
 import '../models/models.dart' hide ExerciseType;
+import '../models/skin_temperature_sample.dart';
 import 'interfaces/health_connect_service_interface.dart';
 import 'utils/hc_session_builder.dart';
 
@@ -74,6 +75,8 @@ class HealthConnectService implements IHealthConnectService {
     HealthReadType.restingHeartRate:
         HealthDataType.restingHeartRate.readPermission,
     HealthReadType.hrv: HealthDataType.heartRateVariabilityRMSSD.readPermission,
+    HealthReadType.skinTemperature:
+        HealthDataType.skinTemperatureDeltaSeries.readPermission,
   };
 
   @override
@@ -261,6 +264,47 @@ class HealthConnectService implements IHealthConnectService {
       return const [];
     }
   }
+
+  @override
+  Future<List<SkinTemperatureSample>> readSkinTemperature(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final connector = await _getConnector();
+    if (connector == null) throw StateError('Health Connect unavailable');
+    var response = await connector.readRecords(
+      HealthDataType.skinTemperatureDeltaSeries.readInTimeRange(
+        startTime: start,
+        endTime: end,
+      ),
+    ).timeout(_queryDeadline);
+    final result = <SkinTemperatureSample>[];
+    while (true) {
+      result.addAll(mapSkinTemperatureRecords(response.records));
+      final next = response.nextPageRequest;
+      if (next == null) break;
+      response = await connector.readRecords(next).timeout(_queryDeadline);
+    }
+    return result;
+  }
+
+  @visibleForTesting
+  static List<SkinTemperatureSample> mapSkinTemperatureRecords(
+    List<SkinTemperatureDeltaSeriesRecord> records,
+  ) => [
+    for (final record in records)
+      for (final sample in record.samples)
+        SkinTemperatureSample(
+          recordId: record.id.value,
+          recordStart: record.startTime,
+          recordEnd: record.endTime,
+          time: sample.time,
+          deltaCelsius: sample.temperatureDelta.inCelsius,
+          baselineCelsius: record.baseline?.inCelsius,
+          sourcePackage: record.metadata.dataOrigin?.packageName ?? '',
+          measurementLocation: record.measurementLocation.name,
+        ),
+  ];
 
   static bool _segmentWeightUnsupported = false;
 

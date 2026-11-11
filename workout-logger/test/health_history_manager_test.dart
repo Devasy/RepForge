@@ -1,3 +1,4 @@
+import 'package:repforge/models/skin_temperature_sample.dart';
 // Unit tests for HealthHistoryManager (windowing + aggregation).
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,9 @@ import 'package:repforge/services/managers/health_history_manager.dart';
 import 'test_utils/mock_storage_service.dart';
 
 class _StubHc implements IHealthConnectService {
+  @override
+  Future<List<SkinTemperatureSample>> readSkinTemperature(DateTime start, DateTime end) async => const [];
+
   Set<HealthReadType> granted;
   List<SleepPeriod> sleep;
   List<HealthSample> resting;

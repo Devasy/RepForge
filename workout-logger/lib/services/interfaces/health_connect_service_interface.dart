@@ -1,7 +1,8 @@
 import '../../models/models.dart';
+import '../../models/skin_temperature_sample.dart';
 
 /// Read-side Health Connect data categories used for readiness scoring.
-enum HealthReadType { sleep, heartRate, restingHeartRate, hrv }
+enum HealthReadType { sleep, heartRate, restingHeartRate, hrv, skinTemperature }
 
 abstract class IHealthConnectService {
   Future<bool> isAvailable();
@@ -17,8 +18,8 @@ abstract class IHealthConnectService {
     Map<String, String>? exerciseNames,
   });
 
-  /// Requests all readiness read permissions (sleep, HR, resting HR, HRV)
-  /// in one dialog. Returns true if at least one was granted — partial
+  /// Requests recovery/analysis read permissions (sleep, HR, resting HR, HRV,
+  /// skin temperature). Returns true if at least one was granted — partial
   /// grants are usable because readiness components are independent.
   Future<bool> requestReadPermissions();
 
@@ -28,6 +29,13 @@ abstract class IHealthConnectService {
   Future<List<SleepPeriod>> readSleepSessions(DateTime start, DateTime end);
   Future<List<HealthSample>> readRestingHeartRate(DateTime start, DateTime end);
   Future<List<HealthSample>> readHrvRmssd(DateTime start, DateTime end);
+
+  /// Raw deltas and optional baseline, as written by the source/bridge app.
+  /// Throws on failed reads so sync can retry without advancing its watermark.
+  Future<List<SkinTemperatureSample>> readSkinTemperature(
+    DateTime start,
+    DateTime end,
+  );
 
   /// Raw heart-rate samples. Only used as a morning-RHR fallback over a
   /// narrow window when no [readRestingHeartRate] records exist.

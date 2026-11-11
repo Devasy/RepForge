@@ -4,6 +4,16 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.2.3]
+
+### Features added
+
+- Read skin-temperature deltas and optional baselines written to Health Connect by bridge apps, preserving their source for sleep and workout analysis by the AI coach.
+
+### Known limitations
+
+- Skin-temperature analysis requires a supported Health Connect version, read permission, and recorded temperature and sleep data; temperature provides supporting context and does not change the readiness score.
+
 ## [2.2.2]
 
 ### Features added
@@ -31,6 +41,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 - Programs follow their saved week/day order; missed workouts are not automatically rescheduled.
 - Saved chat history keeps answer text and source links; live Google Search suggestion chips are not saved with messages.
 - Langfuse is available only in debug builds. Estimated costs are informational and separate from provider billing.
+
 
 ## [2.2.1]
 

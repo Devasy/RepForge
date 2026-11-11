@@ -1,3 +1,4 @@
+import 'package:repforge/models/skin_temperature_sample.dart';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -8,6 +9,15 @@ import 'package:repforge/services/interfaces/health_connect_service_interface.da
 import 'package:repforge/services/sqlite_storage_service.dart';
 
 class _RecordingHcService implements IHealthConnectService {
+  @override
+  Future<List<SkinTemperatureSample>> readSkinTemperature(DateTime start, DateTime end) async {
+    calls.add((method: 'skin_temperature', from: start, to: end));
+    if (throwOnSkinTemperature) throw Exception('unsupported or failed page');
+    return skinTemperatureSamples;
+  }
+  List<SkinTemperatureSample> skinTemperatureSamples = const [];
+  bool throwOnSkinTemperature = false;
+
   final List<({String method, DateTime from, DateTime to})> calls = [];
   List<HealthSample> heartRateSamples = const [];
   List<HealthSample> restingHrSamples = const [];
@@ -101,6 +111,82 @@ void main() {
     final sleepCall = hc.calls.firstWhere((c) => c.method == 'sleep');
     expect(sleepCall.to, now);
     expect(sleepCall.from, now.subtract(const Duration(days: 93)));
+  });
+
+  test('temperature preserves bridge data, separates sources and joins sleep', () async {
+    final start = DateTime(2026, 8, 10, 22);
+    final end = DateTime(2026, 8, 11, 7);
+    final time = start.add(const Duration(hours: 2));
+    hc.skinTemperatureSamples = [
+      for (final source in ['bridge.one', 'bridge.two'])
+        SkinTemperatureSample(
+          recordId: 'record', recordStart: start, recordEnd: end,
+          time: time, deltaCelsius: -0.25,
+          baselineCelsius: source == 'bridge.one' ? 33.5 : null,
+          sourcePackage: source, measurementLocation: 'wrist',
+        ),
+    ];
+    await storage.upsertSleepSessions([SleepPeriod(start: start, end: end)]);
+    final service = HealthDataSyncService(
+      healthConnectService: hc, storage: storage, now: () => end,
+    );
+    await service.sync(force: true);
+    await service.sync(force: true);
+    final rows = await _rawQuery(storage,
+      'SELECT t.* FROM skin_temperature_samples t JOIN sleep_sessions s '
+      'ON t.timestamp >= s.start_ts AND t.timestamp < s.end_ts '
+      'ORDER BY source_package');
+    expect(rows, hasLength(2));
+    expect(rows.first['delta_c'], -0.25);
+    expect(rows.first['baseline_c'], 33.5);
+    expect(rows.last['baseline_c'], isNull);
+    expect(rows.first['utc_ts'], time.toUtc().toIso8601String());
+    expect(rows.first['measurement_location'], 'wrist');
+  });
+
+  test('temperature failure leaves watermark and other streams usable', () async {
+    hc.throwOnSkinTemperature = true;
+    final now = DateTime(2026, 8, 11, 9);
+    final service = HealthDataSyncService(
+      healthConnectService: hc, storage: storage, now: () => now,
+    );
+    await service.sync(force: true);
+    expect(await storage.getSetting('health_sync.skin_temperature'), isNull);
+    expect(await storage.getSetting('health_sync.hrv_rmssd'), isNotNull);
+    hc.throwOnSkinTemperature = false;
+    hc.calls.clear();
+    await service.sync(force: true);
+    expect(hc.calls.firstWhere((c) => c.method == 'skin_temperature').from,
+      now.subtract(const Duration(days: 93)));
+  });
+
+  test('temperature grant after upgrade retains full initial backfill', () async {
+    hc.grantedTypes.remove(HealthReadType.skinTemperature);
+    final now = DateTime(2026, 8, 11, 9);
+    final service = HealthDataSyncService(
+      healthConnectService: hc, storage: storage, now: () => now,
+    );
+    await service.sync(force: true);
+    expect(hc.calls.any((c) => c.method == 'skin_temperature'), isFalse);
+    expect(await storage.getSetting('health_sync.skin_temperature'), isNull);
+    hc.grantedTypes.add(HealthReadType.skinTemperature);
+    await service.sync(force: true);
+    expect(hc.calls.firstWhere((c) => c.method == 'skin_temperature').from,
+      now.subtract(const Duration(days: 93)));
+  });
+
+  test('v8 database upgrade adds temperature without losing existing data', () async {
+    await storage.saveSetting('keep', 'value');
+    final path = storage.databasePath;
+    await storage.close();
+    final legacy = await openDatabase(path);
+    await legacy.execute('DROP TABLE skin_temperature_samples');
+    await legacy.execute('PRAGMA user_version = 8');
+    await legacy.close();
+    storage = SqliteStorageService(databasePathOverride: path);
+    await storage.init();
+    expect(await storage.getSetting('keep'), 'value');
+    expect(await _rawQuery(storage, 'SELECT * FROM skin_temperature_samples'), isEmpty);
   });
 
   test('second sync only re-fetches from watermark minus the 3-day lookback', () async {
