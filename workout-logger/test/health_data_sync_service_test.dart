@@ -144,6 +144,52 @@ void main() {
     expect(rows.first['measurement_location'], 'wrist');
   });
 
+  test('HealthBridge nightly comparison reconstructs absolute temperatures', () async {
+    // HealthBridge's RecordMapper uses the session summary/sample mean as its
+    // baseline. Both nights have zero mean delta despite being 1 C apart.
+    final start = DateTime(2026, 11, 9, 22);
+    hc.skinTemperatureSamples = [
+      for (var night = 0; night < 2; night++)
+        for (var minute = 0; minute < 2; minute++)
+          SkinTemperatureSample(
+            recordId: 'night-$night',
+            recordStart: start.add(Duration(days: night)),
+            recordEnd: start.add(Duration(days: night, hours: 8)),
+            time: start.add(Duration(days: night, minutes: minute + 1)),
+            deltaCelsius: minute == 0 ? -0.1 : 0.1,
+            baselineCelsius: 33.8 + night,
+            sourcePackage: 'com.repforge.healthbridge',
+            measurementLocation: 'wrist',
+          ),
+    ];
+    await storage.upsertSleepSessions([
+      for (var night = 0; night < 2; night++)
+        SleepPeriod(
+          start: start.add(Duration(days: night)),
+          end: start.add(Duration(days: night, hours: 8)),
+        ),
+    ]);
+    final service = HealthDataSyncService(
+      healthConnectService: hc,
+      storage: storage,
+      now: () => start.add(const Duration(days: 2)),
+    );
+    await service.sync(force: true);
+    final rows = await _rawQuery(storage,
+      'SELECT s.id, AVG(t.delta_c) AS mean_delta, '
+      'AVG(t.baseline_c + t.delta_c) AS mean_skin_c '
+      'FROM skin_temperature_samples t JOIN sleep_sessions s '
+      'ON t.timestamp >= s.start_ts AND t.timestamp < s.end_ts '
+      'WHERE t.source_package = \'com.repforge.healthbridge\' '
+      'AND t.measurement_location = \'wrist\' '
+      'GROUP BY s.id ORDER BY s.id');
+    expect(rows, hasLength(2));
+    expect(rows.first['mean_delta'], closeTo(0, 1e-9));
+    expect(rows.last['mean_delta'], closeTo(0, 1e-9));
+    expect(rows.first['mean_skin_c'], closeTo(33.8, 1e-9));
+    expect(rows.last['mean_skin_c'], closeTo(34.8, 1e-9));
+  });
+
   test('temperature failure leaves watermark and other streams usable', () async {
     hc.throwOnSkinTemperature = true;
     final now = DateTime(2026, 8, 11, 9);
