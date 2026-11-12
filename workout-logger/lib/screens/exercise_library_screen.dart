@@ -11,6 +11,7 @@ import 'add_custom_exercise_screen.dart';
 import 'widgets/rf_widgets.dart';
 import 'widgets/rf_cards.dart';
 import 'widgets/exercise_details_sheet.dart';
+import 'widgets/extended_library_download.dart';
 
 class ExerciseLibraryScreen extends StatefulWidget {
   const ExerciseLibraryScreen({super.key});
@@ -29,22 +30,28 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
     final all = provider.allExercises;
     final customCount = all.where((e) => e.isCustom).length;
 
-    final filtered = all.where((e) {
-      final matchQ = _query.isEmpty ||
-          e.name.toLowerCase().contains(_query.toLowerCase());
-      final matchM = _muscleFilter == null ||
-          e.muscleActivations.any((m) => m.muscleGroupId == _muscleFilter);
-      return matchQ && matchM;
-    }).toList()
-      ..sort((a, b) {
-        if (a.isCustom && !b.isCustom) return -1;
-        if (!a.isCustom && b.isCustom) return 1;
-        return a.name.compareTo(b.name);
-      });
+    final filtered =
+        all.where((e) {
+          final matchQ =
+              _query.isEmpty ||
+              e.name.toLowerCase().contains(_query.toLowerCase());
+          final matchM =
+              _muscleFilter == null ||
+          e.muscleActivations.any((m) => m.muscleGroupId == _muscleFilter) ||
+          (provider.muscleProfileFor(e.id)?.matchesMuscle(_muscleFilter!) ?? false);
+          return matchQ && matchM;
+        }).toList()..sort((a, b) {
+          if (a.isCustom && !b.isCustom) return -1;
+          if (!a.isCustom && b.isCustom) return 1;
+          return a.name.compareTo(b.name);
+        });
 
     final grouped = <String, List<Exercise>>{};
     for (final ex in filtered) {
-      grouped.putIfAbsent(ex.primaryMuscle, () => []).add(ex);
+      final muscle = ex.muscleActivations.isEmpty
+          ? provider.muscleProfileFor(ex.id)?.primaryMuscle ?? 'Unknown'
+          : ex.primaryMuscle;
+      grouped.putIfAbsent(muscle, () => []).add(ex);
     }
 
     return Scaffold(
@@ -57,6 +64,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
               query: _query,
               onChanged: (v) => setState(() => _query = v),
             ),
+            const ExtendedLibraryDownload(),
             _MuscleFilterChips(
               selected: _muscleFilter,
               onSelected: (id) => setState(() => _muscleFilter = id),
@@ -117,10 +125,8 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
-      builder: (_) => ExerciseDetailsSheet(
-        exercise: exercise,
-        provider: provider,
-      ),
+      builder: (_) =>
+          ExerciseDetailsSheet(exercise: exercise, provider: provider),
     );
   }
 }
@@ -203,8 +209,10 @@ class _SearchBar extends StatelessWidget {
           style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
           decoration: InputDecoration(
             hintText: 'Search exercises…',
-            hintStyle:
-                const TextStyle(color: AppColors.textMuted, fontSize: 14),
+            hintStyle: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 14,
+            ),
             prefixIcon: const Icon(
               Icons.search_rounded,
               color: AppColors.textMuted,
@@ -361,10 +369,7 @@ class _MuscleGroup extends StatelessWidget {
           ),
         ),
         ...exercises.map(
-          (ex) => ExerciseCard(
-            exercise: ex,
-            onTap: () => onTap(ex),
-          ),
+          (ex) => ExerciseCard(exercise: ex, onTap: () => onTap(ex)),
         ),
         const SizedBox(height: AppSpacing.sm),
       ],
@@ -384,8 +389,7 @@ class ExerciseSelectorScreen extends StatefulWidget {
   final void Function(List<String>)? onExercisesSelected;
 
   @override
-  State<ExerciseSelectorScreen> createState() =>
-      _ExerciseSelectorScreenState();
+  State<ExerciseSelectorScreen> createState() => _ExerciseSelectorScreenState();
 }
 
 class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
@@ -395,13 +399,15 @@ class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
   @override
   Widget build(BuildContext context) {
     final all = context.watch<WorkoutProvider>().allExercises;
-    final filtered = all
-        .where(
-          (e) => _query.isEmpty ||
-              e.name.toLowerCase().contains(_query.toLowerCase()),
-        )
-        .toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    final filtered =
+        all
+            .where(
+              (e) =>
+                  _query.isEmpty ||
+                  e.name.toLowerCase().contains(_query.toLowerCase()),
+            )
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
 
     final grouped = <String, List<Exercise>>{};
     for (final ex in filtered) {
@@ -421,12 +427,13 @@ class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
             ),
             child: TextField(
               onChanged: (v) => setState(() => _query = v),
-              style:
-                  const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+              ),
               decoration: const InputDecoration(
                 hintText: 'Search exercises…',
-                hintStyle:
-                    TextStyle(color: AppColors.textMuted, fontSize: 14),
+                hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 14),
                 prefixIcon: Icon(
                   Icons.search_rounded,
                   color: AppColors.textMuted,
@@ -508,7 +515,7 @@ class _ExerciseSelectorScreenState extends State<ExerciseSelectorScreen> {
               onPressed: _selectedIds.isEmpty
                   ? null
                   : () =>
-                      widget.onExercisesSelected?.call(_selectedIds.toList()),
+                        widget.onExercisesSelected?.call(_selectedIds.toList()),
               fullWidth: true,
             ),
           ),

@@ -147,9 +147,9 @@ void main() {
   );
 
   testWidgets(
-    'both shoulder presses show shoulder and triceps involvement in both phases',
+    'shoulder press without a source profile retains its illustrative phases',
     (tester) async {
-      for (final id in ['overhead_press', 'dumbbell_shoulder_press']) {
+      for (final id in ['dumbbell_shoulder_press']) {
         final exercise = _exercise(id);
         await tester.pumpWidget(
           MaterialApp(
@@ -230,7 +230,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: SingleChildScrollView(
-            child: ExerciseMuscleMap(exercise: _exercise('bicep_curl')),
+            child: ExerciseMuscleMap(exercise: _exercise('skull_crushers')),
           ),
         ),
       ),
@@ -245,7 +245,7 @@ void main() {
     expect(find.text('Stretched · lengthening under load'), findsOneWidget);
     final map = tester.widget<MuscleBodyMap>(find.byType(MuscleBodyMap));
     expect(map.heatColor, stretchedMuscleColor);
-    expect(map.muscleVolumes, {'biceps': .95});
+    expect(map.muscleVolumes, {'triceps': .90});
     expect(
       tester
           .widgetList<BodyHeatmapWidget>(find.byType(BodyHeatmapWidget))
@@ -274,7 +274,11 @@ void main() {
         );
         expect(find.text('Stretched'), findsNothing);
         expect(find.text('Contracted'), findsNothing);
-        expect(find.text('Target muscle involvement'), findsOneWidget);
+        if (exercise.id == 'plank') {
+          expect(find.text('Resistance'), findsOneWidget);
+        } else {
+          expect(find.text('Target muscle involvement'), findsOneWidget);
+        }
       }
     },
   );

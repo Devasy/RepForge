@@ -61,6 +61,27 @@ class CoachToolService {
     ),
   );
 
+  static Schema get _muscleIntensitiesSchema => Schema.array(
+    description:
+        'Complete per-muscle estimated intensity scores, integers 1–10. '
+        'Include all involved muscles once using known muscle names or IDs. '
+        'Scores are independent and need not sum to 10. Omit to preserve existing scores; '
+        'an empty list clears this dataset. Stretch never adds resistance load. '
+        'For resistance, primary_muscle must have a highest score (ties allowed). '
+        'Use resistance_intensities instead of muscle_activations for 1–10 scores. '
+        'These are estimates, not measured activation or muscle growth.',
+    nullable: true,
+    items: Schema.object(
+      properties: {
+        'muscle': Schema.string(description: 'Known muscle group name or ID.'),
+        'intensity': Schema.integer(
+          description: 'Independent estimated score, 1–10.',
+        ),
+      },
+      requiredProperties: ['muscle', 'intensity'],
+    ),
+  );
+
   /// Tool declaration for the optimizer screen's `ask_user_questions` flow.
   /// NOT included in the coach's tool list — only the optimizer adds it.
   static FunctionDeclaration
@@ -391,7 +412,7 @@ class CoachToolService {
               'muscle group (call get_muscle_recovery or list routines first '
               'if unsure of the available muscle names). After creating it you '
               'can reference it by name in create_routine / update_routine. '
-              'Use muscle_activations for primary and secondary involvement estimates.',
+              'Use resistance_intensities and stretch_intensities for all involved muscles. Legacy muscle_activations supplies resistance involvement on a 1–100 scale.',
           Schema.object(
             properties: {
               'name': Schema.string(
@@ -408,6 +429,8 @@ class CoachToolService {
                     'or "Biceps". Must match an existing muscle group.',
               ),
               'muscle_activations': _muscleActivationsSchema,
+              'resistance_intensities': _muscleIntensitiesSchema,
+              'stretch_intensities': _muscleIntensitiesSchema,
               'exercise_type': Schema.string(
                 description:
                     'Optional. Either "weightAndReps" (standard sets/reps) or "timeBased" (duration holds). Defaults to "weightAndReps".',
@@ -428,12 +451,14 @@ class CoachToolService {
           'Modify an existing exercise in the catalogue (both custom exercises and '
               'library exercises). You can update its name, exercise type '
               '("weightAndReps" or "timeBased"), category ("compound" or "isolation"), '
-              'primary and secondary muscle involvement, or available attachments/handles '
+              'multiple per-muscle resistance and stretch intensities, primary and secondary '
+              'involvement, or available attachments/handles '
               '(e.g. ["Rope", "V-Bar", "D-Handles"]).',
           Schema.object(
             properties: {
               'exercise_name': Schema.string(
-                description: 'Current name of the exercise to update.',
+                description:
+                    'Current exercise name or exact exercise ID. Use the ID when names are ambiguous.',
               ),
               'new_name': Schema.string(
                 description: 'Optional. New display name for the exercise.',
@@ -453,6 +478,8 @@ class CoachToolService {
                 nullable: true,
               ),
               'muscle_activations': _muscleActivationsSchema,
+              'resistance_intensities': _muscleIntensitiesSchema,
+              'stretch_intensities': _muscleIntensitiesSchema,
               'available_handles': Schema.array(
                 items: Schema.string(),
                 description:
@@ -542,8 +569,9 @@ class CoachToolService {
         'exercise_logs(id, session_id, exercise_id, notes, handle)\n'
         'sets(id, exercise_log_id, weight, reps, is_dropset, drops_json, '
         'time_taken, timestamp, assist_weight, extra_weight, handle, body_weight_at_log, load_mode, load_encoding_version)\n'
-        'exercises(id, name, category, is_custom, available_handles, exercise_type) — custom '
+        'exercises(id, name, category, is_custom, available_handles, exercise_type, stretch_intensities, resistance_intensity_override) — custom '
         'exercises and built-in overrides (is_custom=0 indicates an override of a built-in exercise)\n'
+        'stretch_intensities is optional JSON of per-muscle stretch scores (1–10), separate from resistance; never include it in resistance load.\n'
         'muscle_groups(id, name, growth_rate, last_updated)\n'
         'exercise_muscle_activations(exercise_id, muscle_group_id, activation_percentage)\n'
         'routines(id, name, created_at)\n'
@@ -1786,6 +1814,11 @@ class CoachToolService {
         category: category,
         primaryMuscleGroupId: muscle.id,
         muscleActivations: _readMuscleActivations(args),
+        resistanceIntensities: _readMuscleIntensities(
+          args,
+          'resistance_intensities',
+        ),
+        stretchIntensities: _readMuscleIntensities(args, 'stretch_intensities'),
         exerciseType: exerciseType,
         availableHandles: handles?.isEmpty == true ? null : handles,
       );
@@ -1801,6 +1834,14 @@ class CoachToolService {
       'category': category,
       'primary_muscle': muscle.name,
       'muscle_activations': _activationSummary(created),
+      'resistance_intensities': [
+        for (final a in created.muscleActivations)
+          {'muscle': a.muscleGroupId, 'intensity': a.activationPercentage / 10},
+      ],
+      'stretch_intensities': [
+        for (final e in (created.stretchIntensities ?? <String, int>{}).entries)
+          {'muscle': e.key, 'intensity': e.value},
+      ],
       'activation_interpretation':
           'Estimated involvement, not measured activation or growth.',
       'exercise_type': exerciseType.name,
@@ -1893,6 +1934,11 @@ class CoachToolService {
         category: (category != null && category.isNotEmpty) ? category : null,
         primaryMuscleGroupId: primaryMuscleId,
         muscleActivations: _readMuscleActivations(args),
+        resistanceIntensities: _readMuscleIntensities(
+          args,
+          'resistance_intensities',
+        ),
+        stretchIntensities: _readMuscleIntensities(args, 'stretch_intensities'),
         exerciseType: exerciseType,
         availableHandles: availableHandles,
       );
@@ -1905,6 +1951,18 @@ class CoachToolService {
         'primary_muscle':
             primaryMuscleName ?? _wp.getMuscleGroupName(updated.primaryMuscle),
         'muscle_activations': _activationSummary(updated),
+        'resistance_intensities': [
+          for (final a in updated.muscleActivations)
+            {
+              'muscle': a.muscleGroupId,
+              'intensity': a.activationPercentage / 10,
+            },
+        ],
+        'stretch_intensities': [
+          for (final e
+              in (updated.stretchIntensities ?? <String, int>{}).entries)
+            {'muscle': e.key, 'intensity': e.value},
+        ],
         'activation_interpretation':
             'Estimated involvement, not measured activation or growth.',
         'exercise_type': updated.exerciseType.name,
@@ -1916,6 +1974,35 @@ class CoachToolService {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  Map<String, int>? _readMuscleIntensities(
+    Map<String, Object?> args,
+    String field,
+  ) {
+    if (!args.containsKey(field)) return null;
+    final input = args[field];
+    if (input == null) return null;
+    if (input is! List) throw ArgumentError('$field must be a list.');
+    final scores = <String, int>{};
+    for (final item in input) {
+      if (item is! Map ||
+          item['muscle'] is! String ||
+          item['intensity'] is! int ||
+          (item['intensity'] as int) < 1 ||
+          (item['intensity'] as int) > 10) {
+        throw ArgumentError(
+          '$field requires muscle names and integer intensity scores from 1 to 10.',
+        );
+      }
+      final muscle = _resolveMuscleGroup((item['muscle'] as String).trim());
+      if (muscle == null) throw ArgumentError('Unknown muscle in $field.');
+      if (scores.containsKey(muscle.id)) {
+        throw ArgumentError('Duplicate muscle in $field.');
+      }
+      scores[muscle.id] = item['intensity'] as int;
+    }
+    return scores;
+  }
 
   List<MuscleActivation>? _readMuscleActivations(Map<String, Object?> args) {
     if (!args.containsKey('muscle_activations')) return null;
@@ -2052,7 +2139,17 @@ class CoachToolService {
     if (q.isEmpty) return null;
     final all = _wp.allExercises;
     for (final e in all) {
-      if (e.name.toLowerCase() == q) return e;
+      if (e.id.toLowerCase() == q) return e;
+    }
+    final exact = [
+      for (final e in all)
+        if (e.name.toLowerCase() == q) e,
+    ];
+    if (exact.length == 1) return exact.single;
+    if (exact.length > 1) {
+      throw AmbiguousMatchException([
+        for (final e in exact) '${e.name} (ID: ${e.id})',
+      ]);
     }
     final partials = [
       for (final e in all)

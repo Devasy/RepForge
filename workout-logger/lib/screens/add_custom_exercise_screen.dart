@@ -32,6 +32,8 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
   bool _isSubmitting = false;
 
   bool get _isEditing => widget.initialExercise != null;
+  bool get _canKeepEmptyMuscles =>
+      _isEditing && widget.initialExercise!.muscleActivations.isEmpty;
 
   @override
   void initState() {
@@ -68,7 +70,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_muscleId == null) {
+    if (_muscleId == null && !_canKeepEmptyMuscles) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a primary muscle group'),
@@ -91,7 +93,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
           id: widget.initialExercise!.id,
           name: exerciseName,
           category: _category,
-          primaryMuscleGroupId: _muscleId!,
+          primaryMuscleGroupId: _muscleId,
           exerciseType: _exerciseType,
           availableHandles: handles,
         );
@@ -188,8 +190,11 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded,
-                        color: AppColors.primary, size: 18),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
@@ -273,9 +278,8 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                     icon: Icons.timer_rounded,
                     description: 'Holds & duration (s)',
                     selected: _exerciseType == ExerciseType.timeBased,
-                    onTap: () => setState(
-                      () => _exerciseType = ExerciseType.timeBased,
-                    ),
+                    onTap: () =>
+                        setState(() => _exerciseType = ExerciseType.timeBased),
                   ),
                 ],
               ),
@@ -284,6 +288,10 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
 
               // Category toggle
               _label('EXERCISE CATEGORY'),
+              if (_category == 'other')
+                const Text(
+                  'Not classified by the source. You can choose a category below.',
+                ),
               const SizedBox(height: AppSpacing.sm),
               Row(
                 children: [
@@ -416,12 +424,12 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                     vertical: AppSpacing.sm,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.muscle(_muscleId!)
-                        .withValues(alpha: 0.1),
+                    color: AppColors.muscle(_muscleId!).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                     border: Border.all(
-                      color: AppColors.muscle(_muscleId!)
-                          .withValues(alpha: 0.3),
+                      color: AppColors.muscle(
+                        _muscleId!,
+                      ).withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -579,9 +587,7 @@ class _MuscleGrid extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? color.withValues(alpha: 0.2)
-                  : AppColors.card,
+              color: isSelected ? color.withValues(alpha: 0.2) : AppColors.card,
               borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border.all(
                 color: isSelected

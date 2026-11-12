@@ -15,6 +15,8 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'extended_exercise_library.dart';
+import 'utils/muscle_intensity_validation.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
@@ -54,6 +56,70 @@ class WorkoutProvider extends ChangeNotifier {
   List<Target> _targets = [];
   List<MuscleGroup> _muscleGroups = [];
   List<Exercise> _allExercises = [];
+  ExtendedExerciseLibrary? _extendedLibrary;
+  static final _builtInExerciseIndex = {
+    for (final e in ExerciseDatabase.getAll()) e.id: e,
+  };
+  bool get hasExtendedLibrary => _extendedLibrary != null;
+  MuscleIntensityProfile? muscleProfileFor(String id) {
+    final source =
+        _extendedLibrary?.profileFor(id) ??
+        ExtendedExerciseLibrary.builtInProfileFor(id);
+    final exercise = getExercise(id);
+    if (exercise == null) return source;
+    final baseline = _builtInExerciseIndex[id] ?? source?.toExercise();
+    final changedWeights =
+        baseline != null &&
+        !mapEquals(
+          {
+            for (final a in exercise.muscleActivations)
+              a.muscleGroupId: a.activationPercentage,
+          },
+          {
+            for (final a in baseline.muscleActivations)
+              a.muscleGroupId: a.activationPercentage,
+          },
+        );
+    final editedResistance =
+        exercise.isCustom ||
+        exercise.resistanceIntensityOverride ||
+        changedWeights;
+    if (!editedResistance && exercise.stretchIntensities == null) return source;
+    return MuscleIntensityProfile(
+      code: source?.code ?? id,
+      name: source?.name ?? exercise.name,
+      exerciseType: exercise.exerciseType,
+      sourceVersion: source?.sourceVersion ?? '',
+      resistance: editedResistance
+          ? {
+              for (final a in exercise.muscleActivations)
+                a.muscleGroupId: a.activationPercentage / 10,
+            }
+          : source?.resistance ??
+                {
+                  for (final a in exercise.muscleActivations)
+                    a.muscleGroupId: a.activationPercentage / 10,
+                },
+      stretch: exercise.stretchIntensities ?? source?.stretch ?? {},
+      resistanceAttribution: editedResistance || source == null
+          ? 'User/coach estimate'
+          : source.resistanceAttribution,
+      stretchAttribution: exercise.stretchIntensities != null || source == null
+          ? 'User/coach estimate'
+          : source.stretchAttribution,
+    );
+  }
+
+  Future<void> loadExtendedLibrary(String json) async {
+    final library = ExtendedExerciseLibrary.fromJson(json);
+    final exercises = library.mergeExercises(await _storage.getAllExercises());
+    await _storage.saveSetting(ExtendedExerciseLibrary.settingKey, json);
+    _extendedLibrary = library;
+    _allExercises = exercises;
+    _invalidateHistoryCache();
+    notifyListeners();
+  }
+
   final Map<String, GrowthModel> _growthModels =
       {}; // exerciseId -> GrowthModel
 
@@ -153,6 +219,12 @@ class WorkoutProvider extends ChangeNotifier {
     final storedOffset = await _storage.getSetting(_effortCalibrationOffsetKey);
     _effortCalibrationOffset = double.tryParse(storedOffset ?? '') ?? 0.0;
     _allExercises = await _storage.getAllExercises();
+    _extendedLibrary = ExtendedExerciseLibrary.fromCache(
+      await _storage.getSetting(ExtendedExerciseLibrary.settingKey),
+    );
+    if (_extendedLibrary != null) {
+      _allExercises = _extendedLibrary!.mergeExercises(_allExercises);
+    }
     _invalidateHistoryCache();
     await programManager.loadPrograms();
     notifyListeners();
@@ -347,7 +419,11 @@ class WorkoutProvider extends ChangeNotifier {
   // ==================== CUSTOM EXERCISES ====================
 
   /// Allowed category values for exercises
-  static const Set<String> _allowedCategories = {'compound', 'isolation'};
+  static const Set<String> _allowedCategories = {
+    'compound',
+    'isolation',
+    'other',
+  };
 
   List<MuscleActivation> _validateMuscleActivations(
     String primaryId,
@@ -412,6 +488,8 @@ class WorkoutProvider extends ChangeNotifier {
     required String category,
     required String primaryMuscleGroupId,
     List<MuscleActivation>? muscleActivations,
+    Map<String, int>? resistanceIntensities,
+    Map<String, int>? stretchIntensities,
     ExerciseType exerciseType = ExerciseType.weightAndReps,
     List<String>? availableHandles,
   }) async {
@@ -437,16 +515,25 @@ class WorkoutProvider extends ChangeNotifier {
     // Generate unique ID
     final id = 'custom_${_uuid.v4()}';
 
-    final resolvedActivations = _validateMuscleActivations(
-      primaryMuscleGroupId,
-      muscleActivations ??
-          [
-            MuscleActivation(
-              muscleGroupId: primaryMuscleGroupId,
-              activationPercentage: 100,
-            ),
-          ],
-    );
+    if (muscleActivations != null && resistanceIntensities != null) {
+      throw ArgumentError(
+        'Use resistance_intensities or muscle_activations, not both.',
+      );
+    }
+    final resistance = validateMuscleIntensities(resistanceIntensities);
+    final stretch = validateMuscleIntensities(stretchIntensities);
+    final resolvedActivations = resistance != null
+        ? resistanceActivations(resistance, primaryMuscleGroupId)
+        : _validateMuscleActivations(
+            primaryMuscleGroupId,
+            muscleActivations ??
+                [
+                  MuscleActivation(
+                    muscleGroupId: primaryMuscleGroupId,
+                    activationPercentage: 100,
+                  ),
+                ],
+          );
 
     // Create exercise with isCustom flag using normalized values
     final exercise = Exercise(
@@ -457,6 +544,8 @@ class WorkoutProvider extends ChangeNotifier {
       isCustom: true,
       availableHandles: availableHandles,
       exerciseType: exerciseType,
+      stretchIntensities: stretch,
+      resistanceIntensityOverride: true,
     );
 
     // Persist to storage
@@ -478,6 +567,8 @@ class WorkoutProvider extends ChangeNotifier {
     String? category,
     String? primaryMuscleGroupId,
     List<MuscleActivation>? muscleActivations,
+    Map<String, int>? resistanceIntensities,
+    Map<String, int>? stretchIntensities,
   }) async {
     final existing = getExercise(id);
     if (existing == null) {
@@ -500,9 +591,18 @@ class WorkoutProvider extends ChangeNotifier {
       );
     }
 
+    if (muscleActivations != null && resistanceIntensities != null) {
+      throw ArgumentError(
+        'Use resistance_intensities or muscle_activations, not both.',
+      );
+    }
+    final resistance = validateMuscleIntensities(resistanceIntensities);
+    final stretch = validateMuscleIntensities(stretchIntensities);
     List<MuscleActivation> activations = existing.muscleActivations;
     final primaryId = primaryMuscleGroupId ?? existing.primaryMuscle;
-    if (muscleActivations != null) {
+    if (resistance != null) {
+      activations = resistanceActivations(resistance, primaryMuscleGroupId);
+    } else if (muscleActivations != null) {
       activations = _validateMuscleActivations(primaryId, muscleActivations);
     } else if (primaryMuscleGroupId != null &&
         primaryMuscleGroupId.isNotEmpty &&
@@ -526,6 +626,13 @@ class WorkoutProvider extends ChangeNotifier {
       muscleActivations: activations,
       exerciseType: exerciseType ?? existing.exerciseType,
       availableHandles: availableHandles ?? existing.availableHandles,
+      stretchIntensities: stretch,
+      resistanceIntensityOverride:
+          existing.resistanceIntensityOverride ||
+          resistance != null ||
+          muscleActivations != null ||
+          (primaryMuscleGroupId != null &&
+              primaryMuscleGroupId != existing.primaryMuscle),
     );
 
     await _storage.saveCustomExercise(updated);

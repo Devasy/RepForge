@@ -50,6 +50,59 @@ void main() {
     return rows;
   }
 
+  test(
+    'v9 migration retains existing resistance weights and adds optional stretch scores',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('repforge-v9-');
+      final path = '${directory.path}/legacy.db';
+      final old = await openDatabase(
+        path,
+        version: 9,
+        onCreate: (db, _) async {
+          await db.execute(
+            'CREATE TABLE muscle_groups (id TEXT PRIMARY KEY, name TEXT, growth_rate REAL, last_updated TEXT)',
+          );
+          await db.execute(
+            "CREATE TABLE exercises (id TEXT PRIMARY KEY, name TEXT, category TEXT, is_custom INTEGER, available_handles TEXT, exercise_type TEXT)",
+          );
+          await db.execute(
+            'CREATE TABLE exercise_muscle_activations (exercise_id TEXT, muscle_group_id TEXT, activation_percentage INTEGER)',
+          );
+          await db.insert('exercises', {
+            'id': 'legacy',
+            'name': 'Legacy lift',
+            'category': 'compound',
+            'is_custom': 1,
+            'exercise_type': 'weightAndReps',
+          });
+          await db.insert('exercise_muscle_activations', {
+            'exercise_id': 'legacy',
+            'muscle_group_id': 'chest',
+            'activation_percentage': 75,
+          });
+        },
+      );
+      await old.close();
+      final migrated = SqliteStorageService(databasePathOverride: path);
+      await migrated.init();
+      try {
+        final exercise = (await migrated.getExercise('legacy'))!;
+        expect(exercise.muscleActivations.single.activationPercentage, 75);
+        expect(exercise.stretchIntensities, isNull);
+        expect(exercise.resistanceIntensityOverride, isFalse);
+        await migrated.saveCustomExercise(
+          exercise.copyWith(stretchIntensities: {'chest': 4}),
+        );
+        expect((await migrated.getExercise('legacy'))!.stretchIntensities, {
+          'chest': 4,
+        });
+      } finally {
+        await migrated.close();
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
   test('v5 migration preserves raw sets and splits legacy PR handle keys', () async {
     final directory = await Directory.systemTemp.createTemp('repforge-v5-');
     final path = '${directory.path}/legacy.db';

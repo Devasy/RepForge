@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/exercise_database.dart';
 import '../../models/models.dart';
 import '../interfaces/storage_service_interface.dart';
+import '../utils/muscle_intensity_validation.dart';
 
 /// Manages exercises (built-in and custom).
 ///
@@ -29,7 +30,11 @@ class ExerciseManager extends ChangeNotifier {
   Map<String, Exercise> _exerciseIndex = {};
 
   /// Allowed category values for exercises
-  static const Set<String> allowedCategories = {'compound', 'isolation'};
+  static const Set<String> allowedCategories = {
+    'compound',
+    'isolation',
+    'other',
+  };
 
   ExerciseManager(this._storage);
 
@@ -70,6 +75,8 @@ class ExerciseManager extends ChangeNotifier {
     required String name,
     required String category,
     required String primaryMuscleGroupId,
+    Map<String, int>? resistanceIntensities,
+    Map<String, int>? stretchIntensities,
     ExerciseType exerciseType = ExerciseType.weightAndReps,
     List<String>? availableHandles,
   }) async {
@@ -96,12 +103,16 @@ class ExerciseManager extends ChangeNotifier {
     final id = 'custom_${_uuid.v4()}';
 
     // Create muscle activation (100% for primary muscle in v1)
-    final muscleActivations = [
-      MuscleActivation(
-        muscleGroupId: primaryMuscleGroupId,
-        activationPercentage: 100,
-      ),
-    ];
+    final resistance = validateMuscleIntensities(resistanceIntensities);
+    final stretch = validateMuscleIntensities(stretchIntensities);
+    final muscleActivations = resistance != null
+        ? resistanceActivations(resistance, primaryMuscleGroupId)
+        : [
+            MuscleActivation(
+              muscleGroupId: primaryMuscleGroupId,
+              activationPercentage: 100,
+            ),
+          ];
 
     final exercise = Exercise(
       id: id,
@@ -111,6 +122,8 @@ class ExerciseManager extends ChangeNotifier {
       isCustom: true,
       availableHandles: availableHandles,
       exerciseType: exerciseType,
+      stretchIntensities: stretch,
+      resistanceIntensityOverride: true,
     );
 
     await _storage.saveCustomExercise(exercise);
@@ -131,6 +144,8 @@ class ExerciseManager extends ChangeNotifier {
     List<String>? availableHandles,
     String? category,
     String? primaryMuscleGroupId,
+    Map<String, int>? resistanceIntensities,
+    Map<String, int>? stretchIntensities,
   }) async {
     final existing = getExercise(id);
     if (existing == null) {
@@ -154,7 +169,12 @@ class ExerciseManager extends ChangeNotifier {
     }
 
     List<MuscleActivation> activations = existing.muscleActivations;
-    if (primaryMuscleGroupId != null && primaryMuscleGroupId.isNotEmpty) {
+    final resistance = validateMuscleIntensities(resistanceIntensities);
+    final stretch = validateMuscleIntensities(stretchIntensities);
+    if (resistance != null) {
+      activations = resistanceActivations(resistance, primaryMuscleGroupId);
+    } else if (primaryMuscleGroupId != null &&
+        primaryMuscleGroupId.isNotEmpty) {
       activations = [
         MuscleActivation(
           muscleGroupId: primaryMuscleGroupId,
@@ -169,6 +189,12 @@ class ExerciseManager extends ChangeNotifier {
       muscleActivations: activations,
       exerciseType: exerciseType ?? existing.exerciseType,
       availableHandles: availableHandles ?? existing.availableHandles,
+      stretchIntensities: stretch,
+      resistanceIntensityOverride:
+          existing.resistanceIntensityOverride ||
+          resistance != null ||
+          (primaryMuscleGroupId != null &&
+              primaryMuscleGroupId != existing.primaryMuscle),
     );
 
     await _storage.saveCustomExercise(updated);

@@ -53,7 +53,7 @@ void main() {
           'name': 'Variant Push Up',
           'category': 'compound',
           'primary_muscle': 'chest',
-      'muscle_activations': ?activations,
+          'muscle_activations': ?activations,
         }),
       );
 
@@ -62,6 +62,240 @@ void main() {
     activation('Chest', 90),
     activation('Core', 30),
   ];
+
+  test(
+    'duplicate extended names require an exact source ID before editing',
+    () async {
+      await provider.loadExtendedLibrary(
+        File('../catalogues/fitify-v1.json').readAsStringSync(),
+      );
+      final ambiguous = await coach.handleCall(
+        FunctionCall('update_exercise', {
+          'exercise_name': 'Face Pulls',
+          'new_name': 'Wrong variant',
+        }),
+      );
+      expect(ambiguous, contains('ambiguous_matches'));
+      final resolved = await coach.handleCall(
+        FunctionCall('update_exercise', {
+          'exercise_name': 'fitify:gm255_cable_face_pull',
+          'new_name': 'My cable face pull',
+          'stretch_intensities': [
+            {'muscle': 'rear_delts', 'intensity': 3},
+          ],
+        }),
+      );
+      expect(resolved['updated'], true);
+      expect(
+        provider.getExercise('fitify:gm255_cable_face_pull')!.name,
+        'My cable face pull',
+      );
+      expect(
+        provider.getExercise('fitify:gm033_cable_rope_rear_delt_rows')!.name,
+        'Face Pulls',
+      );
+    },
+  );
+
+  test(
+    'legacy built-in resistance edits remain visible without the new flag',
+    () async {
+      final original = provider.getExercise('bench_press')!;
+      await storage.saveCustomExercise(
+        original.copyWith(name: 'Renamed bench'),
+      );
+      await provider.loadAllData();
+      expect(provider.muscleProfileFor('bench_press')!.resistance['chest'], 9);
+      final legacy = Exercise.fromJson({
+        ...original.toJson(),
+        'muscleActivations': [
+          {'muscleGroupId': 'chest', 'activationPercentage': 40},
+          {'muscleGroupId': 'triceps', 'activationPercentage': 20},
+        ],
+      });
+      await storage.saveCustomExercise(legacy);
+      await provider.loadAllData();
+      expect(provider.muscleProfileFor('bench_press')!.resistance, {
+        'chest': 4,
+        'triceps': 2,
+      });
+      expect(
+        provider.muscleProfileFor('bench_press')!.resistanceAttribution,
+        'User/coach estimate',
+      );
+    },
+  );
+
+  test(
+    'coach creates separate resistance and stretch scores, allowing tied resistance',
+    () async {
+      final result = await coach.handleCall(
+        FunctionCall('add_custom_exercise', {
+          'name': 'Scored push up',
+          'category': 'compound',
+          'primary_muscle': 'chest',
+          'resistance_intensities': [
+            {'muscle': 'chest', 'intensity': 8},
+            {'muscle': 'triceps', 'intensity': 8},
+          ],
+          'stretch_intensities': [
+            {'muscle': 'front_delts', 'intensity': 3},
+          ],
+        }),
+      );
+      expect(result['created'], true);
+      final id = result['exercise_id'] as String;
+      final exercise = provider.getExercise(id)!;
+      expect(exercise.muscleActivations.map((a) => a.activationPercentage), [
+        80,
+        80,
+      ]);
+      expect(exercise.toJson()['stretchIntensities'], {'front_delts': 3});
+      expect(provider.muscleProfileFor(id)!.resistance, {
+        'chest': 8,
+        'triceps': 8,
+      });
+      expect(provider.muscleProfileFor(id)!.stretch, {'front_delts': 3});
+      expect(result['stretch_intensities'], [
+        {'muscle': 'front_delts', 'intensity': 3},
+      ]);
+      final backup = await storage.exportAllData();
+      final restored = SqliteStorageService(
+        databasePathOverride: inMemoryDatabasePath,
+      );
+      await restored.init();
+      try {
+        await restored.importData(backup);
+        expect(
+          (await restored.getExercise(id))!.toJson()['stretchIntensities'],
+          {'front_delts': 3},
+        );
+      } finally {
+        final path = restored.databasePath;
+        await restored.close();
+        await File(path).delete();
+      }
+      final path = storage.databasePath;
+      await storage.close();
+      storage = SqliteStorageService(databasePathOverride: path);
+      await storage.init();
+      expect((await storage.getExercise(id))!.toJson()['stretchIntensities'], {
+        'front_delts': 3,
+      });
+    },
+  );
+
+  test(
+    'omitted scores survive rename, stretch-only updates leave resistance unchanged, empty clears',
+    () async {
+      final created = await create(pushMuscles());
+      final id = created['exercise_id'] as String;
+      final changed = await coach.handleCall(
+        FunctionCall('update_exercise', {
+          'exercise_name': 'Variant Push Up',
+          'stretch_intensities': [
+            {'muscle': 'chest', 'intensity': 4},
+          ],
+        }),
+      );
+      expect(changed['updated'], true);
+      final before = provider
+          .getExercise(id)!
+          .muscleActivations
+          .map((a) => a.toJson())
+          .toList();
+      await coach.handleCall(
+        FunctionCall('update_exercise', {
+          'exercise_name': 'Variant Push Up',
+          'new_name': 'Renamed push up',
+        }),
+      );
+      expect(provider.getExercise(id)!.toJson()['stretchIntensities'], {
+        'chest': 4,
+      });
+      await coach.handleCall(
+        FunctionCall('update_exercise', {
+          'exercise_name': 'Renamed push up',
+          'stretch_intensities': <Object>[],
+        }),
+      );
+      expect(provider.getExercise(id)!.toJson()['stretchIntensities'], isEmpty);
+      expect(
+        provider
+            .getExercise(id)!
+            .muscleActivations
+            .map((a) => a.toJson())
+            .toList(),
+        before,
+      );
+    },
+  );
+
+  test('explicit stretch-only creation does not invent resistance', () async {
+    final result = await coach.handleCall(
+      FunctionCall('add_custom_exercise', {
+        'name': 'Gentle chest stretch',
+        'category': 'isolation',
+        'primary_muscle': 'chest',
+        'resistance_intensities': <Object>[],
+        'stretch_intensities': [
+          {'muscle': 'chest', 'intensity': 7},
+        ],
+        'exercise_type': 'timeBased',
+      }),
+    );
+    expect(result['created'], true);
+    final exercise = provider.getExercise(result['exercise_id'] as String)!;
+    expect(exercise.muscleActivations, isEmpty);
+    expect(provider.muscleProfileFor(exercise.id)!.stretch, {'chest': 7});
+  });
+
+  test(
+    'invalid or conflicting intensity proposals cannot create exercises',
+    () async {
+      for (final input in [
+        [
+          {'muscle': 'chest', 'intensity': 11},
+        ],
+        [
+          {'muscle': 'chest', 'intensity': 0},
+        ],
+        [
+          {'muscle': 'chest', 'intensity': 2.5},
+        ],
+        [
+          {'muscle': 'unknown', 'intensity': 3},
+        ],
+        [
+          {'muscle': 'chest', 'intensity': 3},
+          {'muscle': 'Chest', 'intensity': 5},
+        ],
+      ]) {
+        final result = await coach.handleCall(
+          FunctionCall('add_custom_exercise', {
+            'name': 'Invalid score',
+            'category': 'compound',
+            'primary_muscle': 'chest',
+            'stretch_intensities': input,
+          }),
+        );
+        expect(result, contains('error'));
+      }
+      final result = await coach.handleCall(
+        FunctionCall('add_custom_exercise', {
+          'name': 'Conflicting score',
+          'category': 'compound',
+          'primary_muscle': 'chest',
+          'muscle_activations': pushMuscles(),
+          'resistance_intensities': [
+            {'muscle': 'chest', 'intensity': 8},
+          ],
+        }),
+      );
+      expect(result, contains('error'));
+      expect(await storage.getCustomExercises(), isEmpty);
+    },
+  );
 
   test(
     'coach stores primary and secondary weights across a database reopen',

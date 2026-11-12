@@ -102,6 +102,8 @@ class Exercise {
   final String id;
   final String name;
   final List<MuscleActivation> muscleActivations;
+  final Map<String, int>? stretchIntensities;
+  final bool resistanceIntensityOverride;
   final String category; // 'compound' or 'isolation'
   final bool isCustom; // User-created exercise
   final List<String>?
@@ -113,6 +115,8 @@ class Exercise {
     required this.name,
     required this.muscleActivations,
     required this.category,
+    this.stretchIntensities,
+    this.resistanceIntensityOverride = false,
     this.isCustom = false,
     this.availableHandles,
     this.exerciseType = ExerciseType.weightAndReps,
@@ -122,6 +126,8 @@ class Exercise {
     String? id,
     String? name,
     List<MuscleActivation>? muscleActivations,
+    Map<String, int>? stretchIntensities,
+    bool? resistanceIntensityOverride,
     String? category,
     bool? isCustom,
     List<String>? availableHandles,
@@ -130,6 +136,9 @@ class Exercise {
     id: id ?? this.id,
     name: name ?? this.name,
     muscleActivations: muscleActivations ?? this.muscleActivations,
+    stretchIntensities: stretchIntensities ?? this.stretchIntensities,
+    resistanceIntensityOverride:
+        resistanceIntensityOverride ?? this.resistanceIntensityOverride,
     category: category ?? this.category,
     isCustom: isCustom ?? this.isCustom,
     availableHandles: availableHandles ?? this.availableHandles,
@@ -148,6 +157,8 @@ class Exercise {
     'id': id,
     'name': name,
     'muscleActivations': muscleActivations.map((m) => m.toJson()).toList(),
+    if (stretchIntensities != null) 'stretchIntensities': stretchIntensities,
+    if (resistanceIntensityOverride) 'resistanceIntensityOverride': true,
     'category': category,
     'isCustom': isCustom,
     'availableHandles': availableHandles,
@@ -179,7 +190,29 @@ class Exercise {
       isCustom: json['isCustom'] ?? false,
       availableHandles: (json['availableHandles'] as List?)?.cast<String>(),
       exerciseType: type,
+      stretchIntensities: decodeStretchIntensities(json['stretchIntensities']),
+      resistanceIntensityOverride: json['resistanceIntensityOverride'] == true,
     );
+  }
+
+  static Map<String, int>? decodeStretchIntensities(dynamic input) {
+    if (input == null) return null;
+    if (input is! Map) {
+      throw const FormatException('Invalid muscle intensity map.');
+    }
+    final result = <String, int>{};
+    for (final entry in input.entries) {
+      if (entry.key is! String ||
+          entry.value is! int ||
+          entry.value < 1 ||
+          entry.value > 10) {
+        throw const FormatException(
+          'Muscle intensity scores must be integers from 1 to 10.',
+        );
+      }
+      result[entry.key as String] = entry.value as int;
+    }
+    return Map.unmodifiable(result);
   }
 }
 

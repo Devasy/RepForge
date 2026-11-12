@@ -192,11 +192,13 @@ class MuscleBodyMap extends StatelessWidget {
 
 const _muscleIds = <String, List<String>>{
   'chest': ['chest', 'upper_chest'],
-  'abs': ['core'],
-  'obliques': ['core'],
+  'abs': ['core', 'abs'],
+  'obliques': ['core', 'obliques'],
+  'adductors': ['adductors'],
+  'neck': ['neck_front', 'neck_side', 'neck_back'],
   'biceps': ['biceps'],
   'triceps': ['triceps'],
-  'forearm': ['forearms'],
+  'forearm': ['forearms', 'forearm_anterior', 'forearm_posterior'],
   'quadriceps': ['quads'],
   'hamstring': ['hamstrings'],
   'gluteal': ['glutes'],
@@ -206,13 +208,16 @@ const _muscleIds = <String, List<String>>{
   'lower-back': ['lower_back'],
 };
 
-List<String> _ids(String part, BodyView view) => part == 'deltoids'
-    ? [
+List<String> _ids(String part, BodyView view) => switch (part) {
+  'neck' => [view == BodyView.front ? 'neck_front' : 'neck_back', 'neck_side'],
+  'forearm' => ['forearms', view == BodyView.front ? 'forearm_anterior' : 'forearm_posterior'],
+  'deltoids' => [
         'shoulders',
         view == BodyView.front ? 'front_delts' : 'rear_delts',
         'side_delts',
-      ]
-    : _muscleIds[part] ?? const [];
+      ],
+  _ => _muscleIds[part] ?? const [],
+};
 
 Color _heatColor(double value, [Color color = AppColors.primary]) => value <= 0
     ? AppColors.glass2

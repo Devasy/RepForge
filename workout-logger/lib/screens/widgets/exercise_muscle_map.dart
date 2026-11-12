@@ -4,7 +4,9 @@ import '../../data/exercise_database.dart';
 import '../../data/exercise_muscle_motion.dart';
 import '../../models/models.dart';
 import '../../theme/app_theme.dart';
+import '../../services/extended_exercise_library.dart';
 import 'body_heatmap.dart';
+import 'muscle_intensity_map.dart';
 
 enum MusclePhase { stretched, contracted }
 
@@ -13,8 +15,9 @@ const contractedMuscleColor = Color(0xFFFB7185);
 
 /// Educational phase illustration, not a live muscle-state measurement.
 class ExerciseMuscleMap extends StatefulWidget {
-  const ExerciseMuscleMap({super.key, required this.exercise});
+  const ExerciseMuscleMap({super.key, required this.exercise, this.profile});
   final Exercise exercise;
+  final MuscleIntensityProfile? profile;
   @override
   State<ExerciseMuscleMap> createState() => _ExerciseMuscleMapState();
 }
@@ -24,6 +27,12 @@ class _ExerciseMuscleMapState extends State<ExerciseMuscleMap> {
 
   @override
   Widget build(BuildContext context) {
+    final profile =
+        widget.profile ??
+        (widget.exercise.isCustom
+            ? null
+            : ExtendedExerciseLibrary.builtInProfileFor(widget.exercise.id));
+    if (profile != null) return MuscleIntensityMap(profile: profile);
     final motion = ExerciseMuscleMotion.forExercise(widget.exercise);
     final stretched = _phase == MusclePhase.stretched;
     final color = motion == null

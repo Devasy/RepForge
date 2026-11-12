@@ -208,70 +208,75 @@ class ExerciseDetailsSheet extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           ExerciseDemonstrationSection(exercise: exercise),
           const SizedBox(height: AppSpacing.lg),
-          const RFSectionHeader('Muscle movement'),
+          const RFSectionHeader('Muscle focus'),
           const SizedBox(height: AppSpacing.sm),
-          ExerciseMuscleMap(exercise: exercise),
+          ExerciseMuscleMap(
+            exercise: exercise,
+            profile: provider.muscleProfileFor(exercise.id),
+          ),
           const SizedBox(height: AppSpacing.lg),
 
-          // Muscle activations
-          const RFSectionHeader('Muscle Activation'),
-          const SizedBox(height: AppSpacing.sm),
-          const Text(
-            'Estimated muscle involvement, not measured activation or growth.',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          ...exercise.muscleActivations.map((a) {
-            final muscleColor = AppColors.muscle(a.muscleGroupId);
-            final name = MuscleGroups.names[a.muscleGroupId] ?? a.muscleGroupId;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    margin: const EdgeInsets.only(right: AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: muscleColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      name,
-                      style: const TextStyle(
-                        color: AppColors.textSoft,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 100,
-                    child: RFProgressBar(
-                      value: a.activationPercentage / 100,
-                      color: muscleColor,
-                      height: 6,
-                      showGlow: false,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  SizedBox(
-                    width: 32,
-                    child: Text(
-                      '${a.activationPercentage}%',
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
+          if (provider.muscleProfileFor(exercise.id) == null) ...[
+            const RFSectionHeader('Muscle Activation'),
+            const SizedBox(height: AppSpacing.sm),
+            const Text(
+              'Estimated muscle involvement, not measured activation or growth.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            ...exercise.muscleActivations.map((a) {
+              final muscleColor = AppColors.muscle(a.muscleGroupId);
+              final name =
+                  MuscleGroups.names[a.muscleGroupId] ?? a.muscleGroupId;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      margin: const EdgeInsets.only(right: AppSpacing.sm),
+                      decoration: BoxDecoration(
                         color: muscleColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        shape: BoxShape.circle,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          color: AppColors.textSoft,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 100,
+                      child: RFProgressBar(
+                        value: a.activationPercentage / 100,
+                        color: muscleColor,
+                        height: 6,
+                        showGlow: false,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    SizedBox(
+                      width: 32,
+                      child: Text(
+                        '${a.activationPercentage}%',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: muscleColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
 
           // Last session
           if (lastSession != null) ...[

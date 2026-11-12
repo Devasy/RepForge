@@ -5,6 +5,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'backup_codec.dart';
+import 'extended_exercise_library.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -20,7 +21,7 @@ class SqliteStorageService implements IStorageService {
       _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 9;
+  static const int _dbVersion = 10;
   static const _skinTemperatureSchema =
       '''CREATE TABLE IF NOT EXISTS skin_temperature_samples (
     record_id TEXT NOT NULL,
@@ -116,7 +117,9 @@ class SqliteStorageService implements IStorageService {
       category TEXT NOT NULL,
       is_custom INTEGER NOT NULL DEFAULT 0,
       available_handles TEXT,
-      exercise_type TEXT NOT NULL DEFAULT 'weightAndReps'
+      exercise_type TEXT NOT NULL DEFAULT 'weightAndReps',
+      stretch_intensities TEXT,
+      resistance_intensity_override INTEGER NOT NULL DEFAULT 0
     )''',
     '''CREATE TABLE muscle_groups (
       id TEXT PRIMARY KEY,
@@ -271,6 +274,26 @@ class SqliteStorageService implements IStorageService {
         }
       },
       onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 10) {
+          final tables = await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'exercises'",
+          );
+          if (tables.isNotEmpty) {
+            final columns = (await db.rawQuery(
+              'PRAGMA table_info(exercises)',
+            )).map((row) => row['name']).toSet();
+            if (!columns.contains('stretch_intensities')) {
+              await db.execute(
+                'ALTER TABLE exercises ADD COLUMN stretch_intensities TEXT',
+              );
+            }
+            if (!columns.contains('resistance_intensity_override')) {
+              await db.execute(
+                'ALTER TABLE exercises ADD COLUMN resistance_intensity_override INTEGER NOT NULL DEFAULT 0',
+              );
+            }
+          }
+        }
         if (oldVersion < 9) {
           await db.execute(_skinTemperatureSchema);
         }
@@ -427,14 +450,7 @@ class SqliteStorageService implements IStorageService {
       },
     );
 
-    final count =
-        Sqflite.firstIntValue(
-          await _db.rawQuery('SELECT COUNT(*) FROM muscle_groups'),
-        ) ??
-        0;
-    if (count == 0) {
-      await _seedDefaultMuscleGroups();
-    }
+    await _seedDefaultMuscleGroups();
 
     _initialized = true;
   }
@@ -447,7 +463,7 @@ class SqliteStorageService implements IStorageService {
         'name': mg.name,
         'growth_rate': mg.growthRate,
         'last_updated': mg.lastUpdated.toIso8601String(),
-      });
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
   }
@@ -864,6 +880,12 @@ class SqliteStorageService implements IStorageService {
             ? null
             : jsonEncode(exercise.availableHandles),
         'exercise_type': exercise.exerciseType.name,
+        'stretch_intensities': exercise.stretchIntensities == null
+            ? null
+            : jsonEncode(exercise.stretchIntensities),
+        'resistance_intensity_override': exercise.resistanceIntensityOverride
+            ? 1
+            : 0,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
       for (final ma in exercise.muscleActivations) {
         await txn.insert('exercise_muscle_activations', {
@@ -905,6 +927,12 @@ class SqliteStorageService implements IStorageService {
           : (jsonDecode(row['available_handles'] as String) as List)
                 .cast<String>(),
       exerciseType: type,
+      stretchIntensities: Exercise.decodeStretchIntensities(
+        row['stretch_intensities'] == null
+            ? null
+            : jsonDecode(row['stretch_intensities'] as String),
+      ),
+      resistanceIntensityOverride: row['resistance_intensity_override'] == 1,
       muscleActivations: activations
           .map(
             (a) => MuscleActivation(
@@ -960,9 +988,13 @@ class SqliteStorageService implements IStorageService {
         .map((e) => dbExercises[e.id] ?? e)
         .toList();
     final customOnly = dbExercises.values.where(
-      (e) => e.isCustom && ExerciseDatabase.getById(e.id) == null,
+      (e) => ExerciseDatabase.getById(e.id) == null,
     );
-    return [...builtIn, ...customOnly];
+    final exercises = [...builtIn, ...customOnly];
+    return ExtendedExerciseLibrary.fromCache(
+          await getSetting(ExtendedExerciseLibrary.settingKey),
+        )?.mergeExercises(exercises) ??
+        exercises;
   }
 
   @override
@@ -971,7 +1003,13 @@ class SqliteStorageService implements IStorageService {
     if (rows.isNotEmpty) {
       return _loadCustomExerciseRow(rows.first);
     }
-    return ExerciseDatabase.getById(id);
+    final builtIn = ExerciseDatabase.getById(id);
+    if (builtIn != null) return builtIn;
+    final library = ExtendedExerciseLibrary.fromCache(
+      await getSetting(ExtendedExerciseLibrary.settingKey),
+    );
+    return library?.profiles[id.startsWith('fitify:') ? id.substring(7) : null]
+        ?.toExercise();
   }
 
   // ==================== SETTINGS ====================
