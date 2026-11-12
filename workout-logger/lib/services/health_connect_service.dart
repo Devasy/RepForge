@@ -5,15 +5,108 @@ import 'package:health_connector/health_connector.dart';
 
 import '../models/models.dart' hide ExerciseType;
 import '../models/skin_temperature_sample.dart';
+import '../models/health_connect_workout.dart';
+import 'interfaces/workout_import_health_service.dart';
 import 'interfaces/health_connect_service_interface.dart';
 import 'utils/hc_session_builder.dart';
 
-class HealthConnectService implements IHealthConnectService {
+class HealthConnectService
+    implements IHealthConnectService, IWorkoutImportHealthService {
   HealthConnector? _connector;
 
   static const _statusDeadline = Duration(seconds: 5);
   static const _queryDeadline = Duration(seconds: 10);
   static const _hrQueryDeadline = Duration(seconds: 20);
+
+  @override
+  Future<WorkoutImportAccess> requestWorkoutImportAccess({
+    bool includeHistory = false,
+  }) async {
+    final connector = await _getConnector();
+    if (connector == null) throw StateError('Health Connect is not available.');
+    final read = HealthDataType.exerciseSession.readPermission;
+    final history = HealthPlatformFeature.readHealthDataHistory;
+    final canRequestHistory =
+        includeHistory &&
+        await connector.getFeatureStatus(history) ==
+            HealthPlatformFeatureStatus.available;
+    await connector.requestPermissions([
+      read,
+      if (canRequestHistory) history.permission,
+    ]);
+    return WorkoutImportAccess(
+      exerciseGranted:
+          await connector.getPermissionStatus(read) == PermissionStatus.granted,
+      historyGranted:
+          canRequestHistory &&
+          await connector.getPermissionStatus(history.permission) ==
+              PermissionStatus.granted,
+    );
+  }
+
+  @override
+  Future<List<HealthConnectWorkout>> readFitifyWorkouts(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final connector = await _getConnector();
+    if (connector == null) throw StateError('Health Connect is not available.');
+    var request = HealthDataType.exerciseSession.readInTimeRange(
+      startTime: start,
+      endTime: end,
+      dataOrigins: const [DataOrigin('com.fitifysync.app')],
+      pageSize: 100,
+    );
+    final records = <HealthConnectWorkout>[];
+    final tokens = <String>{};
+    while (true) {
+      final response = await connector
+          .readRecords(request)
+          .timeout(_queryDeadline);
+      for (final record in response.records) {
+        final origin = record.metadata.dataOrigin?.packageName;
+        if (origin != 'com.fitifysync.app') continue;
+        records.add(
+          HealthConnectWorkout(
+            recordId: record.id.value,
+            origin: origin!,
+            clientRecordId: record.metadata.clientRecordId,
+            version: record.metadata.clientRecordVersion ?? 0,
+            start: record.startTime,
+            end: record.endTime,
+            title: record.title,
+            notes: record.notes,
+            segments: [
+              for (final segment in record.segmentEvents)
+                HealthConnectWorkoutSegment(
+                  start: segment.startTime,
+                  end: segment.endTime,
+                  isRest:
+                      segment.segmentType == ExerciseSegmentType.rest ||
+                      segment.segmentType == ExerciseSegmentType.pause,
+                  repetitions: segment.repetitions,
+                  weightKg: segment.weight?.inKilograms,
+                ),
+            ],
+          ),
+        );
+        if (records.length > 2000) {
+          throw StateError('Too many workouts. Choose a shorter date range.');
+        }
+      }
+      final next = response.nextPageRequest;
+      if (next == null) break;
+      request = next;
+      if (request.pageToken case final String token) {
+        if (!tokens.add(token)) {
+          throw StateError(
+            'Health Connect repeated a page token; import stopped.',
+          );
+        }
+      }
+    }
+    return records;
+  }
 
   Future<HealthConnector?> _getConnector() async {
     try {
@@ -28,7 +121,9 @@ class HealthConnectService implements IHealthConnectService {
   @override
   Future<bool> isAvailable() async {
     try {
-      final status = await HealthConnector.getHealthPlatformStatus().timeout(_statusDeadline);
+      final status = await HealthConnector.getHealthPlatformStatus().timeout(
+        _statusDeadline,
+      );
       debugPrint('[HC] isAvailable: platform status = $status');
       return status == HealthPlatformStatus.available;
     } catch (e) {
@@ -58,9 +153,9 @@ class HealthConnectService implements IHealthConnectService {
     try {
       final connector = await _getConnector();
       if (connector == null) return false;
-      final status = await connector.getPermissionStatus(
-        HealthDataType.exerciseSession.writePermission,
-      ).timeout(_statusDeadline);
+      final status = await connector
+          .getPermissionStatus(HealthDataType.exerciseSession.writePermission)
+          .timeout(_statusDeadline);
       return status == PermissionStatus.granted;
     } catch (_) {
       return false;
@@ -81,18 +176,26 @@ class HealthConnectService implements IHealthConnectService {
 
   @override
   Future<bool> requestReadPermissions() async {
-    debugPrint('[HC] requestReadPermissions: requesting ${_readPermissions.length} permissions individually');
+    debugPrint(
+      '[HC] requestReadPermissions: requesting ${_readPermissions.length} permissions individually',
+    );
     final connector = await _getConnector();
     if (connector == null) return false;
     var anyGranted = false;
     for (final entry in _readPermissions.entries) {
       try {
         final results = await connector.requestPermissions([entry.value]);
-        final granted = results.any((r) => r.status == PermissionStatus.granted);
-        debugPrint('[HC] requestReadPermissions: ${entry.key} → granted=$granted');
+        final granted = results.any(
+          (r) => r.status == PermissionStatus.granted,
+        );
+        debugPrint(
+          '[HC] requestReadPermissions: ${entry.key} → granted=$granted',
+        );
         if (granted) anyGranted = true;
       } catch (e) {
-        debugPrint('[HC] requestReadPermissions: ${entry.key} unsupported, skipping ($e)');
+        debugPrint(
+          '[HC] requestReadPermissions: ${entry.key} unsupported, skipping ($e)',
+        );
       }
     }
     debugPrint('[HC] requestReadPermissions: anyGranted = $anyGranted');
@@ -106,11 +209,15 @@ class HealthConnectService implements IHealthConnectService {
     final granted = <HealthReadType>{};
     for (final entry in _readPermissions.entries) {
       try {
-        final status = await connector.getPermissionStatus(entry.value).timeout(_statusDeadline);
+        final status = await connector
+            .getPermissionStatus(entry.value)
+            .timeout(_statusDeadline);
         debugPrint('[HC] grantedReadTypes: ${entry.key} → $status');
         if (status == PermissionStatus.granted) granted.add(entry.key);
       } catch (e) {
-        debugPrint('[HC] grantedReadTypes: ${entry.key} unsupported, skipping ($e)');
+        debugPrint(
+          '[HC] grantedReadTypes: ${entry.key} unsupported, skipping ($e)',
+        );
       }
     }
     debugPrint('[HC] grantedReadTypes: result = $granted');
@@ -125,12 +232,14 @@ class HealthConnectService implements IHealthConnectService {
     try {
       final connector = await _getConnector();
       if (connector == null) return const [];
-      final response = await connector.readRecords(
-        HealthDataType.sleepSession.readInTimeRange(
-          startTime: start,
-          endTime: end,
-        ),
-      ).timeout(_queryDeadline);
+      final response = await connector
+          .readRecords(
+            HealthDataType.sleepSession.readInTimeRange(
+              startTime: start,
+              endTime: end,
+            ),
+          )
+          .timeout(_queryDeadline);
       final result = response.records.map((r) {
         // Tally stage durations from embedded SleepStageSamples and build
         // an ordered stage timeline for HR segment colouring.
@@ -144,18 +253,26 @@ class HealthConnectService implements IHealthConnectService {
             case SleepStage.light:
             case SleepStage.sleeping: // generic "asleep" — count as light
               light += mins;
-              timeline.add(SleepStageInterval(start: cursor, end: segEnd, stage: 'light'));
+              timeline.add(
+                SleepStageInterval(start: cursor, end: segEnd, stage: 'light'),
+              );
             case SleepStage.deep:
               deep += mins;
-              timeline.add(SleepStageInterval(start: cursor, end: segEnd, stage: 'deep'));
+              timeline.add(
+                SleepStageInterval(start: cursor, end: segEnd, stage: 'deep'),
+              );
             case SleepStage.rem:
               rem += mins;
-              timeline.add(SleepStageInterval(start: cursor, end: segEnd, stage: 'rem'));
+              timeline.add(
+                SleepStageInterval(start: cursor, end: segEnd, stage: 'rem'),
+              );
             case SleepStage.awake:
             case SleepStage.outOfBed:
             case SleepStage.inBed:
               awake += mins;
-              timeline.add(SleepStageInterval(start: cursor, end: segEnd, stage: 'awake'));
+              timeline.add(
+                SleepStageInterval(start: cursor, end: segEnd, stage: 'awake'),
+              );
             case SleepStage.unknown:
               break;
           }
@@ -171,13 +288,17 @@ class HealthConnectService implements IHealthConnectService {
           awakeMinutes: hasStages ? awake : null,
           stageTimeline: timeline,
         );
-        debugPrint('[HC]   sleep ${r.startTime.toLocal().hour}:${r.startTime.toLocal().minute.toString().padLeft(2, '0')}'
-            '→${r.endTime.toLocal().hour}:${r.endTime.toLocal().minute.toString().padLeft(2, '0')}'
-            ' actual=${period.minutes}min'
-            '${hasStages ? " (L=$light D=$deep R=$rem A=$awake)" : " (no stages)"}');
+        debugPrint(
+          '[HC]   sleep ${r.startTime.toLocal().hour}:${r.startTime.toLocal().minute.toString().padLeft(2, '0')}'
+          '→${r.endTime.toLocal().hour}:${r.endTime.toLocal().minute.toString().padLeft(2, '0')}'
+          ' actual=${period.minutes}min'
+          '${hasStages ? " (L=$light D=$deep R=$rem A=$awake)" : " (no stages)"}',
+        );
         return period;
       }).toList();
-      debugPrint('[HC] readSleepSessions [$start → $end]: ${result.length} records');
+      debugPrint(
+        '[HC] readSleepSessions [$start → $end]: ${result.length} records',
+      );
       return result;
     } catch (e) {
       debugPrint('[HC] readSleepSessions failed: $e');
@@ -193,16 +314,20 @@ class HealthConnectService implements IHealthConnectService {
     try {
       final connector = await _getConnector();
       if (connector == null) return const [];
-      final response = await connector.readRecords(
-        HealthDataType.restingHeartRate.readInTimeRange(
-          startTime: start,
-          endTime: end,
-        ),
-      ).timeout(_queryDeadline);
+      final response = await connector
+          .readRecords(
+            HealthDataType.restingHeartRate.readInTimeRange(
+              startTime: start,
+              endTime: end,
+            ),
+          )
+          .timeout(_queryDeadline);
       final result = response.records
           .map((r) => HealthSample(time: r.time, value: r.rate.inPerMinute))
           .toList();
-      debugPrint('[HC] readRestingHeartRate [$start → $end]: ${result.length} records');
+      debugPrint(
+        '[HC] readRestingHeartRate [$start → $end]: ${result.length} records',
+      );
       return result;
     } catch (e) {
       debugPrint('[HC] readRestingHeartRate failed: $e');
@@ -215,12 +340,14 @@ class HealthConnectService implements IHealthConnectService {
     try {
       final connector = await _getConnector();
       if (connector == null) return const [];
-      final response = await connector.readRecords(
-        HealthDataType.heartRateVariabilityRMSSD.readInTimeRange(
-          startTime: start,
-          endTime: end,
-        ),
-      ).timeout(_queryDeadline);
+      final response = await connector
+          .readRecords(
+            HealthDataType.heartRateVariabilityRMSSD.readInTimeRange(
+              startTime: start,
+              endTime: end,
+            ),
+          )
+          .timeout(_queryDeadline);
       final result = response.records
           .map((r) => HealthSample(time: r.time, value: r.rmssd.inMilliseconds))
           .toList();
@@ -242,13 +369,15 @@ class HealthConnectService implements IHealthConnectService {
       if (connector == null) return const [];
       // heartRateSeries = Android HeartRateRecord (container with BPM samples).
       // heartRate is iOS-only and throws UNSUPPORTED_OPERATION on Health Connect.
-      final response = await connector.readRecords(
-        HealthDataType.heartRateSeries.readInTimeRange(
-          startTime: start,
-          endTime: end,
-          pageSize: 5000,
-        ),
-      ).timeout(_hrQueryDeadline);
+      final response = await connector
+          .readRecords(
+            HealthDataType.heartRateSeries.readInTimeRange(
+              startTime: start,
+              endTime: end,
+              pageSize: 5000,
+            ),
+          )
+          .timeout(_hrQueryDeadline);
       final samples = response.records
           .expand(
             (r) => r.samples.map(
@@ -256,8 +385,10 @@ class HealthConnectService implements IHealthConnectService {
             ),
           )
           .toList();
-      debugPrint('[HC] readHeartRateSamples [$start → $end]: '
-          '${response.records.length} series records, ${samples.length} samples');
+      debugPrint(
+        '[HC] readHeartRateSamples [$start → $end]: '
+        '${response.records.length} series records, ${samples.length} samples',
+      );
       return samples;
     } catch (e) {
       debugPrint('[HC] readHeartRateSamples failed: $e');
@@ -272,12 +403,14 @@ class HealthConnectService implements IHealthConnectService {
   ) async {
     final connector = await _getConnector();
     if (connector == null) throw StateError('Health Connect unavailable');
-    var response = await connector.readRecords(
-      HealthDataType.skinTemperatureDeltaSeries.readInTimeRange(
-        startTime: start,
-        endTime: end,
-      ),
-    ).timeout(_queryDeadline);
+    var response = await connector
+        .readRecords(
+          HealthDataType.skinTemperatureDeltaSeries.readInTimeRange(
+            startTime: start,
+            endTime: end,
+          ),
+        )
+        .timeout(_queryDeadline);
     final result = <SkinTemperatureSample>[];
     while (true) {
       result.addAll(mapSkinTemperatureRecords(response.records));
@@ -344,6 +477,7 @@ class HealthConnectService implements IHealthConnectService {
     String? title,
     Map<String, String>? exerciseNames,
   }) async {
+    if (session.importSource != null) return false;
     try {
       final connector = await _getConnector();
       if (connector == null) return false;
@@ -357,7 +491,9 @@ class HealthConnectService implements IHealthConnectService {
           startTime: sessionStart,
           endTime: sessionEnd,
           exerciseType: ExerciseType.strengthTraining,
-          metadata: Metadata.manualEntry(clientRecordId: 'workout_${session.id}'),
+          metadata: Metadata.manualEntry(
+            clientRecordId: 'workout_${session.id}',
+          ),
           title: title?.isNotEmpty == true ? title : null,
           notes: buildHcNotes(
             session: session,

@@ -21,6 +21,8 @@ import 'utils/muscle_intensity_validation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
+import '../models/health_connect_workout.dart';
+import 'fitify_workout_import.dart';
 import '../data/exercise_database.dart';
 import 'interfaces/storage_service_interface.dart';
 import 'interfaces/ml_service_interface.dart';
@@ -71,14 +73,8 @@ class WorkoutProvider extends ChangeNotifier {
     final changedWeights =
         baseline != null &&
         !mapEquals(
-          {
-            for (final a in exercise.muscleActivations)
-              a.muscleGroupId: a.activationPercentage,
-          },
-          {
-            for (final a in baseline.muscleActivations)
-              a.muscleGroupId: a.activationPercentage,
-          },
+          exercise.resistanceIntensities,
+          baseline.resistanceIntensities,
         );
     final editedResistance =
         exercise.isCustom ||
@@ -91,15 +87,8 @@ class WorkoutProvider extends ChangeNotifier {
       exerciseType: exercise.exerciseType,
       sourceVersion: source?.sourceVersion ?? '',
       resistance: editedResistance
-          ? {
-              for (final a in exercise.muscleActivations)
-                a.muscleGroupId: a.activationPercentage / 10,
-            }
-          : source?.resistance ??
-                {
-                  for (final a in exercise.muscleActivations)
-                    a.muscleGroupId: a.activationPercentage / 10,
-                },
+          ? exercise.resistanceIntensities
+          : source?.resistance ?? exercise.resistanceIntensities,
       stretch: exercise.stretchIntensities ?? source?.stretch ?? {},
       resistanceAttribution: editedResistance || source == null
           ? 'User/coach estimate'
@@ -1111,6 +1100,93 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== SESSION MANAGEMENT ====================
 
+  List<FitifyImportEntry> previewFitifyWorkouts(
+    List<HealthConnectWorkout> records,
+  ) {
+    final existing = {for (final session in _sessions) session.id: session};
+    return [
+      for (final record in records)
+        FitifyWorkoutImport.inspect(
+          record,
+          exercises: _allExercises,
+          existing: existing[FitifyWorkoutImport.localId(record)],
+        ),
+    ];
+  }
+
+  Future<void>? _importQueue;
+
+  Future<FitifyImportReport> importFitifyWorkouts(
+    List<HealthConnectWorkout> records,
+  ) {
+    final result =
+        _importQueue?.then((_) => _importFitifyWorkouts(records)) ??
+        _importFitifyWorkouts(records);
+    _importQueue = result.then<void>(
+      (_) => null,
+      onError: (Object error, StackTrace stack) {
+        debugPrint('Fitify import stopped: $error');
+      },
+    );
+    return result;
+  }
+
+  Future<FitifyImportReport> _importFitifyWorkouts(
+    List<HealthConnectWorkout> records,
+  ) async {
+    final report = FitifyImportReport();
+    final affected = <String>{};
+    for (final record in records) {
+      try {
+        final id = FitifyWorkoutImport.localId(record);
+        final existing = await _storage.getWorkoutSession(id);
+        final entry = FitifyWorkoutImport.inspect(
+          record,
+          exercises: _allExercises,
+          existing: existing,
+        );
+        if (entry.action == FitifyImportAction.current) {
+          report.current++;
+          continue;
+        }
+        if (!entry.canImport) {
+          report.issues.add(
+            '${record.title ?? 'Fitify workout'}: ${entry.message}',
+          );
+          continue;
+        }
+        final session = entry.session!;
+        // Persist first; do not export an imported workout back to Health Connect.
+        await _storage.saveWorkoutSession(session);
+        affected.addAll(session.exercises.map((e) => e.exerciseId));
+        affected.addAll(
+          existing?.exercises.map((e) => e.exerciseId) ?? const [],
+        );
+        _sessions = [..._sessions.where((s) => s.id != session.id), session]
+          ..sort((a, b) => b.date.compareTo(a.date));
+        _invalidateHistoryCache();
+        if (entry.action == FitifyImportAction.add) {
+          report.added++;
+        } else {
+          report.updated++;
+        }
+      } catch (_) {
+        report.issues.add(
+          '${record.title ?? 'Fitify workout'}: Could not save this workout. Retry the import.',
+        );
+      }
+    }
+    if (affected.isNotEmpty) {
+      await _historyManager?.loadSessions();
+      for (final id in affected) {
+        await _updateGrowthModel(id);
+      }
+      await _recalculateTargets(affected);
+      notifyListeners();
+    }
+    return report;
+  }
+
   /// Delete a workout session
   Future<void> deleteWorkoutSession(String sessionId) async {
     // Find the session to get exercise IDs for model retraining
@@ -1512,16 +1588,46 @@ class WorkoutProvider extends ChangeNotifier {
         final exercise = exerciseMap[log.exerciseId];
         if (exercise == null) continue;
 
-        for (final activation in exercise.muscleActivations) {
-          final muscleVolume =
-              log.totalVolume * (activation.activationPercentage / 100);
-          volumeByMuscle[activation.muscleGroupId] =
-              (volumeByMuscle[activation.muscleGroupId] ?? 0) + muscleVolume;
+        for (final intensity in exercise.resistanceIntensities.entries) {
+          final muscleVolume = log.totalVolume * intensity.value / 10;
+          volumeByMuscle[intensity.key] =
+              (volumeByMuscle[intensity.key] ?? 0) + muscleVolume;
         }
       }
     }
 
     return volumeByMuscle;
+  }
+
+  bool hasUnknownLoadsSince(DateTime start) => _sessions.any(
+    (session) =>
+        !session.date.isBefore(start) &&
+        session.exercises.any(
+          (log) =>
+              log.sets.any((set) => set.loadMode == WorkoutLoadMode.unknown),
+        ),
+  );
+
+  /// Weighted completed sets, kept separate from load volume for bodyweight work.
+  Map<String, double> getMuscleTrainingExposure({DateTime? since}) {
+    final start = since ?? DateTime.now().subtract(const Duration(days: 7));
+    final scores = <String, double>{};
+    for (final session in _sessions) {
+      if (session.date.isBefore(start)) continue;
+      for (final log in session.exercises) {
+        final exercise = getExercise(log.exerciseId);
+        if (exercise == null) continue;
+        final sets = log.sets
+            .where((s) => s.reps > 0 || (s.timeTaken ?? 0) > 0)
+            .length;
+        for (final entry in exercise.resistanceIntensities.entries) {
+          if (entry.value > 0 && sets > 0)
+            scores[entry.key] =
+                (scores[entry.key] ?? 0) + sets * entry.value / 10;
+        }
+      }
+    }
+    return scores;
   }
 
   /// Per-muscle recovery scores using exponential decay (recovery = 1 − e^(−t/τ)).
@@ -1616,11 +1722,11 @@ class WorkoutProvider extends ChangeNotifier {
       for (final log in session.exercises) {
         final exercise = exerciseMap[log.exerciseId];
         if (exercise == null) continue;
-        for (final activation in exercise.muscleActivations) {
-          if (activation.muscleGroupId != muscleId) continue;
+        for (final intensity in exercise.resistanceIntensities.entries) {
+          if (intensity.key != muscleId) continue;
           byExercise[log.exerciseId] =
               (byExercise[log.exerciseId] ?? 0) +
-              log.totalVolume * (activation.activationPercentage / 100);
+              log.totalVolume * intensity.value / 10;
         }
       }
     }
@@ -1694,12 +1800,10 @@ class WorkoutProvider extends ChangeNotifier {
       for (final log in session.exercises) {
         final exercise = exerciseMap[log.exerciseId];
         if (exercise == null) continue;
-        final activation = exercise.muscleActivations
-            .where((a) => a.muscleGroupId == muscleId)
-            .firstOrNull;
-        if (activation == null) continue;
+        final intensity = exercise.resistanceIntensities[muscleId];
+        if (intensity == null) continue;
         names.add(exercise.name);
-        vol += log.totalVolume * (activation.activationPercentage / 100);
+        vol += log.totalVolume * intensity / 10;
       }
       if (names.isNotEmpty) {
         result.add((date: session.date, exerciseNames: names, volume: vol));
@@ -1727,11 +1831,11 @@ class WorkoutProvider extends ChangeNotifier {
       for (final log in session.exercises) {
         final exercise = exerciseMap[log.exerciseId];
         if (exercise == null) continue;
-        for (final activation in exercise.muscleActivations) {
-          if (activation.muscleGroupId != muscleId) continue;
+        for (final intensity in exercise.resistanceIntensities.entries) {
+          if (intensity.key != muscleId) continue;
           buckets[weekIndex] =
               (buckets[weekIndex] ?? 0) +
-              log.totalVolume * (activation.activationPercentage / 100);
+              log.totalVolume * intensity.value / 10;
         }
       }
     }

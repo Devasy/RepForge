@@ -25,6 +25,7 @@ import '../services/managers/readiness_manager.dart';
 import '../services/health_data_sync_service.dart';
 import '../theme/app_theme.dart';
 import 'widgets/profile_sections.dart';
+import 'widgets/fitify_workout_import_card.dart';
 import 'widgets/langfuse_settings.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -470,6 +471,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ? null
                       : _syncHealthDataNow,
                 ),
+                const SizedBox(height: AppSpacing.md),
+                const FitifyWorkoutImportCard(),
                 const SizedBox(height: AppSpacing.md),
                 DataManagementSection(
                   isExporting: _isExporting,

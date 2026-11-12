@@ -423,7 +423,8 @@ class _MuscleFocusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final byMuscle = provider.getWeeklyVolumeByMuscle();
+    final exposure = provider.hasUnknownLoadsSince(DateTime.now().subtract(const Duration(days:7)));
+    final byMuscle = exposure ? provider.getMuscleTrainingExposure() : provider.getWeeklyVolumeByMuscle();
     final recovery = provider.getMuscleRecoveryScores();
     final growth = provider.getMuscleGrowthModels();
 
@@ -444,7 +445,7 @@ class _MuscleFocusCard extends StatelessWidget {
 
     return _ChartCard(
       title: 'Muscle Focus',
-      subtitle: 'Weekly volume · recovery · trend — tap a muscle',
+      subtitle: exposure ? 'Weighted sets · recovery — missing loads stay unknown' : 'Weekly volume · recovery · trend — tap a muscle',
       child: Column(
         children: [
           MuscleBodyMap(
@@ -463,9 +464,10 @@ class _MuscleFocusCard extends StatelessWidget {
                 _MuscleFocusRow(
                   muscleId: id,
                   weeklyVolume: byMuscle[id] ?? 0,
+                  exposure: exposure,
                   fraction: maxVol > 0 ? (byMuscle[id] ?? 0) / maxVol : 0,
                   recovery: recovery[id],
-                  growth: growth[id],
+                  growth: exposure ? null : growth[id],
                   settings: settings,
                   onTap: () => _openDrillDown(context, id),
                 ),
@@ -493,6 +495,7 @@ class _MuscleFocusRow extends StatelessWidget {
   const _MuscleFocusRow({
     required this.muscleId,
     required this.weeklyVolume,
+    this.exposure = false,
     required this.fraction,
     required this.recovery,
     required this.growth,
@@ -502,6 +505,7 @@ class _MuscleFocusRow extends StatelessWidget {
 
   final String muscleId;
   final double weeklyVolume;
+  final bool exposure;
   final double fraction;
   final MuscleRecoveryStatus? recovery;
   final GrowthModel? growth;
@@ -541,7 +545,7 @@ class _MuscleFocusRow extends StatelessWidget {
     final name = MuscleGroups.names[muscleId] ?? muscleId;
     final color = AppColors.muscle(muscleId);
     final trend = _trend;
-    final displayVol = settings.toDisplay(weeklyVolume);
+    final displayVol = exposure ? weeklyVolume : settings.toDisplay(weeklyVolume);
 
     return GestureDetector(
       onTap: onTap,
@@ -564,7 +568,7 @@ class _MuscleFocusRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${_fmtK(displayVol)} ${settings.unitLabel}',
+                  exposure ? '${displayVol.toStringAsFixed(1)} weighted sets' : '${_fmtK(displayVol)} ${settings.unitLabel}',
                   style: TextStyle(fontFamily: 'GeistMono', 
                     color: AppColors.textMuted,
                     fontSize: 11,

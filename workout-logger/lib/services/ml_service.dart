@@ -78,9 +78,7 @@ class MLService implements IMLService {
     for (final session in sorted) {
       final incompatible = session.exercises.any(
         (log) =>
-            (exerciseMap[log.exerciseId]?.muscleActivations.any(
-                  (a) => a.muscleGroupId == muscleGroupId,
-                ) ??
+            (exerciseMap[log.exerciseId]?.resistanceIntensities.containsKey(muscleGroupId) ??
                 false) &&
             log.sets.any(
               (set) =>

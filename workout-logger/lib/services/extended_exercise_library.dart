@@ -101,13 +101,7 @@ class MuscleIntensityProfile {
     category: 'other',
     exerciseType: exerciseType,
     // Relative involvement weights, not measured activation percentages.
-    muscleActivations: [
-      for (final entry in resistance.entries)
-        MuscleActivation(
-          muscleGroupId: entry.key,
-          activationPercentage: (entry.value * 10).round(),
-        ),
-    ],
+    resistanceIntensities: resistance,
   );
 }
 
@@ -132,6 +126,13 @@ class ExtendedExerciseLibrary {
 
   static MuscleIntensityProfile? builtInProfileFor(String id) =>
       _builtInProfiles[id];
+
+  static String? builtInIdForCode(String code) {
+    for (final entry in _builtInProfiles.entries) {
+      if (entry.value.code == code) return entry.key;
+    }
+    return null;
+  }
 
   factory ExtendedExerciseLibrary.fromJson(String text) {
     if (utf8.encode(text).length > maxBytes) {

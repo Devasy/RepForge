@@ -87,7 +87,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final months = grouped.keys.toList();
 
     final totalVolume = all.fold<double>(0, (s, e) => s + e.totalVolume);
-    final hasUnsynced = settings.healthConnectEnabled && all.any((s) => s.hcSyncedAt == null);
+    final hasUnsynced = settings.healthConnectEnabled && all.any((s) => s.hcSyncedAt == null && s.importSource == null);
 
     return Stack(
       children: [
@@ -502,7 +502,7 @@ class _MonthGroup extends StatelessWidget {
             session: s,
             provider: provider,
             historyManager: historyManager,
-            showSync: settings.healthConnectEnabled && s.hcSyncedAt == null,
+            showSync: settings.healthConnectEnabled && s.hcSyncedAt == null && s.importSource == null,
           ),
         ),
       ],
@@ -625,7 +625,7 @@ class _HistoryCard extends StatelessWidget {
     final routineName = session.routineId != null
         ? provider.routines.cast<Routine?>().firstWhere(
             (r) => r?.id == session.routineId, orElse: () => null)?.name ?? 'Workout'
-        : 'Quick Workout';
+        : (session.importSource?['rawRecord']?['title'] as String? ?? (session.importSource != null ? 'Fitify workout' : 'Quick Workout'));
 
     return GestureDetector(
       onTap: () => _openDetails(context),

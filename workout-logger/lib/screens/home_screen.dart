@@ -729,15 +729,17 @@ class _DashboardTab extends StatelessWidget {
         .where((s) => s.date.isAfter(weekStart.subtract(const Duration(days: 1))))
         .toList();
 
-    final muscleVols = <String, double>{};
+    final exposure = provider.hasUnknownLoadsSince(weekStart.subtract(const Duration(days:1)));
+    final muscleVols = exposure ? provider.getMuscleTrainingExposure(since:weekStart.subtract(const Duration(days:1))) : <String, double>{};
     for (final s in weekSessions) {
+      if(exposure) break;
       for (final el in s.exercises) {
         final ex = provider.getExercise(el.exerciseId);
         if (ex == null) continue;
         final vol = settings.toDisplay(el.totalVolume);
-        for (final ma in ex.muscleActivations) {
-          muscleVols[ma.muscleGroupId] =
-              (muscleVols[ma.muscleGroupId] ?? 0) + vol * ma.activationPercentage / 100;
+        for (final intensity in ex.resistanceIntensities.entries) {
+          muscleVols[intensity.key] =
+              (muscleVols[intensity.key] ?? 0) + vol * intensity.value / 10;
         }
       }
     }
@@ -748,7 +750,7 @@ class _DashboardTab extends StatelessWidget {
     final topMuscles = muscleList.take(5).toList();
 
     final normalizedVols = {
-      for (final e in muscleVols.entries) e.key: e.value / maxVol
+      if(maxVol>0) for (final e in muscleVols.entries) e.key: e.value / maxVol
     };
 
     return GlassCard(
@@ -760,7 +762,7 @@ class _DashboardTab extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Weekly muscle volume',
+                exposure ? 'Weekly muscle exposure' : 'Weekly muscle volume',
                 style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -768,7 +770,7 @@ class _DashboardTab extends StatelessWidget {
                 ),
               ),
               Text(
-                settings.unitLabel,
+                exposure ? 'weighted sets' : settings.unitLabel,
                 style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 11,
                   color: AppColors.textMuted,

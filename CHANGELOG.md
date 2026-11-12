@@ -12,10 +12,14 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 - Ask Coach to create or edit custom exercises with primary and secondary muscle involvement estimates, with validation of muscle names and weights and clear labelling that these are estimates.
 - View separate per-muscle resistance and stretch scores, including Coach-created multi-muscle exercises and enriched references for existing exercises.
 - Download the optional 937-exercise extended library from the public JSON catalogue and keep it available offline without losing existing exercise IDs, edits or backups.
+- Import FitifySync workouts from Health Connect in Profile: choose dates, preview exact exercises and repeated sets, and save resolved workouts into history and muscle recovery. Re-importing avoids duplicates and protects local edits.
+- See resistance-weighted set exposure in muscle heatmaps when workouts have unknown loads, keeping bodyweight training visible without inventing kilograms.
+- Store resistance and stretch maps together on each exercise, migrating existing muscle weights without rounding and removing the activation join table.
 
 ### Known limitations
 
 - Skin-temperature analysis requires a supported Health Connect version, read permission, and recorded temperature and sleep data; temperature provides supporting context and does not change the readiness score.
+- Fitify imports require the updated FitifySync notes payload and exercise-read permission. Older history requires supported history access. Unknown exercise codes remain unresolved; segment timings are reconstructed, missing loads stay unknown, and source deletions are not automatically applied to local history.
 
 ## [2.2.2]
 

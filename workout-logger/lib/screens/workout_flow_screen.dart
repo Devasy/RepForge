@@ -217,7 +217,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
         : exercise.id == 'push_ups'
         ? WorkoutLoadMode.weighted
         : lastSet?.loadMode != null &&
-              lastSet!.loadMode != WorkoutLoadMode.external
+              (lastSet!.loadMode == WorkoutLoadMode.assisted ||
+                  lastSet.loadMode == WorkoutLoadMode.weighted)
         ? lastSet.loadMode
         : WorkoutLoadMode.assisted;
     if (lastSet != null) {

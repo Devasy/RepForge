@@ -1,7 +1,6 @@
 import 'package:repforge/models/skin_temperature_sample.dart';
 // Unit tests for HealthSyncManager
 
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/interfaces/health_connect_service_interface.dart';
@@ -13,7 +12,10 @@ import 'test_utils/mock_storage_service.dart';
 
 class _MockHcService implements IHealthConnectService {
   @override
-  Future<List<SkinTemperatureSample>> readSkinTemperature(DateTime start, DateTime end) async => const [];
+  Future<List<SkinTemperatureSample>> readSkinTemperature(
+    DateTime start,
+    DateTime end,
+  ) async => const [];
 
   int syncCallCount = 0;
   WorkoutSession? lastSession;
@@ -40,20 +42,26 @@ class _MockHcService implements IHealthConnectService {
   Future<Set<HealthReadType>> grantedReadTypes() async => const {};
 
   @override
-  Future<List<SleepPeriod>> readSleepSessions(DateTime start, DateTime end) async =>
-      const [];
+  Future<List<SleepPeriod>> readSleepSessions(
+    DateTime start,
+    DateTime end,
+  ) async => const [];
 
   @override
-  Future<List<HealthSample>> readRestingHeartRate(DateTime start, DateTime end) async =>
-      const [];
+  Future<List<HealthSample>> readRestingHeartRate(
+    DateTime start,
+    DateTime end,
+  ) async => const [];
 
   @override
   Future<List<HealthSample>> readHrvRmssd(DateTime start, DateTime end) async =>
       const [];
 
   @override
-  Future<List<HealthSample>> readHeartRateSamples(DateTime start, DateTime end) async =>
-      const [];
+  Future<List<HealthSample>> readHeartRateSamples(
+    DateTime start,
+    DateTime end,
+  ) async => const [];
 
   @override
   Future<bool> syncWorkoutSession(
@@ -115,16 +123,27 @@ void main() {
       expect(hc.lastTitle, 'Push Day');
     });
 
+    test(
+      'never re-exports imported workouts even when sync is enabled',
+      () async {
+        await settings.setHealthConnectEnabled(true);
+        HealthSyncManager(hc, settings).syncSession(
+          _makeSession().copyWith(
+            importSource: {'origin': 'com.fitifysync.app'},
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(hc.syncCallCount, 0);
+      },
+    );
+
     test('calls onSynced with updated session when sync succeeds', () async {
       await settings.setHealthConnectEnabled(true);
       hc = _MockHcService(returnValue: true);
       final manager = HealthSyncManager(hc, settings);
 
       WorkoutSession? syncedSession;
-      manager.syncSession(
-        _makeSession(),
-        onSynced: (s) => syncedSession = s,
-      );
+      manager.syncSession(_makeSession(), onSynced: (s) => syncedSession = s);
       await Future<void>.delayed(Duration.zero);
 
       expect(syncedSession, isNotNull);
@@ -137,10 +156,7 @@ void main() {
       final manager = HealthSyncManager(hc, settings);
 
       WorkoutSession? syncedSession;
-      manager.syncSession(
-        _makeSession(),
-        onSynced: (s) => syncedSession = s,
-      );
+      manager.syncSession(_makeSession(), onSynced: (s) => syncedSession = s);
       await Future<void>.delayed(Duration.zero);
 
       expect(syncedSession, isNull);

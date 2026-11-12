@@ -76,7 +76,9 @@ List<({DateTime date, ExerciseLog log})> comparableExerciseLogs(
   final logs = [
     for (final session in sessions)
       for (final log in session.exercises)
-        if (log.exerciseId == exerciseId && log.sets.isNotEmpty)
+        if (log.exerciseId == exerciseId &&
+            log.sets.isNotEmpty &&
+            log.sets.every((set) => set.loadMode != WorkoutLoadMode.unknown))
           (date: session.date, log: log),
   ]..sort((a, b) => b.date.compareTo(a.date));
   if (logs.isEmpty) return [];
@@ -93,7 +95,8 @@ Map<String, WorkoutSet> latestLoadReferences(List<WorkoutSession> sessions) {
   final references = <String, WorkoutSet>{};
   for (final session in sorted) {
     for (final log in session.exercises) {
-      if (log.sets.isNotEmpty) {
+      if (log.sets.isNotEmpty &&
+          log.sets.every((set) => set.loadMode != WorkoutLoadMode.unknown)) {
         references.putIfAbsent(log.exerciseId, () => log.sets.last);
       }
     }

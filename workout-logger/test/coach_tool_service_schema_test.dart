@@ -32,11 +32,7 @@ void main() {
         final properties = schema['properties'] as Map;
         expect(
           properties.keys,
-          containsAll([
-            'muscle_activations',
-            'resistance_intensities',
-            'stretch_intensities',
-          ]),
+          containsAll(['resistance_intensities', 'stretch_intensities']),
         );
         for (final key in ['resistance_intensities', 'stretch_intensities']) {
           final values = properties[key] as Map;
@@ -45,6 +41,7 @@ void main() {
             (values['items'] as Map)['required'],
             containsAll(['muscle', 'intensity']),
           );
+          expect(properties, isNot(contains('muscle_activations')));
         }
       }
       wp.dispose();

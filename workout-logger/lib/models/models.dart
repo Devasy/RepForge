@@ -82,7 +82,7 @@ bool isAssistedBodyweightExercise(String? exerciseId) =>
 bool isBodyweightExercise(String? id) =>
     id == 'push_ups' || isAssistedBodyweightExercise(id);
 
-enum WorkoutLoadMode { external, assisted, weighted }
+enum WorkoutLoadMode { external, assisted, weighted, unknown }
 
 enum ExerciseType {
   weightAndReps,
@@ -101,7 +101,25 @@ enum ExerciseType {
 class Exercise {
   final String id;
   final String name;
-  final List<MuscleActivation> muscleActivations;
+  final List<MuscleActivation> _legacyMuscleActivations;
+  final Map<String, num>? _resistanceIntensities;
+  Map<String, num> get resistanceIntensities =>
+      _resistanceIntensities ??
+      {
+        for (final muscle in _legacyMuscleActivations)
+          muscle.muscleGroupId: muscle.activationPercentage / 10,
+      };
+
+  /// Compatibility for existing analytics; persistence uses intensity maps.
+  List<MuscleActivation> get muscleActivations => _resistanceIntensities == null
+      ? _legacyMuscleActivations
+      : [
+          for (final entry in _resistanceIntensities.entries)
+            MuscleActivation(
+              muscleGroupId: entry.key,
+              activationPercentage: (entry.value * 10).round(),
+            ),
+        ];
   final Map<String, int>? stretchIntensities;
   final bool resistanceIntensityOverride;
   final String category; // 'compound' or 'isolation'
@@ -113,19 +131,22 @@ class Exercise {
   const Exercise({
     required this.id,
     required this.name,
-    required this.muscleActivations,
+    List<MuscleActivation> muscleActivations = const [],
+    Map<String, num>? resistanceIntensities,
     required this.category,
     this.stretchIntensities,
     this.resistanceIntensityOverride = false,
     this.isCustom = false,
     this.availableHandles,
     this.exerciseType = ExerciseType.weightAndReps,
-  });
+  }) : _legacyMuscleActivations = muscleActivations,
+       _resistanceIntensities = resistanceIntensities;
 
   Exercise copyWith({
     String? id,
     String? name,
     List<MuscleActivation>? muscleActivations,
+    Map<String, num>? resistanceIntensities,
     Map<String, int>? stretchIntensities,
     bool? resistanceIntensityOverride,
     String? category,
@@ -135,7 +156,10 @@ class Exercise {
   }) => Exercise(
     id: id ?? this.id,
     name: name ?? this.name,
-    muscleActivations: muscleActivations ?? this.muscleActivations,
+    muscleActivations: muscleActivations ?? const [],
+    resistanceIntensities:
+        resistanceIntensities ??
+        (muscleActivations == null ? this.resistanceIntensities : null),
     stretchIntensities: stretchIntensities ?? this.stretchIntensities,
     resistanceIntensityOverride:
         resistanceIntensityOverride ?? this.resistanceIntensityOverride,
@@ -156,7 +180,7 @@ class Exercise {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
-    'muscleActivations': muscleActivations.map((m) => m.toJson()).toList(),
+    'resistanceIntensities': resistanceIntensities,
     if (stretchIntensities != null) 'stretchIntensities': stretchIntensities,
     if (resistanceIntensityOverride) 'resistanceIntensityOverride': true,
     'category': category,
@@ -183,7 +207,10 @@ class Exercise {
     return Exercise(
       id: json['id'],
       name: json['name'],
-      muscleActivations: (json['muscleActivations'] as List)
+      resistanceIntensities: decodeResistanceIntensities(
+        json['resistanceIntensities'],
+      ),
+      muscleActivations: (json['muscleActivations'] as List? ?? [])
           .map((m) => MuscleActivation.fromJson(m))
           .toList(),
       category: json['category'],
@@ -211,6 +238,25 @@ class Exercise {
         );
       }
       result[entry.key as String] = entry.value as int;
+    }
+    return Map.unmodifiable(result);
+  }
+
+  static Map<String, num>? decodeResistanceIntensities(dynamic input) {
+    if (input == null) return null;
+    if (input is! Map) throw const FormatException('Invalid resistance map.');
+    final result = <String, num>{};
+    for (final entry in input.entries) {
+      if (entry.key is! String ||
+          entry.value is! num ||
+          !(entry.value as num).isFinite ||
+          entry.value < 0 ||
+          entry.value > 10) {
+        throw const FormatException(
+          'Resistance scores must be between 0 and 10.',
+        );
+      }
+      result[entry.key as String] = entry.value as num;
     }
     return Map.unmodifiable(result);
   }
@@ -286,11 +332,16 @@ class WorkoutSet {
   /// Version 0 preserves raw historical data. Version 1 uses a recorded BW.
   /// Consumers must compare only matching conventions, never backfill BW.
   String get loadConvention =>
-      '$loadEncodingVersion:${loadMode == WorkoutLoadMode.external ? 'external' : 'bodyweight'}';
+      '$loadEncodingVersion:${loadMode == WorkoutLoadMode.unknown
+          ? 'unknown'
+          : loadMode == WorkoutLoadMode.external
+          ? 'external'
+          : 'bodyweight'}';
   bool hasComparableLoad(WorkoutSet other) =>
       loadConvention == other.loadConvention;
 
   double effectiveLoad(double enteredWeight, {double? userBodyWeight}) {
+    if (loadMode == WorkoutLoadMode.unknown) return 0;
     if (loadMode == WorkoutLoadMode.external) return enteredWeight;
     final bw = bodyWeightAtLog ?? userBodyWeight ?? 70.0;
     if (loadMode == WorkoutLoadMode.weighted) {
@@ -305,7 +356,9 @@ class WorkoutSet {
     assistWeight: null,
     extraWeight: null,
     bodyWeightAtLog: null,
-    loadMode: WorkoutLoadMode.external,
+    loadMode: loadMode == WorkoutLoadMode.unknown
+        ? WorkoutLoadMode.unknown
+        : WorkoutLoadMode.external,
     loadEncodingVersion: 0,
     drops: drops
         ?.map(
@@ -319,6 +372,7 @@ class WorkoutSet {
   );
 
   double calculateVolume({double? userBodyWeight, bool? isAssistedBW}) {
+    if (loadMode == WorkoutLoadMode.unknown) return 0;
     // Explicit override is retained only for legacy callers. Stored modes win.
     double load(double value) =>
         loadMode == WorkoutLoadMode.external && isAssistedBW == true
@@ -514,6 +568,9 @@ class WorkoutSession {
   final int duration; // minutes
   final String? notes;
 
+  /// Source identity, original payload and last imported content snapshot.
+  final Map<String, dynamic>? importSource;
+
   /// Non-null when this session was successfully synced to Health Connect.
   final DateTime? hcSyncedAt;
 
@@ -532,6 +589,7 @@ class WorkoutSession {
     required this.exercises,
     required this.duration,
     this.notes,
+    this.importSource,
     this.hcSyncedAt,
     this.sessionEffort,
   });
@@ -549,6 +607,7 @@ class WorkoutSession {
     'exercises': exercises.map((e) => e.toJson()).toList(),
     'duration': duration,
     'notes': notes,
+    if (importSource != null) 'importSource': importSource,
     'hcSyncedAt': hcSyncedAt?.toIso8601String(),
     'sessionEffort': sessionEffort,
   };
@@ -565,6 +624,9 @@ class WorkoutSession {
         .toList(),
     duration: json['duration'],
     notes: json['notes'],
+    importSource: json['importSource'] == null
+        ? null
+        : Map<String, dynamic>.from(json['importSource'] as Map),
     hcSyncedAt: json['hcSyncedAt'] != null
         ? DateTime.parse(json['hcSyncedAt'] as String)
         : null,
@@ -582,6 +644,7 @@ class WorkoutSession {
     Object? duration = _sentinel,
     Object? notes = _sentinel,
     Object? hcSyncedAt = _sentinel,
+    Object? importSource = _sentinel,
     Object? sessionEffort = _sentinel,
   }) => WorkoutSession(
     id: id == _sentinel ? this.id : id as String,
@@ -602,6 +665,9 @@ class WorkoutSession {
     hcSyncedAt: hcSyncedAt == _sentinel
         ? this.hcSyncedAt
         : hcSyncedAt as DateTime?,
+    importSource: importSource == _sentinel
+        ? this.importSource
+        : importSource as Map<String, dynamic>?,
     sessionEffort: sessionEffort == _sentinel
         ? this.sessionEffort
         : sessionEffort as int?,

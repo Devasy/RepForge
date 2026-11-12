@@ -39,28 +39,6 @@ class CoachToolService {
        _hh = healthHistory,
        _sql = sqlQuery;
 
-  static Schema get _muscleActivationsSchema => Schema.array(
-    description:
-        'Optional complete primary and secondary muscle involvement estimates. '
-        'Each muscle must be a known group, appear once, and have an integer '
-        'weight from 1 to 100. Include primary_muscle with the unique highest '
-        'weight. Weights are independent, do not have to sum to 100, and are '
-        'not measured EMG or muscle growth. Omit to retain existing assignments '
-        'on update or use the legacy primary-only default on creation.',
-    nullable: true,
-    items: Schema.object(
-      properties: {
-        'muscle': Schema.string(
-          description: 'Existing muscle group name or ID.',
-        ),
-        'activation_percentage': Schema.integer(
-          description: 'Estimated independent involvement weight, 1 to 100.',
-        ),
-      },
-      requiredProperties: ['muscle', 'activation_percentage'],
-    ),
-  );
-
   static Schema get _muscleIntensitiesSchema => Schema.array(
     description:
         'Complete per-muscle estimated intensity scores, integers 1–10. '
@@ -68,7 +46,7 @@ class CoachToolService {
         'Scores are independent and need not sum to 10. Omit to preserve existing scores; '
         'an empty list clears this dataset. Stretch never adds resistance load. '
         'For resistance, primary_muscle must have a highest score (ties allowed). '
-        'Use resistance_intensities instead of muscle_activations for 1–10 scores. '
+        'Use separate resistance_intensities and stretch_intensities maps. '
         'These are estimates, not measured activation or muscle growth.',
     nullable: true,
     items: Schema.object(
@@ -412,7 +390,7 @@ class CoachToolService {
               'muscle group (call get_muscle_recovery or list routines first '
               'if unsure of the available muscle names). After creating it you '
               'can reference it by name in create_routine / update_routine. '
-              'Use resistance_intensities and stretch_intensities for all involved muscles. Legacy muscle_activations supplies resistance involvement on a 1–100 scale.',
+              'Use resistance_intensities and stretch_intensities for all involved muscles.',
           Schema.object(
             properties: {
               'name': Schema.string(
@@ -428,7 +406,6 @@ class CoachToolService {
                     'Primary muscle group this exercise targets, e.g. "Chest" '
                     'or "Biceps". Must match an existing muscle group.',
               ),
-              'muscle_activations': _muscleActivationsSchema,
               'resistance_intensities': _muscleIntensitiesSchema,
               'stretch_intensities': _muscleIntensitiesSchema,
               'exercise_type': Schema.string(
@@ -477,7 +454,6 @@ class CoachToolService {
                     'Optional. Primary muscle group name (e.g. "Chest", "Biceps").',
                 nullable: true,
               ),
-              'muscle_activations': _muscleActivationsSchema,
               'resistance_intensities': _muscleIntensitiesSchema,
               'stretch_intensities': _muscleIntensitiesSchema,
               'available_handles': Schema.array(
@@ -565,15 +541,14 @@ class CoachToolService {
     'Run a read-only SQL SELECT query directly against the workout database '
         'for complex questions and to verify contradictory or incomplete tool results (custom joins, filters, '
         'or aggregations). Tables:\n'
-        'sessions(id, date, routine_id, duration_min, notes, hc_synced_at, session_effort, program_id, program_day_id, program_week_number)\n'
+        'sessions(id, date, routine_id, duration_min, notes, hc_synced_at, session_effort, program_id, program_day_id, program_week_number, import_source)\n'
         'exercise_logs(id, session_id, exercise_id, notes, handle)\n'
         'sets(id, exercise_log_id, weight, reps, is_dropset, drops_json, '
         'time_taken, timestamp, assist_weight, extra_weight, handle, body_weight_at_log, load_mode, load_encoding_version)\n'
-        'exercises(id, name, category, is_custom, available_handles, exercise_type, stretch_intensities, resistance_intensity_override) — custom '
+        'exercises(id, name, category, is_custom, available_handles, exercise_type, resistance_intensities, stretch_intensities, resistance_intensity_override) — custom '
         'exercises and built-in overrides (is_custom=0 indicates an override of a built-in exercise)\n'
-        'stretch_intensities is optional JSON of per-muscle stretch scores (1–10), separate from resistance; never include it in resistance load.\n'
+        'resistance_intensities and stretch_intensities are JSON maps of muscle IDs to independent 1–10 scores. Legacy resistance may have decimals. Stretch never contributes to resistance load.\n'
         'muscle_groups(id, name, growth_rate, last_updated)\n'
-        'exercise_muscle_activations(exercise_id, muscle_group_id, activation_percentage)\n'
         'routines(id, name, created_at)\n'
         'routine_exercises(routine_id, exercise_id, position, default_handle)\n'
         'targets(id, exercise_id, target_type, target_value, current_value, '
@@ -609,7 +584,7 @@ class CoachToolService {
         'When joining tables, select explicit columns with aliases (e.g. s.id AS '
         'session_id, l.id AS log_id) instead of SELECT *, since duplicate column '
         'names across joined tables will silently collide.\n'
-        'Built-ins without overrides are absent from exercises AND exercise_muscle_activations: discover group IDs with get_logged_exercises, filter exercise_logs.exercise_id IN those IDs, and LEFT JOIN names. Do not require a catalogue or activation row for built-in logs. If joining activations for custom exercises, use EXISTS to avoid duplicating sets. Explicitly filter requested dates; separate handles and load encodings. Only SELECT/WITH statements are allowed, one statement per call.',
+        'Built-ins without overrides are absent from exercises: discover group IDs with get_logged_exercises, filter exercise_logs.exercise_id IN those IDs, and LEFT JOIN names. Do not require a catalogue row for built-in logs. The activation join table has been removed. Resolve muscle membership with get_logged_exercises; never multiply sets by muscle entries. Explicitly filter requested dates; separate handles and load encodings. Imported sets with load_mode=unknown have no known load; exclude them from tonnage and load trends and use reps, duration or weighted-set exposure instead. Reconstructed segment times are not measured HR boundaries. Only SELECT/WITH statements are allowed, one statement per call.',
     Schema.object(
       properties: {
         'query': Schema.string(

@@ -122,10 +122,9 @@ class RecoveryCalculator {
       final exercise = exerciseMap[log.exerciseId];
       if (exercise == null) continue;
       final total = log.totalVolume;
-      for (final activation in exercise.muscleActivations) {
-        volumes[activation.muscleGroupId] =
-            (volumes[activation.muscleGroupId] ?? 0.0) +
-                total * activation.activationPercentage / 100.0;
+      for (final intensity in exercise.resistanceIntensities.entries) {
+        volumes[intensity.key] =
+            (volumes[intensity.key] ?? 0.0) + total * intensity.value / 10.0;
       }
     }
     return volumes;

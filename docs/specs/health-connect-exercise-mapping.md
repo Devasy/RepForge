@@ -1,72 +1,90 @@
 # Health Connect exercise and muscle mapping
 
-Target release: `r2.2.3`. The full external-workout import is not implemented yet.
-Coach can now create/edit custom exercises with primary and secondary estimated
-involvement weights. Those assignments use the existing exercise model, storage,
-backup format and analysis paths. Existing write proposals still require review.
+Target release: `r2.2.3`.
 
-## Establish source data before choosing an inference strategy
+## What is implemented
 
-FitifySync's inspected parser reads `SELECT code, title FROM exercises` and keeps
-those values in a code-to-title map. This does **not** establish that the source
-catalogue lacks muscle fields: it establishes that the parser does not read them.
+Profile contains **Import Fitify workouts**. Choose a date range, read a preview,
+then import complete resolved workouts. Download the optional extended catalogue
+once for source codes outside the bundled built-in mappings; it stays offline.
+Run the updated FitifySync app's sync first so older records gain the complete
+`fitifysync.exercise_segments` v1 notes payload (FitifySync PR #6).
 
-The next source-side investigation is a read-only schema inspection of Fitify's
-`exercises` table and any related muscle/target tables. Record column names and
-relationships, the app/schema version, and representative non-personal catalogue
-entries. Check whether fields are primary/secondary muscle labels, broad body
-regions, equipment tags, or actual numeric weights; do not conflate them.
+The foreground reader requests exercise-read access independently of workout
+export/readiness settings. It filters `com.fitifysync.app`, follows every page,
+and fails a partial read instead of reporting an empty successful result. Dates
+older than the recent four-week window require supported and granted Health
+Connect history access. It caps a read at 2,000 workouts; choose shorter dates
+for larger histories. No background-read permission is requested.
 
-If available, FitifySync should preserve original muscle labels/roles alongside
-exercise code and title in its versioned Health Connect notes payload. Numeric
-weights must carry their original meaning. A primary/secondary label alone is
-not evidence of a measured activation percentage. The code and name must map to
-the exact exported segment, including its position among rest segments.
+## Source identity and conversion
 
-## Mapping order for the future importer
+Only the exact `fitifysync.exercise_segments` v1 schema is accepted. Each item
+requires a unique integer `segment_index`, string `code` and `name`, and
+`timing_kind: reconstructed`. Indices address the complete native segment list,
+including rests. Every active segment must be identified. Empty/malformed notes,
+unsupported versions, invalid intervals and unresolved codes are reported per
+workout; no partial workout is saved.
 
-1. Reuse a previously resolved `(source package, source exercise code)` mapping.
-   Preserve catalogue/schema version information so source changes can be reviewed.
-2. Match a specific known RepForge exercise, preserving meaningful movement and
-   equipment variants. A generic HC type such as `WEIGHTLIFTING` is insufficient
-   to identify a particular push-up variation.
-3. When present, translate source muscle labels to RepForge's canonical muscle
-   groups, retaining the original labels and their source provenance.
-4. For a clearly identified unfamiliar movement, have AI propose an existing
-   match or a custom exercise with a primary muscle and relevant secondary muscles.
-   If AI supplies numeric weights absent from the source, mark them as estimates.
-5. Leave ambiguous identities unresolved, with the raw workout/segments intact.
-   Ask for clarification rather than creating a guessed exercise. Missing AI
-   access must not lose the source workout or turn missing values into zeros.
-6. Persist resolved mappings once so later imports do not repeatedly create the
-   same exercise or ask AI to infer its muscles again. Corrections should update
-   mappings without duplicating workouts or changing unrelated exercise entries.
+Match verified source codes to bundled built-in mappings, then `fitify:<code>`
+exercise IDs from the downloaded catalogue. Names and generic native segment
+types are not sufficient to guess a variant. Consecutive sets share a log;
+returning to an exercise later in a circuit retains its original order.
 
-## Involvement weights and analysis
+Preserve native reps, duration and timestamps and the original notes/segments.
+Timings are reconstructed, including durations estimated upstream by FitifySync;
+they must not be used as measured per-exercise heart-rate boundaries. Read a
+native weight when present. Otherwise keep load mode `unknown`, with no inferred
+bodyweight or kilogram volume. Duration and reps remain usable. Catalogue
+resistance/stretch scores are not RPE, measured EMG or evidence of growth.
 
-The existing catalogue uses independent per-muscle involvement weights. They do
-not have to sum to 100. Coach's optional `muscle_activations` argument supplies a
-complete list of known muscles with integer weights from 1 to 100. The primary
-must be present with the unique highest weight; secondary muscles cannot repeat.
-Omitting the list preserves existing assignments on update, or keeps the legacy
-single-primary default on creation. Changing a multi-muscle exercise's primary
-requires an explicit replacement list so secondary assignments are not discarded.
+## History and analysis
 
-Show the assignments as estimated involvement. Keep source labels, user edits,
-and AI estimates distinguishable when implementing the importer provenance.
-Heart-rate correlations must retain any indication that segment boundaries were
-reconstructed. Preserve reps versus hold duration; unknown bodyweight resistance
-must not become invented tonnage. Training exposure, exercise performance and
-estimated involvement are distinct from measured muscle growth.
+Local IDs use source client record identity (falling back to Health Connect
+record ID). Source provenance and the last imported content snapshot travel with
+the session through SQLite, Hive and backups. Repeated source versions are
+skipped. A newer source version can replace an untouched imported workout;
+locally edited imports are retained and reported as conflicts. Saves are
+serialized and confirmed before updating caches/counts. Imported workouts are
+never exported back to Health Connect, including manual history sync paths.
 
-## Remaining release work
+Saved workouts feed normal history and resistance-based recovery. Where a week
+contains unknown loads, Home and Analytics muscle maps show **weighted sets**:
+completed sets multiplied by independent resistance score / 10. This is training
+exposure, separate from tonnage. Stretch scores do not increase resistance or
+recovery load. Unknown loads do not fit weight/tonnage trends or one-rep maxima.
 
-- Confirm which muscle information exists in Fitify's on-device catalogue.
-- Agree and implement FitifySync's versioned notes contract and existing-workout
-  enrichment without duplication.
-- Implement HC workout reads, source staging/deduplication, saved identity maps,
-  import review, and workout display/analysis integration in RepForge.
-- Verify the complete import and correction flows on a real phone.
+## SQLite v11 and backup compatibility
 
-The present coach extension is a prerequisite for this workflow, not completion
-of these remaining items.
+`exercises.resistance_intensities` and `stretch_intensities` contain independent
+muscle-ID maps. The v11 migration converts each old activation weight / 10 in
+Dart, preserving decimals (95 becomes 9.5), and drops the activation join table.
+No Android SQLite JSON extension is required for migration or app queries.
+`Exercise.resistanceIntensities` is canonical; a computed `muscleActivations`
+adapter supports existing callers. New backups write canonical maps; old
+activation-list backups remain readable. User edits and stretch overrides stay
+intact. Coach schemas expose resistance/stretch inputs; legacy pending proposals
+remain executable for backward compatibility. Coach SQL guidance describes the
+new schema and excludes unknown loads from tonnage.
+
+## Current limits and live verification
+
+This first flow is manual foreground import, not background synchronization or
+automatic source deletion handling. Deleting a record in Health Connect does
+not delete saved RepForge history. Unresolved workouts stay in Health Connect
+for a later retry after catalogue/source fixes. The imported session model does
+not add source calorie totals; heart-rate/readiness reads use their existing
+separate paths.
+
+JVM/Flutter checks do not prove device permission behavior, exact source
+Firestore timestamp semantics, or display/import support in another app. Verify
+on the actual phone with the updated FitifySync build and the RepForge test APK
+before calling the complete on-device flow verified.
+
+## Android references
+
+- [ExerciseSessionRecord](https://developer.android.com/reference/kotlin/androidx/health/connect/client/records/ExerciseSessionRecord.md.txt)
+- [ExerciseSegment](https://developer.android.com/reference/kotlin/androidx/health/connect/client/records/ExerciseSegment.md.txt)
+- [Metadata](https://developer.android.com/reference/kotlin/androidx/health/connect/client/records/metadata/Metadata.md.txt)
+- [HealthConnectClient](https://developer.android.com/reference/kotlin/androidx/health/connect/client/HealthConnectClient.md.txt)
+- [Reading, pagination and history access](https://developer.android.com/health-and-fitness/health-connect/read-data)

@@ -107,7 +107,8 @@ void main() {
       await provider.loadAllData();
       expect(provider.muscleProfileFor('bench_press')!.resistance['chest'], 9);
       final legacy = Exercise.fromJson({
-        ...original.toJson(),
+        ...(Map<String, dynamic>.from(original.toJson())
+          ..remove('resistanceIntensities')),
         'muscleActivations': [
           {'muscleGroupId': 'chest', 'activationPercentage': 40},
           {'muscleGroupId': 'triceps', 'activationPercentage': 20},
