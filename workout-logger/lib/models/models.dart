@@ -82,7 +82,7 @@ bool isAssistedBodyweightExercise(String? exerciseId) =>
 bool isBodyweightExercise(String? id) =>
     id == 'push_ups' || isAssistedBodyweightExercise(id);
 
-enum WorkoutLoadMode { external, assisted, weighted }
+enum WorkoutLoadMode { external, assisted, weighted, unknown }
 
 enum ExerciseType {
   weightAndReps,
@@ -101,7 +101,27 @@ enum ExerciseType {
 class Exercise {
   final String id;
   final String name;
-  final List<MuscleActivation> muscleActivations;
+  final List<MuscleActivation> _legacyMuscleActivations;
+  final Map<String, num>? _resistanceIntensities;
+  Map<String, num> get resistanceIntensities =>
+      _resistanceIntensities ??
+      {
+        for (final muscle in _legacyMuscleActivations)
+          muscle.muscleGroupId: muscle.activationPercentage / 10,
+      };
+
+  /// Compatibility for existing analytics; persistence uses intensity maps.
+  List<MuscleActivation> get muscleActivations => _resistanceIntensities == null
+      ? _legacyMuscleActivations
+      : [
+          for (final entry in _resistanceIntensities.entries)
+            MuscleActivation(
+              muscleGroupId: entry.key,
+              activationPercentage: (entry.value * 10).round(),
+            ),
+        ];
+  final Map<String, int>? stretchIntensities;
+  final bool resistanceIntensityOverride;
   final String category; // 'compound' or 'isolation'
   final bool isCustom; // User-created exercise
   final List<String>?
@@ -111,17 +131,24 @@ class Exercise {
   const Exercise({
     required this.id,
     required this.name,
-    required this.muscleActivations,
+    List<MuscleActivation> muscleActivations = const [],
+    Map<String, num>? resistanceIntensities,
     required this.category,
+    this.stretchIntensities,
+    this.resistanceIntensityOverride = false,
     this.isCustom = false,
     this.availableHandles,
     this.exerciseType = ExerciseType.weightAndReps,
-  });
+  }) : _legacyMuscleActivations = muscleActivations,
+       _resistanceIntensities = resistanceIntensities;
 
   Exercise copyWith({
     String? id,
     String? name,
     List<MuscleActivation>? muscleActivations,
+    Map<String, num>? resistanceIntensities,
+    Map<String, int>? stretchIntensities,
+    bool? resistanceIntensityOverride,
     String? category,
     bool? isCustom,
     List<String>? availableHandles,
@@ -129,7 +156,13 @@ class Exercise {
   }) => Exercise(
     id: id ?? this.id,
     name: name ?? this.name,
-    muscleActivations: muscleActivations ?? this.muscleActivations,
+    muscleActivations: muscleActivations ?? const [],
+    resistanceIntensities:
+        resistanceIntensities ??
+        (muscleActivations == null ? this.resistanceIntensities : null),
+    stretchIntensities: stretchIntensities ?? this.stretchIntensities,
+    resistanceIntensityOverride:
+        resistanceIntensityOverride ?? this.resistanceIntensityOverride,
     category: category ?? this.category,
     isCustom: isCustom ?? this.isCustom,
     availableHandles: availableHandles ?? this.availableHandles,
@@ -147,7 +180,9 @@ class Exercise {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
-    'muscleActivations': muscleActivations.map((m) => m.toJson()).toList(),
+    'resistanceIntensities': resistanceIntensities,
+    if (stretchIntensities != null) 'stretchIntensities': stretchIntensities,
+    if (resistanceIntensityOverride) 'resistanceIntensityOverride': true,
     'category': category,
     'isCustom': isCustom,
     'availableHandles': availableHandles,
@@ -172,14 +207,58 @@ class Exercise {
     return Exercise(
       id: json['id'],
       name: json['name'],
-      muscleActivations: (json['muscleActivations'] as List)
+      resistanceIntensities: decodeResistanceIntensities(
+        json['resistanceIntensities'],
+      ),
+      muscleActivations: (json['muscleActivations'] as List? ?? [])
           .map((m) => MuscleActivation.fromJson(m))
           .toList(),
       category: json['category'],
       isCustom: json['isCustom'] ?? false,
       availableHandles: (json['availableHandles'] as List?)?.cast<String>(),
       exerciseType: type,
+      stretchIntensities: decodeStretchIntensities(json['stretchIntensities']),
+      resistanceIntensityOverride: json['resistanceIntensityOverride'] == true,
     );
+  }
+
+  static Map<String, int>? decodeStretchIntensities(dynamic input) {
+    if (input == null) return null;
+    if (input is! Map) {
+      throw const FormatException('Invalid muscle intensity map.');
+    }
+    final result = <String, int>{};
+    for (final entry in input.entries) {
+      if (entry.key is! String ||
+          entry.value is! int ||
+          entry.value < 1 ||
+          entry.value > 10) {
+        throw const FormatException(
+          'Muscle intensity scores must be integers from 1 to 10.',
+        );
+      }
+      result[entry.key as String] = entry.value as int;
+    }
+    return Map.unmodifiable(result);
+  }
+
+  static Map<String, num>? decodeResistanceIntensities(dynamic input) {
+    if (input == null) return null;
+    if (input is! Map) throw const FormatException('Invalid resistance map.');
+    final result = <String, num>{};
+    for (final entry in input.entries) {
+      if (entry.key is! String ||
+          entry.value is! num ||
+          !(entry.value as num).isFinite ||
+          entry.value < 0 ||
+          entry.value > 10) {
+        throw const FormatException(
+          'Resistance scores must be between 0 and 10.',
+        );
+      }
+      result[entry.key as String] = entry.value as num;
+    }
+    return Map.unmodifiable(result);
   }
 }
 
@@ -253,11 +332,16 @@ class WorkoutSet {
   /// Version 0 preserves raw historical data. Version 1 uses a recorded BW.
   /// Consumers must compare only matching conventions, never backfill BW.
   String get loadConvention =>
-      '$loadEncodingVersion:${loadMode == WorkoutLoadMode.external ? 'external' : 'bodyweight'}';
+      '$loadEncodingVersion:${loadMode == WorkoutLoadMode.unknown
+          ? 'unknown'
+          : loadMode == WorkoutLoadMode.external
+          ? 'external'
+          : 'bodyweight'}';
   bool hasComparableLoad(WorkoutSet other) =>
       loadConvention == other.loadConvention;
 
   double effectiveLoad(double enteredWeight, {double? userBodyWeight}) {
+    if (loadMode == WorkoutLoadMode.unknown) return 0;
     if (loadMode == WorkoutLoadMode.external) return enteredWeight;
     final bw = bodyWeightAtLog ?? userBodyWeight ?? 70.0;
     if (loadMode == WorkoutLoadMode.weighted) {
@@ -272,7 +356,9 @@ class WorkoutSet {
     assistWeight: null,
     extraWeight: null,
     bodyWeightAtLog: null,
-    loadMode: WorkoutLoadMode.external,
+    loadMode: loadMode == WorkoutLoadMode.unknown
+        ? WorkoutLoadMode.unknown
+        : WorkoutLoadMode.external,
     loadEncodingVersion: 0,
     drops: drops
         ?.map(
@@ -286,6 +372,7 @@ class WorkoutSet {
   );
 
   double calculateVolume({double? userBodyWeight, bool? isAssistedBW}) {
+    if (loadMode == WorkoutLoadMode.unknown) return 0;
     // Explicit override is retained only for legacy callers. Stored modes win.
     double load(double value) =>
         loadMode == WorkoutLoadMode.external && isAssistedBW == true
@@ -411,6 +498,8 @@ class ExerciseLog {
   final List<WorkoutSet> sets;
   final String? notes;
   final String? handle;
+  int get completedSetCount =>
+      sets.where((s) => s.reps > 0 || (s.timeTaken ?? 0) > 0).length;
 
   const ExerciseLog({
     required this.exerciseId,
@@ -439,16 +528,31 @@ class ExerciseLog {
   /// True when all logged sets represent time-based holds.
   bool get isTimeBased => sets.isNotEmpty && sets.every((s) => s.isTimeBased);
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({bool utcTimestamps = false}) => {
     'exerciseId': exerciseId,
-    'sets': sets.map((s) => s.toJson()).toList(),
+    'sets': [
+      for (final set in sets)
+        {
+          ...set.toJson(),
+          if (utcTimestamps)
+            'timestamp': set.timestamp.toUtc().toIso8601String(),
+        },
+    ],
     'notes': notes,
     'handle': handle,
   };
 
-  factory ExerciseLog.fromJson(Map<String, dynamic> json) => ExerciseLog(
+  factory ExerciseLog.fromJson(
+    Map<String, dynamic> json, {
+    bool localTimestamps = false,
+  }) => ExerciseLog(
     exerciseId: json['exerciseId'],
-    sets: (json['sets'] as List).map((s) => WorkoutSet.fromJson(s)).toList(),
+    sets: (json['sets'] as List).map((s) {
+      final set = WorkoutSet.fromJson(s);
+      return localTimestamps
+          ? set.copyWith(timestamp: set.timestamp.toLocal())
+          : set;
+    }).toList(),
     notes: json['notes'],
     handle: json['handle'] as String?,
   );
@@ -481,6 +585,9 @@ class WorkoutSession {
   final int duration; // minutes
   final String? notes;
 
+  /// Source identity, original payload and last imported content snapshot.
+  final Map<String, dynamic>? importSource;
+
   /// Non-null when this session was successfully synced to Health Connect.
   final DateTime? hcSyncedAt;
 
@@ -499,6 +606,7 @@ class WorkoutSession {
     required this.exercises,
     required this.duration,
     this.notes,
+    this.importSource,
     this.hcSyncedAt,
     this.sessionEffort,
   });
@@ -506,32 +614,64 @@ class WorkoutSession {
   double get totalVolume =>
       exercises.fold(0.0, (sum, ex) => sum + ex.totalVolume);
 
+  int get timedWorkSeconds => exercises.fold(
+    0,
+    (total, log) =>
+        total +
+        log.sets
+            .where((set) => set.isTimeBased)
+            .fold(0, (sum, set) => sum + set.timeTaken!),
+  );
+
+  String? get displayNotes {
+    if (importSource != null) {
+      final title = importSource!['rawRecord']?['title'];
+      final legacy =
+          'Imported from FitifySync${title == null ? '' : ': $title'}';
+      if (notes == legacy) return 'Imported from Health Connect';
+    }
+    return notes;
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
-    'date': date.toIso8601String(),
+    'date': (importSource == null ? date : date.toUtc()).toIso8601String(),
     'routineId': routineId,
     'programId': programId,
     'programDayId': programDayId,
     'programWeekNumber': programWeekNumber,
-    'exercises': exercises.map((e) => e.toJson()).toList(),
+    'exercises': exercises
+        .map((e) => e.toJson(utcTimestamps: importSource != null))
+        .toList(),
     'duration': duration,
     'notes': notes,
+    if (importSource != null) 'importSource': importSource,
     'hcSyncedAt': hcSyncedAt?.toIso8601String(),
     'sessionEffort': sessionEffort,
   };
 
   factory WorkoutSession.fromJson(Map<String, dynamic> json) => WorkoutSession(
     id: json['id'],
-    date: DateTime.parse(json['date']),
+    date: json['importSource'] == null
+        ? DateTime.parse(json['date'])
+        : DateTime.parse(json['date']).toLocal(),
     routineId: json['routineId'],
     programId: json['programId'] as String?,
     programDayId: json['programDayId'] as String?,
     programWeekNumber: json['programWeekNumber'] as int?,
     exercises: (json['exercises'] as List)
-        .map((e) => ExerciseLog.fromJson(e))
+        .map(
+          (e) => ExerciseLog.fromJson(
+            e,
+            localTimestamps: json['importSource'] != null,
+          ),
+        )
         .toList(),
     duration: json['duration'],
     notes: json['notes'],
+    importSource: json['importSource'] == null
+        ? null
+        : Map<String, dynamic>.from(json['importSource'] as Map),
     hcSyncedAt: json['hcSyncedAt'] != null
         ? DateTime.parse(json['hcSyncedAt'] as String)
         : null,
@@ -549,6 +689,7 @@ class WorkoutSession {
     Object? duration = _sentinel,
     Object? notes = _sentinel,
     Object? hcSyncedAt = _sentinel,
+    Object? importSource = _sentinel,
     Object? sessionEffort = _sentinel,
   }) => WorkoutSession(
     id: id == _sentinel ? this.id : id as String,
@@ -569,6 +710,9 @@ class WorkoutSession {
     hcSyncedAt: hcSyncedAt == _sentinel
         ? this.hcSyncedAt
         : hcSyncedAt as DateTime?,
+    importSource: importSource == _sentinel
+        ? this.importSource
+        : importSource as Map<String, dynamic>?,
     sessionEffort: sessionEffort == _sentinel
         ? this.sessionEffort
         : sessionEffort as int?,
@@ -806,10 +950,12 @@ class PersonalRecord {
     required this.bestVolume,
     required this.achievedAt,
     this.bestDuration,
-  }) : exerciseId = handle == null && exerciseId.contains(':')
+    bool legacyCompositeId = false,
+  }) : exerciseId =
+           legacyCompositeId && handle == null && exerciseId.contains(':')
            ? exerciseId.substring(0, exerciseId.indexOf(':'))
            : exerciseId,
-       handle = handle == null && exerciseId.contains(':')
+       handle = legacyCompositeId && handle == null && exerciseId.contains(':')
            ? exerciseId.substring(exerciseId.indexOf(':') + 1)
            : (handle?.isEmpty == true ? null : handle);
 
@@ -828,6 +974,7 @@ class PersonalRecord {
   };
   factory PersonalRecord.fromJson(Map<String, dynamic> json) => PersonalRecord(
     exerciseId: json['exerciseId'] as String,
+    legacyCompositeId: !json.containsKey('handle'),
     handle: json['handle'] as String?,
     loadEncodingVersion: json['loadEncodingVersion'] as int? ?? 0,
     bestWeight: (json['bestWeight'] as num).toDouble(),

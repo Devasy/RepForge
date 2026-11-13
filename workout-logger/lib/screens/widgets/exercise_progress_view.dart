@@ -60,6 +60,7 @@ class _ExerciseProgressViewState extends State<ExerciseProgressView> {
           }),
         ),
         if (effectiveId != null &&
+            !provider.tracksDuration(effectiveId) &&
             provider.hasMixedLoadConventions(effectiveId))
           const Padding(
             padding: EdgeInsets.all(12),
@@ -459,11 +460,8 @@ class _ExerciseStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final exercise = provider.allExercises
-        .where((e) => e.id == exerciseId)
-        .firstOrNull;
-    final isTimeBased = exercise?.exerciseType == ExerciseType.timeBased;
-    final setProgression = provider.getSetProgression(exerciseId);
+    final isTimeBased = provider.tracksDuration(exerciseId);
+    final setProgression = provider.getSetProgression(exerciseId, duration: isTimeBased);
     final progression = isTimeBased
         ? [
             for (final session in setProgression)
@@ -471,7 +469,7 @@ class _ExerciseStats extends StatelessWidget {
                 date: session.date,
                 volume: session.sets.fold<double>(
                   0.0,
-                  (sum, s) => sum + (s.timeTaken ?? 0).toDouble(),
+                  (best, s) => max(best, (s.timeTaken ?? 0).toDouble()),
                 ),
               ),
           ]
@@ -812,6 +810,11 @@ class _ChartSection extends StatelessWidget {
               ),
             ],
           ),
+          if (isTimeBased && chartMode == _ChartMode.volume) ...[
+            const SizedBox(height: AppSpacing.sm),
+            const Text('Longest timed set per session',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          ],
           const SizedBox(height: AppSpacing.md),
           if (chartMode == _ChartMode.volume)
             _VolumeChart(

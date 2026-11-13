@@ -25,10 +25,12 @@ class MuscleDetailSheet extends StatelessWidget {
     super.key,
     required this.muscleId,
     required this.provider,
+    this.exposure = false,
   });
 
   final String muscleId;
   final WorkoutProvider provider;
+  final bool exposure;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +38,7 @@ class MuscleDetailSheet extends StatelessWidget {
     final recovery = provider.getMuscleRecoveryScores()[muscleId];
     final name = MuscleGroups.names[muscleId] ?? muscleId;
     final color = AppColors.muscle(muscleId);
-    final exercises = provider.getMuscleExerciseBreakdown(muscleId);
+    final exercises = provider.getMuscleExerciseBreakdown(muscleId, exposure:exposure);
 
     Color recoveryColor = AppColors.textFaint;
     String recoveryLabel = '—';
@@ -155,7 +157,7 @@ class MuscleDetailSheet extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
               child: Text(
-                'No sessions logged for this muscle in the last 7 days.',
+                'No sessions logged for this muscle this week.',
                 style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textMuted,
                   fontSize: 13,
@@ -164,11 +166,11 @@ class MuscleDetailSheet extends StatelessWidget {
             )
           else
             ...exercises.map((ex) {
-              final displayVol = settings.toDisplay(ex.volume);
+              final displayVol = exposure ? ex.volume : settings.toDisplay(ex.volume);
               final volStr = displayVol >= 1000
                   ? '${(displayVol / 1000).toStringAsFixed(1)}k'
-                  : displayVol.toStringAsFixed(0);
-              final growth = ex.growth;
+                  : displayVol.toStringAsFixed(exposure ? 1 : 0);
+              final growth = exposure ? null : ex.growth;
               Color trendColor = AppColors.textFaint;
               IconData trendIcon = Icons.remove_rounded;
               if (growth != null) {
@@ -211,7 +213,7 @@ class MuscleDetailSheet extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '$volStr ${settings.unitLabel}',
+                      '$volStr ${exposure ? 'weighted sets' : settings.unitLabel}',
                       style: TextStyle(fontFamily: 'GeistMono', 
                         color: AppColors.textPrimary,
                         fontSize: 12,
@@ -229,12 +231,14 @@ class MuscleDetailSheet extends StatelessWidget {
           _MuscleVolumeTrendChart(
             muscleId: muscleId,
             provider: provider,
+            exposure:exposure,
           ),
 
           const SizedBox(height: AppSpacing.lg),
           _RecentMuscleSessionsSection(
             muscleId: muscleId,
             provider: provider,
+            exposure:exposure,
           ),
 
           const SizedBox(height: AppSpacing.md),
@@ -242,6 +246,7 @@ class MuscleDetailSheet extends StatelessWidget {
             muscleId: muscleId,
             muscleName: name,
             provider: provider,
+            exposure:exposure,
           ),
         ],
       ),
@@ -256,19 +261,21 @@ class _MuscleVolumeTrendChart extends StatelessWidget {
   const _MuscleVolumeTrendChart({
     required this.muscleId,
     required this.provider,
+    this.exposure = false,
   });
 
   final String muscleId;
   final WorkoutProvider provider;
+  final bool exposure;
 
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     return _VolumeTrendChartView(
       muscleId: muscleId,
-      series: provider.getMuscleWeeklyVolumeSeries(muscleId, weeks: 8),
-      toDisplay: settings.toDisplay,
-      unitLabel: settings.unitLabel,
+      series: provider.getMuscleWeeklyVolumeSeries(muscleId, weeks: 8, exposure:exposure),
+      toDisplay: exposure ? (value)=>value : settings.toDisplay,
+      unitLabel: exposure ? 'weighted sets' : settings.unitLabel,
     );
   }
 }
@@ -295,7 +302,7 @@ class _VolumeTrendChartView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RFSectionHeader('Volume trend (8 wk)', bottomPad: false),
+        RFSectionHeader(unitLabel == 'weighted sets' ? 'Exposure trend (8 wk)' : 'Volume trend (8 wk)', bottomPad: false),
         const SizedBox(height: AppSpacing.sm),
         if (!hasData)
           Padding(
@@ -373,18 +380,20 @@ class _RecentMuscleSessionsSection extends StatelessWidget {
   const _RecentMuscleSessionsSection({
     required this.muscleId,
     required this.provider,
+    this.exposure = false,
   });
 
   final String muscleId;
   final WorkoutProvider provider;
+  final bool exposure;
 
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     return _RecentSessionsView(
-      sessions: provider.getRecentMuscleSessionSummaries(muscleId),
-      toDisplay: settings.toDisplay,
-      unitLabel: settings.unitLabel,
+      sessions: provider.getRecentMuscleSessionSummaries(muscleId,exposure:exposure),
+      toDisplay: exposure ? (value)=>value : settings.toDisplay,
+      unitLabel: exposure ? 'weighted sets' : settings.unitLabel,
     );
   }
 }
@@ -433,7 +442,7 @@ class _RecentSessionsView extends StatelessWidget {
             final displayVol = toDisplay(s.volume);
             final volStr = displayVol >= 1000
                 ? '${(displayVol / 1000).toStringAsFixed(1)}k'
-                : displayVol.toStringAsFixed(0);
+                : displayVol.toStringAsFixed(unitLabel == 'weighted sets' ? 1 : 0);
             return Container(
               margin: const EdgeInsets.only(bottom: AppSpacing.sm),
               padding: const EdgeInsets.symmetric(
@@ -575,11 +584,13 @@ class _AiInsightSection extends StatefulWidget {
     required this.muscleId,
     required this.muscleName,
     required this.provider,
+    this.exposure = false,
   });
 
   final String muscleId;
   final String muscleName;
   final WorkoutProvider provider;
+  final bool exposure;
 
   @override
   State<_AiInsightSection> createState() => _AiInsightSectionState();
@@ -601,7 +612,7 @@ class _AiInsightSectionState extends State<_AiInsightSection> {
       provider.sessions,
       exerciseMap,
     );
-    final exercises = provider.getMuscleExerciseBreakdown(widget.muscleId);
+    final exercises = provider.getMuscleExerciseBreakdown(widget.muscleId,exposure:widget.exposure);
     final recoveryScore = recovery[widget.muscleId];
 
     final contextText = StringBuffer()
@@ -610,9 +621,9 @@ class _AiInsightSectionState extends State<_AiInsightSection> {
           'Recovery: ${recoveryScore != null ? "${recoveryScore.recoveryPercent}% (${recoveryScore.isRecovered ? "ready" : recoveryScore.isUnderRecovered ? "fatigued" : "recovering"})" : "no data"}')
       ..writeln('Weekly contributing exercises:');
     for (final ex in exercises) {
-      final vol = settings.toDisplay(ex.volume);
+      final vol = widget.exposure ? ex.volume : settings.toDisplay(ex.volume);
       contextText.writeln(
-          '  ${ex.name}: ${vol.toStringAsFixed(0)} ${settings.unitLabel}');
+          '  ${ex.name}: ${vol.toStringAsFixed(1)} ${widget.exposure ? 'weighted sets (not kilograms)' : settings.unitLabel}');
     }
 
     const system =

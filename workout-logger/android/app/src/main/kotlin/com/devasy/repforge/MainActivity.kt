@@ -3,11 +3,11 @@ package com.devasy.repforge
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private var permissionResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

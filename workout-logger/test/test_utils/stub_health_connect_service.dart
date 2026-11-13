@@ -1,7 +1,11 @@
+import 'package:repforge/models/skin_temperature_sample.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/interfaces/health_connect_service_interface.dart';
 
 class StubHcService implements IHealthConnectService {
+  @override
+  Future<List<SkinTemperatureSample>> readSkinTemperature(DateTime start, DateTime end) async => const [];
+
   final List<SleepPeriod> sleepPeriods;
   final List<HealthSample> hrSamples;
   final List<HealthSample> restingHrSamples;

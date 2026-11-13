@@ -1,3 +1,4 @@
+import 'package:repforge/models/skin_temperature_sample.dart';
 // Unit tests for ReadinessManager (orchestration, caching, degradation)
 
 import 'dart:convert';
@@ -14,6 +15,9 @@ import 'test_utils/mock_storage_service.dart';
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
 class _MockHcService implements IHealthConnectService {
+  @override
+  Future<List<SkinTemperatureSample>> readSkinTemperature(DateTime start, DateTime end) async => const [];
+
   Set<HealthReadType> granted;
   List<SleepPeriod> sleepPeriods;
   List<HealthSample> restingHr;

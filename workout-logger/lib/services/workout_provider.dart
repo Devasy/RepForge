@@ -15,10 +15,14 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'extended_exercise_library.dart';
+import 'utils/muscle_intensity_validation.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
+import '../models/health_connect_workout.dart';
+import 'health_workout_import.dart';
 import '../data/exercise_database.dart';
 import 'interfaces/storage_service_interface.dart';
 import 'interfaces/ml_service_interface.dart';
@@ -54,6 +58,57 @@ class WorkoutProvider extends ChangeNotifier {
   List<Target> _targets = [];
   List<MuscleGroup> _muscleGroups = [];
   List<Exercise> _allExercises = [];
+  ExtendedExerciseLibrary? _extendedLibrary;
+  static final _builtInExerciseIndex = {
+    for (final e in ExerciseDatabase.getAll()) e.id: e,
+  };
+  bool get hasExtendedLibrary => _extendedLibrary != null;
+  MuscleIntensityProfile? muscleProfileFor(String id, {Exercise? exercise}) {
+    final source =
+        _extendedLibrary?.profileFor(id) ??
+        ExtendedExerciseLibrary.builtInProfileFor(id);
+    exercise ??= getExercise(id);
+    if (exercise == null) return source;
+    final baseline = _builtInExerciseIndex[id] ?? source?.toExercise();
+    final changedWeights =
+        baseline != null &&
+        !mapEquals(
+          exercise.resistanceIntensities,
+          baseline.resistanceIntensities,
+        );
+    final editedResistance =
+        exercise.isCustom ||
+        exercise.resistanceIntensityOverride ||
+        changedWeights;
+    if (!editedResistance && exercise.stretchIntensities == null) return source;
+    return MuscleIntensityProfile(
+      code: source?.code ?? id,
+      name: source?.name ?? exercise.name,
+      exerciseType: exercise.exerciseType,
+      sourceVersion: source?.sourceVersion ?? '',
+      resistance: editedResistance
+          ? exercise.resistanceIntensities
+          : source?.resistance ?? exercise.resistanceIntensities,
+      stretch: exercise.stretchIntensities ?? source?.stretch ?? {},
+      resistanceAttribution: editedResistance || source == null
+          ? 'User/coach estimate'
+          : source.resistanceAttribution,
+      stretchAttribution: exercise.stretchIntensities != null || source == null
+          ? 'User/coach estimate'
+          : source.stretchAttribution,
+    );
+  }
+
+  Future<void> loadExtendedLibrary(String json) async {
+    final library = ExtendedExerciseLibrary.fromJson(json);
+    final exercises = library.mergeExercises(await _storage.getAllExercises());
+    await _storage.saveSetting(ExtendedExerciseLibrary.settingKey, json);
+    _extendedLibrary = library;
+    _allExercises = exercises;
+    _invalidateHistoryCache();
+    notifyListeners();
+  }
+
   final Map<String, GrowthModel> _growthModels =
       {}; // exerciseId -> GrowthModel
 
@@ -153,6 +208,18 @@ class WorkoutProvider extends ChangeNotifier {
     final storedOffset = await _storage.getSetting(_effortCalibrationOffsetKey);
     _effortCalibrationOffset = double.tryParse(storedOffset ?? '') ?? 0.0;
     _allExercises = await _storage.getAllExercises();
+    _extendedLibrary = ExtendedExerciseLibrary.fromCache(
+      await _storage.getSetting(ExtendedExerciseLibrary.settingKey),
+    );
+    if (_extendedLibrary != null) {
+      _allExercises = _extendedLibrary!.mergeExercises(_allExercises);
+    }
+    await _persistImportedExercises(
+      _sessions
+          .where((s) => s.importSource != null)
+          .expand((s) => s.exercises)
+          .map((log) => log.exerciseId),
+    );
     _invalidateHistoryCache();
     await programManager.loadPrograms();
     notifyListeners();
@@ -347,7 +414,66 @@ class WorkoutProvider extends ChangeNotifier {
   // ==================== CUSTOM EXERCISES ====================
 
   /// Allowed category values for exercises
-  static const Set<String> _allowedCategories = {'compound', 'isolation'};
+  static const Set<String> _allowedCategories = {
+    'compound',
+    'isolation',
+    'other',
+  };
+
+  List<MuscleActivation> _validateMuscleActivations(
+    String primaryId,
+    List<MuscleActivation> proposed,
+  ) {
+    if (proposed.isEmpty) {
+      throw ArgumentError('At least one muscle activation is required');
+    }
+    final knownIds = {
+      for (final muscle in MuscleGroups.getAll()) muscle.id,
+      for (final muscle in _muscleGroups) muscle.id,
+    };
+    final seen = <String>{};
+    for (final activation in proposed) {
+      if (!knownIds.contains(activation.muscleGroupId)) {
+        throw ArgumentError(
+          'Unknown muscle group: ${activation.muscleGroupId}',
+        );
+      }
+      if (!seen.add(activation.muscleGroupId)) {
+        throw ArgumentError(
+          'Duplicate muscle group: ${activation.muscleGroupId}',
+        );
+      }
+      if (activation.activationPercentage < 1 ||
+          activation.activationPercentage > 100) {
+        throw ArgumentError(
+          'Muscle activation weights must be integers from 1 to 100',
+        );
+      }
+    }
+    final primary = proposed
+        .where((a) => a.muscleGroupId == primaryId)
+        .firstOrNull;
+    if (primary == null) {
+      throw ArgumentError(
+        'The activation list must include the primary muscle',
+      );
+    }
+    if (proposed.any(
+      (a) =>
+          a.muscleGroupId != primaryId &&
+          a.activationPercentage >= primary.activationPercentage,
+    )) {
+      throw ArgumentError(
+        'The primary muscle must have the highest activation weight',
+      );
+    }
+    // Independent involvement weights, matching the built-in catalogue. They
+    // are not a partition of effort and do not have to sum to 100.
+    return List.unmodifiable([
+      primary,
+      ...proposed.where((a) => a.muscleGroupId != primaryId),
+    ]);
+  }
 
   /// Add a custom exercise created by the user
   ///
@@ -356,6 +482,9 @@ class WorkoutProvider extends ChangeNotifier {
     required String name,
     required String category,
     required String primaryMuscleGroupId,
+    List<MuscleActivation>? muscleActivations,
+    Map<String, int>? resistanceIntensities,
+    Map<String, int>? stretchIntensities,
     ExerciseType exerciseType = ExerciseType.weightAndReps,
     List<String>? availableHandles,
   }) async {
@@ -381,23 +510,42 @@ class WorkoutProvider extends ChangeNotifier {
     // Generate unique ID
     final id = 'custom_${_uuid.v4()}';
 
-    // Create muscle activation (100% for primary muscle in v1)
-    final muscleActivations = [
-      MuscleActivation(
-        muscleGroupId: primaryMuscleGroupId,
-        activationPercentage: 100,
-      ),
-    ];
+    if (muscleActivations != null && resistanceIntensities != null) {
+      throw ArgumentError(
+        'Use resistance_intensities or muscle_activations, not both.',
+      );
+    }
+    final resistance = validateMuscleIntensities(resistanceIntensities);
+    final stretch = validateMuscleIntensities(stretchIntensities);
+    if (resistance?.isEmpty == true && (stretch?.isEmpty ?? true)) {
+      throw ArgumentError(
+        'Provide resistance or stretch scores for at least one muscle.',
+      );
+    }
+    final resolvedActivations = resistance != null
+        ? resistanceActivations(resistance, primaryMuscleGroupId)
+        : _validateMuscleActivations(
+            primaryMuscleGroupId,
+            muscleActivations ??
+                [
+                  MuscleActivation(
+                    muscleGroupId: primaryMuscleGroupId,
+                    activationPercentage: 100,
+                  ),
+                ],
+          );
 
     // Create exercise with isCustom flag using normalized values
     final exercise = Exercise(
       id: id,
       name: normalizedName,
-      muscleActivations: muscleActivations,
+      muscleActivations: resolvedActivations,
       category: normalizedCategory,
       isCustom: true,
       availableHandles: availableHandles,
       exerciseType: exerciseType,
+      stretchIntensities: stretch,
+      resistanceIntensityOverride: true,
     );
 
     // Persist to storage
@@ -418,6 +566,9 @@ class WorkoutProvider extends ChangeNotifier {
     List<String>? availableHandles,
     String? category,
     String? primaryMuscleGroupId,
+    List<MuscleActivation>? muscleActivations,
+    Map<String, int>? resistanceIntensities,
+    Map<String, int>? stretchIntensities,
   }) async {
     final existing = getExercise(id);
     if (existing == null) {
@@ -440,22 +591,55 @@ class WorkoutProvider extends ChangeNotifier {
       );
     }
 
+    if (muscleActivations != null && resistanceIntensities != null) {
+      throw ArgumentError(
+        'Use resistance_intensities or muscle_activations, not both.',
+      );
+    }
+    final resistance = validateMuscleIntensities(resistanceIntensities);
+    final stretch = validateMuscleIntensities(stretchIntensities);
     List<MuscleActivation> activations = existing.muscleActivations;
-    if (primaryMuscleGroupId != null && primaryMuscleGroupId.isNotEmpty) {
-      activations = [
+    final primaryId = primaryMuscleGroupId ?? existing.primaryMuscle;
+    if (resistance != null) {
+      activations = resistanceActivations(resistance, primaryMuscleGroupId);
+    } else if (muscleActivations != null) {
+      activations = _validateMuscleActivations(primaryId, muscleActivations);
+    } else if (primaryMuscleGroupId != null &&
+        primaryMuscleGroupId.isNotEmpty &&
+        primaryMuscleGroupId != existing.primaryMuscle) {
+      if (activations.length > 1) {
+        throw ArgumentError(
+          'Provide the full muscle activation list when changing the primary muscle',
+        );
+      }
+      activations = _validateMuscleActivations(primaryMuscleGroupId, [
         MuscleActivation(
           muscleGroupId: primaryMuscleGroupId,
           activationPercentage: 100,
         ),
-      ];
+      ]);
     }
 
     final updated = existing.copyWith(
       name: normalizedName,
       category: normalizedCategory,
-      muscleActivations: activations,
+      muscleActivations:
+          resistance != null ||
+              muscleActivations != null ||
+              (primaryMuscleGroupId != null &&
+                  primaryMuscleGroupId.isNotEmpty &&
+                  primaryMuscleGroupId != existing.primaryMuscle)
+          ? activations
+          : null,
       exerciseType: exerciseType ?? existing.exerciseType,
       availableHandles: availableHandles ?? existing.availableHandles,
+      stretchIntensities: stretch,
+      resistanceIntensityOverride:
+          existing.resistanceIntensityOverride ||
+          resistance != null ||
+          muscleActivations != null ||
+          (primaryMuscleGroupId != null &&
+              primaryMuscleGroupId != existing.primaryMuscle),
     );
 
     await _storage.saveCustomExercise(updated);
@@ -934,8 +1118,128 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== SESSION MANAGEMENT ====================
 
+  List<WorkoutImportEntry> previewHealthWorkouts(
+    List<HealthConnectWorkout> records,
+  ) {
+    final existing = {for (final session in _sessions) session.id: session};
+    return [
+      for (final record in records)
+        HealthWorkoutImport.inspect(
+          record,
+          exercises: _allExercises,
+          existing: existing[HealthWorkoutImport.localId(record)],
+        ),
+    ];
+  }
+
+  Future<void>? _sessionWriteQueue;
+  final _pendingImportRefresh = <String>{};
+  bool _importHistoryRefreshPending = false;
+  bool get hasPendingImportRefresh =>
+      _importHistoryRefreshPending || _pendingImportRefresh.isNotEmpty;
+
+  Future<T> _queueSessionWrite<T>(Future<T> Function() write) {
+    final result = _sessionWriteQueue?.then((_) => write()) ?? write();
+    _sessionWriteQueue = result.then<void>(
+      (_) => null,
+      onError: (Object error, StackTrace stack) {
+        debugPrint('Session write stopped: $error');
+      },
+    );
+    return result;
+  }
+
+  Future<WorkoutImportReport> importHealthWorkouts(
+    List<HealthConnectWorkout> records,
+  ) => _queueSessionWrite(() => _importHealthWorkouts(records));
+
+  Future<bool> retryImportedWorkoutRefresh() =>
+      _queueSessionWrite(_refreshImportedWorkouts);
+
+  Future<bool> _refreshImportedWorkouts() async {
+    if (!hasPendingImportRefresh) return true;
+    try {
+      await _historyManager?.loadSessions();
+      for (final id in _pendingImportRefresh) {
+        await _updateGrowthModel(id);
+      }
+      await _recalculateTargets(_pendingImportRefresh);
+      _pendingImportRefresh.clear();
+      _importHistoryRefreshPending = false;
+      return true;
+    } catch (error) {
+      debugPrint('Saved imports need analysis refresh: $error');
+      return false;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  Future<void> _persistImportedExercises(Iterable<String> exerciseIds) async {
+    for (final id in exerciseIds.toSet()) {
+      if (_builtInExerciseIndex.containsKey(id)) continue;
+      final exercise = getExercise(id);
+      if (exercise != null) await _storage.saveCustomExercise(exercise);
+    }
+  }
+
+  Future<WorkoutImportReport> _importHealthWorkouts(
+    List<HealthConnectWorkout> records,
+  ) async {
+    final report = WorkoutImportReport();
+    final affected = _pendingImportRefresh;
+    for (final record in records) {
+      try {
+        final id = HealthWorkoutImport.localId(record);
+        final existing = await _storage.getWorkoutSession(id);
+        final entry = HealthWorkoutImport.inspect(
+          record,
+          exercises: _allExercises,
+          existing: existing,
+        );
+        if (entry.action == WorkoutImportAction.current) {
+          report.current++;
+          continue;
+        }
+        if (!entry.canImport) {
+          report.issues.add(
+            '${record.title ?? 'Saved workout'}: ${entry.message}',
+          );
+          continue;
+        }
+        final session = entry.session!;
+        // Persist first; do not export an imported workout back to Health Connect.
+        await _persistImportedExercises(
+          session.exercises.map((log) => log.exerciseId),
+        );
+        await _storage.saveWorkoutSession(session);
+        _importHistoryRefreshPending = true;
+        affected.addAll(session.exercises.map((e) => e.exerciseId));
+        affected.addAll(
+          existing?.exercises.map((e) => e.exerciseId) ?? const [],
+        );
+        _sessions = [..._sessions.where((s) => s.id != session.id), session]
+          ..sort((a, b) => b.date.compareTo(a.date));
+        _invalidateHistoryCache();
+        if (entry.action == WorkoutImportAction.add) {
+          report.added++;
+        } else {
+          report.updated++;
+        }
+      } catch (_) {
+        report.issues.add(
+          '${record.title ?? 'Saved workout'}: Could not save this workout. Retry the import.',
+        );
+      }
+    }
+    report.refreshPending = !await _refreshImportedWorkouts();
+    return report;
+  }
+
   /// Delete a workout session
-  Future<void> deleteWorkoutSession(String sessionId) async {
+  Future<void> deleteWorkoutSession(String sessionId) =>
+      _queueSessionWrite(() => _deleteWorkoutSession(sessionId));
+  Future<void> _deleteWorkoutSession(String sessionId) async {
     // Find the session to get exercise IDs for model retraining
     final sessionIndex = _sessions.indexWhere((s) => s.id == sessionId);
 
@@ -974,11 +1278,16 @@ class WorkoutProvider extends ChangeNotifier {
   }
 
   /// Update an existing workout session
-  Future<void> updateWorkoutSession(WorkoutSession updatedSession) async {
+  Future<void> updateWorkoutSession(WorkoutSession updatedSession) =>
+      _queueSessionWrite(() => _updateWorkoutSession(updatedSession));
+  Future<void> _updateWorkoutSession(WorkoutSession updatedSession) async {
     // Find the previous version of the session to compare exercises
     final previousSession = _sessions.firstWhere(
       (s) => s.id == updatedSession.id,
       orElse: () => updatedSession, // Fallback if not found (shouldn't happen)
+    );
+    updatedSession = updatedSession.copyWith(
+      importSource: previousSession.importSource,
     );
 
     // Gather exercise IDs from BOTH previous and updated sessions
@@ -1024,7 +1333,6 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Tail of the in-flight effort writes, so overlapping chip taps run one
   /// after another. See [recordSessionEffort].
-  Future<void> _effortWriteQueue = Future<void>.value();
 
   /// Records the once-per-workout effort chip (1 = Easy, 2 = Solid,
   /// 3 = Brutal) for [sessionId] and folds it into the rolling
@@ -1048,13 +1356,7 @@ class WorkoutProvider extends ChangeNotifier {
   /// had already committed — leaving storage behind provider state. Queuing
   /// is enough: each call re-reads `_sessions` when its turn comes.
   Future<void> recordSessionEffort(String sessionId, int chipValue) {
-    final result = _effortWriteQueue.then(
-      (_) => _recordSessionEffort(sessionId, chipValue),
-    );
-    // The queue must survive a failed write, or every later tap would inherit
-    // that error. The caller still sees it through [result].
-    _effortWriteQueue = result.then((_) {}, onError: (_) {});
-    return result;
+    return _queueSessionWrite(() => _recordSessionEffort(sessionId, chipValue));
   }
 
   Future<void> _recordSessionEffort(String sessionId, int chipValue) async {
@@ -1292,6 +1594,13 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== ANALYTICS ====================
 
+  bool get prefersTimedWork =>
+      _sessions.any((s) => s.timedWorkSeconds > 0) &&
+      !_sessions
+          .expand((s) => s.exercises)
+          .expand((log) => log.sets)
+          .any((set) => !set.isTimeBased && set.volume > 0);
+
   /// Get volume progression for an exercise
   List<({DateTime date, double volume})> getVolumeProgression(
     String exerciseId,
@@ -1311,14 +1620,16 @@ class WorkoutProvider extends ChangeNotifier {
           .length >
       1;
 
-  /// Get weekly volume by muscle group.
-  ///
-  /// Sessions are traversed newest-first and the loop breaks once we reach
-  /// a session older than 7 days, so only in-range sessions are visited.
-  /// An exercise map is built once at the top for O(1) per-set lookup.
-  Map<String, double> getWeeklyVolumeByMuscle() {
+  static DateTime weekStartFor(DateTime date) {
+    final local = date.toLocal();
+    return DateTime(local.year, local.month, local.day - local.weekday + 1);
+  }
+
+  /// Muscle volume logged since local Monday midnight, excluding future sessions.
+  Map<String, double> getWeeklyVolumeByMuscle({DateTime? asOf}) {
     final volumeByMuscle = <String, double>{};
-    final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+    final now = asOf ?? DateTime.now();
+    final weekAgo = weekStartFor(now);
 
     // Pre-build exercise map for O(1) lookup
     final exerciseMap = <String, Exercise>{
@@ -1329,22 +1640,60 @@ class WorkoutProvider extends ChangeNotifier {
     // We use continue rather than break in case of external imports
     // that might temporarily violate the newest-first invariant.
     for (final session in _sessions) {
-      if (session.date.isBefore(weekAgo)) continue;
+      if (session.date.isBefore(weekAgo) || session.date.isAfter(now)) continue;
 
       for (final log in session.exercises) {
         final exercise = exerciseMap[log.exerciseId];
         if (exercise == null) continue;
 
-        for (final activation in exercise.muscleActivations) {
-          final muscleVolume =
-              log.totalVolume * (activation.activationPercentage / 100);
-          volumeByMuscle[activation.muscleGroupId] =
-              (volumeByMuscle[activation.muscleGroupId] ?? 0) + muscleVolume;
+        for (final intensity in exercise.resistanceIntensities.entries) {
+          final muscleVolume = log.totalVolume * intensity.value / 10;
+          volumeByMuscle[intensity.key] =
+              (volumeByMuscle[intensity.key] ?? 0) + muscleVolume;
         }
       }
     }
 
     return volumeByMuscle;
+  }
+
+  bool hasUnknownLoadsSince(DateTime start, {DateTime? asOf}) {
+    final now = asOf ?? DateTime.now();
+    return _sessions.any(
+      (session) =>
+          !session.date.isBefore(start) &&
+          !session.date.isAfter(now) &&
+          session.exercises.any(
+            (log) =>
+                log.sets.any((set) => set.loadMode == WorkoutLoadMode.unknown),
+          ),
+    );
+  }
+
+  /// Weighted completed sets, kept separate from load volume for bodyweight work.
+  Map<String, double> getMuscleTrainingExposure({
+    DateTime? since,
+    DateTime? asOf,
+  }) {
+    final now = asOf ?? DateTime.now();
+    final start = since ?? weekStartFor(now);
+    final scores = <String, double>{};
+    for (final session in _sessions) {
+      if (session.date.isBefore(start) || session.date.isAfter(now)) continue;
+      for (final log in session.exercises) {
+        final exercise = getExercise(log.exerciseId);
+        if (exercise == null) continue;
+        final sets = log.sets
+            .where((s) => s.reps > 0 || (s.timeTaken ?? 0) > 0)
+            .length;
+        for (final entry in exercise.resistanceIntensities.entries) {
+          if (entry.value > 0 && sets > 0)
+            scores[entry.key] =
+                (scores[entry.key] ?? 0) + sets * entry.value / 10;
+        }
+      }
+    }
+    return scores;
   }
 
   /// Per-muscle recovery scores using exponential decay (recovery = 1 − e^(−t/τ)).
@@ -1405,8 +1754,7 @@ class WorkoutProvider extends ChangeNotifier {
       for (final log in session.exercises) {
         if (log.exerciseId != exerciseId) continue;
         for (final set in log.sets) {
-          if (set.timeTaken != null &&
-              (best == null || set.timeTaken! > best)) {
+          if (set.isTimeBased && (best == null || set.timeTaken! > best)) {
             best = set.timeTaken!;
           }
         }
@@ -1417,7 +1765,7 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Per-exercise contribution to a muscle group's volume within a time window.
   ///
-  /// [start]/[end] default to the last 7 days. Results are sorted by contributed
+  /// [start]/[end] default to the current calendar week. Results are sorted by contributed
   /// volume (desc). This is a pure, parameterized query intended to double as the
   /// implementation surface for a future Coach agent tool.
   List<({String exerciseId, String name, double volume, GrowthModel? growth})>
@@ -1425,10 +1773,11 @@ class WorkoutProvider extends ChangeNotifier {
     String muscleId, {
     DateTime? start,
     DateTime? end,
+    bool exposure = false,
   }) {
     final now = DateTime.now();
-    final from = start ?? now.subtract(const Duration(days: 7));
     final to = end ?? now;
+    final from = start ?? weekStartFor(to);
     final exerciseMap = <String, Exercise>{
       for (final e in _allExercises) e.id: e,
     };
@@ -1439,11 +1788,13 @@ class WorkoutProvider extends ChangeNotifier {
       for (final log in session.exercises) {
         final exercise = exerciseMap[log.exerciseId];
         if (exercise == null) continue;
-        for (final activation in exercise.muscleActivations) {
-          if (activation.muscleGroupId != muscleId) continue;
+        for (final intensity in exercise.resistanceIntensities.entries) {
+          if (intensity.key != muscleId) continue;
           byExercise[log.exerciseId] =
               (byExercise[log.exerciseId] ?? 0) +
-              log.totalVolume * (activation.activationPercentage / 100);
+              (exposure ? log.completedSetCount : log.totalVolume) *
+                  intensity.value /
+                  10;
         }
       }
     }
@@ -1455,7 +1806,7 @@ class WorkoutProvider extends ChangeNotifier {
                 exerciseId: e.key,
                 name: getExerciseName(e.key),
                 volume: e.value,
-                growth: _growthModels[e.key],
+                growth: exposure ? null : _growthModels[e.key],
               ),
             )
             .toList()
@@ -1472,6 +1823,7 @@ class WorkoutProvider extends ChangeNotifier {
     String exerciseId, {
     DateTime? start,
     DateTime? end,
+    bool duration = false,
   }) {
     final convention = latestLoadReferences(_sessions)[exerciseId];
     final result = <({DateTime date, List<WorkoutSet> sets})>[];
@@ -1479,6 +1831,16 @@ class WorkoutProvider extends ChangeNotifier {
     for (final session in _sessions.reversed) {
       if (start != null && session.date.isBefore(start)) continue;
       if (end != null && session.date.isAfter(end)) continue;
+      if (duration) {
+        final timedSets = session.exercises
+            .where((log) => log.exerciseId == exerciseId)
+            .expand((log) => log.sets)
+            .where((set) => set.isTimeBased)
+            .toList();
+        if (timedSets.isNotEmpty)
+          result.add((date: session.date, sets: timedSets));
+        continue;
+      }
       for (final log in session.exercises) {
         if (log.exerciseId == exerciseId &&
             log.sets.isNotEmpty &&
@@ -1499,12 +1861,24 @@ class WorkoutProvider extends ChangeNotifier {
         }
       }
     }
+    result.sort((a, b) => a.date.compareTo(b.date));
     return result;
+  }
+
+  bool tracksDuration(String exerciseId) {
+    if (getExercise(exerciseId)?.exerciseType == ExerciseType.timeBased)
+      return true;
+    final latest = findMostRecentExerciseLog(exerciseId, _sessions);
+    return latest?.isTimeBased ?? false;
   }
 
   /// Last [limit] sessions where [muscleId] was trained (newest-first).
   List<({DateTime date, List<String> exerciseNames, double volume})>
-  getRecentMuscleSessionSummaries(String muscleId, {int limit = 6}) {
+  getRecentMuscleSessionSummaries(
+    String muscleId, {
+    int limit = 6,
+    bool exposure = false,
+  }) {
     final exerciseMap = <String, Exercise>{
       for (final e in _allExercises) e.id: e,
     };
@@ -1517,12 +1891,13 @@ class WorkoutProvider extends ChangeNotifier {
       for (final log in session.exercises) {
         final exercise = exerciseMap[log.exerciseId];
         if (exercise == null) continue;
-        final activation = exercise.muscleActivations
-            .where((a) => a.muscleGroupId == muscleId)
-            .firstOrNull;
-        if (activation == null) continue;
+        final intensity = exercise.resistanceIntensities[muscleId];
+        if (intensity == null) continue;
         names.add(exercise.name);
-        vol += log.totalVolume * (activation.activationPercentage / 100);
+        vol +=
+            (exposure ? log.completedSetCount : log.totalVolume) *
+            intensity /
+            10;
       }
       if (names.isNotEmpty) {
         result.add((date: session.date, exerciseNames: names, volume: vol));
@@ -1535,6 +1910,7 @@ class WorkoutProvider extends ChangeNotifier {
   List<({DateTime weekStart, double volume})> getMuscleWeeklyVolumeSeries(
     String muscleId, {
     int weeks = 8,
+    bool exposure = false,
   }) {
     final now = DateTime.now();
     final exerciseMap = <String, Exercise>{
@@ -1550,11 +1926,13 @@ class WorkoutProvider extends ChangeNotifier {
       for (final log in session.exercises) {
         final exercise = exerciseMap[log.exerciseId];
         if (exercise == null) continue;
-        for (final activation in exercise.muscleActivations) {
-          if (activation.muscleGroupId != muscleId) continue;
+        for (final intensity in exercise.resistanceIntensities.entries) {
+          if (intensity.key != muscleId) continue;
           buckets[weekIndex] =
               (buckets[weekIndex] ?? 0) +
-              log.totalVolume * (activation.activationPercentage / 100);
+              (exposure ? log.completedSetCount : log.totalVolume) *
+                  intensity.value /
+                  10;
         }
       }
     }

@@ -4,6 +4,34 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.2.3]
+
+### Features added
+
+- Track timed training with weekly active-exercise minutes, period totals and per-exercise longest-hold trends. Timed-only histories default to duration charts, while load volume remains available separately.
+- Read skin-temperature deltas and optional baselines written to Health Connect by bridge apps, preserving their source for sleep and workout analysis by the AI coach.
+- Ask Coach to create or edit custom exercises with primary and secondary muscle involvement estimates, with validation of muscle names and weights and clear labelling that these are estimates.
+- View separate per-muscle resistance and stretch scores, including Coach-created multi-muscle exercises and enriched references for existing exercises.
+- Download the optional 937-exercise extended library from the public JSON catalogue and keep it available offline without losing existing exercise IDs, edits or backups.
+- Import saved workouts from Health Connect in Profile across connected apps, preserving supported exercise details and session summaries. Re-importing avoids duplicates and protects local edits.
+- See resistance-weighted set exposure in muscle heatmaps when workouts have unknown loads, keeping bodyweight training visible without inventing kilograms.
+- Store resistance and stretch maps together on each exercise, migrating existing muscle weights without rounding and removing the activation join table.
+
+### Known limitations
+
+- Skin-temperature analysis requires a supported Health Connect version, read permission, and recorded temperature and sleep data; temperature provides supporting context and does not change the readiness score.
+- Health Connect imports require exercise-read permission; older history requires supported history access. Available exercise details depend on the source app. Unsupported movements are not guessed, and source deletions are not automatically applied to local history.
+
+### Fixes
+
+- Use the current calendar week for muscle highlights and drill-downs, so earlier workouts do not light up a rest week. Keep historical recovery information separate.
+- Search imported workout titles, repair legacy personal-record IDs after backup restoration, and avoid assigning specific exercise variants from ambiguous Health Connect types.
+- Resolve extended-library exercise names in personal records, repair affected saved records, and display timed imports like native holds.
+- Fix Android Health Connect plugin attachment so workout-import permission requests can open correctly.
+- Protect workout edits during imports, preserve decimal muscle scores on unrelated changes, and allow saved imports to retry an interrupted analysis refresh.
+- Keep bodyweight muscle drill-downs and charts consistent with weighted-set exposure, retain known-load sets in mixed logs, and label unknown timed-set loads clearly.
+- Correct import date boundaries, weekly grouping, muscle filters, Coach score responses and initial health-data backfills.
+
 ## [2.2.2]
 
 ### Features added
@@ -31,6 +59,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 - Programs follow their saved week/day order; missed workouts are not automatically rescheduled.
 - Saved chat history keeps answer text and source links; live Google Search suggestion chips are not saved with messages.
 - Langfuse is available only in debug builds. Estimated costs are informational and separate from provider billing.
+
 
 ## [2.2.1]
 

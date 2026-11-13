@@ -185,7 +185,7 @@ class WorkoutLoggerApp extends StatelessWidget {
   static final HealthDataSyncService? _healthDataSyncService =
       _storageService is SqliteStorageService
       ? HealthDataSyncService(
-          healthConnectService: _healthConnectService,
+          healthConnectService: HealthConnectService(throwOnReadFailure: true),
           storage: _storageService as SqliteStorageService,
         )
       : null;

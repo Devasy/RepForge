@@ -32,6 +32,8 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
   bool _isSubmitting = false;
 
   bool get _isEditing => widget.initialExercise != null;
+  bool get _canKeepEmptyMuscles =>
+      _isEditing && widget.initialExercise!.muscleActivations.isEmpty;
 
   @override
   void initState() {
@@ -68,7 +70,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_muscleId == null) {
+    if (_muscleId == null && !_canKeepEmptyMuscles) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a primary muscle group'),
@@ -91,7 +93,7 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
           id: widget.initialExercise!.id,
           name: exerciseName,
           category: _category,
-          primaryMuscleGroupId: _muscleId!,
+          primaryMuscleGroupId: _muscleId,
           exerciseType: _exerciseType,
           availableHandles: handles,
         );
@@ -188,8 +190,11 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded,
-                        color: AppColors.primary, size: 18),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
@@ -273,9 +278,8 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                     icon: Icons.timer_rounded,
                     description: 'Holds & duration (s)',
                     selected: _exerciseType == ExerciseType.timeBased,
-                    onTap: () => setState(
-                      () => _exerciseType = ExerciseType.timeBased,
-                    ),
+                    onTap: () =>
+                        setState(() => _exerciseType = ExerciseType.timeBased),
                   ),
                 ],
               ),
@@ -284,6 +288,10 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
 
               // Category toggle
               _label('EXERCISE CATEGORY'),
+              if (_category == 'other')
+                const Text(
+                  'Not classified by the source. You can choose a category below.',
+                ),
               const SizedBox(height: AppSpacing.sm),
               Row(
                 children: [
@@ -405,8 +413,11 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
               const SizedBox(height: AppSpacing.sm),
               _MuscleGrid(
                 selected: _muscleId,
-                onSelect: (id) => setState(() => _muscleId = id),
+                onSelect: _isEditing && widget.initialExercise!.resistanceIntensities.length > 1
+                    ? null : (id) => setState(() => _muscleId = id),
               ),
+              if(_isEditing && widget.initialExercise!.resistanceIntensities.length > 1)
+                const Padding(padding:EdgeInsets.only(top:8),child:Text('To change the primary muscle, ask Coach to update the complete resistance score list.',style:TextStyle(color:AppColors.textMuted))),
 
               if (_muscleId != null) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -416,12 +427,12 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
                     vertical: AppSpacing.sm,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.muscle(_muscleId!)
-                        .withValues(alpha: 0.1),
+                    color: AppColors.muscle(_muscleId!).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                     border: Border.all(
-                      color: AppColors.muscle(_muscleId!)
-                          .withValues(alpha: 0.3),
+                      color: AppColors.muscle(
+                        _muscleId!,
+                      ).withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -553,7 +564,7 @@ class _CategoryTile extends StatelessWidget {
 class _MuscleGrid extends StatelessWidget {
   const _MuscleGrid({required this.selected, required this.onSelect});
   final String? selected;
-  final ValueChanged<String> onSelect;
+  final ValueChanged<String>? onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -575,13 +586,11 @@ class _MuscleGrid extends StatelessWidget {
         final isSelected = selected == id;
 
         return GestureDetector(
-          onTap: () => onSelect(id),
+          onTap: onSelect == null ? null : () => onSelect!(id),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? color.withValues(alpha: 0.2)
-                  : AppColors.card,
+              color: isSelected ? color.withValues(alpha: 0.2) : AppColors.card,
               borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border.all(
                 color: isSelected

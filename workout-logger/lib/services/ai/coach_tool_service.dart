@@ -39,6 +39,27 @@ class CoachToolService {
        _hh = healthHistory,
        _sql = sqlQuery;
 
+  static Schema get _muscleIntensitiesSchema => Schema.array(
+    description:
+        'Complete per-muscle estimated intensity scores, integers 1–10. '
+        'Include all involved muscles once using known muscle names or IDs. '
+        'Scores are independent and need not sum to 10. Omit to preserve existing scores; '
+        'an empty list clears this dataset. Stretch never adds resistance load. '
+        'For resistance, primary_muscle must have a highest score (ties allowed). '
+        'Use separate resistance_intensities and stretch_intensities maps. '
+        'These are estimates, not measured activation or muscle growth.',
+    nullable: true,
+    items: Schema.object(
+      properties: {
+        'muscle': Schema.string(description: 'Known muscle group name or ID.'),
+        'intensity': Schema.integer(
+          description: 'Independent estimated score, 1–10.',
+        ),
+      },
+      requiredProperties: ['muscle', 'intensity'],
+    ),
+  );
+
   /// Tool declaration for the optimizer screen's `ask_user_questions` flow.
   /// NOT included in the coach's tool list — only the optimizer adds it.
   static FunctionDeclaration
@@ -368,7 +389,8 @@ class CoachToolService {
               'wants does not already exist. Match the muscle to an existing '
               'muscle group (call get_muscle_recovery or list routines first '
               'if unsure of the available muscle names). After creating it you '
-              'can reference it by name in create_routine / update_routine.',
+              'can reference it by name in create_routine / update_routine. '
+              'Use resistance_intensities and stretch_intensities for all involved muscles.',
           Schema.object(
             properties: {
               'name': Schema.string(
@@ -384,6 +406,8 @@ class CoachToolService {
                     'Primary muscle group this exercise targets, e.g. "Chest" '
                     'or "Biceps". Must match an existing muscle group.',
               ),
+              'resistance_intensities': _muscleIntensitiesSchema,
+              'stretch_intensities': _muscleIntensitiesSchema,
               'exercise_type': Schema.string(
                 description:
                     'Optional. Either "weightAndReps" (standard sets/reps) or "timeBased" (duration holds). Defaults to "weightAndReps".',
@@ -404,12 +428,14 @@ class CoachToolService {
           'Modify an existing exercise in the catalogue (both custom exercises and '
               'library exercises). You can update its name, exercise type '
               '("weightAndReps" or "timeBased"), category ("compound" or "isolation"), '
-              'primary muscle group, or available attachments/handles '
+              'multiple per-muscle resistance and stretch intensities, primary and secondary '
+              'involvement, or available attachments/handles '
               '(e.g. ["Rope", "V-Bar", "D-Handles"]).',
           Schema.object(
             properties: {
               'exercise_name': Schema.string(
-                description: 'Current name of the exercise to update.',
+                description:
+                    'Current exercise name or exact exercise ID. Use the ID when names are ambiguous.',
               ),
               'new_name': Schema.string(
                 description: 'Optional. New display name for the exercise.',
@@ -428,6 +454,8 @@ class CoachToolService {
                     'Optional. Primary muscle group name (e.g. "Chest", "Biceps").',
                 nullable: true,
               ),
+              'resistance_intensities': _muscleIntensitiesSchema,
+              'stretch_intensities': _muscleIntensitiesSchema,
               'available_handles': Schema.array(
                 items: Schema.string(),
                 description:
@@ -513,14 +541,14 @@ class CoachToolService {
     'Run a read-only SQL SELECT query directly against the workout database '
         'for complex questions and to verify contradictory or incomplete tool results (custom joins, filters, '
         'or aggregations). Tables:\n'
-        'sessions(id, date, routine_id, duration_min, notes, hc_synced_at, session_effort, program_id, program_day_id, program_week_number)\n'
+        'sessions(id, date, routine_id, duration_min, notes, hc_synced_at, session_effort, program_id, program_day_id, program_week_number, import_source)\n'
         'exercise_logs(id, session_id, exercise_id, notes, handle)\n'
         'sets(id, exercise_log_id, weight, reps, is_dropset, drops_json, '
         'time_taken, timestamp, assist_weight, extra_weight, handle, body_weight_at_log, load_mode, load_encoding_version)\n'
-        'exercises(id, name, category, is_custom, available_handles, exercise_type) — custom '
+        'exercises(id, name, category, is_custom, available_handles, exercise_type, resistance_intensities, stretch_intensities, resistance_intensity_override) — custom '
         'exercises and built-in overrides (is_custom=0 indicates an override of a built-in exercise)\n'
+        'resistance_intensities and stretch_intensities are JSON maps of muscle IDs to independent 1–10 scores. Legacy resistance may have decimals. Stretch never contributes to resistance load.\n'
         'muscle_groups(id, name, growth_rate, last_updated)\n'
-        'exercise_muscle_activations(exercise_id, muscle_group_id, activation_percentage)\n'
         'routines(id, name, created_at)\n'
         'routine_exercises(routine_id, exercise_id, position, default_handle)\n'
         'targets(id, exercise_id, target_type, target_value, current_value, '
@@ -536,10 +564,27 @@ class CoachToolService {
         'wall-clock, id is the UTC start instant\n'
         'sleep_stage_intervals(sleep_session_id, start_ts, end_ts, stage) — '
         'stage is deep | rem | light | awake\n'
+        'skin_temperature_samples(record_id, source_package, measurement_location, '
+        'record_start_ts, record_end_ts, timestamp, utc_ts, delta_c, baseline_c) — '
+        'Health Connect skin temperature as written by the bridge/source app. '
+        'delta_c is a Celsius difference from the source baseline; baseline_c '
+        'is optional. Absolute skin temperature is baseline_c + delta_c ONLY '
+        'when baseline_c is present. Never interpret deltas as body temperature. '
+        'For source_package com.repforge.healthbridge, baseline_c is the Samsung '
+        'session summary or the mean of source samples, not a personal rolling '
+        'baseline. Compare reconstructed absolute skin temperatures across nights, '
+        'not raw deltas centered on different record baselines. '
+        'All timestamps except utc_ts use local wall-clock. For sleep analysis '
+        'join timestamp >= sleep_sessions.start_ts AND timestamp < sleep_sessions.end_ts; '
+        'use EXISTS or deduplicate overlapping sleep sessions to avoid double counting. '
+        'Aggregate per sleep session/morning date, source_package and measurement_location '
+        'before joining workouts. Do not pool sources or measurement locations. '
+        'Report nights with data and missing nights; missing is not zero. '
+        'Use run_sql_query for skin-temperature trends and workout comparisons.\n'
         'When joining tables, select explicit columns with aliases (e.g. s.id AS '
         'session_id, l.id AS log_id) instead of SELECT *, since duplicate column '
         'names across joined tables will silently collide.\n'
-        'Built-ins without overrides are absent from exercises AND exercise_muscle_activations: discover group IDs with get_logged_exercises, filter exercise_logs.exercise_id IN those IDs, and LEFT JOIN names. Do not require a catalogue or activation row for built-in logs. If joining activations for custom exercises, use EXISTS to avoid duplicating sets. Explicitly filter requested dates; separate handles and load encodings. Only SELECT/WITH statements are allowed, one statement per call.',
+        'Built-ins without overrides are absent from exercises: discover group IDs with get_logged_exercises, filter exercise_logs.exercise_id IN those IDs, and LEFT JOIN names. Do not require a catalogue row for built-in logs. The activation join table has been removed. Resolve muscle membership with get_logged_exercises; never multiply sets by muscle entries. Explicitly filter requested dates; separate handles and load encodings. Imported sets with load_mode=unknown have no known load; exclude them from tonnage and load trends and use reps, duration or weighted-set exposure instead. Reconstructed segment times are not measured HR boundaries. Only SELECT/WITH statements are allowed, one statement per call.',
     Schema.object(
       properties: {
         'query': Schema.string(
@@ -1676,7 +1721,8 @@ class CoachToolService {
   Future<Map<String, Object?>> _addCustomExercise(
     Map<String, Object?> args,
   ) async {
-    final name = (args['name'] as String?)?.trim() ?? '';
+    final name =
+        (args['name'] as String?)?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
     if (name.isEmpty) return {'error': 'Exercise name cannot be empty.'};
 
     // Reject duplicates so the model reuses the existing exercise instead.
@@ -1742,6 +1788,12 @@ class CoachToolService {
         name: name,
         category: category,
         primaryMuscleGroupId: muscle.id,
+        muscleActivations: _readMuscleActivations(args),
+        resistanceIntensities: _readMuscleIntensities(
+          args,
+          'resistance_intensities',
+        ),
+        stretchIntensities: _readMuscleIntensities(args, 'stretch_intensities'),
         exerciseType: exerciseType,
         availableHandles: handles?.isEmpty == true ? null : handles,
       );
@@ -1749,11 +1801,21 @@ class CoachToolService {
       return {'error': 'Could not create exercise: $e'};
     }
 
+    final created = _wp.allExercises.firstWhere((e) => e.name == name);
     return {
       'created': true,
+      'exercise_id': created.id,
       'exercise_name': name,
       'category': category,
       'primary_muscle': muscle.name,
+      'muscle_activations': _activationSummary(created),
+      ..._resistanceResult(created),
+      'stretch_intensities': [
+        for (final e in (created.stretchIntensities ?? <String, int>{}).entries)
+          {'muscle': e.key, 'intensity': e.value},
+      ],
+      'activation_interpretation':
+          'Estimated involvement, not measured activation or growth.',
       'exercise_type': exerciseType.name,
       if (handles != null && handles.isNotEmpty) 'available_handles': handles,
     };
@@ -1843,6 +1905,12 @@ class CoachToolService {
         name: (newName != null && newName.isNotEmpty) ? newName : null,
         category: (category != null && category.isNotEmpty) ? category : null,
         primaryMuscleGroupId: primaryMuscleId,
+        muscleActivations: _readMuscleActivations(args),
+        resistanceIntensities: _readMuscleIntensities(
+          args,
+          'resistance_intensities',
+        ),
+        stretchIntensities: _readMuscleIntensities(args, 'stretch_intensities'),
         exerciseType: exerciseType,
         availableHandles: availableHandles,
       );
@@ -1854,6 +1922,15 @@ class CoachToolService {
         'category': updated.category,
         'primary_muscle':
             primaryMuscleName ?? _wp.getMuscleGroupName(updated.primaryMuscle),
+        'muscle_activations': _activationSummary(updated),
+        ..._resistanceResult(updated),
+        'stretch_intensities': [
+          for (final e
+              in (updated.stretchIntensities ?? <String, int>{}).entries)
+            {'muscle': e.key, 'intensity': e.value},
+        ],
+        'activation_interpretation':
+            'Estimated involvement, not measured activation or growth.',
         'exercise_type': updated.exerciseType.name,
         'available_handles': updated.availableHandles,
       };
@@ -1863,6 +1940,92 @@ class CoachToolService {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  Map<String, Object?> _resistanceResult(Exercise exercise) => {
+    'resistance_reference': exercise.resistanceIntensities,
+    if (exercise.resistanceIntensities.values.every(
+      (score) => score >= 1 && score <= 10 && score == score.round(),
+    ))
+      'resistance_intensities': [
+        for (final entry in exercise.resistanceIntensities.entries)
+          {'muscle': entry.key, 'intensity': entry.value.toInt()},
+      ],
+  };
+
+  Map<String, int>? _readMuscleIntensities(
+    Map<String, Object?> args,
+    String field,
+  ) {
+    if (!args.containsKey(field)) return null;
+    final input = args[field];
+    if (input == null) return null;
+    if (input is! List) throw ArgumentError('$field must be a list.');
+    final scores = <String, int>{};
+    for (final item in input) {
+      if (item is! Map ||
+          item['muscle'] is! String ||
+          item['intensity'] is! int ||
+          (item['intensity'] as int) < 1 ||
+          (item['intensity'] as int) > 10) {
+        throw ArgumentError(
+          '$field requires muscle names and integer intensity scores from 1 to 10.',
+        );
+      }
+      final muscle = _resolveMuscleGroup((item['muscle'] as String).trim());
+      if (muscle == null) throw ArgumentError('Unknown muscle in $field.');
+      if (scores.containsKey(muscle.id)) {
+        throw ArgumentError('Duplicate muscle in $field.');
+      }
+      scores[muscle.id] = item['intensity'] as int;
+    }
+    return scores;
+  }
+
+  List<MuscleActivation>? _readMuscleActivations(Map<String, Object?> args) {
+    if (!args.containsKey('muscle_activations')) return null;
+    final raw = args['muscle_activations'];
+    if (raw == null) return null;
+    if (raw is! List || raw.isEmpty) {
+      throw ArgumentError('muscle_activations must be a nonempty list');
+    }
+    return raw.map((entry) {
+      if (entry is! Map ||
+          entry['muscle'] is! String ||
+          entry['activation_percentage'] is! int) {
+        throw ArgumentError(
+          'Each activation requires a muscle and an integer weight',
+        );
+      }
+      final name = (entry['muscle'] as String).trim();
+      final MuscleGroup? muscle;
+      try {
+        muscle = _resolveMuscleGroup(name);
+      } on AmbiguousMatchException catch (e) {
+        throw ArgumentError(
+          'Ambiguous muscle "$name": ${e.candidates.join(", ")}',
+        );
+      }
+      if (muscle == null) throw ArgumentError('Unknown muscle "$name"');
+      return MuscleActivation(
+        muscleGroupId: muscle.id,
+        activationPercentage: entry['activation_percentage'] as int,
+      );
+    }).toList();
+  }
+
+  List<Map<String, Object?>> _activationSummary(Exercise exercise) => [
+    for (final activation in exercise.muscleActivations)
+      {
+        'muscle_id': activation.muscleGroupId,
+        'muscle':
+            MuscleGroups.names[activation.muscleGroupId] ??
+            _wp.getMuscleGroupName(activation.muscleGroupId),
+        'role': activation.muscleGroupId == exercise.primaryMuscle
+            ? 'primary'
+            : 'secondary',
+        'activation_percentage': activation.activationPercentage,
+      },
+  ];
 
   /// Per-session weight×reps breakdown for [exerciseId], newest first.
   /// Bounded to the most recent [limit] sessions (after the optional [cutoff])
@@ -1953,7 +2116,17 @@ class CoachToolService {
     if (q.isEmpty) return null;
     final all = _wp.allExercises;
     for (final e in all) {
-      if (e.name.toLowerCase() == q) return e;
+      if (e.id.toLowerCase() == q) return e;
+    }
+    final exact = [
+      for (final e in all)
+        if (e.name.toLowerCase() == q) e,
+    ];
+    if (exact.length == 1) return exact.single;
+    if (exact.length > 1) {
+      throw AmbiguousMatchException([
+        for (final e in exact) '${e.name} (ID: ${e.id})',
+      ]);
     }
     final partials = [
       for (final e in all)

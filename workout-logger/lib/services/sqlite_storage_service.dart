@@ -5,11 +5,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'backup_codec.dart';
+import 'extended_exercise_library.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/models.dart';
+import '../models/skin_temperature_sample.dart';
 import '../data/exercise_database.dart';
 import 'interfaces/storage_service_interface.dart';
 
@@ -19,7 +21,20 @@ class SqliteStorageService implements IStorageService {
       _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 8;
+  static const int _dbVersion = 12;
+  static const _skinTemperatureSchema =
+      '''CREATE TABLE IF NOT EXISTS skin_temperature_samples (
+    record_id TEXT NOT NULL,
+    source_package TEXT NOT NULL,
+    measurement_location TEXT NOT NULL,
+    record_start_ts TEXT NOT NULL,
+    record_end_ts TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    utc_ts TEXT NOT NULL,
+    delta_c REAL NOT NULL,
+    baseline_c REAL,
+    PRIMARY KEY (source_package, record_id, utc_ts)
+  )''';
   static const _messageChunkBytes = 64 * 1024;
   static const _conversationChunksSchema =
       '''CREATE TABLE conversation_message_chunks (
@@ -95,24 +110,23 @@ class SqliteStorageService implements IStorageService {
   )''';
 
   static const List<String> _schemaStatements = [
+    _skinTemperatureSchema,
     '''CREATE TABLE exercises (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       category TEXT NOT NULL,
       is_custom INTEGER NOT NULL DEFAULT 0,
       available_handles TEXT,
-      exercise_type TEXT NOT NULL DEFAULT 'weightAndReps'
+      exercise_type TEXT NOT NULL DEFAULT 'weightAndReps',
+      resistance_intensities TEXT NOT NULL DEFAULT '{}',
+      stretch_intensities TEXT,
+      resistance_intensity_override INTEGER NOT NULL DEFAULT 0
     )''',
     '''CREATE TABLE muscle_groups (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       growth_rate REAL NOT NULL DEFAULT 0,
       last_updated TEXT NOT NULL
-    )''',
-    '''CREATE TABLE exercise_muscle_activations (
-      exercise_id TEXT NOT NULL,
-      muscle_group_id TEXT NOT NULL,
-      activation_percentage INTEGER NOT NULL
     )''',
     '''CREATE TABLE routines (
       id TEXT PRIMARY KEY,
@@ -135,7 +149,8 @@ class SqliteStorageService implements IStorageService {
       session_effort INTEGER,
       program_id TEXT,
       program_day_id TEXT,
-      program_week_number INTEGER
+      program_week_number INTEGER,
+      import_source TEXT
     )''',
     '''CREATE TABLE exercise_logs (
       id TEXT PRIMARY KEY,
@@ -256,6 +271,29 @@ class SqliteStorageService implements IStorageService {
         }
       },
       onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 10) {
+          final tables = await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'exercises'",
+          );
+          if (tables.isNotEmpty) {
+            final columns = (await db.rawQuery(
+              'PRAGMA table_info(exercises)',
+            )).map((row) => row['name']).toSet();
+            if (!columns.contains('stretch_intensities')) {
+              await db.execute(
+                'ALTER TABLE exercises ADD COLUMN stretch_intensities TEXT',
+              );
+            }
+            if (!columns.contains('resistance_intensity_override')) {
+              await db.execute(
+                'ALTER TABLE exercises ADD COLUMN resistance_intensity_override INTEGER NOT NULL DEFAULT 0',
+              );
+            }
+          }
+        }
+        if (oldVersion < 9) {
+          await db.execute(_skinTemperatureSchema);
+        }
         if (oldVersion < 2) {
           for (final statement in _healthSchemaStatements) {
             await db.execute(statement);
@@ -338,6 +376,7 @@ class SqliteStorageService implements IStorageService {
             for (final row in records) {
               final record = PersonalRecord(
                 exerciseId: row['exercise_id'] as String,
+                legacyCompositeId: true,
                 bestWeight: (row['best_weight'] as num).toDouble(),
                 bestReps: row['best_reps'] as int,
                 bestVolume: (row['best_volume'] as num).toDouble(),
@@ -406,19 +445,117 @@ class SqliteStorageService implements IStorageService {
             await db.update('conversations', {'messages_json': '[]'});
           }
         }
+        if (oldVersion < 11) {
+          final tables = (await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table'",
+          )).map((row) => row['name']).toSet();
+          if (tables.contains('exercises')) {
+            final columns = (await db.rawQuery(
+              'PRAGMA table_info(exercises)',
+            )).map((row) => row['name']).toSet();
+            if (!columns.contains('resistance_intensities')) {
+              await db.execute(
+                "ALTER TABLE exercises ADD COLUMN resistance_intensities TEXT NOT NULL DEFAULT '{}'",
+              );
+            }
+            if (tables.contains('exercise_muscle_activations')) {
+              final weights = <String, Map<String, num>>{};
+              for (final row in await db.query('exercise_muscle_activations')) {
+                weights.putIfAbsent(
+                      row['exercise_id'] as String,
+                      () => {},
+                    )[row['muscle_group_id'] as String] =
+                    (row['activation_percentage'] as num) / 10;
+              }
+              for (final entry in weights.entries) {
+                await db.update(
+                  'exercises',
+                  {'resistance_intensities': jsonEncode(entry.value)},
+                  where: 'id = ?',
+                  whereArgs: [entry.key],
+                );
+              }
+            }
+          }
+          if (tables.contains('exercise_muscle_activations')) {
+            await db.execute('DROP TABLE exercise_muscle_activations');
+          }
+          if (tables.contains('sessions')) {
+            final columns = (await db.rawQuery(
+              'PRAGMA table_info(sessions)',
+            )).map((row) => row['name']).toSet();
+            if (!columns.contains('import_source')) {
+              await db.execute(
+                'ALTER TABLE sessions ADD COLUMN import_source TEXT',
+              );
+            }
+          }
+        }
+        if (oldVersion < 12) {
+          await _repairSplitPersonalRecords(db);
+        }
       },
     );
 
-    final count =
-        Sqflite.firstIntValue(
-          await _db.rawQuery('SELECT COUNT(*) FROM muscle_groups'),
-        ) ??
-        0;
-    if (count == 0) {
-      await _seedDefaultMuscleGroups();
-    }
+    await _seedDefaultMuscleGroups();
 
     _initialized = true;
+  }
+
+  Future<void> _repairSplitPersonalRecords(DatabaseExecutor db) async {
+    final tables = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table'",
+    )).map((r) => r['name']).toSet();
+    if (tables.contains('personal_records') &&
+        tables.contains('exercise_logs')) {
+      for (final row in await db.query('personal_records')) {
+        final base = row['exercise_id'] as String;
+        final handle = row['handle'] as String?;
+        if (handle == null || handle.isEmpty) continue;
+        final fullId = '$base:$handle';
+        final hasFullId = (await db.query(
+          'exercise_logs',
+          columns: ['id'],
+          where: 'exercise_id = ?',
+          whereArgs: [fullId],
+          limit: 1,
+        )).isNotEmpty;
+        final hasBaseId = (await db.query(
+          'exercises',
+          columns: ['id'],
+          where: 'id = ?',
+          whereArgs: [base],
+          limit: 1,
+        )).isNotEmpty;
+        if (!hasFullId || hasBaseId) continue;
+        await db.rawInsert(
+          '''INSERT INTO personal_records
+        (exercise_id, handle, load_encoding_version, best_weight, best_reps, best_volume, achieved_at, best_duration)
+        VALUES (?, '', ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(exercise_id, handle, load_encoding_version) DO UPDATE SET
+          best_weight = MAX(best_weight, excluded.best_weight),
+          best_reps = MAX(best_reps, excluded.best_reps),
+          best_volume = MAX(best_volume, excluded.best_volume),
+          achieved_at = MAX(achieved_at, excluded.achieved_at),
+          best_duration = NULLIF(MAX(COALESCE(best_duration, 0), COALESCE(excluded.best_duration, 0)), 0)
+      ''',
+          [
+            fullId,
+            row['load_encoding_version'],
+            row['best_weight'],
+            row['best_reps'],
+            row['best_volume'],
+            row['achieved_at'],
+            row['best_duration'],
+          ],
+        );
+        await db.delete(
+          'personal_records',
+          where: 'exercise_id = ? AND handle = ? AND load_encoding_version = ?',
+          whereArgs: [base, handle, row['load_encoding_version']],
+        );
+      }
+    }
   }
 
   Future<void> _seedDefaultMuscleGroups() async {
@@ -429,7 +566,7 @@ class SqliteStorageService implements IStorageService {
         'name': mg.name,
         'growth_rate': mg.growthRate,
         'last_updated': mg.lastUpdated.toIso8601String(),
-      });
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
   }
@@ -470,6 +607,24 @@ class SqliteStorageService implements IStorageService {
         'notes': session.notes,
         'hc_synced_at': session.hcSyncedAt?.toIso8601String(),
         'session_effort': session.sessionEffort,
+        'import_source': session.importSource == null
+            ? null
+            : jsonEncode({
+                ...session.importSource!,
+                '_storageUtc': {
+                  'date': session.date.toUtc().toIso8601String(),
+                  'sets': {
+                    for (var i = 0; i < session.exercises.length; i++)
+                      for (var j = 0; j < session.exercises[i].sets.length; j++)
+                        '${session.id}_${i}_$j': session
+                            .exercises[i]
+                            .sets[j]
+                            .timestamp
+                            .toUtc()
+                            .toIso8601String(),
+                  },
+                },
+              }),
       });
 
       for (var i = 0; i < session.exercises.length; i++) {
@@ -510,8 +665,16 @@ class SqliteStorageService implements IStorageService {
   Future<List<WorkoutSession>> _loadSessions({
     String? where,
     List<Object?>? whereArgs,
+  }) => _db.transaction(
+    (txn) => _loadSessionsSnapshot(txn, where: where, whereArgs: whereArgs),
+  );
+
+  Future<List<WorkoutSession>> _loadSessionsSnapshot(
+    DatabaseExecutor txn, {
+    String? where,
+    List<Object?>? whereArgs,
   }) async {
-    final sessionRows = await _db.query(
+    final sessionRows = await txn.query(
       'sessions',
       where: where,
       whereArgs: whereArgs,
@@ -519,7 +682,13 @@ class SqliteStorageService implements IStorageService {
     final sessions = <WorkoutSession>[];
     for (final row in sessionRows) {
       final sessionId = row['id'] as String;
-      final logRows = await _db.query(
+      final importSource = row['import_source'] == null
+          ? null
+          : Map<String, dynamic>.from(
+              jsonDecode(row['import_source'] as String) as Map,
+            );
+      final storedUtc = importSource?.remove('_storageUtc') as Map?;
+      final logRows = await txn.query(
         'exercise_logs',
         where: 'session_id = ?',
         whereArgs: [sessionId],
@@ -531,7 +700,7 @@ class SqliteStorageService implements IStorageService {
       final exerciseLogs = <ExerciseLog>[];
       for (final logRow in logRows) {
         final logId = logRow['id'] as String;
-        final setRows = await _db.query(
+        final setRows = await txn.query(
           'sets',
           where: 'exercise_log_id = ?',
           whereArgs: [logId],
@@ -555,7 +724,11 @@ class SqliteStorageService implements IStorageService {
                           )
                           .toList(),
                 timeTaken: s['time_taken'] as int?,
-                timestamp: DateTime.parse(s['timestamp'] as String),
+                timestamp: storedUtc?['sets']?[s['id']] == null
+                    ? DateTime.parse(s['timestamp'] as String)
+                    : DateTime.parse(
+                        storedUtc!['sets'][s['id']] as String,
+                      ).toLocal(),
                 assistWeight: (s['assist_weight'] as num?)?.toDouble(),
                 extraWeight: (s['extra_weight'] as num?)?.toDouble(),
                 bodyWeightAtLog: (s['body_weight_at_log'] as num?)?.toDouble(),
@@ -579,7 +752,9 @@ class SqliteStorageService implements IStorageService {
       sessions.add(
         WorkoutSession(
           id: sessionId,
-          date: DateTime.parse(row['date'] as String),
+          date: storedUtc?['date'] == null
+              ? DateTime.parse(row['date'] as String)
+              : DateTime.parse(storedUtc!['date'] as String).toLocal(),
           routineId: row['routine_id'] as String?,
           programId: row['program_id'] as String?,
           programDayId: row['program_day_id'] as String?,
@@ -588,6 +763,7 @@ class SqliteStorageService implements IStorageService {
           duration: row['duration_min'] as int,
           notes: row['notes'] as String?,
           sessionEffort: row['session_effort'] as int?,
+          importSource: importSource,
           hcSyncedAt: row['hc_synced_at'] == null
               ? null
               : DateTime.parse(row['hc_synced_at'] as String),
@@ -832,11 +1008,6 @@ class SqliteStorageService implements IStorageService {
   @override
   Future<void> saveCustomExercise(Exercise exercise) async {
     await _db.transaction((txn) async {
-      await txn.delete(
-        'exercise_muscle_activations',
-        where: 'exercise_id = ?',
-        whereArgs: [exercise.id],
-      );
       await txn.insert('exercises', {
         'id': exercise.id,
         'name': exercise.name,
@@ -846,23 +1017,18 @@ class SqliteStorageService implements IStorageService {
             ? null
             : jsonEncode(exercise.availableHandles),
         'exercise_type': exercise.exerciseType.name,
+        'resistance_intensities': jsonEncode(exercise.resistanceIntensities),
+        'stretch_intensities': exercise.stretchIntensities == null
+            ? null
+            : jsonEncode(exercise.stretchIntensities),
+        'resistance_intensity_override': exercise.resistanceIntensityOverride
+            ? 1
+            : 0,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
-      for (final ma in exercise.muscleActivations) {
-        await txn.insert('exercise_muscle_activations', {
-          'exercise_id': exercise.id,
-          'muscle_group_id': ma.muscleGroupId,
-          'activation_percentage': ma.activationPercentage,
-        });
-      }
     });
   }
 
   Future<Exercise> _loadCustomExerciseRow(Map<String, Object?> row) async {
-    final activations = await _db.query(
-      'exercise_muscle_activations',
-      where: 'exercise_id = ?',
-      whereArgs: [row['id']],
-    );
     final rawType = row['exercise_type'] as String?;
     final ExerciseType type;
     if (rawType == null) {
@@ -887,14 +1053,15 @@ class SqliteStorageService implements IStorageService {
           : (jsonDecode(row['available_handles'] as String) as List)
                 .cast<String>(),
       exerciseType: type,
-      muscleActivations: activations
-          .map(
-            (a) => MuscleActivation(
-              muscleGroupId: a['muscle_group_id'] as String,
-              activationPercentage: a['activation_percentage'] as int,
-            ),
-          )
-          .toList(),
+      stretchIntensities: Exercise.decodeStretchIntensities(
+        row['stretch_intensities'] == null
+            ? null
+            : jsonDecode(row['stretch_intensities'] as String),
+      ),
+      resistanceIntensityOverride: row['resistance_intensity_override'] == 1,
+      resistanceIntensities: Exercise.decodeResistanceIntensities(
+        jsonDecode(row['resistance_intensities'] as String),
+      ),
     );
   }
 
@@ -921,11 +1088,6 @@ class SqliteStorageService implements IStorageService {
   @override
   Future<void> deleteCustomExercise(String id) async {
     await _db.transaction((txn) async {
-      await txn.delete(
-        'exercise_muscle_activations',
-        where: 'exercise_id = ?',
-        whereArgs: [id],
-      );
       await txn.delete('exercises', where: 'id = ?', whereArgs: [id]);
     });
   }
@@ -942,9 +1104,13 @@ class SqliteStorageService implements IStorageService {
         .map((e) => dbExercises[e.id] ?? e)
         .toList();
     final customOnly = dbExercises.values.where(
-      (e) => e.isCustom && ExerciseDatabase.getById(e.id) == null,
+      (e) => ExerciseDatabase.getById(e.id) == null,
     );
-    return [...builtIn, ...customOnly];
+    final exercises = [...builtIn, ...customOnly];
+    return ExtendedExerciseLibrary.fromCache(
+          await getSetting(ExtendedExerciseLibrary.settingKey),
+        )?.mergeExercises(exercises) ??
+        exercises;
   }
 
   @override
@@ -953,7 +1119,13 @@ class SqliteStorageService implements IStorageService {
     if (rows.isNotEmpty) {
       return _loadCustomExerciseRow(rows.first);
     }
-    return ExerciseDatabase.getById(id);
+    final builtIn = ExerciseDatabase.getById(id);
+    if (builtIn != null) return builtIn;
+    final library = ExtendedExerciseLibrary.fromCache(
+      await getSetting(ExtendedExerciseLibrary.settingKey),
+    );
+    return library?.profiles[id.startsWith('fitify:') ? id.substring(7) : null]
+        ?.toExercise();
   }
 
   // ==================== SETTINGS ====================
@@ -1068,6 +1240,13 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<PersonalRecord?> getPersonalRecord(String exerciseId) async {
+    final exact = await _db.query(
+      'personal_records',
+      where: 'exercise_id = ?',
+      whereArgs: [exerciseId],
+    );
+    if (exact.isNotEmpty)
+      return PersonalRecord.aggregate(exact.map(_prFromRow));
     final split = exerciseId.indexOf(':');
     final id = split < 0 ? exerciseId : exerciseId.substring(0, split);
     final handle = split < 0 ? null : exerciseId.substring(split + 1);
@@ -1277,6 +1456,27 @@ class SqliteStorageService implements IStorageService {
         'end_ts': localIso,
         'utc_ts': utcIso,
         'value': s.value,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> upsertSkinTemperatureSamples(
+    List<SkinTemperatureSample> samples,
+  ) async {
+    if (samples.isEmpty) return;
+    final batch = _db.batch();
+    for (final sample in samples) {
+      batch.insert('skin_temperature_samples', {
+        'record_id': sample.recordId,
+        'source_package': sample.sourcePackage,
+        'measurement_location': sample.measurementLocation,
+        'record_start_ts': sample.recordStart.toLocal().toIso8601String(),
+        'record_end_ts': sample.recordEnd.toLocal().toIso8601String(),
+        'timestamp': sample.time.toLocal().toIso8601String(),
+        'utc_ts': sample.time.toUtc().toIso8601String(),
+        'delta_c': sample.deltaCelsius,
+        'baseline_c': sample.baselineCelsius,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
@@ -1565,5 +1765,7 @@ class SqliteStorageService implements IStorageService {
         }
       }
     }
+
+    await _db.transaction(_repairSplitPersonalRecords);
   }
 }

@@ -22,6 +22,15 @@ class MuscleGroups {
   static const calves = 'calves';
   static const core = 'core';
   static const traps = 'traps';
+  static const abs = 'abs';
+  static const obliques = 'obliques';
+  static const abductors = 'abductors';
+  static const adductors = 'adductors';
+  static const forearmAnterior = 'forearm_anterior';
+  static const forearmPosterior = 'forearm_posterior';
+  static const neckFront = 'neck_front';
+  static const neckSide = 'neck_side';
+  static const neckBack = 'neck_back';
 
   static List<MuscleGroup> getAll() => [
     MuscleGroup(id: chest, name: 'Chest'),
@@ -42,6 +51,15 @@ class MuscleGroups {
     MuscleGroup(id: calves, name: 'Calves'),
     MuscleGroup(id: core, name: 'Core'),
     MuscleGroup(id: traps, name: 'Traps'),
+    MuscleGroup(id: abs, name: 'Abdominals'),
+    MuscleGroup(id: obliques, name: 'Obliques'),
+    MuscleGroup(id: abductors, name: 'Hip Abductors'),
+    MuscleGroup(id: adductors, name: 'Hip Adductors'),
+    MuscleGroup(id: forearmAnterior, name: 'Forearm Flexors'),
+    MuscleGroup(id: forearmPosterior, name: 'Forearm Extensors'),
+    MuscleGroup(id: neckFront, name: 'Front Neck'),
+    MuscleGroup(id: neckSide, name: 'Side Neck'),
+    MuscleGroup(id: neckBack, name: 'Back Neck'),
   ];
 
   static Map<String, String> get names => {
@@ -63,6 +81,15 @@ class MuscleGroups {
     calves: 'Calves',
     core: 'Core',
     traps: 'Traps',
+    abs: 'Abdominals',
+    obliques: 'Obliques',
+    abductors: 'Hip Abductors',
+    adductors: 'Hip Adductors',
+    forearmAnterior: 'Forearm Flexors',
+    forearmPosterior: 'Forearm Extensors',
+    neckFront: 'Front Neck',
+    neckSide: 'Side Neck',
+    neckBack: 'Back Neck',
   };
 }
 
@@ -499,8 +526,8 @@ class ExerciseDatabase {
   }
 
   static List<Exercise> getByMuscleGroup(String muscleGroupId) {
-    return getAll().where((e) => 
-      e.muscleActivations.any((m) => m.muscleGroupId == muscleGroupId)
-    ).toList();
+    return getAll()
+        .where((e) => e.muscleActivations.any((m) => m.muscleGroupId == muscleGroupId))
+        .toList();
   }
 }

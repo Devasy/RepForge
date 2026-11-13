@@ -30,7 +30,7 @@ class HealthSyncManager implements IHealthSyncManager {
   Map<String, String>? _exerciseNames;
 
   HealthSyncManager(this._hc, this._settings, {IStorageService? storage})
-      : _storage = storage;
+    : _storage = storage;
 
   @override
   void syncSession(
@@ -39,14 +39,16 @@ class HealthSyncManager implements IHealthSyncManager {
     void Function(WorkoutSession updated)? onSynced,
   }) {
     // Synchronous in-memory flag check — no I/O, no await.
-    if (!_settings.healthConnectEnabled) return;
+    if (!_settings.healthConnectEnabled || session.importSource != null) return;
 
     _resolveExerciseNames()
-        .then((names) => _hc.syncWorkoutSession(
-              session,
-              title: routineName,
-              exerciseNames: names,
-            ))
+        .then(
+          (names) => _hc.syncWorkoutSession(
+            session,
+            title: routineName,
+            exerciseNames: names,
+          ),
+        )
         .then((success) {
           if (success) {
             onSynced?.call(session.copyWith(hcSyncedAt: DateTime.now()));

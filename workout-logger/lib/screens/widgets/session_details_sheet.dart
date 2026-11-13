@@ -34,7 +34,10 @@ class SessionDetailsSheet extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final dateStr = DateFormat('EEEE, MMMM d, yyyy').format(session.date);
     final timeStr = DateFormat('h:mm a').format(session.date);
-    final totalSets = session.exercises.fold<int>(0, (s, e) => s + e.sets.length);
+    final totalSets = session.exercises.fold<int>(
+      0,
+      (s, e) => s + e.sets.length,
+    );
     final volume = settings.toDisplay(session.totalVolume);
     final volStr = volume >= 1000
         ? '${(volume / 1000).toStringAsFixed(1)}k'
@@ -158,6 +161,14 @@ class SessionDetailsSheet extends StatelessWidget {
 
         const SizedBox(height: AppSpacing.lg),
         const RFSectionHeader('Exercises'),
+        if (session.importSource != null)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Imported from Health Connect. Available repetitions and durations are preserved.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+          ),
         const SizedBox(height: AppSpacing.sm),
 
         ...session.exercises.map(
@@ -167,7 +178,7 @@ class SessionDetailsSheet extends StatelessWidget {
         // HR + rest-recovery breakdown (self-hides when no HR data).
         WorkoutHrSection(session: session, provider: provider),
 
-        if (session.notes != null && session.notes!.isNotEmpty) ...[
+        if (session.displayNotes != null && session.displayNotes!.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
           const RFSectionHeader('Notes'),
           const SizedBox(height: AppSpacing.sm),
@@ -180,7 +191,7 @@ class SessionDetailsSheet extends StatelessWidget {
               border: Border.all(color: AppColors.glassBorder),
             ),
             child: Text(
-              session.notes!,
+              session.displayNotes!,
               style: const TextStyle(
                 color: AppColors.textSoft,
                 fontSize: 14,
@@ -232,10 +243,7 @@ class _StatBannerBox extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
             textAlign: TextAlign.center,
           ),
         ],
@@ -263,7 +271,10 @@ class _ActionChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm + 2, vertical: 6),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm + 2,
+          vertical: 6,
+        ),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(AppRadius.full),
@@ -372,13 +383,16 @@ class _ExerciseDetailCard extends StatelessWidget {
               children: [
                 Text(
                   log.isTimeBased ? 'Total Hold ' : 'Total ',
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                  ),
                 ),
                 Text(
                   log.isTimeBased
                       ? (log.sets.any((s) => s.weight > 0)
-                          ? '${formatHoldDuration(log.totalHoldDuration)} · ${settings.toDisplay(log.totalVolume).toStringAsFixed(0)} ${settings.unitLabel}'
-                          : formatHoldDuration(log.totalHoldDuration))
+                            ? '${formatHoldDuration(log.totalHoldDuration)} · ${settings.toDisplay(log.totalVolume).toStringAsFixed(0)} ${settings.unitLabel}'
+                            : formatHoldDuration(log.totalHoldDuration))
                       : '${settings.toDisplay(log.totalVolume).toStringAsFixed(0)} ${settings.unitLabel}',
                   style: TextStyle(
                     color: log.isTimeBased ? AppColors.cyan : AppColors.success,
@@ -409,7 +423,10 @@ class _SetRow extends StatelessWidget {
         ? dw.toStringAsFixed(0)
         : dw.toStringAsFixed(1);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        vertical: 4,
+        horizontal: AppSpacing.sm,
+      ),
       child: Row(
         children: [
           Container(
@@ -434,14 +451,13 @@ class _SetRow extends StatelessWidget {
           Expanded(
             child: Text(
               set.isTimeBased
-                  ? (set.weight > 0
-                      ? '${formatHoldDuration(set.timeTaken ?? 0)} (+$wStr ${settings.unitLabel})'
-                      : formatHoldDuration(set.timeTaken ?? 0))
+                  ? (set.loadMode != WorkoutLoadMode.unknown && set.weight > 0
+                        ? '${formatHoldDuration(set.timeTaken ?? 0)} (+$wStr ${settings.unitLabel})'
+                        : formatHoldDuration(set.timeTaken ?? 0))
+                  : set.loadMode == WorkoutLoadMode.unknown
+                  ? '${set.reps} reps · load unknown'
                   : '$wStr ${settings.unitLabel} × ${set.reps} reps',
-              style: const TextStyle(
-                color: AppColors.textSoft,
-                fontSize: 13,
-              ),
+              style: const TextStyle(color: AppColors.textSoft, fontSize: 13),
             ),
           ),
           if (set.isDropset)
@@ -462,13 +478,11 @@ class _SetRow extends StatelessWidget {
                 ),
               ),
             ),
-          if (!set.isTimeBased || set.weight > 0)
+          if (set.loadMode != WorkoutLoadMode.unknown &&
+              (!set.isTimeBased || set.weight > 0))
             Text(
               '${settings.toDisplay(set.volume).toStringAsFixed(0)} ${settings.unitLabel}',
-              style: const TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
         ],
       ),

@@ -13,6 +13,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/workout_provider.dart';
@@ -550,6 +551,9 @@ void main() {
       expect(find.text('Best Hold'), findsOneWidget);
       expect(find.text('1m'), findsWidgets);
       expect(find.text('Hold Duration'), findsOneWidget);
+      expect(find.text('Longest timed set per session'), findsOneWidget);
+      final holdChart = tester.widget<LineChart>(find.byType(LineChart).first);
+      expect(holdChart.data.lineBarsData.first.spots.first.y, 60);
       expect(find.text('Hold'), findsOneWidget);
       expect(find.text('Sets'), findsOneWidget);
 

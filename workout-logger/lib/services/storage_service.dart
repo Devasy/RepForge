@@ -6,6 +6,7 @@
 
 import 'dart:convert';
 import 'backup_codec.dart';
+import 'extended_exercise_library.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../models/models.dart';
@@ -93,9 +94,7 @@ class StorageService implements IStorageService {
     }
 
     // Initialize default muscle groups if empty
-    if (_muscleGroupsBoxInstance.isEmpty) {
-      await _initializeDefaultMuscleGroups();
-    }
+    await _initializeDefaultMuscleGroups();
 
     _initialized = true;
   }
@@ -103,7 +102,9 @@ class StorageService implements IStorageService {
   Future<void> _initializeDefaultMuscleGroups() async {
     final muscleGroups = MuscleGroups.getAll();
     for (var mg in muscleGroups) {
-      await _muscleGroupsBoxInstance.put(mg.id, jsonEncode(mg.toJson()));
+      if (!_muscleGroupsBoxInstance.containsKey(mg.id)) {
+        await _muscleGroupsBoxInstance.put(mg.id, jsonEncode(mg.toJson()));
+      }
     }
   }
 
@@ -289,23 +290,29 @@ class StorageService implements IStorageService {
   Future<List<Exercise>> getAllExercises() async {
     final builtIn = ExerciseDatabase.getAll();
     final custom = await getCustomExercises();
-    return [...builtIn, ...custom];
+    final merged = <String, Exercise>{
+      for (final e in [...builtIn, ...custom]) e.id: e,
+    }.values.toList();
+    return ExtendedExerciseLibrary.fromCache(
+          await getSetting(ExtendedExerciseLibrary.settingKey),
+        )?.mergeExercises(merged) ??
+        merged;
   }
 
   /// Get exercise by ID (built-in or custom)
   @override
   Future<Exercise?> getExercise(String id) async {
-    // Check built-in first
-    final builtIn = ExerciseDatabase.getById(id);
-    if (builtIn != null) return builtIn;
-
-    // Check custom
     final json = _customExercisesBoxInstance.get(id);
     if (json != null) {
       return Exercise.fromJson(jsonDecode(json));
     }
-
-    return null;
+    final builtIn = ExerciseDatabase.getById(id);
+    if (builtIn != null) return builtIn;
+    final library = ExtendedExerciseLibrary.fromCache(
+      await getSetting(ExtendedExerciseLibrary.settingKey),
+    );
+    return library?.profiles[id.startsWith('fitify:') ? id.substring(7) : null]
+        ?.toExercise();
   }
 
   // ==================== SETTINGS ====================
@@ -570,10 +577,13 @@ class StorageService implements IStorageService {
 
   @override
   Future<PersonalRecord?> getPersonalRecord(String exerciseId) async {
+    final records = await getAllPersonalRecords();
+    final exact = records.where((r) => r.exerciseId == exerciseId).toList();
+    if (exact.isNotEmpty) return PersonalRecord.aggregate(exact);
     final split = exerciseId.indexOf(':');
     final id = split < 0 ? exerciseId : exerciseId.substring(0, split);
     final handle = split < 0 ? null : exerciseId.substring(split + 1);
-    final matches = (await getAllPersonalRecords()).where(
+    final matches = records.where(
       (r) => r.exerciseId == id && (handle == null || r.handle == handle),
     );
     if (handle == null) return PersonalRecord.aggregate(matches);

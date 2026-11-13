@@ -16,6 +16,18 @@ import 'widgets/calendar_grid.dart';
 
 const Color _hcColor = Color(0xFF4ECDC4);
 
+String _sessionTitle(WorkoutSession session, WorkoutProvider provider) {
+  if (session.routineId != null) {
+    return provider.routines.cast<Routine?>().firstWhere(
+          (r) => r?.id == session.routineId, orElse: () => null)?.name ??
+        'Workout';
+  }
+  final importedTitle =
+      (session.importSource?['rawRecord']?['title'] as String?)?.trim();
+  if (importedTitle != null && importedTitle.isNotEmpty) return importedTitle;
+  return session.importSource != null ? 'Saved workout' : 'Quick Workout';
+}
+
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -44,6 +56,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return sessions.where((s) {
       final dateStr = DateFormat('EEEE MMM d yyyy').format(s.date).toLowerCase();
       if (dateStr.contains(q)) return true;
+      if (_sessionTitle(s, provider).toLowerCase().contains(q)) return true;
       return s.exercises.any((e) {
         final name = provider.getExerciseName(e.exerciseId).toLowerCase();
         return name.contains(q);
@@ -87,7 +100,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final months = grouped.keys.toList();
 
     final totalVolume = all.fold<double>(0, (s, e) => s + e.totalVolume);
-    final hasUnsynced = settings.healthConnectEnabled && all.any((s) => s.hcSyncedAt == null);
+    final hasUnsynced = settings.healthConnectEnabled && all.any((s) => s.hcSyncedAt == null && s.importSource == null);
 
     return Stack(
       children: [
@@ -443,7 +456,7 @@ class _SearchBar extends StatelessWidget {
         autofocus: true,
         style: TextStyle(fontFamily: 'Geist', color: AppColors.textPrimary, fontSize: 14),
         decoration: InputDecoration(
-          hintText: 'Search by date or exercise…',
+          hintText: 'Search by date, title or exercise…',
           hintStyle: TextStyle(fontFamily: 'Geist', color: AppColors.textMuted, fontSize: 14),
           prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 18),
           border: InputBorder.none,
@@ -502,7 +515,7 @@ class _MonthGroup extends StatelessWidget {
             session: s,
             provider: provider,
             historyManager: historyManager,
-            showSync: settings.healthConnectEnabled && s.hcSyncedAt == null,
+            showSync: settings.healthConnectEnabled && s.hcSyncedAt == null && s.importSource == null,
           ),
         ),
       ],
@@ -622,10 +635,7 @@ class _HistoryCard extends StatelessWidget {
     final vol = settings.toDisplay(session.totalVolume);
     final volStr = vol >= 1000 ? '${(vol / 1000).toStringAsFixed(1)}k' : vol.toStringAsFixed(0);
     final duration = session.duration;
-    final routineName = session.routineId != null
-        ? provider.routines.cast<Routine?>().firstWhere(
-            (r) => r?.id == session.routineId, orElse: () => null)?.name ?? 'Workout'
-        : 'Quick Workout';
+    final routineName = _sessionTitle(session, provider);
 
     return GestureDetector(
       onTap: () => _openDetails(context),

@@ -9,6 +9,44 @@ import 'test_utils/mock_ml_service.dart';
 import 'test_utils/mock_storage_service.dart';
 
 void main() {
+  test(
+    'custom exercise tools declare multiple resistance and stretch scores',
+    () {
+      final storage = MockStorageService();
+      final wp = WorkoutProvider(
+        storage,
+        mlService: MockMLService(),
+        programManager: ProgramManager(storage),
+      );
+      final tools = CoachToolService(
+        workoutProvider: wp,
+        prManager: PRManager(storage),
+      );
+      for (final name in ['add_custom_exercise', 'update_exercise']) {
+        final declaration = tools
+            .buildTools()
+            .single
+            .functionDeclarations!
+            .firstWhere((d) => d.name == name);
+        final schema = declaration.parameters!.toJson();
+        final properties = schema['properties'] as Map;
+        expect(
+          properties.keys,
+          containsAll(['resistance_intensities', 'stretch_intensities']),
+        );
+        for (final key in ['resistance_intensities', 'stretch_intensities']) {
+          final values = properties[key] as Map;
+          expect(values['type'], 'ARRAY');
+          expect(
+            (values['items'] as Map)['required'],
+            containsAll(['muscle', 'intensity']),
+          );
+          expect(properties, isNot(contains('muscle_activations')));
+        }
+      }
+      wp.dispose();
+    },
+  );
   test('run_sql_query schema description includes the new health tables', () {
     final storage = MockStorageService();
     final wp = WorkoutProvider(

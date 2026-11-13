@@ -59,6 +59,8 @@ class AnalyticsOverviewTab extends StatelessWidget {
 
 enum _Range { w4, w12, all }
 
+enum _WorkMetric { volume, time }
+
 extension on _Range {
   String get label => switch (this) {
         _Range.w4 => '4W',
@@ -81,6 +83,7 @@ class _VolumeTrendCard extends StatefulWidget {
 
 class _VolumeTrendCardState extends State<_VolumeTrendCard> {
   _Range _range = _Range.w12;
+  _WorkMetric? _metric;
 
   static const int _allCap = 26; // keep the chart readable for long histories
 
@@ -89,6 +92,15 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
     final provider = context.watch<WorkoutProvider>();
     final settings = context.watch<SettingsProvider>();
     final sessions = provider.sessions;
+    final hasTimedWork = sessions.any((s) => s.timedWorkSeconds > 0);
+    final selectedMetric = _metric ?? (provider.prefersTimedWork ? _WorkMetric.time : _WorkMetric.volume);
+    final timed = selectedMetric == _WorkMetric.time;
+    final unit = timed ? 'min' : settings.unitLabel;
+    double valueFor(WorkoutSession session) => timed
+        ? session.timedWorkSeconds / 60.0 : settings.toDisplay(session.totalVolume);
+    String formatValue(double value) => timed ? value.toStringAsFixed(1) : _fmtK(value);
+    final estimatedTimes = sessions.any((s) => s.timedWorkSeconds > 0 &&
+        s.importSource != null && s.importSource!['timingReconstructed'] != false);
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -117,8 +129,8 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
       final wEnd = wStart.add(const Duration(days: 7));
       final raw = sessions
           .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
-          .fold<double>(0, (sum, s) => sum + s.totalVolume);
-      return settings.toDisplay(raw);
+          .fold<double>(0, (sum, s) => sum + valueFor(s));
+      return raw;
     }
 
     final spots = <FlSpot>[
@@ -134,9 +146,9 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
       final wStart =
           currentWeekStart.subtract(Duration(days: (weeks + i) * 7));
       final wEnd = wStart.add(const Duration(days: 7));
-      prevSum += settings.toDisplay(sessions
+      prevSum += sessions
           .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
-          .fold<double>(0, (sum, s) => sum + s.totalVolume));
+          .fold<double>(0, (sum, s) => sum + valueFor(s));
     }
     final double? deltaPct =
         prevSum > 0 ? ((curSum - prevSum) / prevSum * 100) : null;
@@ -157,7 +169,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Volume Trend',
+                      timed ? 'Timed Work Trend' : 'Volume Trend',
                       style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 14,
@@ -166,7 +178,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${settings.unitLabel} · per week',
+                      '$unit · per week',
                       style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 11,
@@ -181,6 +193,28 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
               ),
             ],
           ),
+          if (hasTimedWork) ...[
+            const SizedBox(height: 12),
+            SegmentedButton<_WorkMetric>(
+              expandedInsets: EdgeInsets.zero,
+              showSelectedIcon: false,
+              style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(0, 44))),
+              segments: const [
+                ButtonSegment(value: _WorkMetric.time, label: Text('Timed work')),
+                ButtonSegment(value: _WorkMetric.volume, label: Text('Load volume')),
+              ],
+              selected: {selectedMetric},
+              onSelectionChanged: (selection) => setState(() => _metric = selection.single),
+            ),
+          ],
+          if (timed && hasData) ...[
+            const SizedBox(height: 12),
+            Text('${curSum.toStringAsFixed(1)} min in this period',
+              style: const TextStyle(fontFamily: 'GeistMono', color: AppColors.cyan, fontSize: 16)),
+            Text(estimatedTimes ? 'Timed sets only, excluding rest. Some imported durations are estimated.'
+                : 'Timed sets only, excluding rest.',
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+          ],
           if (deltaPct != null) ...[
             const SizedBox(height: 8),
             Row(
@@ -206,7 +240,9 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
           ],
           if (!hasData) ...[
             const SizedBox(height: 24),
-            const _EmptyChart(),
+            _EmptyChart(subtitle: !timed && hasTimedWork
+              ? 'Switch to Timed work to see duration-based training.'
+              : 'Complete workouts to see progress'),
             const SizedBox(height: 8),
           ] else ...[
             const SizedBox(height: 14),
@@ -227,10 +263,10 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                         getTooltipColor: (_) => AppColors.cardHigh,
                         getTooltipItems: (touched) => touched.map((spot) {
                           final i = spot.x.toInt();
-                          final volStr = _fmtK(spot.y);
+                          final volStr = formatValue(spot.y);
                           final ws = weekStartFor(i);
                           return LineTooltipItem(
-                            '$volStr ${settings.unitLabel}',
+                            '$volStr $unit',
                             TextStyle(fontFamily: 'GeistMono', 
                               color: AppColors.primary,
                               fontSize: 13,
@@ -282,7 +318,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                           showTitles: true,
                           reservedSize: 40,
                           getTitlesWidget: (v, _) => Text(
-                            _fmtK(v),
+                            formatValue(v),
                             style: TextStyle(fontFamily: 'GeistMono', 
                               color: AppColors.textMuted,
                               fontSize: 9,
@@ -310,7 +346,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                                 fontSize: 9,
                                 fontWeight: FontWeight.w600,
                               ),
-                              labelResolver: (_) => 'BEST ${_fmtK(bestVol)}',
+                              labelResolver: (_) => 'BEST ${formatValue(bestVol)}${timed ? ' min' : ''}',
                             ),
                           ),
                       ],
@@ -318,7 +354,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                     lineBarsData: [
                       LineChartBarData(
                         spots: spots,
-                        isCurved: true,
+                        isCurved: !timed,
                         curveSmoothness: 0.3,
                         color: AppColors.primary,
                         barWidth: 2.5,
@@ -423,7 +459,11 @@ class _MuscleFocusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final byMuscle = provider.getWeeklyVolumeByMuscle();
+    final now = DateTime.now();
+    final weekStart = WorkoutProvider.weekStartFor(now);
+    final exposure = provider.hasUnknownLoadsSince(weekStart, asOf: now);
+    final byMuscle = exposure ? provider.getMuscleTrainingExposure(since: weekStart, asOf: now)
+        : provider.getWeeklyVolumeByMuscle(asOf: now);
     final recovery = provider.getMuscleRecoveryScores();
     final growth = provider.getMuscleGrowthModels();
 
@@ -444,17 +484,17 @@ class _MuscleFocusCard extends StatelessWidget {
 
     return _ChartCard(
       title: 'Muscle Focus',
-      subtitle: 'Weekly volume · recovery · trend — tap a muscle',
+      subtitle: 'This week · since ${DateFormat('EEE d MMM').format(weekStart)} · ${exposure ? 'weighted sets' : settings.unitLabel}',
       child: Column(
         children: [
           MuscleBodyMap(
             muscleVolumes: normalized,
-            onMuscleTap: (id) => _openDrillDown(context, id),
+            onMuscleTap: (id) => _openDrillDown(context, id, exposure:exposure),
           ),
           const SizedBox(height: 16),
-          if (top.isEmpty)
+          if (maxVol <= 0)
             const Text(
-              'Log a workout to see your weekly muscle volume.',
+              'No training logged this week. Recovery reflects earlier workouts.',
               style: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
           Column(
@@ -463,11 +503,12 @@ class _MuscleFocusCard extends StatelessWidget {
                 _MuscleFocusRow(
                   muscleId: id,
                   weeklyVolume: byMuscle[id] ?? 0,
+                  exposure: exposure,
                   fraction: maxVol > 0 ? (byMuscle[id] ?? 0) / maxVol : 0,
                   recovery: recovery[id],
-                  growth: growth[id],
+                  growth: exposure ? null : growth[id],
                   settings: settings,
-                  onTap: () => _openDrillDown(context, id),
+                  onTap: () => _openDrillDown(context, id, exposure:exposure),
                 ),
             ],
           ),
@@ -476,7 +517,7 @@ class _MuscleFocusCard extends StatelessWidget {
     );
   }
 
-  void _openDrillDown(BuildContext context, String muscleId) {
+  void _openDrillDown(BuildContext context, String muscleId, {bool exposure=false}) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -484,7 +525,7 @@ class _MuscleFocusCard extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
-      builder: (_) => MuscleDetailSheet(muscleId: muscleId, provider: provider),
+      builder: (_) => MuscleDetailSheet(muscleId: muscleId, provider: provider,exposure:exposure),
     );
   }
 }
@@ -493,6 +534,7 @@ class _MuscleFocusRow extends StatelessWidget {
   const _MuscleFocusRow({
     required this.muscleId,
     required this.weeklyVolume,
+    this.exposure = false,
     required this.fraction,
     required this.recovery,
     required this.growth,
@@ -502,6 +544,7 @@ class _MuscleFocusRow extends StatelessWidget {
 
   final String muscleId;
   final double weeklyVolume;
+  final bool exposure;
   final double fraction;
   final MuscleRecoveryStatus? recovery;
   final GrowthModel? growth;
@@ -541,7 +584,7 @@ class _MuscleFocusRow extends StatelessWidget {
     final name = MuscleGroups.names[muscleId] ?? muscleId;
     final color = AppColors.muscle(muscleId);
     final trend = _trend;
-    final displayVol = settings.toDisplay(weeklyVolume);
+    final displayVol = exposure ? weeklyVolume : settings.toDisplay(weeklyVolume);
 
     return GestureDetector(
       onTap: onTap,
@@ -564,7 +607,7 @@ class _MuscleFocusRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${_fmtK(displayVol)} ${settings.unitLabel}',
+                  exposure ? '${displayVol.toStringAsFixed(1)} weighted sets' : '${_fmtK(displayVol)} ${settings.unitLabel}',
                   style: TextStyle(fontFamily: 'GeistMono', 
                     color: AppColors.textMuted,
                     fontSize: 11,
@@ -732,7 +775,8 @@ class _ChartCard extends StatelessWidget {
 }
 
 class _EmptyChart extends StatelessWidget {
-  const _EmptyChart();
+  const _EmptyChart({this.subtitle = 'Complete workouts to see progress'});
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -743,7 +787,7 @@ class _EmptyChart extends StatelessWidget {
           const SizedBox(height: 8),
           Text('No data yet',
               style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.textMuted)),
-          Text('Complete workouts to see progress',
+          Text(subtitle,
               style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.textFaint)),
         ],
       ),

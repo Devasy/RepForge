@@ -595,8 +595,10 @@ class _DashboardTab extends StatelessWidget {
         .toList();
 
     final settings = context.read<SettingsProvider>();
+    final timed = provider.prefersTimedWork;
     final weekVol = weekSessions.fold<double>(0, (s, e) => s + e.totalVolume);
-    final displayVol = settings.toDisplay(weekVol);
+    final displayVol = timed ? weekSessions.fold<int>(0, (sum, session) => sum + session.timedWorkSeconds) / 60.0
+        : settings.toDisplay(weekVol);
     final weekSets =
         weekSessions.fold<int>(0, (s, e) => s + e.exercises.fold(0, (a, ex) => a + ex.sets.length));
     final avgDuration = sessions.isEmpty
@@ -615,8 +617,8 @@ class _DashboardTab extends StatelessWidget {
       final wEnd = wStart.add(const Duration(days: 7));
       final rawVol = sessions
           .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
-          .fold<double>(0, (s, e) => s + e.totalVolume);
-      return settings.toDisplay(rawVol);
+          .fold<double>(0, (s, e) => s + (timed ? e.timedWorkSeconds / 60.0 : e.totalVolume));
+      return timed ? rawVol : settings.toDisplay(rawVol);
     });
     List<double> weeklySets = List.generate(7, (i) {
       final wStart = today.subtract(Duration(days: (6 - i) * 7 + today.weekday - 1));
@@ -642,11 +644,11 @@ class _DashboardTab extends StatelessWidget {
         spark: weeklyWorkouts,
       ),
       _StatItem(
-        label: 'Volume',
+        label: timed ? 'Timed work' : 'Volume',
         value: displayVol >= 1000
             ? '${(displayVol / 1000).toStringAsFixed(1)}k'
             : displayVol.toStringAsFixed(0),
-        unit: settings.unitLabel,
+        unit: timed ? 'min' : settings.unitLabel,
         color: AppColors.secondary,
         spark: weeklyVolumes,
       ),
@@ -724,23 +726,12 @@ class _DashboardTab extends StatelessWidget {
   Widget _buildMuscleVolumeCard(BuildContext context, WorkoutProvider provider) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final weekSessions = provider.sessions
-        .where((s) => s.date.isAfter(weekStart.subtract(const Duration(days: 1))))
-        .toList();
-
-    final muscleVols = <String, double>{};
-    for (final s in weekSessions) {
-      for (final el in s.exercises) {
-        final ex = provider.getExercise(el.exerciseId);
-        if (ex == null) continue;
-        final vol = settings.toDisplay(el.totalVolume);
-        for (final ma in ex.muscleActivations) {
-          muscleVols[ma.muscleGroupId] =
-              (muscleVols[ma.muscleGroupId] ?? 0) + vol * ma.activationPercentage / 100;
-        }
-      }
-    }
+    final weekStart = WorkoutProvider.weekStartFor(now);
+    final exposure = provider.hasUnknownLoadsSince(weekStart, asOf: now);
+    final muscleVols = exposure
+        ? provider.getMuscleTrainingExposure(since: weekStart, asOf: now)
+        : provider.getWeeklyVolumeByMuscle(asOf: now)
+            .map((id, volume) => MapEntry(id, settings.toDisplay(volume)));
 
     final maxVol = muscleVols.values.isEmpty ? 1.0 : muscleVols.values.reduce((a, b) => a > b ? a : b);
     final muscleList = muscleVols.entries.toList()
@@ -748,7 +739,7 @@ class _DashboardTab extends StatelessWidget {
     final topMuscles = muscleList.take(5).toList();
 
     final normalizedVols = {
-      for (final e in muscleVols.entries) e.key: e.value / maxVol
+      if(maxVol>0) for (final e in muscleVols.entries) e.key: e.value / maxVol
     };
 
     return GlassCard(
@@ -760,7 +751,7 @@ class _DashboardTab extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Weekly muscle volume',
+                exposure ? 'Weekly muscle exposure' : 'Weekly muscle volume',
                 style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -768,7 +759,7 @@ class _DashboardTab extends StatelessWidget {
                 ),
               ),
               Text(
-                settings.unitLabel,
+                exposure ? 'weighted sets' : settings.unitLabel,
                 style: TextStyle(fontFamily: 'Geist', 
                   fontSize: 11,
                   color: AppColors.textMuted,
@@ -788,7 +779,7 @@ class _DashboardTab extends StatelessWidget {
                   children: topMuscles.isEmpty
                       ? [
                           Text(
-                            'No data yet',
+                            'No training logged this week',
                             style: TextStyle(fontFamily: 'Geist', 
                               fontSize: 12,
                               color: AppColors.textMuted,

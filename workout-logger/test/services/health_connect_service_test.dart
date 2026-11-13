@@ -8,6 +8,35 @@ import '../test_utils/test_fixtures.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('skin temperature mapping preserves deltas, baseline and bridge origin', () {
+    final start = DateTime.utc(2026, 11, 10, 22);
+    final samples = HealthConnectService.mapSkinTemperatureRecords([
+      for (final baseline in [const Temperature.celsius(33.5), null])
+        SkinTemperatureDeltaSeriesRecord(
+          id: HealthRecordId('bridge-record'),
+          startTime: start,
+          endTime: start.add(const Duration(hours: 8)),
+          metadata: Metadata.internal(
+            recordingMethod: RecordingMethod.automaticallyRecorded,
+            dataOrigin: const DataOrigin('bridge.app'),
+          ),
+          baseline: baseline,
+          measurementLocation: SkinTemperatureMeasurementLocation.wrist,
+          samples: [SkinTemperatureDeltaSample(
+            time: start.add(const Duration(hours: 1)),
+            temperatureDelta: const Temperature.celsius(-0.25),
+          )],
+        ),
+    ]);
+    expect(samples, hasLength(2));
+    expect(samples.first.recordId, 'bridge-record');
+    expect(samples.first.sourcePackage, 'bridge.app');
+    expect(samples.first.measurementLocation, 'wrist');
+    expect(samples.first.deltaCelsius, -0.25);
+    expect(samples.first.baselineCelsius, 33.5);
+    expect(samples.last.baselineCelsius, isNull);
+  });
+
   const pigeonChannels = [
     'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.getHealthPlatformStatus',
     'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.initialize',
@@ -136,6 +165,17 @@ void main() {
 
     final hr = await service.readHeartRateSamples(start, now);
     expect(hr, isEmpty);
+  });
+
+  testWidgets('sync reader propagates unavailable reads instead of empty success', (tester) async {
+    final service = HealthConnectService(throwOnReadFailure: true);
+    final end = DateTime(2026, 11, 13);
+    final start = end.subtract(const Duration(days: 90));
+    await expectLater(service.readSleepSessions(start, end), throwsStateError);
+    await expectLater(service.readRestingHeartRate(start, end), throwsStateError);
+    await expectLater(service.readHrvRmssd(start, end), throwsStateError);
+    await expectLater(service.readHeartRateSamples(start, end), throwsStateError);
+    expect(await service.hasHistoryReadPermission(), isFalse);
   });
 
   test('HealthConnectService succeeds when platform response takes > 100ms within deadline', () async {
