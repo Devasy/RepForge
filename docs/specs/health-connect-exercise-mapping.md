@@ -45,6 +45,12 @@ resistance/stretch scores are not RPE, measured EMG or evidence of growth.
 
 ## History and analysis
 
+Timed-only histories default to a weekly timed-work chart in minutes and a matching
+Home statistic. Only positive timed sets count; workout/rest duration and rep-set
+timings do not inflate this total. Load volume remains a separate metric. Exercise
+hold trends use the longest timed set per session, including sets with unknown loads
+and repeated circuit entries. Imported timing estimates are labelled in the chart.
+
 Local IDs use source client record identity (falling back to Health Connect
 record ID). Source provenance and the last imported content snapshot travel with
 the session through SQLite, Hive and backups. Repeated source versions are

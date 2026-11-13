@@ -595,8 +595,10 @@ class _DashboardTab extends StatelessWidget {
         .toList();
 
     final settings = context.read<SettingsProvider>();
+    final timed = provider.prefersTimedWork;
     final weekVol = weekSessions.fold<double>(0, (s, e) => s + e.totalVolume);
-    final displayVol = settings.toDisplay(weekVol);
+    final displayVol = timed ? weekSessions.fold<int>(0, (sum, session) => sum + session.timedWorkSeconds) / 60.0
+        : settings.toDisplay(weekVol);
     final weekSets =
         weekSessions.fold<int>(0, (s, e) => s + e.exercises.fold(0, (a, ex) => a + ex.sets.length));
     final avgDuration = sessions.isEmpty
@@ -615,8 +617,8 @@ class _DashboardTab extends StatelessWidget {
       final wEnd = wStart.add(const Duration(days: 7));
       final rawVol = sessions
           .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
-          .fold<double>(0, (s, e) => s + e.totalVolume);
-      return settings.toDisplay(rawVol);
+          .fold<double>(0, (s, e) => s + (timed ? e.timedWorkSeconds / 60.0 : e.totalVolume));
+      return timed ? rawVol : settings.toDisplay(rawVol);
     });
     List<double> weeklySets = List.generate(7, (i) {
       final wStart = today.subtract(Duration(days: (6 - i) * 7 + today.weekday - 1));
@@ -642,11 +644,11 @@ class _DashboardTab extends StatelessWidget {
         spark: weeklyWorkouts,
       ),
       _StatItem(
-        label: 'Volume',
+        label: timed ? 'Timed work' : 'Volume',
         value: displayVol >= 1000
             ? '${(displayVol / 1000).toStringAsFixed(1)}k'
             : displayVol.toStringAsFixed(0),
-        unit: settings.unitLabel,
+        unit: timed ? 'min' : settings.unitLabel,
         color: AppColors.secondary,
         spark: weeklyVolumes,
       ),

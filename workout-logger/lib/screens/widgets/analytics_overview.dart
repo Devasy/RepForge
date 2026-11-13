@@ -59,6 +59,8 @@ class AnalyticsOverviewTab extends StatelessWidget {
 
 enum _Range { w4, w12, all }
 
+enum _WorkMetric { volume, time }
+
 extension on _Range {
   String get label => switch (this) {
         _Range.w4 => '4W',
@@ -81,6 +83,7 @@ class _VolumeTrendCard extends StatefulWidget {
 
 class _VolumeTrendCardState extends State<_VolumeTrendCard> {
   _Range _range = _Range.w12;
+  _WorkMetric? _metric;
 
   static const int _allCap = 26; // keep the chart readable for long histories
 
@@ -89,6 +92,15 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
     final provider = context.watch<WorkoutProvider>();
     final settings = context.watch<SettingsProvider>();
     final sessions = provider.sessions;
+    final hasTimedWork = sessions.any((s) => s.timedWorkSeconds > 0);
+    final selectedMetric = _metric ?? (provider.prefersTimedWork ? _WorkMetric.time : _WorkMetric.volume);
+    final timed = selectedMetric == _WorkMetric.time;
+    final unit = timed ? 'min' : settings.unitLabel;
+    double valueFor(WorkoutSession session) => timed
+        ? session.timedWorkSeconds / 60.0 : settings.toDisplay(session.totalVolume);
+    String formatValue(double value) => timed ? value.toStringAsFixed(1) : _fmtK(value);
+    final estimatedTimes = sessions.any((s) => s.timedWorkSeconds > 0 &&
+        s.importSource != null && s.importSource!['timingReconstructed'] != false);
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -117,8 +129,8 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
       final wEnd = wStart.add(const Duration(days: 7));
       final raw = sessions
           .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
-          .fold<double>(0, (sum, s) => sum + s.totalVolume);
-      return settings.toDisplay(raw);
+          .fold<double>(0, (sum, s) => sum + valueFor(s));
+      return raw;
     }
 
     final spots = <FlSpot>[
@@ -134,9 +146,9 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
       final wStart =
           currentWeekStart.subtract(Duration(days: (weeks + i) * 7));
       final wEnd = wStart.add(const Duration(days: 7));
-      prevSum += settings.toDisplay(sessions
+      prevSum += sessions
           .where((s) => !s.date.isBefore(wStart) && s.date.isBefore(wEnd))
-          .fold<double>(0, (sum, s) => sum + s.totalVolume));
+          .fold<double>(0, (sum, s) => sum + valueFor(s));
     }
     final double? deltaPct =
         prevSum > 0 ? ((curSum - prevSum) / prevSum * 100) : null;
@@ -157,7 +169,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Volume Trend',
+                      timed ? 'Timed Work Trend' : 'Volume Trend',
                       style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textPrimary,
                         fontSize: 14,
@@ -166,7 +178,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${settings.unitLabel} · per week',
+                      '$unit · per week',
                       style: TextStyle(fontFamily: 'Geist', 
                         color: AppColors.textMuted,
                         fontSize: 11,
@@ -181,6 +193,28 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
               ),
             ],
           ),
+          if (hasTimedWork) ...[
+            const SizedBox(height: 12),
+            SegmentedButton<_WorkMetric>(
+              expandedInsets: EdgeInsets.zero,
+              showSelectedIcon: false,
+              style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(0, 44))),
+              segments: const [
+                ButtonSegment(value: _WorkMetric.time, label: Text('Timed work')),
+                ButtonSegment(value: _WorkMetric.volume, label: Text('Load volume')),
+              ],
+              selected: {selectedMetric},
+              onSelectionChanged: (selection) => setState(() => _metric = selection.single),
+            ),
+          ],
+          if (timed && hasData) ...[
+            const SizedBox(height: 12),
+            Text('${curSum.toStringAsFixed(1)} min in this period',
+              style: const TextStyle(fontFamily: 'GeistMono', color: AppColors.cyan, fontSize: 16)),
+            Text(estimatedTimes ? 'Timed sets only, excluding rest. Some imported durations are estimated.'
+                : 'Timed sets only, excluding rest.',
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+          ],
           if (deltaPct != null) ...[
             const SizedBox(height: 8),
             Row(
@@ -206,7 +240,9 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
           ],
           if (!hasData) ...[
             const SizedBox(height: 24),
-            const _EmptyChart(),
+            _EmptyChart(subtitle: !timed && hasTimedWork
+              ? 'Switch to Timed work to see duration-based training.'
+              : 'Complete workouts to see progress'),
             const SizedBox(height: 8),
           ] else ...[
             const SizedBox(height: 14),
@@ -227,10 +263,10 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                         getTooltipColor: (_) => AppColors.cardHigh,
                         getTooltipItems: (touched) => touched.map((spot) {
                           final i = spot.x.toInt();
-                          final volStr = _fmtK(spot.y);
+                          final volStr = formatValue(spot.y);
                           final ws = weekStartFor(i);
                           return LineTooltipItem(
-                            '$volStr ${settings.unitLabel}',
+                            '$volStr $unit',
                             TextStyle(fontFamily: 'GeistMono', 
                               color: AppColors.primary,
                               fontSize: 13,
@@ -282,7 +318,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                           showTitles: true,
                           reservedSize: 40,
                           getTitlesWidget: (v, _) => Text(
-                            _fmtK(v),
+                            formatValue(v),
                             style: TextStyle(fontFamily: 'GeistMono', 
                               color: AppColors.textMuted,
                               fontSize: 9,
@@ -310,7 +346,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                                 fontSize: 9,
                                 fontWeight: FontWeight.w600,
                               ),
-                              labelResolver: (_) => 'BEST ${_fmtK(bestVol)}',
+                              labelResolver: (_) => 'BEST ${formatValue(bestVol)}${timed ? ' min' : ''}',
                             ),
                           ),
                       ],
@@ -318,7 +354,7 @@ class _VolumeTrendCardState extends State<_VolumeTrendCard> {
                     lineBarsData: [
                       LineChartBarData(
                         spots: spots,
-                        isCurved: true,
+                        isCurved: !timed,
                         curveSmoothness: 0.3,
                         color: AppColors.primary,
                         barWidth: 2.5,
@@ -736,7 +772,8 @@ class _ChartCard extends StatelessWidget {
 }
 
 class _EmptyChart extends StatelessWidget {
-  const _EmptyChart();
+  const _EmptyChart({this.subtitle = 'Complete workouts to see progress'});
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -747,7 +784,7 @@ class _EmptyChart extends StatelessWidget {
           const SizedBox(height: 8),
           Text('No data yet',
               style: TextStyle(fontFamily: 'Geist', fontSize: 13, color: AppColors.textMuted)),
-          Text('Complete workouts to see progress',
+          Text(subtitle,
               style: TextStyle(fontFamily: 'Geist', fontSize: 11, color: AppColors.textFaint)),
         ],
       ),

@@ -1594,6 +1594,13 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== ANALYTICS ====================
 
+  bool get prefersTimedWork =>
+      _sessions.any((s) => s.timedWorkSeconds > 0) &&
+      !_sessions
+          .expand((s) => s.exercises)
+          .expand((log) => log.sets)
+          .any((set) => !set.isTimeBased && set.volume > 0);
+
   /// Get volume progression for an exercise
   List<({DateTime date, double volume})> getVolumeProgression(
     String exerciseId,
@@ -1737,8 +1744,7 @@ class WorkoutProvider extends ChangeNotifier {
       for (final log in session.exercises) {
         if (log.exerciseId != exerciseId) continue;
         for (final set in log.sets) {
-          if (set.timeTaken != null &&
-              (best == null || set.timeTaken! > best)) {
+          if (set.isTimeBased && (best == null || set.timeTaken! > best)) {
             best = set.timeTaken!;
           }
         }
@@ -1807,6 +1813,7 @@ class WorkoutProvider extends ChangeNotifier {
     String exerciseId, {
     DateTime? start,
     DateTime? end,
+    bool duration = false,
   }) {
     final convention = latestLoadReferences(_sessions)[exerciseId];
     final result = <({DateTime date, List<WorkoutSet> sets})>[];
@@ -1814,6 +1821,16 @@ class WorkoutProvider extends ChangeNotifier {
     for (final session in _sessions.reversed) {
       if (start != null && session.date.isBefore(start)) continue;
       if (end != null && session.date.isAfter(end)) continue;
+      if (duration) {
+        final timedSets = session.exercises
+            .where((log) => log.exerciseId == exerciseId)
+            .expand((log) => log.sets)
+            .where((set) => set.isTimeBased)
+            .toList();
+        if (timedSets.isNotEmpty)
+          result.add((date: session.date, sets: timedSets));
+        continue;
+      }
       for (final log in session.exercises) {
         if (log.exerciseId == exerciseId &&
             log.sets.isNotEmpty &&
@@ -1834,7 +1851,15 @@ class WorkoutProvider extends ChangeNotifier {
         }
       }
     }
+    result.sort((a, b) => a.date.compareTo(b.date));
     return result;
+  }
+
+  bool tracksDuration(String exerciseId) {
+    if (getExercise(exerciseId)?.exerciseType == ExerciseType.timeBased)
+      return true;
+    final latest = findMostRecentExerciseLog(exerciseId, _sessions);
+    return latest?.isTimeBased ?? false;
   }
 
   /// Last [limit] sessions where [muscleId] was trained (newest-first).

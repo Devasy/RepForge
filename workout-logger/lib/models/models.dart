@@ -614,6 +614,15 @@ class WorkoutSession {
   double get totalVolume =>
       exercises.fold(0.0, (sum, ex) => sum + ex.totalVolume);
 
+  int get timedWorkSeconds => exercises.fold(
+    0,
+    (total, log) =>
+        total +
+        log.sets
+            .where((set) => set.isTimeBased)
+            .fold(0, (sum, set) => sum + set.timeTaken!),
+  );
+
   String? get displayNotes {
     if (importSource != null) {
       final title = importSource!['rawRecord']?['title'];
