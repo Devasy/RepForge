@@ -625,7 +625,7 @@ class _HistoryCard extends StatelessWidget {
     final routineName = session.routineId != null
         ? provider.routines.cast<Routine?>().firstWhere(
             (r) => r?.id == session.routineId, orElse: () => null)?.name ?? 'Workout'
-        : (session.importSource?['rawRecord']?['title'] as String? ?? (session.importSource != null ? 'Fitify workout' : 'Quick Workout'));
+        : (session.importSource?['rawRecord']?['title'] as String? ?? (session.importSource != null ? 'Saved workout' : 'Quick Workout'));
 
     return GestureDetector(
       onTap: () => _openDetails(context),

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/data/exercise_database.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/models/health_connect_workout.dart';
-import 'package:repforge/services/fitify_workout_import.dart';
+import 'package:repforge/services/health_workout_import.dart';
 
 HealthConnectWorkout sourceWorkout({
   String origin = 'com.fitifysync.app',
@@ -46,7 +46,7 @@ void main() {
   test(
     'maps exact Fitify codes and retains repeated sets at rest-relative indices',
     () {
-      final session = FitifyWorkoutImport.convert(
+      final session = HealthWorkoutImport.convert(
         sourceWorkout(),
         exercises: ExerciseDatabase.getAll(),
       );
@@ -62,10 +62,10 @@ void main() {
     },
   );
   test(
-    'rejects another origin, unknown code and malformed or newer payloads',
+    'rejects own exports, unknown codes and malformed or newer payloads',
     () {
       for (final source in [
-        sourceWorkout(origin: 'com.other'),
+        sourceWorkout(origin: 'com.devasy.repforge'),
         sourceWorkout(code: 'unverified'),
         sourceWorkout(
           notes:
@@ -74,7 +74,7 @@ void main() {
         sourceWorkout(notes: 'bad'),
       ]) {
         expect(
-          () => FitifyWorkoutImport.convert(
+          () => HealthWorkoutImport.convert(
             source,
             exercises: ExerciseDatabase.getAll(),
           ),
@@ -106,7 +106,7 @@ void main() {
           ],
         });
         expect(
-          () => FitifyWorkoutImport.convert(
+          () => HealthWorkoutImport.convert(
             sourceWorkout(notes: notes),
             exercises: ExerciseDatabase.getAll(),
           ),
@@ -118,7 +118,7 @@ void main() {
   test(
     'unknown load survives backup and cannot be compared with recorded loads',
     () {
-      final imported = FitifyWorkoutImport.convert(
+      final imported = HealthWorkoutImport.convert(
         sourceWorkout(),
         exercises: ExerciseDatabase.getAll(),
       );
@@ -133,11 +133,11 @@ void main() {
   );
   test('blank notes are unresolved instead of aborting a batch', () {
     expect(
-      FitifyWorkoutImport.inspect(
+      HealthWorkoutImport.inspect(
         sourceWorkout(notes: '   '),
         exercises: ExerciseDatabase.getAll(),
       ).action,
-      FitifyImportAction.unresolved,
+      WorkoutImportAction.unresolved,
     );
   });
   test('unknown-load holds retain duration without inventing load volume', () {

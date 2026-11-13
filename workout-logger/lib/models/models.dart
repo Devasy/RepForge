@@ -614,6 +614,16 @@ class WorkoutSession {
   double get totalVolume =>
       exercises.fold(0.0, (sum, ex) => sum + ex.totalVolume);
 
+  String? get displayNotes {
+    if (importSource != null) {
+      final title = importSource!['rawRecord']?['title'];
+      final legacy =
+          'Imported from FitifySync${title == null ? '' : ': $title'}';
+      if (notes == legacy) return 'Imported from Health Connect';
+    }
+    return notes;
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'date': (importSource == null ? date : date.toUtc()).toIso8601String(),
@@ -931,10 +941,12 @@ class PersonalRecord {
     required this.bestVolume,
     required this.achievedAt,
     this.bestDuration,
-  }) : exerciseId = handle == null && exerciseId.contains(':')
+    bool legacyCompositeId = false,
+  }) : exerciseId =
+           legacyCompositeId && handle == null && exerciseId.contains(':')
            ? exerciseId.substring(0, exerciseId.indexOf(':'))
            : exerciseId,
-       handle = handle == null && exerciseId.contains(':')
+       handle = legacyCompositeId && handle == null && exerciseId.contains(':')
            ? exerciseId.substring(exerciseId.indexOf(':') + 1)
            : (handle?.isEmpty == true ? null : handle);
 
@@ -953,6 +965,7 @@ class PersonalRecord {
   };
   factory PersonalRecord.fromJson(Map<String, dynamic> json) => PersonalRecord(
     exerciseId: json['exerciseId'] as String,
+    legacyCompositeId: !json.containsKey('handle'),
     handle: json['handle'] as String?,
     loadEncodingVersion: json['loadEncodingVersion'] as int? ?? 0,
     bestWeight: (json['bestWeight'] as num).toDouble(),

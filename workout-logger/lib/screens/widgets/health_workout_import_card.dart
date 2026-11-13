@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../../services/fitify_workout_import.dart';
+import '../../services/health_workout_import.dart';
 import '../../services/interfaces/health_connect_service_interface.dart';
 import '../../services/interfaces/workout_import_health_service.dart';
 import '../../services/workout_provider.dart';
@@ -9,20 +9,20 @@ import '../../theme/app_theme.dart';
 import 'extended_library_download.dart';
 import 'rf_widgets.dart';
 
-class FitifyWorkoutImportCard extends StatefulWidget {
-  const FitifyWorkoutImportCard({super.key, this.reader});
+class HealthWorkoutImportCard extends StatefulWidget {
+  const HealthWorkoutImportCard({super.key, this.reader});
   final IWorkoutImportHealthService? reader;
   @override
-  State<FitifyWorkoutImportCard> createState() =>
-      _FitifyWorkoutImportCardState();
+  State<HealthWorkoutImportCard> createState() =>
+      _HealthWorkoutImportCardState();
 }
 
-class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
+class _HealthWorkoutImportCardState extends State<HealthWorkoutImportCard> {
   late DateTimeRange _range;
   bool _busy = false;
   String? _error;
-  List<FitifyImportEntry>? _entries;
-  FitifyImportReport? _report;
+  List<WorkoutImportEntry>? _entries;
+  WorkoutImportReport? _report;
 
   @override
   void initState() {
@@ -41,7 +41,7 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
       firstDate: DateTime(2010),
       lastDate: DateTime.now(),
       initialDateRange: _range,
-      helpText: 'Fitify workout dates',
+      helpText: 'Workout dates',
     );
     if (range != null && mounted) {
       setState(() {
@@ -82,14 +82,14 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
           'Older history access is unavailable or was not granted. Choose dates within the last four weeks, or allow history access in Health Connect.',
         );
       }
-      final records = await candidate.readFitifyWorkouts(
+      final records = await candidate.readSavedWorkouts(
         _range.start,
         DateTime(_range.end.year, _range.end.month, _range.end.day + 1),
       );
-      final entries = provider.previewFitifyWorkouts(records);
+      final entries = provider.previewHealthWorkouts(records);
       if (mounted) setState(() => _entries = entries);
     } catch (error, stack) {
-      debugPrint('[Fitify import] Read failed: $error\n$stack');
+      debugPrint('[Health Connect import] Read failed: $error\n$stack');
       if (mounted) {
         setState(
           () => _error = error is StateError
@@ -110,13 +110,13 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
         .toList();
     setState(() => _busy = true);
     try {
-      final report = await provider.importFitifyWorkouts(records);
+      final report = await provider.importHealthWorkouts(records);
       for (final entry in _entries!.where((entry) => !entry.canImport)) {
-        if (entry.action == FitifyImportAction.current) {
+        if (entry.action == WorkoutImportAction.current) {
           report.current++;
         } else {
           report.issues.add(
-            '${entry.record.title ?? 'Fitify workout'}: ${entry.message}',
+            '${entry.record.title ?? 'Saved workout'}: ${entry.message}',
           );
         }
       }
@@ -156,12 +156,12 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
     final entries = _entries;
     final ready = entries?.where((e) => e.canImport).length ?? 0;
     final current =
-        entries?.where((e) => e.action == FitifyImportAction.current).length ??
+        entries?.where((e) => e.action == WorkoutImportAction.current).length ??
         0;
     final issues =
         entries
             ?.where(
-              (e) => !e.canImport && e.action != FitifyImportAction.current,
+              (e) => !e.canImport && e.action != WorkoutImportAction.current,
             )
             .toList() ??
         [];
@@ -172,7 +172,7 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Import Fitify workouts',
+            'Import saved workouts from Health Connect',
             style: TextStyle(
               fontFamily: 'Geist',
               fontWeight: FontWeight.w700,
@@ -181,12 +181,12 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Bring exercises, reps and hold durations from FitifySync in Health Connect into your history and muscle recovery.',
+            'Bring saved workouts from your connected apps into your history. Supported exercise details contribute to your muscle analysis.',
             style: TextStyle(color: AppColors.textSoft),
           ),
           const SizedBox(height: 8),
           const Text(
-            'Run sync in the updated FitifySync app first. Timings are reconstructed; missing weights stay unknown.',
+            'Sync your source apps first. Available exercise details depend on what each app saves to Health Connect.',
             style: TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 12),
@@ -226,7 +226,7 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
             const SizedBox(height: 8),
             Text(
               entries.isEmpty
-                  ? 'No FitifySync workouts found for these dates.'
+                  ? 'No saved workouts found for these dates.'
                   : '$ready ready to import · $current already current · ${issues.length} need attention',
             ),
             if (ready > 0)
@@ -245,19 +245,19 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
                   for (final entry in entries.take(100))
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(entry.record.title ?? 'Fitify workout'),
+                      title: Text(entry.record.title ?? 'Saved workout'),
                       subtitle: Text(
                         '${format.format(entry.record.start.toLocal())} · ${switch (entry.action) {
-                          FitifyImportAction.add => 'New workout',
-                          FitifyImportAction.update => 'Source update',
-                          FitifyImportAction.current => 'Already current',
+                          WorkoutImportAction.add => entry.message ?? 'New workout',
+                          WorkoutImportAction.update => entry.message ?? 'Source update',
+                          WorkoutImportAction.current => 'Already current',
                           _ => entry.message ?? 'Needs attention',
                         }}',
                       ),
                       leading: Icon(
                         entry.canImport
                             ? Icons.check_circle_outline
-                            : entry.action == FitifyImportAction.current
+                            : entry.action == WorkoutImportAction.current
                             ? Icons.done_all
                             : Icons.info_outline,
                       ),

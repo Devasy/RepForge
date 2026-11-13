@@ -28,9 +28,8 @@ class MuscleIntensityProfile {
   final String? _resistanceAttribution;
   final String? _stretchAttribution;
   String get resistanceAttribution =>
-      _resistanceAttribution ?? 'Fitify · $sourceVersion';
-  String get stretchAttribution =>
-      _stretchAttribution ?? 'Fitify · $sourceVersion';
+      _resistanceAttribution ?? 'Library reference';
+  String get stretchAttribution => _stretchAttribution ?? 'Library reference';
 
   String? get primaryMuscle {
     final scores = resistance.isNotEmpty ? resistance : stretch;
@@ -40,7 +39,7 @@ class MuscleIntensityProfile {
 
   bool matchesMuscle(String id) {
     final scores = {...resistance, ...stretch};
-    if(scores.containsKey(id)) return true;
+    if (scores.containsKey(id)) return true;
     final ids = switch (id) {
       'core' => ['abs', 'obliques'],
       'forearms' => ['forearm_anterior', 'forearm_posterior'],
@@ -103,6 +102,7 @@ class MuscleIntensityProfile {
     exerciseType: exerciseType,
     // Relative involvement weights, not measured activation percentages.
     resistanceIntensities: resistance,
+    stretchIntensities: stretch.map((id, score) => MapEntry(id, score.toInt())),
   );
 }
 

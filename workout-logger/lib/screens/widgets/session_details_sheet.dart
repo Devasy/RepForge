@@ -165,7 +165,7 @@ class SessionDetailsSheet extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Text(
-              'Imported from FitifySync. Segment timings are reconstructed. Reps and durations are preserved; missing loads are unknown.',
+              'Imported from Health Connect. Available repetitions and durations are preserved.',
               style: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
           ),
@@ -178,7 +178,7 @@ class SessionDetailsSheet extends StatelessWidget {
         // HR + rest-recovery breakdown (self-hides when no HR data).
         WorkoutHrSection(session: session, provider: provider),
 
-        if (session.notes != null && session.notes!.isNotEmpty) ...[
+        if (session.displayNotes != null && session.displayNotes!.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
           const RFSectionHeader('Notes'),
           const SizedBox(height: AppSpacing.sm),
@@ -191,7 +191,7 @@ class SessionDetailsSheet extends StatelessWidget {
               border: Border.all(color: AppColors.glassBorder),
             ),
             child: Text(
-              session.notes!,
+              session.displayNotes!,
               style: const TextStyle(
                 color: AppColors.textSoft,
                 fontSize: 14,
@@ -451,9 +451,7 @@ class _SetRow extends StatelessWidget {
           Expanded(
             child: Text(
               set.isTimeBased
-                  ? (set.loadMode == WorkoutLoadMode.unknown
-                        ? '${formatHoldDuration(set.timeTaken ?? 0)} · load unknown'
-                        : set.weight > 0
+                  ? (set.loadMode != WorkoutLoadMode.unknown && set.weight > 0
                         ? '${formatHoldDuration(set.timeTaken ?? 0)} (+$wStr ${settings.unitLabel})'
                         : formatHoldDuration(set.timeTaken ?? 0))
                   : set.loadMode == WorkoutLoadMode.unknown

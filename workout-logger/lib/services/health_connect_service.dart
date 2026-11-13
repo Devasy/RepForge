@@ -9,6 +9,7 @@ import '../models/health_connect_workout.dart';
 import 'interfaces/workout_import_health_service.dart';
 import 'interfaces/health_connect_service_interface.dart';
 import 'utils/hc_session_builder.dart';
+import 'health_workout_import.dart';
 
 class HealthConnectService
     implements IHealthConnectService, IWorkoutImportHealthService {
@@ -45,7 +46,7 @@ class HealthConnectService
   }
 
   @override
-  Future<List<HealthConnectWorkout>> readFitifyWorkouts(
+  Future<List<HealthConnectWorkout>> readSavedWorkouts(
     DateTime start,
     DateTime end,
   ) async {
@@ -54,7 +55,6 @@ class HealthConnectService
     var request = HealthDataType.exerciseSession.readInTimeRange(
       startTime: start,
       endTime: end,
-      dataOrigins: const [DataOrigin('com.fitifysync.app')],
       pageSize: 100,
     );
     final records = <HealthConnectWorkout>[];
@@ -65,7 +65,8 @@ class HealthConnectService
           .timeout(_queryDeadline);
       for (final record in response.records) {
         final origin = record.metadata.dataOrigin?.packageName;
-        if (origin != 'com.fitifysync.app') continue;
+        if (origin == null || HealthWorkoutImport.isRepForgeOrigin(origin))
+          continue;
         records.add(
           HealthConnectWorkout(
             recordId: record.id.value,
@@ -76,6 +77,8 @@ class HealthConnectService
             end: record.endTime,
             title: record.title,
             notes: record.notes,
+            exerciseType: record.exerciseType.name,
+            modifiedAt: record.metadata.lastModifiedTime,
             segments: [
               for (final segment in record.segmentEvents)
                 HealthConnectWorkoutSegment(
@@ -86,6 +89,8 @@ class HealthConnectService
                       segment.segmentType == ExerciseSegmentType.pause,
                   repetitions: segment.repetitions,
                   weightKg: segment.weight?.inKilograms,
+                  exerciseId: hcExerciseIdFor(segment.segmentType),
+                  segmentType: segment.segmentType.name,
                 ),
             ],
           ),

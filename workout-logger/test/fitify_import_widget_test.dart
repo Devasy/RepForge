@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/models/health_connect_workout.dart';
-import 'package:repforge/screens/widgets/fitify_workout_import_card.dart';
+import 'package:repforge/screens/widgets/health_workout_import_card.dart';
 import 'package:repforge/services/interfaces/workout_import_health_service.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/managers/program_manager.dart';
@@ -20,7 +20,7 @@ class ImportReader implements IWorkoutImportHealthService {
     historyGranted: includeHistory,
   );
   @override
-  Future<List<HealthConnectWorkout>> readFitifyWorkouts(
+  Future<List<HealthConnectWorkout>> readSavedWorkouts(
     DateTime start,
     DateTime end,
   ) async {
@@ -50,7 +50,7 @@ void main() {
         child: MaterialApp(
           home: Scaffold(
             body: SingleChildScrollView(
-              child: FitifyWorkoutImportCard(reader: reader),
+              child: HealthWorkoutImportCard(reader: reader),
             ),
           ),
         ),

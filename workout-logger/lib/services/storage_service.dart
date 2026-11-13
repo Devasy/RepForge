@@ -577,10 +577,13 @@ class StorageService implements IStorageService {
 
   @override
   Future<PersonalRecord?> getPersonalRecord(String exerciseId) async {
+    final records = await getAllPersonalRecords();
+    final exact = records.where((r) => r.exerciseId == exerciseId).toList();
+    if (exact.isNotEmpty) return PersonalRecord.aggregate(exact);
     final split = exerciseId.indexOf(':');
     final id = split < 0 ? exerciseId : exerciseId.substring(0, split);
     final handle = split < 0 ? null : exerciseId.substring(split + 1);
-    final matches = (await getAllPersonalRecords()).where(
+    final matches = records.where(
       (r) => r.exerciseId == id && (handle == null || r.handle == handle),
     );
     if (handle == null) return PersonalRecord.aggregate(matches);

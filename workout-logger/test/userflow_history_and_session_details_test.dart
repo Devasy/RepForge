@@ -56,6 +56,30 @@ void main() {
   });
 
   group('Userflow 2: History & Session Details Sheet Flow', () {
+    testWidgets('imported timed sets show duration like native holds', (tester) async {
+      tester.view.physicalSize = const Size(800, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await mockStorage.saveWorkoutSession(WorkoutSession(
+        id: 'timed-import', date: DateTime.now(), duration: 1,
+        importSource: {'origin': 'another.app'},
+        exercises: [ExerciseLog(exerciseId: 'plank', sets: [
+          WorkoutSet(weight: 0, reps: 0, timeTaken: 30, loadMode: WorkoutLoadMode.unknown),
+        ])],
+      ));
+      await historyManager.loadSessions();
+      await workoutProvider.loadAllData();
+      await tester.pumpWidget(_buildTestApp(workoutProvider: workoutProvider,
+        settingsProvider: settingsProvider, historyManager: historyManager,
+        healthHistoryManager: healthHistoryManager, child: const HistoryScreen()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Saved workout'));
+      await tester.pumpAndSettle();
+      expect(find.text('30s'), findsWidgets);
+      expect(find.textContaining('load unknown'), findsNothing);
+      expect(find.textContaining('Fitify'), findsNothing);
+    });
     testWidgets('HistoryScreen renders title when no sessions recorded', (tester) async {
       await tester.pumpWidget(_buildTestApp(
         workoutProvider: workoutProvider,

@@ -61,6 +61,22 @@ const _segmentTypeMap = <String, ExerciseSegmentType>{
 ExerciseSegmentType hcSegmentTypeFor(String exerciseId) =>
     _segmentTypeMap[exerciseId] ?? ExerciseSegmentType.otherWorkout;
 
+String? hcExerciseIdFor(ExerciseSegmentType type) => switch (type) {
+  ExerciseSegmentType.plank => 'plank',
+  ExerciseSegmentType.crunch => 'crunches',
+  ExerciseSegmentType.squat => 'squat',
+  ExerciseSegmentType.deadlift => 'deadlift',
+  ExerciseSegmentType.lunge => 'lunges',
+  ExerciseSegmentType.pullUp => 'pull_ups',
+  ExerciseSegmentType.benchPress => 'bench_press',
+  ExerciseSegmentType.legPress => 'leg_press',
+  ExerciseSegmentType.legExtension => 'leg_extension',
+  ExerciseSegmentType.legCurl => 'leg_curl',
+  ExerciseSegmentType.hipThrust => 'hip_thrust',
+  ExerciseSegmentType.legRaise => 'leg_raises',
+  _ => null,
+};
+
 const _minWorkSeconds = 10;
 const _maxWorkSeconds = 180;
 const _minRestSeconds = 30;

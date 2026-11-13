@@ -13,7 +13,7 @@ abstract interface class IWorkoutImportHealthService {
   Future<WorkoutImportAccess> requestWorkoutImportAccess({
     bool includeHistory = false,
   });
-  Future<List<HealthConnectWorkout>> readFitifyWorkouts(
+  Future<List<HealthConnectWorkout>> readSavedWorkouts(
     DateTime start,
     DateTime end,
   );

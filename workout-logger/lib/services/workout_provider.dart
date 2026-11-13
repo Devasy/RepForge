@@ -22,7 +22,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../models/health_connect_workout.dart';
-import 'fitify_workout_import.dart';
+import 'health_workout_import.dart';
 import '../data/exercise_database.dart';
 import 'interfaces/storage_service_interface.dart';
 import 'interfaces/ml_service_interface.dart';
@@ -213,6 +213,9 @@ class WorkoutProvider extends ChangeNotifier {
     );
     if (_extendedLibrary != null) {
       _allExercises = _extendedLibrary!.mergeExercises(_allExercises);
+    }
+    for (final session in _sessions.where((s) => s.importSource != null)) {
+      await _persistImportedExercises(session);
     }
     _invalidateHistoryCache();
     await programManager.loadPrograms();
@@ -1112,23 +1115,25 @@ class WorkoutProvider extends ChangeNotifier {
 
   // ==================== SESSION MANAGEMENT ====================
 
-  List<FitifyImportEntry> previewFitifyWorkouts(
+  List<WorkoutImportEntry> previewHealthWorkouts(
     List<HealthConnectWorkout> records,
   ) {
     final existing = {for (final session in _sessions) session.id: session};
     return [
       for (final record in records)
-        FitifyWorkoutImport.inspect(
+        HealthWorkoutImport.inspect(
           record,
           exercises: _allExercises,
-          existing: existing[FitifyWorkoutImport.localId(record)],
+          existing: existing[HealthWorkoutImport.localId(record)],
         ),
     ];
   }
 
   Future<void>? _sessionWriteQueue;
   final _pendingImportRefresh = <String>{};
-  bool get hasPendingImportRefresh => _pendingImportRefresh.isNotEmpty;
+  bool _importHistoryRefreshPending = false;
+  bool get hasPendingImportRefresh =>
+      _importHistoryRefreshPending || _pendingImportRefresh.isNotEmpty;
 
   Future<T> _queueSessionWrite<T>(Future<T> Function() write) {
     final result = _sessionWriteQueue?.then((_) => write()) ?? write();
@@ -1141,15 +1146,15 @@ class WorkoutProvider extends ChangeNotifier {
     return result;
   }
 
-  Future<FitifyImportReport> importFitifyWorkouts(
+  Future<WorkoutImportReport> importHealthWorkouts(
     List<HealthConnectWorkout> records,
-  ) => _queueSessionWrite(() => _importFitifyWorkouts(records));
+  ) => _queueSessionWrite(() => _importHealthWorkouts(records));
 
   Future<bool> retryImportedWorkoutRefresh() =>
       _queueSessionWrite(_refreshImportedWorkouts);
 
   Future<bool> _refreshImportedWorkouts() async {
-    if (_pendingImportRefresh.isEmpty) return true;
+    if (!hasPendingImportRefresh) return true;
     try {
       await _historyManager?.loadSessions();
       for (final id in _pendingImportRefresh) {
@@ -1157,6 +1162,7 @@ class WorkoutProvider extends ChangeNotifier {
       }
       await _recalculateTargets(_pendingImportRefresh);
       _pendingImportRefresh.clear();
+      _importHistoryRefreshPending = false;
       return true;
     } catch (error) {
       debugPrint('Saved imports need analysis refresh: $error');
@@ -1166,33 +1172,43 @@ class WorkoutProvider extends ChangeNotifier {
     }
   }
 
-  Future<FitifyImportReport> _importFitifyWorkouts(
+  Future<void> _persistImportedExercises(WorkoutSession session) async {
+    for (final id in session.exercises.map((log) => log.exerciseId).toSet()) {
+      if (_builtInExerciseIndex.containsKey(id)) continue;
+      final exercise = getExercise(id);
+      if (exercise != null) await _storage.saveCustomExercise(exercise);
+    }
+  }
+
+  Future<WorkoutImportReport> _importHealthWorkouts(
     List<HealthConnectWorkout> records,
   ) async {
-    final report = FitifyImportReport();
+    final report = WorkoutImportReport();
     final affected = _pendingImportRefresh;
     for (final record in records) {
       try {
-        final id = FitifyWorkoutImport.localId(record);
+        final id = HealthWorkoutImport.localId(record);
         final existing = await _storage.getWorkoutSession(id);
-        final entry = FitifyWorkoutImport.inspect(
+        final entry = HealthWorkoutImport.inspect(
           record,
           exercises: _allExercises,
           existing: existing,
         );
-        if (entry.action == FitifyImportAction.current) {
+        if (entry.action == WorkoutImportAction.current) {
           report.current++;
           continue;
         }
         if (!entry.canImport) {
           report.issues.add(
-            '${record.title ?? 'Fitify workout'}: ${entry.message}',
+            '${record.title ?? 'Saved workout'}: ${entry.message}',
           );
           continue;
         }
         final session = entry.session!;
         // Persist first; do not export an imported workout back to Health Connect.
+        await _persistImportedExercises(session);
         await _storage.saveWorkoutSession(session);
+        _importHistoryRefreshPending = true;
         affected.addAll(session.exercises.map((e) => e.exerciseId));
         affected.addAll(
           existing?.exercises.map((e) => e.exerciseId) ?? const [],
@@ -1200,14 +1216,14 @@ class WorkoutProvider extends ChangeNotifier {
         _sessions = [..._sessions.where((s) => s.id != session.id), session]
           ..sort((a, b) => b.date.compareTo(a.date));
         _invalidateHistoryCache();
-        if (entry.action == FitifyImportAction.add) {
+        if (entry.action == WorkoutImportAction.add) {
           report.added++;
         } else {
           report.updated++;
         }
       } catch (_) {
         report.issues.add(
-          '${record.title ?? 'Fitify workout'}: Could not save this workout. Retry the import.',
+          '${record.title ?? 'Saved workout'}: Could not save this workout. Retry the import.',
         );
       }
     }

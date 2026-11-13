@@ -12,7 +12,7 @@ import 'test_utils/mock_storage_service.dart';
 import 'test_utils/mock_ml_service.dart';
 import 'fitify_workout_import_test.dart' show sourceWorkout;
 import 'fitify_import_widget_test.dart' show ImportReader;
-import 'package:repforge/screens/widgets/fitify_workout_import_card.dart';
+import 'package:repforge/screens/widgets/health_workout_import_card.dart';
 
 class ReviewStorage extends MockStorageService {
   bool failHistory = false;
@@ -137,11 +137,11 @@ void main() {
     expect(session.exercises.single.sets.length, 2);
   });
   test('a local edit queued during import survives the import save', () async {
-    await provider.importFitifyWorkouts([sourceWorkout()]);
+    await provider.importHealthWorkouts([sourceWorkout()]);
     final edited = provider.sessions.single.copyWith(notes: 'Dad edited this');
     storage.readStarted = Completer<void>();
     storage.releaseRead = Completer<void>();
-    final importing = provider.importFitifyWorkouts([
+    final importing = provider.importHealthWorkouts([
       sourceWorkout(version: 2),
     ]);
     await storage.readStarted!.future;
@@ -156,7 +156,7 @@ void main() {
     'committed import retains counts and can retry failed history refresh',
     () async {
       storage.failHistory = true;
-      final report = await provider.importFitifyWorkouts([sourceWorkout()]);
+      final report = await provider.importHealthWorkouts([sourceWorkout()]);
       expect(report.added, 1);
       expect(provider.sessions.length, 1);
       expect(provider.hasPendingImportRefresh, isTrue);
@@ -165,7 +165,7 @@ void main() {
       expect(history.sessions.length, 1);
       expect(provider.hasPendingImportRefresh, isFalse);
       expect(
-        (await provider.importFitifyWorkouts([sourceWorkout()])).current,
+        (await provider.importHealthWorkouts([sourceWorkout()])).current,
         1,
       );
     },
@@ -173,7 +173,7 @@ void main() {
   test(
     'bodyweight drill-down and charts use the same exposure measure',
     () async {
-      await provider.importFitifyWorkouts([sourceWorkout()]);
+      await provider.importHealthWorkouts([sourceWorkout()]);
       await provider.updateWorkoutSession(
         provider.sessions.single.copyWith(
           date: DateTime.now().subtract(const Duration(hours: 1)),
@@ -208,7 +208,7 @@ void main() {
     'refresh retry remains available after reopening and rereading imports',
     (tester) async {
       storage.failHistory = true;
-      await provider.importFitifyWorkouts([sourceWorkout()]);
+      await provider.importHealthWorkouts([sourceWorkout()]);
       final reader = ImportReader();
       await tester.pumpWidget(
         ChangeNotifierProvider.value(
@@ -216,7 +216,7 @@ void main() {
           child: MaterialApp(
             home: Scaffold(
               body: SingleChildScrollView(
-                child: FitifyWorkoutImportCard(reader: reader),
+                child: HealthWorkoutImportCard(reader: reader),
               ),
             ),
           ),

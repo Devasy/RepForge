@@ -21,7 +21,7 @@ class SqliteStorageService implements IStorageService {
       _instanceId = _nextInstanceId++;
 
   static const String _dbName = 'repforge.db';
-  static const int _dbVersion = 11;
+  static const int _dbVersion = 12;
   static const _skinTemperatureSchema =
       '''CREATE TABLE IF NOT EXISTS skin_temperature_samples (
     record_id TEXT NOT NULL,
@@ -376,6 +376,7 @@ class SqliteStorageService implements IStorageService {
             for (final row in records) {
               final record = PersonalRecord(
                 exerciseId: row['exercise_id'] as String,
+                legacyCompositeId: true,
                 bestWeight: (row['best_weight'] as num).toDouble(),
                 bestReps: row['best_reps'] as int,
                 bestVolume: (row['best_volume'] as num).toDouble(),
@@ -486,6 +487,62 @@ class SqliteStorageService implements IStorageService {
             if (!columns.contains('import_source')) {
               await db.execute(
                 'ALTER TABLE sessions ADD COLUMN import_source TEXT',
+              );
+            }
+          }
+        }
+        if (oldVersion < 12) {
+          final tables = (await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table'",
+          )).map((r) => r['name']).toSet();
+          if (tables.contains('personal_records') &&
+              tables.contains('exercise_logs')) {
+            for (final row in await db.query('personal_records')) {
+              final base = row['exercise_id'] as String;
+              final handle = row['handle'] as String?;
+              if (handle == null || handle.isEmpty) continue;
+              final fullId = '$base:$handle';
+              final hasFullId = (await db.query(
+                'exercise_logs',
+                columns: ['id'],
+                where: 'exercise_id = ?',
+                whereArgs: [fullId],
+                limit: 1,
+              )).isNotEmpty;
+              final hasBaseId = (await db.query(
+                'exercises',
+                columns: ['id'],
+                where: 'id = ?',
+                whereArgs: [base],
+                limit: 1,
+              )).isNotEmpty;
+              if (!hasFullId || hasBaseId) continue;
+              await db.rawInsert(
+                '''INSERT INTO personal_records
+                (exercise_id, handle, load_encoding_version, best_weight, best_reps, best_volume, achieved_at, best_duration)
+                VALUES (?, '', ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(exercise_id, handle, load_encoding_version) DO UPDATE SET
+                  best_weight = MAX(best_weight, excluded.best_weight),
+                  best_reps = MAX(best_reps, excluded.best_reps),
+                  best_volume = MAX(best_volume, excluded.best_volume),
+                  achieved_at = MAX(achieved_at, excluded.achieved_at),
+                  best_duration = NULLIF(MAX(COALESCE(best_duration, 0), COALESCE(excluded.best_duration, 0)), 0)
+              ''',
+                [
+                  fullId,
+                  row['load_encoding_version'],
+                  row['best_weight'],
+                  row['best_reps'],
+                  row['best_volume'],
+                  row['achieved_at'],
+                  row['best_duration'],
+                ],
+              );
+              await db.delete(
+                'personal_records',
+                where:
+                    'exercise_id = ? AND handle = ? AND load_encoding_version = ?',
+                whereArgs: [base, handle, row['load_encoding_version']],
               );
             }
           }
@@ -605,8 +662,16 @@ class SqliteStorageService implements IStorageService {
   Future<List<WorkoutSession>> _loadSessions({
     String? where,
     List<Object?>? whereArgs,
+  }) => _db.transaction(
+    (txn) => _loadSessionsSnapshot(txn, where: where, whereArgs: whereArgs),
+  );
+
+  Future<List<WorkoutSession>> _loadSessionsSnapshot(
+    DatabaseExecutor txn, {
+    String? where,
+    List<Object?>? whereArgs,
   }) async {
-    final sessionRows = await _db.query(
+    final sessionRows = await txn.query(
       'sessions',
       where: where,
       whereArgs: whereArgs,
@@ -620,7 +685,7 @@ class SqliteStorageService implements IStorageService {
               jsonDecode(row['import_source'] as String) as Map,
             );
       final storedUtc = importSource?.remove('_storageUtc') as Map?;
-      final logRows = await _db.query(
+      final logRows = await txn.query(
         'exercise_logs',
         where: 'session_id = ?',
         whereArgs: [sessionId],
@@ -632,7 +697,7 @@ class SqliteStorageService implements IStorageService {
       final exerciseLogs = <ExerciseLog>[];
       for (final logRow in logRows) {
         final logId = logRow['id'] as String;
-        final setRows = await _db.query(
+        final setRows = await txn.query(
           'sets',
           where: 'exercise_log_id = ?',
           whereArgs: [logId],
@@ -1172,6 +1237,13 @@ class SqliteStorageService implements IStorageService {
 
   @override
   Future<PersonalRecord?> getPersonalRecord(String exerciseId) async {
+    final exact = await _db.query(
+      'personal_records',
+      where: 'exercise_id = ?',
+      whereArgs: [exerciseId],
+    );
+    if (exact.isNotEmpty)
+      return PersonalRecord.aggregate(exact.map(_prFromRow));
     final split = exerciseId.indexOf(':');
     final id = split < 0 ? exerciseId : exerciseId.substring(0, split);
     final handle = split < 0 ? null : exerciseId.substring(split + 1);

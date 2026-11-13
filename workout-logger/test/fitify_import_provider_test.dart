@@ -4,7 +4,7 @@ import 'package:repforge/services/managers/program_manager.dart';
 import 'package:repforge/services/managers/history_manager.dart';
 import 'package:repforge/services/ml_service.dart';
 import 'package:repforge/services/utils/exercise_history.dart';
-import 'package:repforge/services/fitify_workout_import.dart';
+import 'package:repforge/services/health_workout_import.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/models/health_connect_workout.dart';
 import 'test_utils/mock_storage_service.dart';
@@ -37,7 +37,7 @@ void main() {
   test(
     'import is restart-safe, idempotent and refreshes history and recovery',
     () async {
-      expect((await provider.importFitifyWorkouts([sourceWorkout()])).added, 1);
+      expect((await provider.importHealthWorkouts([sourceWorkout()])).added, 1);
       expect(provider.sessions.length, 1);
       expect(history.sessions.length, 1);
       expect(
@@ -54,12 +54,12 @@ void main() {
       expect(comparableExerciseLogs('push_ups', provider.sessions), isEmpty);
       await provider.loadAllData();
       expect(
-        (await provider.importFitifyWorkouts([sourceWorkout()])).current,
+        (await provider.importHealthWorkouts([sourceWorkout()])).current,
         1,
       );
       expect(provider.sessions.length, 1);
       expect(
-        (await provider.importFitifyWorkouts([
+        (await provider.importHealthWorkouts([
           sourceWorkout(version: 2),
         ])).updated,
         1,
@@ -69,11 +69,11 @@ void main() {
   test(
     'source updates keep local edits and unresolved records never become partial sessions',
     () async {
-      await provider.importFitifyWorkouts([sourceWorkout()]);
+      await provider.importHealthWorkouts([sourceWorkout()]);
       await provider.updateWorkoutSession(
         provider.sessions.single.copyWith(notes: 'Dad edited this'),
       );
-      final report = await provider.importFitifyWorkouts([
+      final report = await provider.importHealthWorkouts([
         sourceWorkout(version: 2),
         sourceWorkout(code: 'unknown_code'),
       ]);
@@ -86,14 +86,14 @@ void main() {
     () async {
       storage.fail = true;
       expect(
-        (await provider.importFitifyWorkouts([sourceWorkout()])).issues.length,
+        (await provider.importHealthWorkouts([sourceWorkout()])).issues.length,
         1,
       );
       expect(provider.sessions, isEmpty);
       storage.fail = false;
       final results = await Future.wait([
-        provider.importFitifyWorkouts([sourceWorkout()]),
-        provider.importFitifyWorkouts([sourceWorkout()]),
+        provider.importHealthWorkouts([sourceWorkout()]),
+        provider.importHealthWorkouts([sourceWorkout()]),
       ]);
       expect(results.fold(0, (n, r) => n + r.added), 1);
       expect(provider.sessions.length, 1);
@@ -115,17 +115,17 @@ void main() {
         title: first.title,
       );
       expect(
-        FitifyWorkoutImport.localId(first),
-        FitifyWorkoutImport.localId(recreated),
+        HealthWorkoutImport.localId(first),
+        HealthWorkoutImport.localId(recreated),
       );
     },
   );
   test('source updates protect a locally assigned routine', () async {
-    await provider.importFitifyWorkouts([sourceWorkout()]);
+    await provider.importHealthWorkouts([sourceWorkout()]);
     await provider.updateWorkoutSession(
       provider.sessions.single.copyWith(routineId: 'dads-routine'),
     );
-    final report = await provider.importFitifyWorkouts([
+    final report = await provider.importHealthWorkouts([
       sourceWorkout(version: 2),
     ]);
     expect(report.issues.length, 1);

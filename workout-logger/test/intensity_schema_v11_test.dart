@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/services/sqlite_storage_service.dart';
-import 'package:repforge/services/fitify_workout_import.dart';
+import 'package:repforge/services/health_workout_import.dart';
 import 'fitify_workout_import_test.dart' show sourceWorkout;
 
 void main() {
@@ -122,7 +122,7 @@ void main() {
       );
       await storage.init();
       try {
-        final session = FitifyWorkoutImport.convert(
+        final session = HealthWorkoutImport.convert(
           sourceWorkout(),
           exercises: await storage.getAllExercises(),
         );
@@ -150,7 +150,7 @@ void main() {
           WorkoutLoadMode.unknown,
         );
         expect(
-          FitifyWorkoutImport.contentSnapshot(restored),
+          HealthWorkoutImport.contentSnapshot(restored),
           restored.importSource!['contentSnapshot'],
         );
         final backup = jsonDecode(await storage.exportAllData()) as Map;

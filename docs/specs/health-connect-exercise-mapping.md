@@ -4,14 +4,13 @@ Target release: `r2.2.3`.
 
 ## What is implemented
 
-Profile contains **Import Fitify workouts**. Choose a date range, read a preview,
-then import complete resolved workouts. Download the optional extended catalogue
-once for source codes outside the bundled built-in mappings; it stays offline.
-Run the updated FitifySync app's sync first so older records gain the complete
-`fitifysync.exercise_segments` v1 notes payload (FitifySync PR #6).
+Profile contains **Import saved workouts from Health Connect**. Choose dates,
+preview sessions from connected apps and import them into normal workout history.
+Used extended-library exercises retain names, tracking types and muscle profiles
+offline, including after a restart or missing catalogue cache.
 
 The foreground reader requests exercise-read access independently of workout
-export/readiness settings. It filters `com.fitifysync.app`, follows every page,
+export/readiness settings. It reads all origins except RepForge, follows every page,
 and fails a partial read instead of reporting an empty successful result. Dates
 older than the recent four-week window require supported and granted Health
 Connect history access. It caps a read at 2,000 workouts; choose shorter dates
@@ -19,7 +18,13 @@ for larger histories. No background-read permission is requested.
 
 ## Source identity and conversion
 
-Only the exact `fitifysync.exercise_segments` v1 schema is accepted. Each item
+Ordinary Health Connect sessions require no custom notes payload. Supported native
+segment types map to existing exercises; ambiguous types are not guessed into
+specific movements. Summaries and raw provenance are retained when exercise details
+are unavailable, with a preview warning. Source-scoped IDs prevent collisions.
+Versionless records can update untouched imports when their source content changes.
+
+An internal adapter decodes `fitifysync.exercise_segments` v1 for richer details. Each item
 requires a unique integer `segment_index`, string `code` and `name`, and
 `timing_kind: reconstructed`. Indices address the complete native segment list,
 including rests. Every active segment must be identified. Empty/malformed notes,
@@ -54,11 +59,16 @@ completed sets multiplied by independent resistance score / 10. This is training
 exposure, separate from tonnage. Stretch scores do not increase resistance or
 recovery load. Unknown loads do not fit weight/tonnage trends or one-rep maxima.
 
-## SQLite v11 and backup compatibility
+## SQLite v12 and backup compatibility
 
 `exercises.resistance_intensities` and `stretch_intensities` contain independent
 muscle-ID maps. The v11 migration converts each old activation weight / 10 in
 Dart, preserving decimals (95 becomes 9.5), and drops the activation join table.
+The v12 migration repairs PR rows split by the old colon-delimited exercise/handle
+parser, retaining best values and legitimate handle variants. Canonical exercise IDs
+are opaque; composite IDs are decoded only at legacy boundaries. Timed imported sets
+display like native holds without a missing-load label. Session timestamp metadata
+and set rows load in one SQLite snapshot.
 No Android SQLite JSON extension is required for migration or app queries.
 `Exercise.resistanceIntensities` is canonical; a computed `muscleActivations`
 adapter supports existing callers. New backups write canonical maps; old
