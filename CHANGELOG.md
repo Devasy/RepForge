@@ -23,6 +23,7 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ### Fixes
 
+- Fix Android Health Connect plugin attachment so workout-import permission requests can open correctly.
 - Protect workout edits during imports, preserve decimal muscle scores on unrelated changes, and allow saved imports to retry an interrupted analysis refresh.
 - Keep bodyweight muscle drill-downs and charts consistent with weighted-set exposure, retain known-load sets in mixed logs, and label unknown timed-set loads clearly.
 - Correct import date boundaries, weekly grouping, muscle filters, Coach score responses and initial health-data backfills.

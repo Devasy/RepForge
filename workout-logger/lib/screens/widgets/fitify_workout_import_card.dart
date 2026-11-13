@@ -88,7 +88,8 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
       );
       final entries = provider.previewFitifyWorkouts(records);
       if (mounted) setState(() => _entries = entries);
-    } catch (error) {
+    } catch (error, stack) {
+      debugPrint('[Fitify import] Read failed: $error\n$stack');
       if (mounted) {
         setState(
           () => _error = error is StateError
