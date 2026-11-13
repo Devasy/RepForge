@@ -13,6 +13,15 @@ import 'package:repforge/services/managers/program_manager.dart';
 import 'test_utils/mock_storage_service.dart';
 import 'test_utils/mock_ml_service.dart';
 
+class LabelPersistenceStorage extends MockStorageService {
+  int exerciseWrites = 0;
+  @override
+  Future<void> saveCustomExercise(Exercise exercise) async {
+    exerciseWrites++;
+    await super.saveCustomExercise(exercise);
+  }
+}
+
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
@@ -96,7 +105,7 @@ void main() {
   test(
     'library exercises retain labels and profiles without downloaded cache',
     () async {
-      final storage = MockStorageService();
+      final storage = LabelPersistenceStorage();
       final history = HistoryManager(storage);
       final provider = WorkoutProvider(
         storage,
@@ -132,7 +141,19 @@ void main() {
           ],
         ),
       );
+      final first = (await storage.getAllWorkoutSessions()).single;
+      await storage.saveWorkoutSession(
+        WorkoutSession(
+          id: 'second-import',
+          date: first.date,
+          duration: first.duration,
+          importSource: first.importSource,
+          exercises: first.exercises,
+        ),
+      );
+      storage.exerciseWrites = 0;
       await provider.loadAllData();
+      expect(storage.exerciseWrites, 1);
       await storage.saveSetting('exerciseLibrary.fitify.v1', 'invalid cache');
       await provider.loadAllData();
       expect(provider.getExerciseName('fitify:bo999_example'), 'Example Hold');
@@ -255,8 +276,13 @@ void main() {
     expect(session.duration, 20);
     expect(session.exercises, isEmpty);
     expect(session.importSource!['origin'], 'another.workout.app');
-    expect(HealthWorkoutImport.inspect(record, exercises: ExerciseDatabase.getAll()).message,
-      contains('Limited exercise details'));
+    expect(
+      HealthWorkoutImport.inspect(
+        record,
+        exercises: ExerciseDatabase.getAll(),
+      ).message,
+      contains('Limited exercise details'),
+    );
     expect(session.notes, isNot(contains('Fitify')));
     final other = HealthConnectWorkout(
       recordId: 'ordinary',

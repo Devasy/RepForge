@@ -214,9 +214,12 @@ class WorkoutProvider extends ChangeNotifier {
     if (_extendedLibrary != null) {
       _allExercises = _extendedLibrary!.mergeExercises(_allExercises);
     }
-    for (final session in _sessions.where((s) => s.importSource != null)) {
-      await _persistImportedExercises(session);
-    }
+    await _persistImportedExercises(
+      _sessions
+          .where((s) => s.importSource != null)
+          .expand((s) => s.exercises)
+          .map((log) => log.exerciseId),
+    );
     _invalidateHistoryCache();
     await programManager.loadPrograms();
     notifyListeners();
@@ -1172,8 +1175,8 @@ class WorkoutProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _persistImportedExercises(WorkoutSession session) async {
-    for (final id in session.exercises.map((log) => log.exerciseId).toSet()) {
+  Future<void> _persistImportedExercises(Iterable<String> exerciseIds) async {
+    for (final id in exerciseIds.toSet()) {
       if (_builtInExerciseIndex.containsKey(id)) continue;
       final exercise = getExercise(id);
       if (exercise != null) await _storage.saveCustomExercise(exercise);
@@ -1206,7 +1209,9 @@ class WorkoutProvider extends ChangeNotifier {
         }
         final session = entry.session!;
         // Persist first; do not export an imported workout back to Health Connect.
-        await _persistImportedExercises(session);
+        await _persistImportedExercises(
+          session.exercises.map((log) => log.exerciseId),
+        );
         await _storage.saveWorkoutSession(session);
         _importHistoryRefreshPending = true;
         affected.addAll(session.exercises.map((e) => e.exerciseId));
