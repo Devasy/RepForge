@@ -450,7 +450,7 @@ class _MuscleFocusCard extends StatelessWidget {
         children: [
           MuscleBodyMap(
             muscleVolumes: normalized,
-            onMuscleTap: (id) => _openDrillDown(context, id),
+            onMuscleTap: (id) => _openDrillDown(context, id, exposure:exposure),
           ),
           const SizedBox(height: 16),
           if (top.isEmpty)
@@ -469,7 +469,7 @@ class _MuscleFocusCard extends StatelessWidget {
                   recovery: recovery[id],
                   growth: exposure ? null : growth[id],
                   settings: settings,
-                  onTap: () => _openDrillDown(context, id),
+                  onTap: () => _openDrillDown(context, id, exposure:exposure),
                 ),
             ],
           ),
@@ -478,7 +478,7 @@ class _MuscleFocusCard extends StatelessWidget {
     );
   }
 
-  void _openDrillDown(BuildContext context, String muscleId) {
+  void _openDrillDown(BuildContext context, String muscleId, {bool exposure=false}) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -486,7 +486,7 @@ class _MuscleFocusCard extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
-      builder: (_) => MuscleDetailSheet(muscleId: muscleId, provider: provider),
+      builder: (_) => MuscleDetailSheet(muscleId: muscleId, provider: provider,exposure:exposure),
     );
   }
 }

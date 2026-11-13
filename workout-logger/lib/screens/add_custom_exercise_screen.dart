@@ -413,8 +413,11 @@ class _AddCustomExerciseScreenState extends State<AddCustomExerciseScreen> {
               const SizedBox(height: AppSpacing.sm),
               _MuscleGrid(
                 selected: _muscleId,
-                onSelect: (id) => setState(() => _muscleId = id),
+                onSelect: _isEditing && widget.initialExercise!.resistanceIntensities.length > 1
+                    ? null : (id) => setState(() => _muscleId = id),
               ),
+              if(_isEditing && widget.initialExercise!.resistanceIntensities.length > 1)
+                const Padding(padding:EdgeInsets.only(top:8),child:Text('To change the primary muscle, ask Coach to update the complete resistance score list.',style:TextStyle(color:AppColors.textMuted))),
 
               if (_muscleId != null) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -561,7 +564,7 @@ class _CategoryTile extends StatelessWidget {
 class _MuscleGrid extends StatelessWidget {
   const _MuscleGrid({required this.selected, required this.onSelect});
   final String? selected;
-  final ValueChanged<String> onSelect;
+  final ValueChanged<String>? onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -583,7 +586,7 @@ class _MuscleGrid extends StatelessWidget {
         final isSelected = selected == id;
 
         return GestureDetector(
-          onTap: () => onSelect(id),
+          onTap: onSelect == null ? null : () => onSelect!(id),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             decoration: BoxDecoration(

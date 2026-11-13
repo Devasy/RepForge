@@ -64,6 +64,43 @@ void main() {
   ];
 
   test(
+    'coach returns writable integer scores and preserves fractional references separately',
+    () async {
+      final legacy = await create([
+        activation('chest', 95),
+        activation('triceps', 40),
+      ]);
+      expect(legacy['resistance_reference'], {'chest': 9.5, 'triceps': 4});
+      expect(legacy.containsKey('resistance_intensities'), isFalse);
+      final renamed = await coach.handleCall(
+        FunctionCall('update_exercise', {
+          'exercise_name': legacy['exercise_id'],
+          'new_name': 'Renamed legacy',
+        }),
+      );
+      expect(renamed['resistance_reference'], legacy['resistance_reference']);
+      expect(renamed.containsKey('resistance_intensities'), isFalse);
+      final fresh = await coach.handleCall(
+        FunctionCall('add_custom_exercise', {
+          'name': 'Integer scores',
+          'category': 'compound',
+          'primary_muscle': 'chest',
+          'resistance_intensities': [
+            {'muscle': 'chest', 'intensity': 8},
+            {'muscle': 'triceps', 'intensity': 5},
+          ],
+        }),
+      );
+      expect(
+        (fresh['resistance_intensities'] as List).every(
+          (row) => row['intensity'] is int,
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test(
     'duplicate extended names require an exact source ID before editing',
     () async {
       await provider.loadExtendedLibrary(

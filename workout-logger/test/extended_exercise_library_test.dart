@@ -6,6 +6,17 @@ import 'package:repforge/data/exercise_database.dart';
 import 'package:repforge/services/extended_exercise_library.dart';
 
 void main() {
+  test('aggregate muscle filters retain directly scored aggregate IDs', () {
+    final profile = MuscleIntensityProfile.parse({
+      'code': 'aggregate',
+      'name': 'Aggregate',
+      'exerciseType': 'weightAndReps',
+      'resistance': {'shoulders': 8},
+      'stretch': {'core': 5},
+    }, 'test');
+    expect(profile.matchesMuscle('shoulders'), isTrue);
+    expect(profile.matchesMuscle('core'), isTrue);
+  });
   Map<String, dynamic> catalogue() => {
     'schema': 'repforge.exercise_library',
     'version': 1,

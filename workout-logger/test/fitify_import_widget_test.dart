@@ -68,8 +68,8 @@ void main() {
         find.text('1 ready to import · 0 already current · 1 need attention'),
         findsOneWidget,
       );
-      await tester.ensureVisible(find.text('Import 1 workouts'));
-      await tester.tap(find.text('Import 1 workouts'));
+      await tester.ensureVisible(find.text('Import 1 workout'));
+      await tester.tap(find.text('Import 1 workout'));
       await tester.pumpAndSettle();
       expect(provider.sessions.length, 1);
       expect(
@@ -109,6 +109,6 @@ void main() {
     reader.fail = false;
     await tester.tap(find.text('Read workouts'));
     await tester.pumpAndSettle();
-    expect(find.text('Import 1 workouts'), findsOneWidget);
+    expect(find.text('Import 1 workout'), findsOneWidget);
   });
 }

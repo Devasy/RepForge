@@ -76,10 +76,13 @@ List<({DateTime date, ExerciseLog log})> comparableExerciseLogs(
   final logs = [
     for (final session in sessions)
       for (final log in session.exercises)
-        if (log.exerciseId == exerciseId &&
-            log.sets.isNotEmpty &&
-            log.sets.every((set) => set.loadMode != WorkoutLoadMode.unknown))
-          (date: session.date, log: log),
+        for (final knownSets in [
+          log.sets
+              .where((set) => set.loadMode != WorkoutLoadMode.unknown)
+              .toList(),
+        ])
+          if (log.exerciseId == exerciseId && knownSets.isNotEmpty)
+            (date: session.date, log: log.copyWith(sets: knownSets)),
   ]..sort((a, b) => b.date.compareTo(a.date));
   if (logs.isEmpty) return [];
   final reference = logs.first.log.sets.last;
@@ -95,9 +98,11 @@ Map<String, WorkoutSet> latestLoadReferences(List<WorkoutSession> sessions) {
   final references = <String, WorkoutSet>{};
   for (final session in sorted) {
     for (final log in session.exercises) {
-      if (log.sets.isNotEmpty &&
-          log.sets.every((set) => set.loadMode != WorkoutLoadMode.unknown)) {
-        references.putIfAbsent(log.exerciseId, () => log.sets.last);
+      final knownSet = log.sets
+          .where((set) => set.loadMode != WorkoutLoadMode.unknown)
+          .lastOrNull;
+      if (knownSet != null) {
+        references.putIfAbsent(log.exerciseId, () => knownSet);
       }
     }
   }

@@ -1809,10 +1809,7 @@ class CoachToolService {
       'category': category,
       'primary_muscle': muscle.name,
       'muscle_activations': _activationSummary(created),
-      'resistance_intensities': [
-        for (final a in created.muscleActivations)
-          {'muscle': a.muscleGroupId, 'intensity': a.activationPercentage / 10},
-      ],
+      ..._resistanceResult(created),
       'stretch_intensities': [
         for (final e in (created.stretchIntensities ?? <String, int>{}).entries)
           {'muscle': e.key, 'intensity': e.value},
@@ -1926,13 +1923,7 @@ class CoachToolService {
         'primary_muscle':
             primaryMuscleName ?? _wp.getMuscleGroupName(updated.primaryMuscle),
         'muscle_activations': _activationSummary(updated),
-        'resistance_intensities': [
-          for (final a in updated.muscleActivations)
-            {
-              'muscle': a.muscleGroupId,
-              'intensity': a.activationPercentage / 10,
-            },
-        ],
+        ..._resistanceResult(updated),
         'stretch_intensities': [
           for (final e
               in (updated.stretchIntensities ?? <String, int>{}).entries)
@@ -1949,6 +1940,17 @@ class CoachToolService {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  Map<String, Object?> _resistanceResult(Exercise exercise) => {
+    'resistance_reference': exercise.resistanceIntensities,
+    if (exercise.resistanceIntensities.values.every(
+      (score) => score >= 1 && score <= 10 && score == score.round(),
+    ))
+      'resistance_intensities': [
+        for (final entry in exercise.resistanceIntensities.entries)
+          {'muscle': entry.key, 'intensity': entry.value.toInt()},
+      ],
+  };
 
   Map<String, int>? _readMuscleIntensities(
     Map<String, Object?> args,

@@ -21,6 +21,12 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 - Skin-temperature analysis requires a supported Health Connect version, read permission, and recorded temperature and sleep data; temperature provides supporting context and does not change the readiness score.
 - Fitify imports require the updated FitifySync notes payload and exercise-read permission. Older history requires supported history access. Unknown exercise codes remain unresolved; segment timings are reconstructed, missing loads stay unknown, and source deletions are not automatically applied to local history.
 
+### Fixes
+
+- Protect workout edits during imports, preserve decimal muscle scores on unrelated changes, and allow saved imports to retry an interrupted analysis refresh.
+- Keep bodyweight muscle drill-downs and charts consistent with weighted-set exposure, retain known-load sets in mixed logs, and label unknown timed-set loads clearly.
+- Correct import date boundaries, weekly grouping, muscle filters, Coach score responses and initial health-data backfills.
+
 ## [2.2.2]
 
 ### Features added

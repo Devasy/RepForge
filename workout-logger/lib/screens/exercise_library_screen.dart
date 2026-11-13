@@ -38,7 +38,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
           final matchM =
               _muscleFilter == null ||
           e.muscleActivations.any((m) => m.muscleGroupId == _muscleFilter) ||
-          (provider.muscleProfileFor(e.id)?.matchesMuscle(_muscleFilter!) ?? false);
+          (provider.muscleProfileFor(e.id,exercise:e)?.matchesMuscle(_muscleFilter!) ?? false);
           return matchQ && matchM;
         }).toList()..sort((a, b) {
           if (a.isCustom && !b.isCustom) return -1;
@@ -49,7 +49,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
     final grouped = <String, List<Exercise>>{};
     for (final ex in filtered) {
       final muscle = ex.muscleActivations.isEmpty
-          ? provider.muscleProfileFor(ex.id)?.primaryMuscle ?? 'Unknown'
+          ? provider.muscleProfileFor(ex.id,exercise:ex)?.primaryMuscle ?? 'Unknown'
           : ex.primaryMuscle;
       grouped.putIfAbsent(muscle, () => []).add(ex);
     }

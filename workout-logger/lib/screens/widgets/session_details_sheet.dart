@@ -451,7 +451,9 @@ class _SetRow extends StatelessWidget {
           Expanded(
             child: Text(
               set.isTimeBased
-                  ? (set.weight > 0
+                  ? (set.loadMode == WorkoutLoadMode.unknown
+                        ? '${formatHoldDuration(set.timeTaken ?? 0)} · load unknown'
+                        : set.weight > 0
                         ? '${formatHoldDuration(set.timeTaken ?? 0)} (+$wStr ${settings.unitLabel})'
                         : formatHoldDuration(set.timeTaken ?? 0))
                   : set.loadMode == WorkoutLoadMode.unknown

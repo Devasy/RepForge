@@ -72,9 +72,11 @@ class _MuscleIntensityMapState extends State<MuscleIntensityMap> {
             color: color,
           ),
         const SizedBox(height: AppSpacing.sm),
-        const Text(
-          'Source intensity · 1–10. These are reference scores, not measured activation percentages. Stretch is separate from resistance.',
-          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+        Text(
+          (kind == _IntensityKind.resistance ? profile.resistanceAttribution : profile.stretchAttribution) == 'User/coach estimate'
+            ? 'Independent estimates · normalized to 0–10. Legacy scores retain decimal precision. Stretch is separate from resistance.'
+            : 'Source intensity · 1–10. These are reference scores, not measured activation percentages. Stretch is separate from resistance.',
+          style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
         ),
         const SizedBox(height: AppSpacing.xs),
         const Text(

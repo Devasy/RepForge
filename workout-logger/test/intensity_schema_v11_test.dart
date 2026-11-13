@@ -127,7 +127,23 @@ void main() {
           exercises: await storage.getAllExercises(),
         );
         await storage.saveWorkoutSession(session);
+        final stored = (await storage.database.query('sessions')).single;
+        final utc =
+            jsonDecode(stored['import_source'] as String)['_storageUtc'] as Map;
+        expect(utc['date'], session.date.toUtc().toIso8601String());
+        expect(stored['date'], session.date.toIso8601String());
+        expect(
+          (session.toJson()['exercises'] as List).first['sets'][0]['timestamp'],
+          endsWith('Z'),
+        );
+        await storage.database.update(
+          'sessions',
+          {'date': '2026-11-12T03:00:00.000'},
+          where: 'id = ?',
+          whereArgs: [session.id],
+        );
         final restored = (await storage.getAllWorkoutSessions()).single;
+        expect(restored.date.toUtc(), session.date.toUtc());
         expect(restored.importSource, session.importSource);
         expect(
           restored.exercises.single.sets.first.loadMode,

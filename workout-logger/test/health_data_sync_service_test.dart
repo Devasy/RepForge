@@ -110,7 +110,7 @@ void main() {
 
     final sleepCall = hc.calls.firstWhere((c) => c.method == 'sleep');
     expect(sleepCall.to, now);
-    expect(sleepCall.from, now.subtract(const Duration(days: 93)));
+    expect(sleepCall.from, now.subtract(const Duration(days: 30)));
   });
 
   test('temperature preserves bridge data, separates sources and joins sleep', () async {
@@ -203,7 +203,7 @@ void main() {
     hc.calls.clear();
     await service.sync(force: true);
     expect(hc.calls.firstWhere((c) => c.method == 'skin_temperature').from,
-      now.subtract(const Duration(days: 93)));
+      now.subtract(const Duration(days: 30)));
   });
 
   test('temperature grant after upgrade retains full initial backfill', () async {
@@ -218,7 +218,7 @@ void main() {
     hc.grantedTypes.add(HealthReadType.skinTemperature);
     await service.sync(force: true);
     expect(hc.calls.firstWhere((c) => c.method == 'skin_temperature').from,
-      now.subtract(const Duration(days: 93)));
+      now.subtract(const Duration(days: 30)));
   });
 
   test('v8 database upgrade adds temperature without losing existing data', () async {

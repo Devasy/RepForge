@@ -724,13 +724,13 @@ class _DashboardTab extends StatelessWidget {
   Widget _buildMuscleVolumeCard(BuildContext context, WorkoutProvider provider) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekStart = DateTime(now.year,now.month,now.day-now.weekday+1);
     final weekSessions = provider.sessions
-        .where((s) => s.date.isAfter(weekStart.subtract(const Duration(days: 1))))
+        .where((s) => !s.date.isBefore(weekStart))
         .toList();
 
-    final exposure = provider.hasUnknownLoadsSince(weekStart.subtract(const Duration(days:1)));
-    final muscleVols = exposure ? provider.getMuscleTrainingExposure(since:weekStart.subtract(const Duration(days:1))) : <String, double>{};
+    final exposure = provider.hasUnknownLoadsSince(weekStart);
+    final muscleVols = exposure ? provider.getMuscleTrainingExposure(since:weekStart) : <String, double>{};
     for (final s in weekSessions) {
       if(exposure) break;
       for (final el in s.exercises) {

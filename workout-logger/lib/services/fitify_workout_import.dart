@@ -22,9 +22,10 @@ class FitifyImportEntry {
 
 class FitifyImportReport {
   int added = 0, updated = 0, current = 0;
+  bool refreshPending = false;
   final List<String> issues = [];
   String get summary =>
-      '$added imported, $updated updated, $current already current, ${issues.length} need attention.';
+      '$added imported, $updated updated, $current already current, ${issues.length} need attention.${refreshPending ? ' Workouts saved; analysis needs refreshing.' : ''}';
 }
 
 class FitifyWorkoutImport {
@@ -43,8 +44,17 @@ class FitifyWorkoutImport {
     'programWeekNumber': session.programWeekNumber,
     'notes': session.notes,
     'sessionEffort': session.sessionEffort,
-    'exercises': [for (final log in session.exercises) log.toJson()],
+    'exercises': [
+      for (final log in session.exercises) log.toJson(utcTimestamps: true),
+    ],
   });
+
+  static String _legacyContentSnapshot(WorkoutSession session) {
+    final content =
+        jsonDecode(contentSnapshot(session)) as Map<String, dynamic>;
+    content['exercises'] = [for (final log in session.exercises) log.toJson()];
+    return jsonEncode(content);
+  }
 
   static FitifyImportEntry inspect(
     HealthConnectWorkout record, {
@@ -76,7 +86,9 @@ class FitifyWorkoutImport {
       if (version >= record.version) {
         return FitifyImportEntry(record, FitifyImportAction.current);
       }
-      if (source['contentSnapshot'] != contentSnapshot(existing)) {
+      if (source['contentSnapshot'] != contentSnapshot(existing) &&
+          !(source['snapshotVersion'] == null &&
+              source['contentSnapshot'] == _legacyContentSnapshot(existing))) {
         return FitifyImportEntry(
           record,
           FitifyImportAction.conflict,
@@ -236,6 +248,7 @@ class FitifyWorkoutImport {
         'version': record.version,
         'rawRecord': record.toJson(),
         'contentSnapshot': contentSnapshot(session),
+        'snapshotVersion': 2,
       },
     );
   }

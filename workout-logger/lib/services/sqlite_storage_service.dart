@@ -549,7 +549,22 @@ class SqliteStorageService implements IStorageService {
         'session_effort': session.sessionEffort,
         'import_source': session.importSource == null
             ? null
-            : jsonEncode(session.importSource),
+            : jsonEncode({
+                ...session.importSource!,
+                '_storageUtc': {
+                  'date': session.date.toUtc().toIso8601String(),
+                  'sets': {
+                    for (var i = 0; i < session.exercises.length; i++)
+                      for (var j = 0; j < session.exercises[i].sets.length; j++)
+                        '${session.id}_${i}_$j': session
+                            .exercises[i]
+                            .sets[j]
+                            .timestamp
+                            .toUtc()
+                            .toIso8601String(),
+                  },
+                },
+              }),
       });
 
       for (var i = 0; i < session.exercises.length; i++) {
@@ -599,6 +614,12 @@ class SqliteStorageService implements IStorageService {
     final sessions = <WorkoutSession>[];
     for (final row in sessionRows) {
       final sessionId = row['id'] as String;
+      final importSource = row['import_source'] == null
+          ? null
+          : Map<String, dynamic>.from(
+              jsonDecode(row['import_source'] as String) as Map,
+            );
+      final storedUtc = importSource?.remove('_storageUtc') as Map?;
       final logRows = await _db.query(
         'exercise_logs',
         where: 'session_id = ?',
@@ -635,7 +656,11 @@ class SqliteStorageService implements IStorageService {
                           )
                           .toList(),
                 timeTaken: s['time_taken'] as int?,
-                timestamp: DateTime.parse(s['timestamp'] as String),
+                timestamp: storedUtc?['sets']?[s['id']] == null
+                    ? DateTime.parse(s['timestamp'] as String)
+                    : DateTime.parse(
+                        storedUtc!['sets'][s['id']] as String,
+                      ).toLocal(),
                 assistWeight: (s['assist_weight'] as num?)?.toDouble(),
                 extraWeight: (s['extra_weight'] as num?)?.toDouble(),
                 bodyWeightAtLog: (s['body_weight_at_log'] as num?)?.toDouble(),
@@ -659,7 +684,9 @@ class SqliteStorageService implements IStorageService {
       sessions.add(
         WorkoutSession(
           id: sessionId,
-          date: DateTime.parse(row['date'] as String),
+          date: storedUtc?['date'] == null
+              ? DateTime.parse(row['date'] as String)
+              : DateTime.parse(storedUtc!['date'] as String).toLocal(),
           routineId: row['routine_id'] as String?,
           programId: row['program_id'] as String?,
           programDayId: row['program_day_id'] as String?,
@@ -668,11 +695,7 @@ class SqliteStorageService implements IStorageService {
           duration: row['duration_min'] as int,
           notes: row['notes'] as String?,
           sessionEffort: row['session_effort'] as int?,
-          importSource: row['import_source'] == null
-              ? null
-              : Map<String, dynamic>.from(
-                  jsonDecode(row['import_source'] as String) as Map,
-                ),
+          importSource: importSource,
           hcSyncedAt: row['hc_synced_at'] == null
               ? null
               : DateTime.parse(row['hc_synced_at'] as String),

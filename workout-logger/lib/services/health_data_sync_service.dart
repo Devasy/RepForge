@@ -57,7 +57,7 @@ class HealthDataSyncService {
   // being repeated across separate keyed maps that could drift apart.
   late final Map<String, _SampleStream> _sampleStreams;
 
-  static const Duration _backfillWindow = Duration(days: 90);
+  static const Duration _backfillWindow = Duration(days: 30);
   static const Duration _lookback = Duration(days: 3);
   static const Duration _throttleWindow = Duration(minutes: 30);
 
@@ -123,8 +123,7 @@ class HealthDataSyncService {
   Future<DateTime> _windowStart(String watermarkKey, DateTime now) async {
     final raw = await _storage.getSetting(watermarkKey);
     final watermark = raw == null ? null : DateTime.tryParse(raw);
-    final base = watermark ?? now.subtract(_backfillWindow);
-    return base.subtract(_lookback);
+    return watermark == null ? now.subtract(_backfillWindow) : watermark.subtract(_lookback);
   }
 
   Future<void> _syncSleep(DateTime now) async {

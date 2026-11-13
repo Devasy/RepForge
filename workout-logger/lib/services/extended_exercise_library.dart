@@ -40,6 +40,7 @@ class MuscleIntensityProfile {
 
   bool matchesMuscle(String id) {
     final scores = {...resistance, ...stretch};
+    if(scores.containsKey(id)) return true;
     final ids = switch (id) {
       'core' => ['abs', 'obliques'],
       'forearms' => ['forearm_anterior', 'forearm_posterior'],

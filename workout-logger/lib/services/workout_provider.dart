@@ -63,11 +63,11 @@ class WorkoutProvider extends ChangeNotifier {
     for (final e in ExerciseDatabase.getAll()) e.id: e,
   };
   bool get hasExtendedLibrary => _extendedLibrary != null;
-  MuscleIntensityProfile? muscleProfileFor(String id) {
+  MuscleIntensityProfile? muscleProfileFor(String id, {Exercise? exercise}) {
     final source =
         _extendedLibrary?.profileFor(id) ??
         ExtendedExerciseLibrary.builtInProfileFor(id);
-    final exercise = getExercise(id);
+    exercise ??= getExercise(id);
     if (exercise == null) return source;
     final baseline = _builtInExerciseIndex[id] ?? source?.toExercise();
     final changedWeights =
@@ -511,6 +511,11 @@ class WorkoutProvider extends ChangeNotifier {
     }
     final resistance = validateMuscleIntensities(resistanceIntensities);
     final stretch = validateMuscleIntensities(stretchIntensities);
+    if (resistance?.isEmpty == true && (stretch?.isEmpty ?? true)) {
+      throw ArgumentError(
+        'Provide resistance or stretch scores for at least one muscle.',
+      );
+    }
     final resolvedActivations = resistance != null
         ? resistanceActivations(resistance, primaryMuscleGroupId)
         : _validateMuscleActivations(
@@ -612,7 +617,14 @@ class WorkoutProvider extends ChangeNotifier {
     final updated = existing.copyWith(
       name: normalizedName,
       category: normalizedCategory,
-      muscleActivations: activations,
+      muscleActivations:
+          resistance != null ||
+              muscleActivations != null ||
+              (primaryMuscleGroupId != null &&
+                  primaryMuscleGroupId.isNotEmpty &&
+                  primaryMuscleGroupId != existing.primaryMuscle)
+          ? activations
+          : null,
       exerciseType: exerciseType ?? existing.exerciseType,
       availableHandles: availableHandles ?? existing.availableHandles,
       stretchIntensities: stretch,
@@ -1114,28 +1126,51 @@ class WorkoutProvider extends ChangeNotifier {
     ];
   }
 
-  Future<void>? _importQueue;
+  Future<void>? _sessionWriteQueue;
+  final _pendingImportRefresh = <String>{};
+  bool get hasPendingImportRefresh => _pendingImportRefresh.isNotEmpty;
 
-  Future<FitifyImportReport> importFitifyWorkouts(
-    List<HealthConnectWorkout> records,
-  ) {
-    final result =
-        _importQueue?.then((_) => _importFitifyWorkouts(records)) ??
-        _importFitifyWorkouts(records);
-    _importQueue = result.then<void>(
+  Future<T> _queueSessionWrite<T>(Future<T> Function() write) {
+    final result = _sessionWriteQueue?.then((_) => write()) ?? write();
+    _sessionWriteQueue = result.then<void>(
       (_) => null,
       onError: (Object error, StackTrace stack) {
-        debugPrint('Fitify import stopped: $error');
+        debugPrint('Session write stopped: $error');
       },
     );
     return result;
+  }
+
+  Future<FitifyImportReport> importFitifyWorkouts(
+    List<HealthConnectWorkout> records,
+  ) => _queueSessionWrite(() => _importFitifyWorkouts(records));
+
+  Future<bool> retryImportedWorkoutRefresh() =>
+      _queueSessionWrite(_refreshImportedWorkouts);
+
+  Future<bool> _refreshImportedWorkouts() async {
+    if (_pendingImportRefresh.isEmpty) return true;
+    try {
+      await _historyManager?.loadSessions();
+      for (final id in _pendingImportRefresh) {
+        await _updateGrowthModel(id);
+      }
+      await _recalculateTargets(_pendingImportRefresh);
+      _pendingImportRefresh.clear();
+      return true;
+    } catch (error) {
+      debugPrint('Saved imports need analysis refresh: $error');
+      return false;
+    } finally {
+      notifyListeners();
+    }
   }
 
   Future<FitifyImportReport> _importFitifyWorkouts(
     List<HealthConnectWorkout> records,
   ) async {
     final report = FitifyImportReport();
-    final affected = <String>{};
+    final affected = _pendingImportRefresh;
     for (final record in records) {
       try {
         final id = FitifyWorkoutImport.localId(record);
@@ -1176,19 +1211,14 @@ class WorkoutProvider extends ChangeNotifier {
         );
       }
     }
-    if (affected.isNotEmpty) {
-      await _historyManager?.loadSessions();
-      for (final id in affected) {
-        await _updateGrowthModel(id);
-      }
-      await _recalculateTargets(affected);
-      notifyListeners();
-    }
+    report.refreshPending = !await _refreshImportedWorkouts();
     return report;
   }
 
   /// Delete a workout session
-  Future<void> deleteWorkoutSession(String sessionId) async {
+  Future<void> deleteWorkoutSession(String sessionId) =>
+      _queueSessionWrite(() => _deleteWorkoutSession(sessionId));
+  Future<void> _deleteWorkoutSession(String sessionId) async {
     // Find the session to get exercise IDs for model retraining
     final sessionIndex = _sessions.indexWhere((s) => s.id == sessionId);
 
@@ -1227,11 +1257,16 @@ class WorkoutProvider extends ChangeNotifier {
   }
 
   /// Update an existing workout session
-  Future<void> updateWorkoutSession(WorkoutSession updatedSession) async {
+  Future<void> updateWorkoutSession(WorkoutSession updatedSession) =>
+      _queueSessionWrite(() => _updateWorkoutSession(updatedSession));
+  Future<void> _updateWorkoutSession(WorkoutSession updatedSession) async {
     // Find the previous version of the session to compare exercises
     final previousSession = _sessions.firstWhere(
       (s) => s.id == updatedSession.id,
       orElse: () => updatedSession, // Fallback if not found (shouldn't happen)
+    );
+    updatedSession = updatedSession.copyWith(
+      importSource: previousSession.importSource,
     );
 
     // Gather exercise IDs from BOTH previous and updated sessions
@@ -1277,7 +1312,6 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Tail of the in-flight effort writes, so overlapping chip taps run one
   /// after another. See [recordSessionEffort].
-  Future<void> _effortWriteQueue = Future<void>.value();
 
   /// Records the once-per-workout effort chip (1 = Easy, 2 = Solid,
   /// 3 = Brutal) for [sessionId] and folds it into the rolling
@@ -1301,13 +1335,7 @@ class WorkoutProvider extends ChangeNotifier {
   /// had already committed — leaving storage behind provider state. Queuing
   /// is enough: each call re-reads `_sessions` when its turn comes.
   Future<void> recordSessionEffort(String sessionId, int chipValue) {
-    final result = _effortWriteQueue.then(
-      (_) => _recordSessionEffort(sessionId, chipValue),
-    );
-    // The queue must survive a failed write, or every later tap would inherit
-    // that error. The caller still sees it through [result].
-    _effortWriteQueue = result.then((_) {}, onError: (_) {});
-    return result;
+    return _queueSessionWrite(() => _recordSessionEffort(sessionId, chipValue));
   }
 
   Future<void> _recordSessionEffort(String sessionId, int chipValue) async {
@@ -1708,6 +1736,7 @@ class WorkoutProvider extends ChangeNotifier {
     String muscleId, {
     DateTime? start,
     DateTime? end,
+    bool exposure = false,
   }) {
     final now = DateTime.now();
     final from = start ?? now.subtract(const Duration(days: 7));
@@ -1726,7 +1755,9 @@ class WorkoutProvider extends ChangeNotifier {
           if (intensity.key != muscleId) continue;
           byExercise[log.exerciseId] =
               (byExercise[log.exerciseId] ?? 0) +
-              log.totalVolume * intensity.value / 10;
+              (exposure ? log.completedSetCount : log.totalVolume) *
+                  intensity.value /
+                  10;
         }
       }
     }
@@ -1738,7 +1769,7 @@ class WorkoutProvider extends ChangeNotifier {
                 exerciseId: e.key,
                 name: getExerciseName(e.key),
                 volume: e.value,
-                growth: _growthModels[e.key],
+                growth: exposure ? null : _growthModels[e.key],
               ),
             )
             .toList()
@@ -1787,7 +1818,11 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Last [limit] sessions where [muscleId] was trained (newest-first).
   List<({DateTime date, List<String> exerciseNames, double volume})>
-  getRecentMuscleSessionSummaries(String muscleId, {int limit = 6}) {
+  getRecentMuscleSessionSummaries(
+    String muscleId, {
+    int limit = 6,
+    bool exposure = false,
+  }) {
     final exerciseMap = <String, Exercise>{
       for (final e in _allExercises) e.id: e,
     };
@@ -1803,7 +1838,10 @@ class WorkoutProvider extends ChangeNotifier {
         final intensity = exercise.resistanceIntensities[muscleId];
         if (intensity == null) continue;
         names.add(exercise.name);
-        vol += log.totalVolume * intensity / 10;
+        vol +=
+            (exposure ? log.completedSetCount : log.totalVolume) *
+            intensity /
+            10;
       }
       if (names.isNotEmpty) {
         result.add((date: session.date, exerciseNames: names, volume: vol));
@@ -1816,6 +1854,7 @@ class WorkoutProvider extends ChangeNotifier {
   List<({DateTime weekStart, double volume})> getMuscleWeeklyVolumeSeries(
     String muscleId, {
     int weeks = 8,
+    bool exposure = false,
   }) {
     final now = DateTime.now();
     final exerciseMap = <String, Exercise>{
@@ -1835,7 +1874,9 @@ class WorkoutProvider extends ChangeNotifier {
           if (intensity.key != muscleId) continue;
           buckets[weekIndex] =
               (buckets[weekIndex] ?? 0) +
-              log.totalVolume * intensity.value / 10;
+              (exposure ? log.completedSetCount : log.totalVolume) *
+                  intensity.value /
+                  10;
         }
       }
     }

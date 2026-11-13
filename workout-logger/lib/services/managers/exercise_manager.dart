@@ -105,6 +105,11 @@ class ExerciseManager extends ChangeNotifier {
     // Create muscle activation (100% for primary muscle in v1)
     final resistance = validateMuscleIntensities(resistanceIntensities);
     final stretch = validateMuscleIntensities(stretchIntensities);
+    if (resistance?.isEmpty == true && (stretch?.isEmpty ?? true)) {
+      throw ArgumentError(
+        'Provide resistance or stretch scores for at least one muscle.',
+      );
+    }
     final muscleActivations = resistance != null
         ? resistanceActivations(resistance, primaryMuscleGroupId)
         : [
@@ -174,7 +179,12 @@ class ExerciseManager extends ChangeNotifier {
     if (resistance != null) {
       activations = resistanceActivations(resistance, primaryMuscleGroupId);
     } else if (primaryMuscleGroupId != null &&
-        primaryMuscleGroupId.isNotEmpty) {
+        primaryMuscleGroupId.isNotEmpty &&
+        primaryMuscleGroupId != existing.primaryMuscle) {
+      if (activations.length > 1)
+        throw ArgumentError(
+          'Use Coach to provide all muscle scores when changing the primary muscle.',
+        );
       activations = [
         MuscleActivation(
           muscleGroupId: primaryMuscleGroupId,
@@ -186,7 +196,13 @@ class ExerciseManager extends ChangeNotifier {
     final updated = existing.copyWith(
       name: normalizedName,
       category: normalizedCategory,
-      muscleActivations: activations,
+      muscleActivations:
+          resistance != null ||
+              (primaryMuscleGroupId != null &&
+                  primaryMuscleGroupId.isNotEmpty &&
+                  primaryMuscleGroupId != existing.primaryMuscle)
+          ? activations
+          : null,
       exerciseType: exerciseType ?? existing.exerciseType,
       availableHandles: availableHandles ?? existing.availableHandles,
       stretchIntensities: stretch,

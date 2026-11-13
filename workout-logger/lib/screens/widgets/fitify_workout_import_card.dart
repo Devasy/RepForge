@@ -30,7 +30,7 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     _range = DateTimeRange(
-      start: today.subtract(const Duration(days: 27)),
+      start: DateTime(today.year, today.month, today.day - 27),
       end: today,
     );
   }
@@ -84,7 +84,7 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
       }
       final records = await candidate.readFitifyWorkouts(
         _range.start,
-        _range.end.add(const Duration(days: 1)),
+        DateTime(_range.end.year, _range.end.month, _range.end.day + 1),
       );
       final entries = provider.previewFitifyWorkouts(records);
       if (mounted) setState(() => _entries = entries);
@@ -135,6 +135,18 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _retryRefresh() async {
+    setState(() => _busy = true);
+    final refreshed = await context
+        .read<WorkoutProvider>()
+        .retryImportedWorkoutRefresh();
+    if (mounted)
+      setState(() {
+        _report?.refreshPending = !refreshed;
+        _busy = false;
+      });
   }
 
   @override
@@ -196,6 +208,11 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
               padding: EdgeInsets.symmetric(vertical: 8),
               child: LinearProgressIndicator(),
             ),
+          if (context.read<WorkoutProvider>().hasPendingImportRefresh)
+            OutlinedButton(
+              onPressed: _busy ? null : _retryRefresh,
+              child: const Text('Refresh imported workouts'),
+            ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -215,7 +232,9 @@ class _FitifyWorkoutImportCardState extends State<FitifyWorkoutImportCard> {
               FilledButton.icon(
                 onPressed: _busy ? null : _import,
                 icon: const Icon(Icons.download_done),
-                label: Text('Import $ready workouts'),
+                label: Text(
+                  'Import $ready ${ready == 1 ? 'workout' : 'workouts'}',
+                ),
               ),
             if (entries.isNotEmpty)
               ExpansionTile(

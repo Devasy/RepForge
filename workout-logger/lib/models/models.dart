@@ -498,6 +498,8 @@ class ExerciseLog {
   final List<WorkoutSet> sets;
   final String? notes;
   final String? handle;
+  int get completedSetCount =>
+      sets.where((s) => s.reps > 0 || (s.timeTaken ?? 0) > 0).length;
 
   const ExerciseLog({
     required this.exerciseId,
@@ -526,16 +528,31 @@ class ExerciseLog {
   /// True when all logged sets represent time-based holds.
   bool get isTimeBased => sets.isNotEmpty && sets.every((s) => s.isTimeBased);
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({bool utcTimestamps = false}) => {
     'exerciseId': exerciseId,
-    'sets': sets.map((s) => s.toJson()).toList(),
+    'sets': [
+      for (final set in sets)
+        {
+          ...set.toJson(),
+          if (utcTimestamps)
+            'timestamp': set.timestamp.toUtc().toIso8601String(),
+        },
+    ],
     'notes': notes,
     'handle': handle,
   };
 
-  factory ExerciseLog.fromJson(Map<String, dynamic> json) => ExerciseLog(
+  factory ExerciseLog.fromJson(
+    Map<String, dynamic> json, {
+    bool localTimestamps = false,
+  }) => ExerciseLog(
     exerciseId: json['exerciseId'],
-    sets: (json['sets'] as List).map((s) => WorkoutSet.fromJson(s)).toList(),
+    sets: (json['sets'] as List).map((s) {
+      final set = WorkoutSet.fromJson(s);
+      return localTimestamps
+          ? set.copyWith(timestamp: set.timestamp.toLocal())
+          : set;
+    }).toList(),
     notes: json['notes'],
     handle: json['handle'] as String?,
   );
@@ -599,12 +616,14 @@ class WorkoutSession {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'date': date.toIso8601String(),
+    'date': (importSource == null ? date : date.toUtc()).toIso8601String(),
     'routineId': routineId,
     'programId': programId,
     'programDayId': programDayId,
     'programWeekNumber': programWeekNumber,
-    'exercises': exercises.map((e) => e.toJson()).toList(),
+    'exercises': exercises
+        .map((e) => e.toJson(utcTimestamps: importSource != null))
+        .toList(),
     'duration': duration,
     'notes': notes,
     if (importSource != null) 'importSource': importSource,
@@ -614,13 +633,20 @@ class WorkoutSession {
 
   factory WorkoutSession.fromJson(Map<String, dynamic> json) => WorkoutSession(
     id: json['id'],
-    date: DateTime.parse(json['date']),
+    date: json['importSource'] == null
+        ? DateTime.parse(json['date'])
+        : DateTime.parse(json['date']).toLocal(),
     routineId: json['routineId'],
     programId: json['programId'] as String?,
     programDayId: json['programDayId'] as String?,
     programWeekNumber: json['programWeekNumber'] as int?,
     exercises: (json['exercises'] as List)
-        .map((e) => ExerciseLog.fromJson(e))
+        .map(
+          (e) => ExerciseLog.fromJson(
+            e,
+            localTimestamps: json['importSource'] != null,
+          ),
+        )
         .toList(),
     duration: json['duration'],
     notes: json['notes'],
