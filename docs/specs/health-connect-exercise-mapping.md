@@ -64,6 +64,14 @@ contains unknown loads, Home and Analytics muscle maps show **weighted sets**:
 completed sets multiplied by independent resistance score / 10. This is training
 exposure, separate from tonnage. Stretch scores do not increase resistance or
 recovery load. Unknown loads do not fit weight/tonnage trends or one-rep maxima.
+Home, Analytics and muscle drill-downs share the current local calendar week,
+starting Monday at midnight and ending now. Future sessions are excluded. A rest
+week has no activity highlights; historical recovery remains separate.
+
+Separate health-data persistence initially reads 30 days, or 90 days when history
+access is supported and already granted. Granting history access later triggers a
+single persisted backfill per stream. Only complete reads and successful writes
+advance that stream's watermark; no additional permission prompt is opened.
 
 ## SQLite v12 and backup compatibility
 
@@ -71,7 +79,8 @@ recovery load. Unknown loads do not fit weight/tonnage trends or one-rep maxima.
 muscle-ID maps. The v11 migration converts each old activation weight / 10 in
 Dart, preserving decimals (95 becomes 9.5), and drops the activation join table.
 The v12 migration repairs PR rows split by the old colon-delimited exercise/handle
-parser, retaining best values and legitimate handle variants. Canonical exercise IDs
+parser, retaining best values and legitimate handle variants. The same repair runs
+after backup restoration into an already-current database. Canonical exercise IDs
 are opaque; composite IDs are decoded only at legacy boundaries. Timed imported sets
 display like native holds without a missing-load label. Session timestamp metadata
 and set rows load in one SQLite snapshot.

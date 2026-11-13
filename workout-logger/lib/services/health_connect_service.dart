@@ -12,12 +12,37 @@ import 'utils/hc_session_builder.dart';
 import 'health_workout_import.dart';
 
 class HealthConnectService
-    implements IHealthConnectService, IWorkoutImportHealthService {
+    implements
+        IHealthConnectService,
+        IWorkoutImportHealthService,
+        IHealthHistoryReadAccess {
+  HealthConnectService({this.throwOnReadFailure = false});
+
+  /// Persistence sync must distinguish a failed query from an empty result.
+  final bool throwOnReadFailure;
   HealthConnector? _connector;
 
   static const _statusDeadline = Duration(seconds: 5);
   static const _queryDeadline = Duration(seconds: 10);
   static const _hrQueryDeadline = Duration(seconds: 20);
+
+  @override
+  Future<bool> hasHistoryReadPermission() async {
+    try {
+      final connector = await _getConnector();
+      if (connector == null) return false;
+      const history = HealthPlatformFeature.readHealthDataHistory;
+      if (await connector.getFeatureStatus(history).timeout(_statusDeadline) !=
+          HealthPlatformFeatureStatus.available)
+        return false;
+      return await connector
+              .getPermissionStatus(history.permission)
+              .timeout(_statusDeadline) ==
+          PermissionStatus.granted;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   Future<WorkoutImportAccess> requestWorkoutImportAccess({
@@ -236,16 +261,28 @@ class HealthConnectService
   ) async {
     try {
       final connector = await _getConnector();
-      if (connector == null) return const [];
-      final response = await connector
-          .readRecords(
-            HealthDataType.sleepSession.readInTimeRange(
-              startTime: start,
-              endTime: end,
-            ),
-          )
-          .timeout(_queryDeadline);
-      final result = response.records.map((r) {
+      if (connector == null) throw StateError('Health Connect unavailable');
+      var request = HealthDataType.sleepSession.readInTimeRange(
+        startTime: start,
+        endTime: end,
+      );
+      final records = <SleepSessionRecord>[];
+      final tokens = <String>{};
+      while (true) {
+        final response = await connector
+            .readRecords(request)
+            .timeout(_queryDeadline);
+        records.addAll(response.records);
+        final next = response.nextPageRequest;
+        if (next == null) break;
+        if (next.pageToken case final String token) {
+          if (!tokens.add(token)) {
+            throw StateError('Health Connect repeated a page token.');
+          }
+        }
+        request = next;
+      }
+      final result = records.map((r) {
         // Tally stage durations from embedded SleepStageSamples and build
         // an ordered stage timeline for HR segment colouring.
         var light = 0, deep = 0, rem = 0, awake = 0;
@@ -307,6 +344,7 @@ class HealthConnectService
       return result;
     } catch (e) {
       debugPrint('[HC] readSleepSessions failed: $e');
+      if (throwOnReadFailure) rethrow;
       return const [];
     }
   }
@@ -318,16 +356,28 @@ class HealthConnectService
   ) async {
     try {
       final connector = await _getConnector();
-      if (connector == null) return const [];
-      final response = await connector
-          .readRecords(
-            HealthDataType.restingHeartRate.readInTimeRange(
-              startTime: start,
-              endTime: end,
-            ),
-          )
-          .timeout(_queryDeadline);
-      final result = response.records
+      if (connector == null) throw StateError('Health Connect unavailable');
+      var request = HealthDataType.restingHeartRate.readInTimeRange(
+        startTime: start,
+        endTime: end,
+      );
+      final records = <RestingHeartRateRecord>[];
+      final tokens = <String>{};
+      while (true) {
+        final response = await connector
+            .readRecords(request)
+            .timeout(_queryDeadline);
+        records.addAll(response.records);
+        final next = response.nextPageRequest;
+        if (next == null) break;
+        if (next.pageToken case final String token) {
+          if (!tokens.add(token)) {
+            throw StateError('Health Connect repeated a page token.');
+          }
+        }
+        request = next;
+      }
+      final result = records
           .map((r) => HealthSample(time: r.time, value: r.rate.inPerMinute))
           .toList();
       debugPrint(
@@ -336,6 +386,7 @@ class HealthConnectService
       return result;
     } catch (e) {
       debugPrint('[HC] readRestingHeartRate failed: $e');
+      if (throwOnReadFailure) rethrow;
       return const [];
     }
   }
@@ -344,22 +395,35 @@ class HealthConnectService
   Future<List<HealthSample>> readHrvRmssd(DateTime start, DateTime end) async {
     try {
       final connector = await _getConnector();
-      if (connector == null) return const [];
-      final response = await connector
-          .readRecords(
-            HealthDataType.heartRateVariabilityRMSSD.readInTimeRange(
-              startTime: start,
-              endTime: end,
-            ),
-          )
-          .timeout(_queryDeadline);
-      final result = response.records
+      if (connector == null) throw StateError('Health Connect unavailable');
+      var request = HealthDataType.heartRateVariabilityRMSSD.readInTimeRange(
+        startTime: start,
+        endTime: end,
+      );
+      final records = <HeartRateVariabilityRMSSDRecord>[];
+      final tokens = <String>{};
+      while (true) {
+        final response = await connector
+            .readRecords(request)
+            .timeout(_queryDeadline);
+        records.addAll(response.records);
+        final next = response.nextPageRequest;
+        if (next == null) break;
+        if (next.pageToken case final String token) {
+          if (!tokens.add(token)) {
+            throw StateError('Health Connect repeated a page token.');
+          }
+        }
+        request = next;
+      }
+      final result = records
           .map((r) => HealthSample(time: r.time, value: r.rmssd.inMilliseconds))
           .toList();
       debugPrint('[HC] readHrvRmssd [$start → $end]: ${result.length} records');
       return result;
     } catch (e) {
       debugPrint('[HC] readHrvRmssd failed: $e');
+      if (throwOnReadFailure) rethrow;
       return const [];
     }
   }
@@ -370,20 +434,32 @@ class HealthConnectService
     DateTime end,
   ) async {
     try {
-      final connector = await _getConnector();
-      if (connector == null) return const [];
       // heartRateSeries = Android HeartRateRecord (container with BPM samples).
       // heartRate is iOS-only and throws UNSUPPORTED_OPERATION on Health Connect.
-      final response = await connector
-          .readRecords(
-            HealthDataType.heartRateSeries.readInTimeRange(
-              startTime: start,
-              endTime: end,
-              pageSize: 5000,
-            ),
-          )
-          .timeout(_hrQueryDeadline);
-      final samples = response.records
+      final connector = await _getConnector();
+      if (connector == null) throw StateError('Health Connect unavailable');
+      var request = HealthDataType.heartRateSeries.readInTimeRange(
+        startTime: start,
+        endTime: end,
+        pageSize: 5000,
+      );
+      final records = <HeartRateSeriesRecord>[];
+      final tokens = <String>{};
+      while (true) {
+        final response = await connector
+            .readRecords(request)
+            .timeout(_hrQueryDeadline);
+        records.addAll(response.records);
+        final next = response.nextPageRequest;
+        if (next == null) break;
+        if (next.pageToken case final String token) {
+          if (!tokens.add(token)) {
+            throw StateError('Health Connect repeated a page token.');
+          }
+        }
+        request = next;
+      }
+      final samples = records
           .expand(
             (r) => r.samples.map(
               (s) => HealthSample(time: s.time, value: s.rate.inPerMinute),
@@ -392,11 +468,12 @@ class HealthConnectService
           .toList();
       debugPrint(
         '[HC] readHeartRateSamples [$start → $end]: '
-        '${response.records.length} series records, ${samples.length} samples',
+        '${records.length} series records, ${samples.length} samples',
       );
       return samples;
     } catch (e) {
       debugPrint('[HC] readHeartRateSamples failed: $e');
+      if (throwOnReadFailure) rethrow;
       return const [];
     }
   }
@@ -408,22 +485,27 @@ class HealthConnectService
   ) async {
     final connector = await _getConnector();
     if (connector == null) throw StateError('Health Connect unavailable');
-    var response = await connector
-        .readRecords(
-          HealthDataType.skinTemperatureDeltaSeries.readInTimeRange(
-            startTime: start,
-            endTime: end,
-          ),
-        )
-        .timeout(_queryDeadline);
-    final result = <SkinTemperatureSample>[];
+    var request = HealthDataType.skinTemperatureDeltaSeries.readInTimeRange(
+      startTime: start,
+      endTime: end,
+    );
+    final records = <SkinTemperatureDeltaSeriesRecord>[];
+    final tokens = <String>{};
     while (true) {
-      result.addAll(mapSkinTemperatureRecords(response.records));
+      final response = await connector
+          .readRecords(request)
+          .timeout(_queryDeadline);
+      records.addAll(response.records);
       final next = response.nextPageRequest;
       if (next == null) break;
-      response = await connector.readRecords(next).timeout(_queryDeadline);
+      if (next.pageToken case final String token) {
+        if (!tokens.add(token)) {
+          throw StateError('Health Connect repeated a page token.');
+        }
+      }
+      request = next;
     }
-    return result;
+    return mapSkinTemperatureRecords(records);
   }
 
   @visibleForTesting

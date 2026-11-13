@@ -1620,14 +1620,16 @@ class WorkoutProvider extends ChangeNotifier {
           .length >
       1;
 
-  /// Get weekly volume by muscle group.
-  ///
-  /// Sessions are traversed newest-first and the loop breaks once we reach
-  /// a session older than 7 days, so only in-range sessions are visited.
-  /// An exercise map is built once at the top for O(1) per-set lookup.
-  Map<String, double> getWeeklyVolumeByMuscle() {
+  static DateTime weekStartFor(DateTime date) {
+    final local = date.toLocal();
+    return DateTime(local.year, local.month, local.day - local.weekday + 1);
+  }
+
+  /// Muscle volume logged since local Monday midnight, excluding future sessions.
+  Map<String, double> getWeeklyVolumeByMuscle({DateTime? asOf}) {
     final volumeByMuscle = <String, double>{};
-    final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+    final now = asOf ?? DateTime.now();
+    final weekAgo = weekStartFor(now);
 
     // Pre-build exercise map for O(1) lookup
     final exerciseMap = <String, Exercise>{
@@ -1638,7 +1640,7 @@ class WorkoutProvider extends ChangeNotifier {
     // We use continue rather than break in case of external imports
     // that might temporarily violate the newest-first invariant.
     for (final session in _sessions) {
-      if (session.date.isBefore(weekAgo)) continue;
+      if (session.date.isBefore(weekAgo) || session.date.isAfter(now)) continue;
 
       for (final log in session.exercises) {
         final exercise = exerciseMap[log.exerciseId];
@@ -1655,21 +1657,29 @@ class WorkoutProvider extends ChangeNotifier {
     return volumeByMuscle;
   }
 
-  bool hasUnknownLoadsSince(DateTime start) => _sessions.any(
-    (session) =>
-        !session.date.isBefore(start) &&
-        session.exercises.any(
-          (log) =>
-              log.sets.any((set) => set.loadMode == WorkoutLoadMode.unknown),
-        ),
-  );
+  bool hasUnknownLoadsSince(DateTime start, {DateTime? asOf}) {
+    final now = asOf ?? DateTime.now();
+    return _sessions.any(
+      (session) =>
+          !session.date.isBefore(start) &&
+          !session.date.isAfter(now) &&
+          session.exercises.any(
+            (log) =>
+                log.sets.any((set) => set.loadMode == WorkoutLoadMode.unknown),
+          ),
+    );
+  }
 
   /// Weighted completed sets, kept separate from load volume for bodyweight work.
-  Map<String, double> getMuscleTrainingExposure({DateTime? since}) {
-    final start = since ?? DateTime.now().subtract(const Duration(days: 7));
+  Map<String, double> getMuscleTrainingExposure({
+    DateTime? since,
+    DateTime? asOf,
+  }) {
+    final now = asOf ?? DateTime.now();
+    final start = since ?? weekStartFor(now);
     final scores = <String, double>{};
     for (final session in _sessions) {
-      if (session.date.isBefore(start)) continue;
+      if (session.date.isBefore(start) || session.date.isAfter(now)) continue;
       for (final log in session.exercises) {
         final exercise = getExercise(log.exerciseId);
         if (exercise == null) continue;
@@ -1755,7 +1765,7 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Per-exercise contribution to a muscle group's volume within a time window.
   ///
-  /// [start]/[end] default to the last 7 days. Results are sorted by contributed
+  /// [start]/[end] default to the current calendar week. Results are sorted by contributed
   /// volume (desc). This is a pure, parameterized query intended to double as the
   /// implementation surface for a future Coach agent tool.
   List<({String exerciseId, String name, double volume, GrowthModel? growth})>
@@ -1766,8 +1776,8 @@ class WorkoutProvider extends ChangeNotifier {
     bool exposure = false,
   }) {
     final now = DateTime.now();
-    final from = start ?? now.subtract(const Duration(days: 7));
     final to = end ?? now;
+    final from = start ?? weekStartFor(to);
     final exerciseMap = <String, Exercise>{
       for (final e in _allExercises) e.id: e,
     };

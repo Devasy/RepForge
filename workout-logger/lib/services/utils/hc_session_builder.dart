@@ -61,14 +61,11 @@ const _segmentTypeMap = <String, ExerciseSegmentType>{
 ExerciseSegmentType hcSegmentTypeFor(String exerciseId) =>
     _segmentTypeMap[exerciseId] ?? ExerciseSegmentType.otherWorkout;
 
+/// Only infer identities from native types that do not combine exported variants.
 String? hcExerciseIdFor(ExerciseSegmentType type) => switch (type) {
   ExerciseSegmentType.plank => 'plank',
-  ExerciseSegmentType.crunch => 'crunches',
   ExerciseSegmentType.squat => 'squat',
-  ExerciseSegmentType.deadlift => 'deadlift',
   ExerciseSegmentType.lunge => 'lunges',
-  ExerciseSegmentType.pullUp => 'pull_ups',
-  ExerciseSegmentType.benchPress => 'bench_press',
   ExerciseSegmentType.legPress => 'leg_press',
   ExerciseSegmentType.legExtension => 'leg_extension',
   ExerciseSegmentType.legCurl => 'leg_curl',

@@ -459,8 +459,11 @@ class _MuscleFocusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final exposure = provider.hasUnknownLoadsSince(DateTime.now().subtract(const Duration(days:7)));
-    final byMuscle = exposure ? provider.getMuscleTrainingExposure() : provider.getWeeklyVolumeByMuscle();
+    final now = DateTime.now();
+    final weekStart = WorkoutProvider.weekStartFor(now);
+    final exposure = provider.hasUnknownLoadsSince(weekStart, asOf: now);
+    final byMuscle = exposure ? provider.getMuscleTrainingExposure(since: weekStart, asOf: now)
+        : provider.getWeeklyVolumeByMuscle(asOf: now);
     final recovery = provider.getMuscleRecoveryScores();
     final growth = provider.getMuscleGrowthModels();
 
@@ -481,7 +484,7 @@ class _MuscleFocusCard extends StatelessWidget {
 
     return _ChartCard(
       title: 'Muscle Focus',
-      subtitle: exposure ? 'Weighted sets · recovery — missing loads stay unknown' : 'Weekly volume · recovery · trend — tap a muscle',
+      subtitle: 'This week · since ${DateFormat('EEE d MMM').format(weekStart)} · ${exposure ? 'weighted sets' : settings.unitLabel}',
       child: Column(
         children: [
           MuscleBodyMap(
@@ -489,9 +492,9 @@ class _MuscleFocusCard extends StatelessWidget {
             onMuscleTap: (id) => _openDrillDown(context, id, exposure:exposure),
           ),
           const SizedBox(height: 16),
-          if (top.isEmpty)
+          if (maxVol <= 0)
             const Text(
-              'Log a workout to see your weekly muscle volume.',
+              'No training logged this week. Recovery reflects earlier workouts.',
               style: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
           Column(

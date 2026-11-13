@@ -726,25 +726,12 @@ class _DashboardTab extends StatelessWidget {
   Widget _buildMuscleVolumeCard(BuildContext context, WorkoutProvider provider) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final now = DateTime.now();
-    final weekStart = DateTime(now.year,now.month,now.day-now.weekday+1);
-    final weekSessions = provider.sessions
-        .where((s) => !s.date.isBefore(weekStart))
-        .toList();
-
-    final exposure = provider.hasUnknownLoadsSince(weekStart);
-    final muscleVols = exposure ? provider.getMuscleTrainingExposure(since:weekStart) : <String, double>{};
-    for (final s in weekSessions) {
-      if(exposure) break;
-      for (final el in s.exercises) {
-        final ex = provider.getExercise(el.exerciseId);
-        if (ex == null) continue;
-        final vol = settings.toDisplay(el.totalVolume);
-        for (final intensity in ex.resistanceIntensities.entries) {
-          muscleVols[intensity.key] =
-              (muscleVols[intensity.key] ?? 0) + vol * intensity.value / 10;
-        }
-      }
-    }
+    final weekStart = WorkoutProvider.weekStartFor(now);
+    final exposure = provider.hasUnknownLoadsSince(weekStart, asOf: now);
+    final muscleVols = exposure
+        ? provider.getMuscleTrainingExposure(since: weekStart, asOf: now)
+        : provider.getWeeklyVolumeByMuscle(asOf: now)
+            .map((id, volume) => MapEntry(id, settings.toDisplay(volume)));
 
     final maxVol = muscleVols.values.isEmpty ? 1.0 : muscleVols.values.reduce((a, b) => a > b ? a : b);
     final muscleList = muscleVols.entries.toList()
@@ -792,7 +779,7 @@ class _DashboardTab extends StatelessWidget {
                   children: topMuscles.isEmpty
                       ? [
                           Text(
-                            'No data yet',
+                            'No training logged this week',
                             style: TextStyle(fontFamily: 'Geist', 
                               fontSize: 12,
                               color: AppColors.textMuted,

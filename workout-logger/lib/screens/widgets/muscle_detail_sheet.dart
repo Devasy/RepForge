@@ -157,7 +157,7 @@ class MuscleDetailSheet extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
               child: Text(
-                'No sessions logged for this muscle in the last 7 days.',
+                'No sessions logged for this muscle this week.',
                 style: TextStyle(fontFamily: 'Geist', 
                   color: AppColors.textMuted,
                   fontSize: 13,

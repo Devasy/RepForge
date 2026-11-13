@@ -167,6 +167,17 @@ void main() {
     expect(hr, isEmpty);
   });
 
+  testWidgets('sync reader propagates unavailable reads instead of empty success', (tester) async {
+    final service = HealthConnectService(throwOnReadFailure: true);
+    final end = DateTime(2026, 11, 13);
+    final start = end.subtract(const Duration(days: 90));
+    await expectLater(service.readSleepSessions(start, end), throwsStateError);
+    await expectLater(service.readRestingHeartRate(start, end), throwsStateError);
+    await expectLater(service.readHrvRmssd(start, end), throwsStateError);
+    await expectLater(service.readHeartRateSamples(start, end), throwsStateError);
+    expect(await service.hasHistoryReadPermission(), isFalse);
+  });
+
   test('HealthConnectService succeeds when platform response takes > 100ms within deadline', () async {
     const channel = 'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.getHealthPlatformStatus';
     addTearDown(() {

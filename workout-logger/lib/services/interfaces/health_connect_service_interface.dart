@@ -4,10 +4,17 @@ import '../../models/skin_temperature_sample.dart';
 /// Read-side Health Connect data categories used for readiness scoring.
 enum HealthReadType { sleep, heartRate, restingHeartRate, hrv, skinTemperature }
 
+/// Optional capability for platforms that support access beyond 30 days.
+abstract interface class IHealthHistoryReadAccess {
+  /// Checks existing access without opening a permission prompt.
+  Future<bool> hasHistoryReadPermission();
+}
+
 abstract class IHealthConnectService {
   Future<bool> isAvailable();
   Future<bool> requestPermissions();
   Future<bool> hasPermissions();
+
   /// Writes [session] to Health Connect.
   ///
   /// [exerciseNames] maps exercise IDs to display names for the session notes,

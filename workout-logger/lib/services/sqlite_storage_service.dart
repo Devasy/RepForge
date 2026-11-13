@@ -492,60 +492,7 @@ class SqliteStorageService implements IStorageService {
           }
         }
         if (oldVersion < 12) {
-          final tables = (await db.rawQuery(
-            "SELECT name FROM sqlite_master WHERE type='table'",
-          )).map((r) => r['name']).toSet();
-          if (tables.contains('personal_records') &&
-              tables.contains('exercise_logs')) {
-            for (final row in await db.query('personal_records')) {
-              final base = row['exercise_id'] as String;
-              final handle = row['handle'] as String?;
-              if (handle == null || handle.isEmpty) continue;
-              final fullId = '$base:$handle';
-              final hasFullId = (await db.query(
-                'exercise_logs',
-                columns: ['id'],
-                where: 'exercise_id = ?',
-                whereArgs: [fullId],
-                limit: 1,
-              )).isNotEmpty;
-              final hasBaseId = (await db.query(
-                'exercises',
-                columns: ['id'],
-                where: 'id = ?',
-                whereArgs: [base],
-                limit: 1,
-              )).isNotEmpty;
-              if (!hasFullId || hasBaseId) continue;
-              await db.rawInsert(
-                '''INSERT INTO personal_records
-                (exercise_id, handle, load_encoding_version, best_weight, best_reps, best_volume, achieved_at, best_duration)
-                VALUES (?, '', ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(exercise_id, handle, load_encoding_version) DO UPDATE SET
-                  best_weight = MAX(best_weight, excluded.best_weight),
-                  best_reps = MAX(best_reps, excluded.best_reps),
-                  best_volume = MAX(best_volume, excluded.best_volume),
-                  achieved_at = MAX(achieved_at, excluded.achieved_at),
-                  best_duration = NULLIF(MAX(COALESCE(best_duration, 0), COALESCE(excluded.best_duration, 0)), 0)
-              ''',
-                [
-                  fullId,
-                  row['load_encoding_version'],
-                  row['best_weight'],
-                  row['best_reps'],
-                  row['best_volume'],
-                  row['achieved_at'],
-                  row['best_duration'],
-                ],
-              );
-              await db.delete(
-                'personal_records',
-                where:
-                    'exercise_id = ? AND handle = ? AND load_encoding_version = ?',
-                whereArgs: [base, handle, row['load_encoding_version']],
-              );
-            }
-          }
+          await _repairSplitPersonalRecords(db);
         }
       },
     );
@@ -553,6 +500,62 @@ class SqliteStorageService implements IStorageService {
     await _seedDefaultMuscleGroups();
 
     _initialized = true;
+  }
+
+  Future<void> _repairSplitPersonalRecords(DatabaseExecutor db) async {
+    final tables = (await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table'",
+    )).map((r) => r['name']).toSet();
+    if (tables.contains('personal_records') &&
+        tables.contains('exercise_logs')) {
+      for (final row in await db.query('personal_records')) {
+        final base = row['exercise_id'] as String;
+        final handle = row['handle'] as String?;
+        if (handle == null || handle.isEmpty) continue;
+        final fullId = '$base:$handle';
+        final hasFullId = (await db.query(
+          'exercise_logs',
+          columns: ['id'],
+          where: 'exercise_id = ?',
+          whereArgs: [fullId],
+          limit: 1,
+        )).isNotEmpty;
+        final hasBaseId = (await db.query(
+          'exercises',
+          columns: ['id'],
+          where: 'id = ?',
+          whereArgs: [base],
+          limit: 1,
+        )).isNotEmpty;
+        if (!hasFullId || hasBaseId) continue;
+        await db.rawInsert(
+          '''INSERT INTO personal_records
+        (exercise_id, handle, load_encoding_version, best_weight, best_reps, best_volume, achieved_at, best_duration)
+        VALUES (?, '', ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(exercise_id, handle, load_encoding_version) DO UPDATE SET
+          best_weight = MAX(best_weight, excluded.best_weight),
+          best_reps = MAX(best_reps, excluded.best_reps),
+          best_volume = MAX(best_volume, excluded.best_volume),
+          achieved_at = MAX(achieved_at, excluded.achieved_at),
+          best_duration = NULLIF(MAX(COALESCE(best_duration, 0), COALESCE(excluded.best_duration, 0)), 0)
+      ''',
+          [
+            fullId,
+            row['load_encoding_version'],
+            row['best_weight'],
+            row['best_reps'],
+            row['best_volume'],
+            row['achieved_at'],
+            row['best_duration'],
+          ],
+        );
+        await db.delete(
+          'personal_records',
+          where: 'exercise_id = ? AND handle = ? AND load_encoding_version = ?',
+          whereArgs: [base, handle, row['load_encoding_version']],
+        );
+      }
+    }
   }
 
   Future<void> _seedDefaultMuscleGroups() async {
@@ -1762,5 +1765,7 @@ class SqliteStorageService implements IStorageService {
         }
       }
     }
+
+    await _db.transaction(_repairSplitPersonalRecords);
   }
 }

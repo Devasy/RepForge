@@ -24,6 +24,8 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ### Fixes
 
+- Use the current calendar week for muscle highlights and drill-downs, so earlier workouts do not light up a rest week. Keep historical recovery information separate.
+- Search imported workout titles, repair legacy personal-record IDs after backup restoration, and avoid assigning specific exercise variants from ambiguous Health Connect types.
 - Resolve extended-library exercise names in personal records, repair affected saved records, and display timed imports like native holds.
 - Fix Android Health Connect plugin attachment so workout-import permission requests can open correctly.
 - Protect workout edits during imports, preserve decimal muscle scores on unrelated changes, and allow saved imports to retry an interrupted analysis refresh.

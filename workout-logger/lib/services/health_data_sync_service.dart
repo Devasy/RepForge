@@ -26,9 +26,9 @@ class HealthDataSyncService {
     required IHealthConnectService healthConnectService,
     required SqliteStorageService storage,
     DateTime Function()? now,
-  })  : _hc = healthConnectService,
-        _storage = storage,
-        _now = now ?? DateTime.now {
+  }) : _hc = healthConnectService,
+       _storage = storage,
+       _now = now ?? DateTime.now {
     _sampleStreams = {
       'heart_rate': _SampleStream(
         watermarkKey: 'health_sync.heart_rate',
@@ -58,6 +58,7 @@ class HealthDataSyncService {
   late final Map<String, _SampleStream> _sampleStreams;
 
   static const Duration _backfillWindow = Duration(days: 30);
+  static const Duration _historyBackfillWindow = Duration(days: 90);
   static const Duration _lookback = Duration(days: 3);
   static const Duration _throttleWindow = Duration(minutes: 30);
 
@@ -74,11 +75,15 @@ class HealthDataSyncService {
   /// watermark is left untouched so the first sync after granting permission
   /// still performs the full backfill instead of resuming from a watermark
   /// that was silently advanced while unauthorized.
+  /// Existing history access enables one 90-day backfill per stream, including
+  /// streams that already synced with the default 30-day access window.
   ///
   /// Concurrent calls (e.g. the launch-time sync overlapping a manual
   /// "sync now" tap) share a single in-flight run instead of racing.
   Future<void> sync({bool force = false}) {
-    return _inFlight ??= _sync(force: force).whenComplete(() => _inFlight = null);
+    return _inFlight ??= _sync(
+      force: force,
+    ).whenComplete(() => _inFlight = null);
   }
 
   Future<void> _sync({required bool force}) async {
@@ -97,21 +102,37 @@ class HealthDataSyncService {
       return;
     }
 
+    var historyGranted = false;
+    final hc = _hc;
+    if (hc is IHealthHistoryReadAccess) {
+      try {
+        historyGranted = await (hc as IHealthHistoryReadAccess)
+            .hasHistoryReadPermission();
+      } catch (_) {
+        // Unsupported or unavailable history access keeps the default window.
+      }
+    }
+
     if (granted.contains(HealthReadType.sleep)) {
-      await _syncSleep(now);
+      await _syncSleep(now, historyGranted);
     }
     for (final entry in _sampleStreams.entries) {
       final stream = entry.value;
       if (!granted.contains(stream.readType)) continue;
-      await _syncSamples(type: entry.key, now: now, stream: stream);
+      await _syncSamples(
+        type: entry.key,
+        now: now,
+        stream: stream,
+        historyGranted: historyGranted,
+      );
     }
     if (granted.contains(HealthReadType.skinTemperature)) {
       const key = 'health_sync.skin_temperature';
       try {
-        final from = await _windowStart(key, now);
+        final from = await _windowStart(key, now, historyGranted);
         final samples = await _hc.readSkinTemperature(from, now);
         await _storage.upsertSkinTemperatureSamples(samples);
-        await _storage.saveSetting(key, now.toIso8601String());
+        await _saveSuccess(key, now, historyGranted);
       } catch (_) {
         // Unsupported modules, denied permissions and failed pages are retried.
       }
@@ -120,18 +141,42 @@ class HealthDataSyncService {
     await _storage.saveSetting(_lastRunKey, now.toIso8601String());
   }
 
-  Future<DateTime> _windowStart(String watermarkKey, DateTime now) async {
+  Future<DateTime> _windowStart(
+    String watermarkKey,
+    DateTime now,
+    bool historyGranted,
+  ) async {
     final raw = await _storage.getSetting(watermarkKey);
     final watermark = raw == null ? null : DateTime.tryParse(raw);
-    return watermark == null ? now.subtract(_backfillWindow) : watermark.subtract(_lookback);
+    final incrementalStart = watermark?.subtract(_lookback);
+    if (historyGranted &&
+        await _storage.getSetting('$watermarkKey.history_backfilled') !=
+            'true') {
+      final historyStart = now.subtract(_historyBackfillWindow);
+      return incrementalStart != null && incrementalStart.isBefore(historyStart)
+          ? incrementalStart
+          : historyStart;
+    }
+    return incrementalStart ?? now.subtract(_backfillWindow);
   }
 
-  Future<void> _syncSleep(DateTime now) async {
+  Future<void> _saveSuccess(
+    String key,
+    DateTime now,
+    bool historyGranted,
+  ) async {
+    await _storage.saveSetting(key, now.toIso8601String());
+    if (historyGranted) {
+      await _storage.saveSetting('$key.history_backfilled', 'true');
+    }
+  }
+
+  Future<void> _syncSleep(DateTime now, bool historyGranted) async {
     try {
-      final from = await _windowStart(_sleepWatermarkKey, now);
+      final from = await _windowStart(_sleepWatermarkKey, now, historyGranted);
       final periods = await _hc.readSleepSessions(from, now);
       await _storage.upsertSleepSessions(periods);
-      await _storage.saveSetting(_sleepWatermarkKey, now.toIso8601String());
+      await _saveSuccess(_sleepWatermarkKey, now, historyGranted);
     } catch (_) {
       // Best-effort; leave the watermark untouched so the next sync retries.
     }
@@ -141,12 +186,13 @@ class HealthDataSyncService {
     required String type,
     required DateTime now,
     required _SampleStream stream,
+    required bool historyGranted,
   }) async {
     try {
-      final from = await _windowStart(stream.watermarkKey, now);
+      final from = await _windowStart(stream.watermarkKey, now, historyGranted);
       final samples = await stream.reader(from, now);
       await _storage.upsertHealthSamples(type, samples);
-      await _storage.saveSetting(stream.watermarkKey, now.toIso8601String());
+      await _saveSuccess(stream.watermarkKey, now, historyGranted);
     } catch (_) {
       // Best-effort; leave the watermark untouched so the next sync retries.
     }

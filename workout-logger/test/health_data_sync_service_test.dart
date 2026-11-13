@@ -8,7 +8,17 @@ import 'package:repforge/services/health_data_sync_service.dart';
 import 'package:repforge/services/interfaces/health_connect_service_interface.dart';
 import 'package:repforge/services/sqlite_storage_service.dart';
 
-class _RecordingHcService implements IHealthConnectService {
+class _RecordingHcService
+    implements IHealthConnectService, IHealthHistoryReadAccess {
+  bool historyGranted = false;
+  bool throwOnHistoryCheck = false;
+
+  @override
+  Future<bool> hasHistoryReadPermission() async {
+    if (throwOnHistoryCheck) throw Exception('history unavailable');
+    return historyGranted;
+  }
+
   @override
   Future<List<SkinTemperatureSample>> readSkinTemperature(DateTime start, DateTime end) async {
     calls.add((method: 'skin_temperature', from: start, to: end));
@@ -67,6 +77,20 @@ class _RecordingHcService implements IHealthConnectService {
   }) async => true;
 }
 
+class _FailingHealthStorage extends SqliteStorageService {
+  _FailingHealthStorage({required super.databasePathOverride});
+  bool failHeartRate = true;
+
+  @override
+  Future<void> upsertHealthSamples(
+    String type,
+    List<HealthSample> samples,
+  ) async {
+    if (type == 'heart_rate' && failHeartRate) throw StateError('write failed');
+    await super.upsertHealthSamples(type, samples);
+  }
+}
+
 Future<List<Map<String, Object?>>> _rawQuery(
   SqliteStorageService s,
   String sql, [
@@ -102,7 +126,7 @@ void main() {
     }
   });
 
-  test('first sync backfills 90 days plus the 3-day lookback', () async {
+  test('first sync defaults to 30 days without history access', () async {
     final now = DateTime(2026, 8, 11, 9);
     final service = HealthDataSyncService(healthConnectService: hc, storage: storage, now: () => now);
 
@@ -111,7 +135,156 @@ void main() {
     final sleepCall = hc.calls.firstWhere((c) => c.method == 'sleep');
     expect(sleepCall.to, now);
     expect(sleepCall.from, now.subtract(const Duration(days: 30)));
+    for (final call in hc.calls) {
+      expect(call.from, now.subtract(const Duration(days: 30)));
+      expect(await storage.getSetting(
+        'health_sync.${call.method}.history_backfilled'), isNull);
+    }
   });
+
+  test(
+    'granted history backfills 90 days for every authorized stream',
+    () async {
+      hc.historyGranted = true;
+      final now = DateTime(2026, 8, 11, 9);
+      final service = HealthDataSyncService(
+        healthConnectService: hc,
+        storage: storage,
+        now: () => now,
+      );
+      await service.sync(force: true);
+      expect(hc.calls, hasLength(5));
+      for (final call in hc.calls) {
+        expect(call.from, now.subtract(const Duration(days: 90)));
+        expect(
+          await storage.getSetting(
+            'health_sync.' + call.method + '.history_backfilled',
+          ),
+          'true',
+        );
+      }
+    },
+  );
+
+  test('failed history check retains the default 30-day window', () async {
+    hc.throwOnHistoryCheck = true;
+    final now = DateTime(2026, 8, 11, 9);
+    await HealthDataSyncService(
+      healthConnectService: hc,
+      storage: storage,
+      now: () => now,
+    ).sync(force: true);
+    for (final call in hc.calls) {
+      expect(call.from, now.subtract(const Duration(days: 30)));
+      expect(
+        await storage.getSetting(
+          'health_sync.' + call.method + '.history_backfilled',
+        ),
+        isNull,
+      );
+    }
+  });
+
+  test(
+    'later history grant backfills old watermarks once per stream',
+    () async {
+      var now = DateTime(2026, 8, 11, 9);
+      final service = HealthDataSyncService(
+        healthConnectService: hc,
+        storage: storage,
+        now: () => now,
+      );
+      await service.sync(force: true);
+      hc.calls.clear();
+      hc.historyGranted = true;
+      hc.throwOnSkinTemperature = true;
+      now = now.add(const Duration(days: 1));
+      await service.sync(force: true);
+      for (final call in hc.calls) {
+        expect(call.from, now.subtract(const Duration(days: 90)));
+      }
+      expect(
+        await storage.getSetting(
+          'health_sync.skin_temperature.history_backfilled',
+        ),
+        isNull,
+      );
+      expect(
+        await storage.getSetting('health_sync.skin_temperature'),
+        now.subtract(const Duration(days: 1)).toIso8601String(),
+      );
+
+      final backfillRun = now;
+      now = now.add(const Duration(days: 1));
+      hc.throwOnSkinTemperature = false;
+      hc.calls.clear();
+      // Recreating the service proves backfill completion survives a restart.
+      await HealthDataSyncService(
+        healthConnectService: hc,
+        storage: storage,
+        now: () => now,
+      ).sync(force: true);
+      for (final call in hc.calls) {
+        expect(
+          call.from,
+          call.method == 'skin_temperature'
+              ? now.subtract(const Duration(days: 90))
+              : backfillRun.subtract(const Duration(days: 3)),
+        );
+      }
+      hc.calls.clear();
+      await service.sync(force: true);
+      for (final call in hc.calls) {
+        expect(call.from, now.subtract(const Duration(days: 3)));
+      }
+    },
+  );
+
+  test(
+    'failed persistence leaves history pending and watermark unchanged',
+    () async {
+      final path = storage.databasePath;
+      await storage.close();
+      storage = _FailingHealthStorage(databasePathOverride: path);
+      await storage.init();
+      hc.historyGranted = true;
+      final now = DateTime(2026, 8, 11, 9);
+      final old = now.subtract(const Duration(days: 1));
+      await storage.saveSetting(
+        'health_sync.heart_rate',
+        old.toIso8601String(),
+      );
+      final service = HealthDataSyncService(
+        healthConnectService: hc,
+        storage: storage,
+        now: () => now,
+      );
+      await service.sync(force: true);
+      expect(
+        await storage.getSetting('health_sync.heart_rate'),
+        old.toIso8601String(),
+      );
+      expect(
+        await storage.getSetting('health_sync.heart_rate.history_backfilled'),
+        isNull,
+      );
+      expect(
+        await storage.getSetting('health_sync.sleep.history_backfilled'),
+        'true',
+      );
+      (storage as _FailingHealthStorage).failHeartRate = false;
+      hc.calls.clear();
+      await service.sync(force: true);
+      expect(
+        hc.calls.firstWhere((c) => c.method == 'heart_rate').from,
+        now.subtract(const Duration(days: 90)),
+      );
+      expect(
+        await storage.getSetting('health_sync.heart_rate.history_backfilled'),
+        'true',
+      );
+    },
+  );
 
   test('temperature preserves bridge data, separates sources and joins sleep', () async {
     final start = DateTime(2026, 8, 10, 22);
@@ -328,7 +501,7 @@ void main() {
     // The reader for the ungranted stream must never even be called.
     expect(hc.calls.any((c) => c.method == 'heart_rate'), isFalse);
     // And critically, its watermark must stay unset so a later grant still
-    // triggers the full 90-day backfill instead of resuming from `now`.
+    // triggers the full initial backfill instead of resuming from `now`.
     expect(await storage.getSetting('health_sync.heart_rate'), isNull);
   });
 }
