@@ -97,3 +97,6 @@ tmp_hive_*/
 
 # Subagent-driven-development scratch workspace
 .superpowers/
+
+# Local linked checkouts
+.worktrees/
