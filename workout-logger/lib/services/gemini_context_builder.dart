@@ -68,7 +68,10 @@ class GeminiContextBuilder {
       ..writeln()
       ..writeln(buildA2UiPromptSection(defaultA2UiRegistry))
       ..writeln(
-        'For sleeping skin temperature, query skin_temperature_samples with '
+        'Skin-temperature collection is disabled in this release. Analyze only '
+        'existing saved data; do not offer to collect or sync new temperature '
+        'readings. For previously saved sleeping skin temperature, query '
+        'skin_temperature_samples with '
         'run_sql_query and match samples to recorded sleep intervals. Compare '
         'nightly trends within the same source and measurement location, with '
         'HRV, resting HR, sleep and subsequent workout performance. Report '

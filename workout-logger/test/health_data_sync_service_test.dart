@@ -126,6 +126,31 @@ void main() {
     }
   });
 
+  test('rollback skips temperature even with a stale grant and preserves saved data', () async {
+    final now = DateTime(2026, 11, 14, 9);
+    final old = now.subtract(const Duration(days: 2)).toIso8601String();
+    await storage.saveSetting('health_sync.skin_temperature', old);
+    await storage.upsertSkinTemperatureSamples([
+      SkinTemperatureSample(
+        recordId: 'saved', recordStart: now, recordEnd: now,
+        time: now, deltaCelsius: 0.2, baselineCelsius: 33.5,
+        sourcePackage: 'bridge', measurementLocation: 'wrist',
+      ),
+    ]);
+    hc.historyGranted = true;
+    await HealthDataSyncService(
+      healthConnectService: hc, storage: storage, now: () => now,
+    ).sync(force: true);
+    expect(hc.calls.map((c) => c.method), unorderedEquals([
+      'sleep', 'heart_rate', 'resting_heart_rate', 'hrv_rmssd',
+    ]));
+    expect(await storage.getSetting('health_sync.skin_temperature'), old);
+    expect(await storage.getSetting('health_sync.skin_temperature.history_backfilled'), isNull);
+    final rows = await _rawQuery(storage, 'SELECT * FROM skin_temperature_samples');
+    expect(rows, hasLength(1));
+    expect(rows.single['delta_c'], 0.2);
+  });
+
   test('first sync defaults to 30 days without history access', () async {
     final now = DateTime(2026, 8, 11, 9);
     final service = HealthDataSyncService(healthConnectService: hc, storage: storage, now: () => now);
@@ -153,7 +178,7 @@ void main() {
         now: () => now,
       );
       await service.sync(force: true);
-      expect(hc.calls, hasLength(5));
+      expect(hc.calls, hasLength(4));
       for (final call in hc.calls) {
         expect(call.from, now.subtract(const Duration(days: 90)));
         expect(
@@ -197,7 +222,6 @@ void main() {
       await service.sync(force: true);
       hc.calls.clear();
       hc.historyGranted = true;
-      hc.throwOnSkinTemperature = true;
       now = now.add(const Duration(days: 1));
       await service.sync(force: true);
       for (final call in hc.calls) {
@@ -211,12 +235,11 @@ void main() {
       );
       expect(
         await storage.getSetting('health_sync.skin_temperature'),
-        now.subtract(const Duration(days: 1)).toIso8601String(),
+        isNull,
       );
 
       final backfillRun = now;
       now = now.add(const Duration(days: 1));
-      hc.throwOnSkinTemperature = false;
       hc.calls.clear();
       // Recreating the service proves backfill completion survives a restart.
       await HealthDataSyncService(
@@ -227,9 +250,7 @@ void main() {
       for (final call in hc.calls) {
         expect(
           call.from,
-          call.method == 'skin_temperature'
-              ? now.subtract(const Duration(days: 90))
-              : backfillRun.subtract(const Duration(days: 3)),
+          backfillRun.subtract(const Duration(days: 3)),
         );
       }
       hc.calls.clear();
@@ -286,7 +307,7 @@ void main() {
     },
   );
 
-  test('temperature preserves bridge data, separates sources and joins sleep', () async {
+  test('saved temperature preserves bridge data, separates sources and joins sleep', () async {
     final start = DateTime(2026, 8, 10, 22);
     final end = DateTime(2026, 8, 11, 7);
     final time = start.add(const Duration(hours: 2));
@@ -299,6 +320,7 @@ void main() {
           sourcePackage: source, measurementLocation: 'wrist',
         ),
     ];
+    await storage.upsertSkinTemperatureSamples(hc.skinTemperatureSamples);
     await storage.upsertSleepSessions([SleepPeriod(start: start, end: end)]);
     final service = HealthDataSyncService(
       healthConnectService: hc, storage: storage, now: () => end,
@@ -335,6 +357,7 @@ void main() {
             measurementLocation: 'wrist',
           ),
     ];
+    await storage.upsertSkinTemperatureSamples(hc.skinTemperatureSamples);
     await storage.upsertSleepSessions([
       for (var night = 0; night < 2; night++)
         SleepPeriod(
@@ -363,35 +386,18 @@ void main() {
     expect(rows.last['mean_skin_c'], closeTo(34.8, 1e-9));
   });
 
-  test('temperature failure leaves watermark and other streams usable', () async {
-    hc.throwOnSkinTemperature = true;
-    final now = DateTime(2026, 8, 11, 9);
-    final service = HealthDataSyncService(
-      healthConnectService: hc, storage: storage, now: () => now,
-    );
-    await service.sync(force: true);
-    expect(await storage.getSetting('health_sync.skin_temperature'), isNull);
-    expect(await storage.getSetting('health_sync.hrv_rmssd'), isNotNull);
-    hc.throwOnSkinTemperature = false;
-    hc.calls.clear();
-    await service.sync(force: true);
-    expect(hc.calls.firstWhere((c) => c.method == 'skin_temperature').from,
-      now.subtract(const Duration(days: 30)));
-  });
-
-  test('temperature grant after upgrade retains full initial backfill', () async {
+  test('temperature stays disabled after an old grant is restored', () async {
     hc.grantedTypes.remove(HealthReadType.skinTemperature);
     final now = DateTime(2026, 8, 11, 9);
     final service = HealthDataSyncService(
       healthConnectService: hc, storage: storage, now: () => now,
     );
     await service.sync(force: true);
-    expect(hc.calls.any((c) => c.method == 'skin_temperature'), isFalse);
-    expect(await storage.getSetting('health_sync.skin_temperature'), isNull);
     hc.grantedTypes.add(HealthReadType.skinTemperature);
     await service.sync(force: true);
-    expect(hc.calls.firstWhere((c) => c.method == 'skin_temperature').from,
-      now.subtract(const Duration(days: 30)));
+    expect(hc.calls.any((c) => c.method == 'skin_temperature'), isFalse);
+    expect(await storage.getSetting('health_sync.skin_temperature'), isNull);
+    expect(await storage.getSetting('health_sync.hrv_rmssd'), isNotNull);
   });
 
   test('v8 database upgrade adds temperature without losing existing data', () async {

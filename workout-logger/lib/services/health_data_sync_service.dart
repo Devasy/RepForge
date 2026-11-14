@@ -126,17 +126,6 @@ class HealthDataSyncService {
         historyGranted: historyGranted,
       );
     }
-    if (granted.contains(HealthReadType.skinTemperature)) {
-      const key = 'health_sync.skin_temperature';
-      try {
-        final from = await _windowStart(key, now, historyGranted);
-        final samples = await _hc.readSkinTemperature(from, now);
-        await _storage.upsertSkinTemperatureSamples(samples);
-        await _saveSuccess(key, now, historyGranted);
-      } catch (_) {
-        // Unsupported modules, denied permissions and failed pages are retried.
-      }
-    }
 
     await _storage.saveSetting(_lastRunKey, now.toIso8601String());
   }

@@ -438,7 +438,7 @@ class HealthConnectSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Reads sleep & heart data for recovery, and skin temperature for coach analysis',
+                      'Reads sleep & heart data for recovery',
                       style: TextStyle(
                         fontFamily: 'Geist',
                         color: AppColors.textMuted,
@@ -467,7 +467,7 @@ class HealthConnectSection extends StatelessWidget {
               iconColor: _hcColor,
               title: 'Sync coach data now',
               subtitle:
-                  "Pull recent sleep, heart rate & skin temperature into the coach's database",
+                  "Pull recent sleep & heart data into the coach's database",
               loading: isHealthSyncLoading,
               onTap: isHealthSyncLoading ? null : onHealthSyncNow,
             ),

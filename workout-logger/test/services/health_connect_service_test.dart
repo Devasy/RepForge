@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_connector/health_connector.dart';
@@ -7,6 +8,39 @@ import '../test_utils/test_fixtures.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('rollback removes declared skin access and retains existing health permissions', () {
+    final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+    expect(manifest, isNot(contains('android.permission.health.READ_SKIN_TEMPERATURE')));
+    for (final permission in [
+      'READ_HEART_RATE_VARIABILITY', 'READ_SLEEP', 'READ_HEART_RATE',
+      'READ_RESTING_HEART_RATE', 'READ_EXERCISE', 'WRITE_EXERCISE',
+      'READ_HEALTH_DATA_HISTORY',
+    ]) {
+      expect(manifest, contains('android.permission.health.$permission'));
+    }
+  });
+
+  test('rollback runtime permission map keeps sleep HR RHR HRV only', () {
+    final source = File('lib/services/health_connect_service.dart').readAsStringSync();
+    final map = source.split('_readPermissions = {')[1].split('};')[0];
+    expect(RegExp(r'HealthReadType\.(\w+):').allMatches(map).map((m) => m[1]),
+      unorderedEquals(['sleep', 'heartRate', 'restingHeartRate', 'hrv']),
+    );
+    expect(source, isNot(contains('skinTemperatureDeltaSeries.readPermission')));
+  });
+
+  test('rollback disables direct skin reads without initializing the platform', () async {
+    var platformCalls = 0;
+    const channel = 'dev.flutter.pigeon.health_connector_hc_android.HealthConnectorHCAndroidApi.getHealthPlatformStatus';
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler(channel, (_) async { platformCalls++; return null; });
+    addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMessageHandler(channel, null));
+    final service = HealthConnectService(throwOnReadFailure: true);
+    final end = DateTime(2026, 11, 14);
+    expect(await service.readSkinTemperature(end.subtract(const Duration(days: 1)), end), isEmpty);
+    expect(platformCalls, 0);
+  });
 
   test('skin temperature mapping preserves deltas, baseline and bridge origin', () {
     final start = DateTime.utc(2026, 11, 10, 22);
