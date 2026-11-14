@@ -1,5 +1,5 @@
 import 'package:ai_orchestration_flutter/ai_orchestration_flutter.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../services/ai/orchestration/agent_change_review.dart';
 import '../../theme/app_theme.dart';
 import 'agent_change_details.dart';

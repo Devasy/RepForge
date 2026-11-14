@@ -3,7 +3,7 @@
 // caps the sheet at 9/16 of the viewport — enough that a three-action sheet
 // with descriptions clipped its last action, with no way to scroll to it.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/screens/widgets/rf_dialogs.dart';
 import 'package:repforge/theme/app_theme.dart';

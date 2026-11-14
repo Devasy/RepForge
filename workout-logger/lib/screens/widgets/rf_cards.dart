@@ -1,7 +1,7 @@
 // rf_cards.dart — RepForge card widget variants
 // Stateless cards that consume AppColors tokens and rf_widgets primitives.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import '../../models/models.dart';
 import '../../theme/app_theme.dart';

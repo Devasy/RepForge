@@ -1,13 +1,18 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+
+import 'test_utils/fake_file_picker.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/screens/profile_screen.dart';
 import 'package:repforge/services/backup_codec.dart';
 import 'package:repforge/services/settings_provider.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/managers/program_manager.dart';
+
 import 'test_utils/mock_storage_service.dart';
 import 'test_utils/mock_ml_service.dart';
 import 'test_utils/test_robot.dart';
@@ -70,18 +75,10 @@ void main() {
               : '{"settings":{"userName":"Imported User"}}',
         ),
       );
-      const channel = MethodChannel('miguelruivo.flutter.plugins.filepicker');
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        channel,
-        (_) async => [
-          {'path': file.path, 'name': 'backup.json', 'size': 64},
-        ],
-      );
+      final originalPicker = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = FakeFilePicker(TestPickedFile(file));
       addTearDown(() async {
-        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          channel,
-          null,
-        );
+        FilePickerPlatform.instance = originalPicker;
         await tester.runAsync(() => directory.delete(recursive: true));
       });
       await TestRobot(tester).pumpScreen(

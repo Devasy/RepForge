@@ -60,7 +60,7 @@ Want to take RepForge for a spin or contribute? Follow these steps to build the 
 
 ### Prerequisites
 
-- [Flutter SDK](https://docs.flutter.dev/get-started/install)
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) 3.50.0 stable (includes Dart 3.14.0)
 - Android Studio / VS Code
 - An Android device or emulator
 

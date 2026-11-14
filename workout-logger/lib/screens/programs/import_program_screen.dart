@@ -14,8 +14,9 @@
 
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/workout_provider.dart';
@@ -89,9 +90,8 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       child: Text(
         'Tap  to pick a .json file, or paste JSON below. '
         'Required: name · totalWeeks · phases · weeks.',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: AppTheme.textSecondary,
-        ),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: AppTheme.textSecondary),
       ),
     );
   }
@@ -104,7 +104,7 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       child: TextField(
         controller: _ctrl,
         scrollController: _scrollCtrl,
-        maxLines: null,  // expands to fill available height
+        maxLines: null, // expands to fill available height
         expands: true,
         textAlignVertical: TextAlignVertical.top,
         style: const TextStyle(
@@ -225,16 +225,20 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
   // ── Action bar ────────────────────────────────────────────────────────
 
   Widget _buildActionBar() {
-    final canValidate = _ctrl.text.trim().isNotEmpty &&
+    final canValidate =
+        _ctrl.text.trim().isNotEmpty &&
         _validationState != _ValidationState.valid;
-    final canImport = _validationState == _ValidationState.valid && _parsed != null;
+    final canImport =
+        _validationState == _ValidationState.valid && _parsed != null;
 
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: const BoxDecoration(
           color: AppTheme.cardColor,
-          border: Border(top: BorderSide(color: AppTheme.surfaceColor, width: 1)),
+          border: Border(
+            top: BorderSide(color: AppTheme.surfaceColor, width: 1),
+          ),
         ),
         child: Row(
           children: [
@@ -266,13 +270,13 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.pickFiles(
+      final file = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['json'],
       );
-      if (result == null || result.files.isEmpty) return;
+      if (file == null) return;
 
-      final path = result.files.single.path;
+      final path = file.path;
       if (path == null) return;
 
       final content = await File(path).readAsString();
@@ -350,13 +354,19 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       throw FormatException('Missing required field: "$key"');
     }
     if (type == int && map[key] is! int) {
-      throw FormatException('"$key" must be an integer, got ${map[key].runtimeType}');
+      throw FormatException(
+        '"$key" must be an integer, got ${map[key].runtimeType}',
+      );
     }
     if (type == String && map[key] is! String) {
-      throw FormatException('"$key" must be a string, got ${map[key].runtimeType}');
+      throw FormatException(
+        '"$key" must be a string, got ${map[key].runtimeType}',
+      );
     }
     if (type == List && map[key] is! List) {
-      throw FormatException('"$key" must be an array, got ${map[key].runtimeType}');
+      throw FormatException(
+        '"$key" must be an array, got ${map[key].runtimeType}',
+      );
     }
   }
 

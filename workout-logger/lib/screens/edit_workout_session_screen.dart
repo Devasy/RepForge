@@ -1,6 +1,6 @@
 // edit_workout_session_screen.dart — Edit a recorded workout session
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';

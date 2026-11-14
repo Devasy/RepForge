@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../theme/app_theme.dart';
 
 /// 14-week × 7-day activity heatmap grid.

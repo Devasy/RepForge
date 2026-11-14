@@ -1,7 +1,7 @@
 // Widget tests for the Gemini model dropdown + thinking-level slider in
 // AiSettingsSection.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:repforge/screens/widgets/profile_sections.dart';

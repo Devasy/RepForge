@@ -3,16 +3,17 @@ import 'package:flutter/widgets.dart';
 import 'agent_controller.dart';
 import 'agent_view_state.dart';
 
-typedef AgentViewBuilder<S> =
-    Widget Function(BuildContext context, AgentViewState<S> state);
+typedef AgentViewBuilder<S> = Widget Function(
+  BuildContext context,
+  AgentViewState<S> state,
+);
 typedef AgentInputSubmit = Future<bool> Function(Object? response);
-typedef AgentInputWidgetBuilder =
-    Widget Function(
-      BuildContext context,
-      PendingAgentInput pending,
-      AgentInputSubmit submit,
-      bool isSubmitting,
-    );
+typedef AgentInputWidgetBuilder = Widget Function(
+  BuildContext context,
+  PendingAgentInput pending,
+  AgentInputSubmit submit,
+  bool isSubmitting,
+);
 
 class AgentRunBuilder<S> extends StatelessWidget {
   final AgentController<S> controller;

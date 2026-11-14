@@ -1,6 +1,6 @@
 // exercise_library_screen.dart — Browse and search the exercise library
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';

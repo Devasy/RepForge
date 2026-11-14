@@ -3,6 +3,12 @@ import 'test_utils/legacy_ai_fixture.dart';
 // persist) using a fake IAiService, so the View has no logic left to test.
 
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+
+import 'test_utils/fake_file_picker.dart';
+
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +23,7 @@ import 'package:repforge/services/managers/pr_manager.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/settings_provider.dart';
 import 'package:repforge/viewmodels/ai_coach_view_model.dart';
+
 import 'test_utils/mock_storage_service.dart';
 
 /// Scripted IAiService: yields fixed chunks; optionally invokes a tool first.
@@ -137,6 +144,56 @@ void main() {
       storage = MockStorageService();
     });
 
+    test(
+      'single image selection and cancellation preserve the attachment',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'repforge-image-',
+        );
+        final originalPicker = FilePickerPlatform.instance;
+        addTearDown(() async {
+          FilePickerPlatform.instance = originalPicker;
+          await directory.delete(recursive: true);
+        });
+        final bytes = Uint8List.fromList([1, 2, 3]);
+        final file = await File('${directory.path}/photo.png')
+            .writeAsBytes(bytes);
+        final picker = FakeFilePicker(TestPickedFile(file));
+        FilePickerPlatform.instance = picker;
+        final vm = await buildVm(_FakeAiService());
+
+        await vm.pickImage();
+        expect(vm.pendingImageBytes, bytes);
+        picker.file = null;
+        await vm.pickImage();
+        expect(vm.pendingImageBytes, bytes);
+      },
+    );
+
+    test('image selection rejects oversized and unsupported files', () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'repforge-image-',
+      );
+      final originalPicker = FilePickerPlatform.instance;
+      addTearDown(() async {
+        FilePickerPlatform.instance = originalPicker;
+        await directory.delete(recursive: true);
+      });
+      final oversized = await File('${directory.path}/large.png')
+          .writeAsBytes(Uint8List(7 * 1024 * 1024));
+      final picker = FakeFilePicker(TestPickedFile(oversized));
+      FilePickerPlatform.instance = picker;
+      final vm = await buildVm(_FakeAiService());
+      await vm.pickImage();
+      expect(vm.hasPendingImage, isFalse);
+
+      final unsupported = await File('${directory.path}/photo.gif')
+          .writeAsBytes([1, 2, 3]);
+      picker.file = TestPickedFile(unsupported);
+      await vm.pickImage();
+      expect(vm.hasPendingImage, isFalse);
+    });
+
     test('sendMessage appends user + model messages and persists', () async {
       final vm = await buildVm(_FakeAiService());
 
@@ -232,27 +289,24 @@ void main() {
       expect(vm.pendingImageBytes, isNull);
     });
 
-    test(
-      'sendMessage attaches pending image, passes to IAiService, and clears pending',
-      () async {
-        final ai = _FakeAiService();
-        final vm = await buildVm(ai);
+    test('sendMessage attaches pending image, passes to IAiService, and clears pending', () async {
+      final ai = _FakeAiService();
+      final vm = await buildVm(ai);
 
-        final testBytes = Uint8List.fromList([10, 20, 30, 40]);
-        vm.setPendingImageForTesting(testBytes, 'image/png');
+      final testBytes = Uint8List.fromList([10, 20, 30, 40]);
+      vm.setPendingImageForTesting(testBytes, 'image/png');
 
-        await vm.sendMessage('Check my form');
+      await vm.sendMessage('Check my form');
 
-        expect(ai.lastImageBytesBase64, base64Encode(testBytes));
-        expect(ai.lastImageMimeType, 'image/png');
-        expect(vm.hasPendingImage, isFalse);
-        expect(vm.pendingImageBytes, isNull);
+      expect(ai.lastImageBytesBase64, base64Encode(testBytes));
+      expect(ai.lastImageMimeType, 'image/png');
+      expect(vm.hasPendingImage, isFalse);
+      expect(vm.pendingImageBytes, isNull);
 
-        final userMsg = vm.messages.firstWhere((m) => m.role == 'user');
-        expect(userMsg.imageBytesBase64, base64Encode(testBytes));
-        expect(userMsg.imageMimeType, 'image/png');
-      },
-    );
+      final userMsg = vm.messages.firstWhere((m) => m.role == 'user');
+      expect(userMsg.imageBytesBase64, base64Encode(testBytes));
+      expect(userMsg.imageMimeType, 'image/png');
+    });
 
     test(
       'sendMessage with image only (no text) is accepted and sends image',
@@ -273,25 +327,22 @@ void main() {
       },
     );
 
-    test(
-      'image-only retry preserves attachment and succeeds without duplicate turn',
-      () async {
-        final ai = _FakeAiService()..fail = true;
-        final retryVm = await buildVm(ai);
-        retryVm.setPendingImageForTesting(
-          Uint8List.fromList([1, 2]),
-          'image/png',
-        );
-        await retryVm.sendMessage('');
-        expect(retryVm.canRetry, isTrue);
-        ai.fail = false;
-        await retryVm.retry();
-        expect(retryVm.messages, hasLength(2));
-        expect(ai.lastImageBytesBase64, base64Encode([1, 2]));
-        expect(ai.lastHistory, isEmpty);
-        expect(retryVm.failure, isNull);
-      },
-    );
+    test('image-only retry preserves attachment and succeeds without duplicate turn', () async {
+      final ai = _FakeAiService()..fail = true;
+      final retryVm = await buildVm(ai);
+      retryVm.setPendingImageForTesting(
+        Uint8List.fromList([1, 2]),
+        'image/png',
+      );
+      await retryVm.sendMessage('');
+      expect(retryVm.canRetry, isTrue);
+      ai.fail = false;
+      await retryVm.retry();
+      expect(retryVm.messages, hasLength(2));
+      expect(ai.lastImageBytesBase64, base64Encode([1, 2]));
+      expect(ai.lastHistory, isEmpty);
+      expect(retryVm.failure, isNull);
+    });
 
     test(
       'failed model continuation stays retryable after a read tool',
@@ -307,71 +358,63 @@ void main() {
       },
     );
 
-    test(
-      'sendMessage exposes friendly failure and retry does not duplicate user turn',
-      () async {
-        final throwingVm = await buildVm(_ThrowingAiService());
+    test('sendMessage exposes friendly failure and retry does not duplicate user turn', () async {
+      final throwingVm = await buildVm(_ThrowingAiService());
 
-        await throwingVm.sendMessage('cause error');
+      await throwingVm.sendMessage('cause error');
 
-        expect(throwingVm.messages, hasLength(1));
-        expect(throwingVm.failure!.message, contains('could not finish'));
-        expect(throwingVm.canRetry, isTrue);
-        await throwingVm.retry();
-        expect(throwingVm.messages, hasLength(1));
-        throwingVm.newConversation();
-        expect(throwingVm.canRetry, isFalse);
-        expect(throwingVm.isLoading, isFalse);
-      },
-    );
+      expect(throwingVm.messages, hasLength(1));
+      expect(throwingVm.failure!.message, contains('could not finish'));
+      expect(throwingVm.canRetry, isTrue);
+      await throwingVm.retry();
+      expect(throwingVm.messages, hasLength(1));
+      throwingVm.newConversation();
+      expect(throwingVm.canRetry, isFalse);
+      expect(throwingVm.isLoading, isFalse);
+    });
 
-    test(
-      '_buildHistory preserves attached images with DataPart and [Attached image] placeholder',
-      () async {
-        final ai = _FakeAiService();
-        final vm = await buildVm(ai);
+    test('_buildHistory preserves attached images with DataPart and [Attached image] placeholder', () async {
+      final ai = _FakeAiService();
+      final vm = await buildVm(ai);
 
-        // Send a message with image — this gets stored and becomes part of history
-        // in the next turn.
-        final imgBytes = Uint8List.fromList([1, 2, 3]);
-        vm.setPendingImageForTesting(imgBytes, 'image/jpeg');
-        await vm.sendMessage(''); // image-only first message
+      // Send a message with image — this gets stored and becomes part of history
+      // in the next turn.
+      final imgBytes = Uint8List.fromList([1, 2, 3]);
+      vm.setPendingImageForTesting(imgBytes, 'image/jpeg');
+      await vm.sendMessage(''); // image-only first message
 
-        // Second message triggers _buildHistory which must preserve the image bytes
-        // as a DataPart while retaining the text fallback.
-        await vm.sendMessage('follow up');
+      // Second message triggers _buildHistory which must preserve the image bytes
+      // as a DataPart while retaining the text fallback.
+      await vm.sendMessage('follow up');
 
-        expect(vm.messages.length, greaterThanOrEqualTo(4));
-        expect(ai.lastHistory, isNotNull);
-        expect(ai.lastHistory, isNotEmpty);
-        final historyContent = ai.lastHistory!.first;
-        final historyParts = historyContent.parts.toList();
-        expect(historyParts.any((p) => p is DataPart), isTrue);
-        final dataPart =
-            historyParts.firstWhere((p) => p is DataPart) as DataPart;
-        expect(dataPart.mimeType, 'image/jpeg');
-        expect(dataPart.bytes, equals(imgBytes));
-        expect(
-          historyParts.any(
-            (p) => p is TextPart && p.text == '[Attached image]',
-          ),
-          isTrue,
-        );
+      expect(vm.messages.length, greaterThanOrEqualTo(4));
+      expect(ai.lastHistory, isNotNull);
+      expect(ai.lastHistory, isNotEmpty);
+      final historyContent = ai.lastHistory!.first;
+      final historyParts = historyContent.parts.toList();
+      expect(historyParts.any((p) => p is DataPart), isTrue);
+      final dataPart =
+          historyParts.firstWhere((p) => p is DataPart) as DataPart;
+      expect(dataPart.mimeType, 'image/jpeg');
+      expect(dataPart.bytes, equals(imgBytes));
+      expect(
+        historyParts.any((p) => p is TextPart && p.text == '[Attached image]'),
+        isTrue,
+      );
 
-        // Verify Content.toJson() serializes the DataPart and TextPart
-        final json = historyContent.toJson();
-        expect(json['role'], 'user');
-        final serializedParts = json['parts'] as List;
-        expect(serializedParts, hasLength(2));
-        expect(serializedParts[0], {
-          'inlineData': {
-            'mimeType': 'image/jpeg',
-            'data': base64Encode(imgBytes),
-          },
-        });
-        expect(serializedParts[1], {'text': '[Attached image]'});
-      },
-    );
+      // Verify Content.toJson() serializes the DataPart and TextPart
+      final json = historyContent.toJson();
+      expect(json['role'], 'user');
+      final serializedParts = json['parts'] as List;
+      expect(serializedParts, hasLength(2));
+      expect(serializedParts[0], {
+        'inlineData': {
+          'mimeType': 'image/jpeg',
+          'data': base64Encode(imgBytes),
+        },
+      });
+      expect(serializedParts[1], {'text': '[Attached image]'});
+    });
 
     test('deleteConversation removes it from the list', () async {
       final vm = await buildVm(_FakeAiService());

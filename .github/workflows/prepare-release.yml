@@ -16,7 +16,7 @@ permissions:
 jobs:
   prepare:
     if: github.event_name != 'create' || github.event.ref_type == 'branch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       actions: write
@@ -29,7 +29,7 @@ jobs:
           if [[ "$SOURCE_BRANCH" =~ ^r[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "name=$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         if: steps.branch.outputs.name != ''
         with:
           ref: ${{ steps.branch.outputs.name }}
@@ -50,8 +50,8 @@ jobs:
           git add -- workout-logger/pubspec.yaml
           git commit -m "chore: set version from $RELEASE_BRANCH"
           git push origin "HEAD:refs/heads/$RELEASE_BRANCH"
-      - name: Run checks on the prepared branch
-        if: steps.branch.outputs.name != ''
+      - name: Run checks after the bot version commit
+        if: steps.version.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_BRANCH: ${{ steps.branch.outputs.name }}

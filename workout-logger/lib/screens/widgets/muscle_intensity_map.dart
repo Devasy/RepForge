@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../data/exercise_database.dart';
 import '../../services/extended_exercise_library.dart';

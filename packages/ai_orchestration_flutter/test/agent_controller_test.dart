@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:ai_orchestration_flutter/ai_orchestration_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import 'support.dart';
 
 void main() {
@@ -176,54 +178,48 @@ void main() {
     expect(controller.state.data, 2);
   });
 
-  test(
-    'detach and reattach preserve accumulated in-flight text without cancelling',
-    () async {
-      final model = ControlledModel();
-      final runtime = AgentRuntime(
-        store: MemoryCheckpointStore(),
-        model: model,
-      );
-      final workflow = chatWorkflow(
-        id: 'chat',
-        modelId: 'demo',
-        systemPrompt: 'Test',
-        tools: ToolRegistry([]),
-      );
-      final first = AgentController.chat(
-        runtime: runtime,
-        workflow: workflow,
-        threadId: 'chat',
-      );
-      final second = AgentController.chat(
-        runtime: runtime,
-        workflow: workflow,
-        threadId: 'chat',
-      );
-      addTearDown(first.dispose);
-      addTearDown(second.dispose);
-      await first.start(input: {'text': 'Hello'});
-      model.output.add(const ModelStatus('Connecting'));
-      await until(first, (state) => state.statusText == 'Connecting');
-      model.output.add(const ModelText('Hello '));
-      await until(first, (state) => state.streamingText == 'Hello ');
-      expect(first.state.statusText, isEmpty);
-      first.detach();
-      expect(first.state.hasLiveRun, true);
-      expect(first.state.needsRecovery, false);
-      model.output.add(const ModelText('world'));
-      await Future<void>.delayed(Duration.zero);
-      expect(await second.restore(), true);
-      await until(second, (state) => state.streamingText == 'Hello world');
-      expect(second.state.isAttached, true);
-      model.output.add(ModelFinished(ModelFinishReason.stop));
-      await model.output.close();
-      await second.completion;
-      await until(second, (state) => state.status == RunStatus.completed);
-      expect(second.state.data!.messages.last.text, 'Hello world');
-      expect(second.state.streamingText, isEmpty);
-    },
-  );
+  test('detach and reattach preserve accumulated in-flight text without cancelling', () async {
+    final model = ControlledModel();
+    final runtime = AgentRuntime(store: MemoryCheckpointStore(), model: model);
+    final workflow = chatWorkflow(
+      id: 'chat',
+      modelId: 'demo',
+      systemPrompt: 'Test',
+      tools: ToolRegistry([]),
+    );
+    final first = AgentController.chat(
+      runtime: runtime,
+      workflow: workflow,
+      threadId: 'chat',
+    );
+    final second = AgentController.chat(
+      runtime: runtime,
+      workflow: workflow,
+      threadId: 'chat',
+    );
+    addTearDown(first.dispose);
+    addTearDown(second.dispose);
+    await first.start(input: {'text': 'Hello'});
+    model.output.add(const ModelStatus('Connecting'));
+    await until(first, (state) => state.statusText == 'Connecting');
+    model.output.add(const ModelText('Hello '));
+    await until(first, (state) => state.streamingText == 'Hello ');
+    expect(first.state.statusText, isEmpty);
+    first.detach();
+    expect(first.state.hasLiveRun, true);
+    expect(first.state.needsRecovery, false);
+    model.output.add(const ModelText('world'));
+    await Future<void>.delayed(Duration.zero);
+    expect(await second.restore(), true);
+    await until(second, (state) => state.streamingText == 'Hello world');
+    expect(second.state.isAttached, true);
+    model.output.add(ModelFinished(ModelFinishReason.stop));
+    await model.output.close();
+    await second.completion;
+    await until(second, (state) => state.status == RunStatus.completed);
+    expect(second.state.data!.messages.last.text, 'Hello world');
+    expect(second.state.streamingText, isEmpty);
+  });
 
   test('disposing a controller never cancels the underlying run', () async {
     final model = ControlledModel();

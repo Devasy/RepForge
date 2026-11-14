@@ -4,6 +4,12 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.2.5]
+
+### Changes
+
+- Update the app to Flutter 3.50 and Dart 3.14, with refreshed charting, Health Connect, Markdown, sharing, file import and local storage dependencies.
+
 ## [2.2.4]
 
 ### Changes

@@ -4,7 +4,7 @@ import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -347,15 +347,15 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     setState(() => _isImporting = true);
     try {
-      final result = await FilePicker.pickFiles(
+      final pickedFile = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['json'],
       );
-      if (result == null || result.files.single.path == null) {
+      if (pickedFile?.path == null) {
         if (mounted) setState(() => _isImporting = false);
         return;
       }
-      final file = File(result.files.single.path!);
+      final file = File(pickedFile!.path!);
       final jsonString = await file.readAsString();
       final data = jsonDecode(jsonString);
       if (!mounted) return;

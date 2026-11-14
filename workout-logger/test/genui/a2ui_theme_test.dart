@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/genui/src/a2ui_panels.dart';
 import 'package:repforge/genui/src/a2ui_theme.dart';

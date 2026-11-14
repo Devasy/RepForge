@@ -10,8 +10,7 @@ class SchemaCatalogTool implements AgentTool {
   @override
   ToolDefinition get definition => ToolDefinition(
     name: 'describe_schema',
-    description:
-        'Describe the application-approved relations, fields, units and query tools.',
+    description: 'Describe the application-approved relations, fields, units and query tools.',
     arguments: ValueSchema.object(),
     replaySafe: true,
   );
@@ -31,12 +30,11 @@ class NamedSqlReadTool implements AgentTool {
   NamedSqlReadTool._(
     this._database, {
     required this.definition,
-    required String sql,
+    required this._sql,
     required List<String> parameterNames,
     required this.maxRows,
     required this.maxResultBytes,
-  }) : _sql = sql,
-       _parameterNames = List.unmodifiable(parameterNames);
+  }) : _parameterNames = List.unmodifiable(parameterNames);
 
   /// Returns the tool and its owned dedicated read-only connection.
   static Future<NamedSqlReadTool> open({

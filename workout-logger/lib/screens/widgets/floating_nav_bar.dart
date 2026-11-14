@@ -28,7 +28,7 @@
 // Only needs the Flutter SDK (material.dart · dart:ui · flutter/physics.dart).
 
 import 'dart:ui' show ImageFilter;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 

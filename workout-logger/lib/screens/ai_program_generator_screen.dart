@@ -1,6 +1,6 @@
 // ai_program_generator_screen.dart — Natural-language training program generation via Gemini
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 

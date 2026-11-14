@@ -1,14 +1,15 @@
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:flutter/widgets.dart';
 
-typedef ArtifactWidgetBuilder =
-    Widget Function(BuildContext context, Artifact artifact);
-typedef ArtifactFallbackBuilder =
-    Widget Function(
-      BuildContext context,
-      Artifact artifact,
-      ArtifactRenderIssue issue,
-    );
+typedef ArtifactWidgetBuilder = Widget Function(
+  BuildContext context,
+  Artifact artifact,
+);
+typedef ArtifactFallbackBuilder = Widget Function(
+  BuildContext context,
+  Artifact artifact,
+  ArtifactRenderIssue issue,
+);
 
 enum ArtifactRenderIssue { unsupportedTypeOrVersion, invalidPayload }
 

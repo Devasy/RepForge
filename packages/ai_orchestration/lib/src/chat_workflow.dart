@@ -122,8 +122,7 @@ Workflow<ChatState> chatWorkflow({
               callId: call.id,
               result: {
                 'status': 'unknown',
-                'message':
-                    'The previous run ended without a recorded result. Do not assume this action completed or failed.',
+                'message': 'The previous run ended without a recorded result. Do not assume this action completed or failed.',
               },
             ),
           );

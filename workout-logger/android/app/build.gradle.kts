@@ -1,4 +1,4 @@
-import com.android.build.gradle.internal.api.ApkVariantOutputImpl
+import com.android.build.api.variant.FilterConfiguration
 import java.io.FileInputStream
 import java.util.Properties
 
@@ -105,13 +105,13 @@ flutter {
 }
 
 val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86_64" to 3)
-android.applicationVariants.configureEach {
-    val variant = this
+// Run after Flutter's callback so its default ABI offsets cannot replace ours.
+androidComponents.onVariants { variant ->
     variant.outputs.forEach { output ->
-        val abiVersionCode = abiCodes[output.filters.find { it.filterType == "ABI" }?.identifier]
+        val abi = output.filters.find { it.filterType == FilterConfiguration.FilterType.ABI }?.identifier
+        val abiVersionCode = abiCodes[abi]
         if (abiVersionCode != null) {
-            (output as ApkVariantOutputImpl).versionCodeOverride = variant.versionCode * 10 + abiVersionCode
+            output.versionCode.set(flutter.versionCode * 10 + abiVersionCode)
         }
     }
 }
-

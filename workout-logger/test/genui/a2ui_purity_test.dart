@@ -79,7 +79,7 @@ void main() {
     }
 
     const mustNotMatch = [
-      "import 'package:flutter/material.dart';",
+      "import 'package:material_ui/material_ui.dart';",
       "import 'a2ui_registry.dart';",
       "import '../src/a2ui_parser.dart';",
       "import 'package:repforge/genui/a2ui.dart';",

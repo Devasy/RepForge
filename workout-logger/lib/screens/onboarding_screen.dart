@@ -4,7 +4,7 @@
 //   • userName == null  → full welcome page asking for name
 //   • userName != null && version changed → version-update bottom sheet
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../services/settings_provider.dart';

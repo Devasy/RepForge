@@ -2,7 +2,7 @@
 // Features dual-mode tracking: live stopwatch & countdown presets, plus manual editing.
 
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import '../../services/settings_provider.dart';
 import '../../theme/app_theme.dart';
