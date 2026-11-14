@@ -56,11 +56,19 @@ RepForge's core workout logging, routines, and analytics work fully offline. The
 
 ## 🚀 Getting Started
 
+### Get the app
+
+- **F-Droid:** [Install RepForge](https://f-droid.org/en/packages/com.devasy.repforge/)
+- **Google Play:** [RepForge on Google Play](https://play.google.com/store/apps/details?id=com.devasy.repforge) — availability depends on your region and testing/rollout access.
+- **GitHub:** [Latest release and APK downloads](https://github.com/Devasy/RepForge/releases/latest)
+
+Store releases can arrive at different times. Check each listing for its available version.
+
 Want to take RepForge for a spin or contribute? Follow these steps to build the application on your local machine.
 
 ### Prerequisites
 
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) 3.50.0 stable (includes Dart 3.14.0)
+- [Flutter SDK 3.50.0 stable](https://docs.flutter.dev/install/archive), including Dart 3.14.0. The SDK version is pinned in [`workout-logger/pubspec.yaml`](workout-logger/pubspec.yaml) and used by CI and F-Droid builds.
 - Android Studio / VS Code
 - An Android device or emulator
 
@@ -89,10 +97,13 @@ flutter build apk --release --split-per-abi
 ```
 The APKs will be available under `build/app/outputs/flutter-apk/`.
 
-### Getting the App
+### Repository layout
 
-- **GitHub Releases:** [github.com/Devasy/RepForge/releases](https://github.com/Devasy/RepForge/releases)
-- **F-Droid:** submission in progress
+- `workout-logger/`: Flutter application, tests, and release-note tooling.
+- `fastlane/` and `fdroid/`: store metadata and F-Droid build configuration.
+- `scripts/` and `.github/workflows/`: development and release automation.
+
+The retired Python analytics backend and Streamlit dashboard have been removed. Python 3 is still used to validate the changelog and generate release notes in CI; it is not needed to run the app.
 
 ---
 
@@ -111,7 +122,7 @@ We believe in the power of open-source! Whether you want to fix a bug, add a fea
 Check out the **[Issues](https://github.com/Devasy/RepForge/issues)** tab! If you have a new idea, feel free to open a new issue for a feature request or bug report before starting your work. Whether it's a UI tweak, performance upgrade, or a brand new workout mode, we'd love to see it!
 
 ### Development Guidelines
-- Follow standard Flutter and Dart formatting (`flutter format .`).
+- Follow standard Dart formatting (`dart format .` from `workout-logger/`).
 - Keep state management clean and modular (we use Provider).
 - Ensure your PR doesn't break existing behaviors and try to add tests for new logic (`flutter test`).
 
