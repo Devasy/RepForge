@@ -2,7 +2,7 @@
 // Android's bigger-font settings was seeing the weight value clipped inside
 // its own field and the assisted-load line run off the edge of its pill.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/models/models.dart';
 import 'package:repforge/screens/widgets/exercise_input_section.dart';

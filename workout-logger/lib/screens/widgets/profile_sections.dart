@@ -1,6 +1,6 @@
 // profile_sections.dart — Section widgets for ProfileScreen
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 

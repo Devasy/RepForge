@@ -1,6 +1,6 @@
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:ai_orchestration_flutter/ai_orchestration_flutter.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/screens/widgets/agent_run_controls.dart';
 import 'package:repforge/services/ai/orchestration/agent_change_review.dart';

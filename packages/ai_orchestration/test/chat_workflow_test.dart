@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:test/test.dart';
+
 import 'support.dart';
 
 void main() {
@@ -39,72 +41,67 @@ void main() {
     },
   );
 
-  test(
-    'clarification followed by approval retains both interrupts across runtimes',
-    () async {
-      var writes = 0;
-      final store = MemoryCheckpointStore();
-      final model = ScriptedModel([
-        calls([
-          ToolCall(id: 'question', name: 'ask'),
-          ToolCall(id: 'write', name: 'write'),
-        ]),
-        answer('Applied'),
-      ]);
-      final workflow = buildChat(
-        [
-          CallbackTool(
-            'ask',
-            (_) => ToolNeedsInput(
-              InputRequest(responseSchema: ValueSchema.string()),
-            ),
+  test('clarification followed by approval retains both interrupts across runtimes', () async {
+    var writes = 0;
+    final store = MemoryCheckpointStore();
+    final model = ScriptedModel([
+      calls([
+        ToolCall(id: 'question', name: 'ask'),
+        ToolCall(id: 'write', name: 'write'),
+      ]),
+      answer('Applied'),
+    ]);
+    final workflow = buildChat(
+      [
+        CallbackTool(
+          'ask',
+          (_) => ToolNeedsInput(
+            InputRequest(responseSchema: ValueSchema.string()),
           ),
-          CallbackTool('write', (_) {
-            writes++;
-            return ToolSuccess({'saved': true});
-          }, effect: ToolEffect.write),
-        ],
-        authorize: (tool, _) => tool.effect == ToolEffect.write
-            ? ToolAuthorization.requireApproval
-            : ToolAuthorization.allow,
-      );
-      final first = await turn(
-        AgentRuntime(store: store, model: model),
-        workflow,
-      );
-      final second =
-          await (await AgentRuntime(store: store, model: model).resume(
-            workflow: workflow,
-            threadId: first.threadId,
-            runId: first.runId,
-            interruptId: first.interrupt!.id,
-            expectedRevision: first.revision,
-            value: 'food',
-          )).done;
-      expect(second.status, RunStatus.suspended);
-      expect(second.interrupt!.kind, 'tool_approval');
-      expect(writes, 0);
-      final third =
-          await (await AgentRuntime(store: store, model: model).resume(
-            workflow: workflow,
-            threadId: second.threadId,
-            runId: second.runId,
-            interruptId: second.interrupt!.id,
-            expectedRevision: second.revision,
-            value: true,
-          )).done;
-      expect(third.status, RunStatus.completed);
-      expect(writes, 1);
-      expect(
-        const ChatStateCodec()
-            .decode(third.state)
-            .messages
-            .where((message) => message.role == 'tool')
-            .map((message) => message.callId),
-        ['question', 'write'],
-      );
-    },
-  );
+        ),
+        CallbackTool('write', (_) {
+          writes++;
+          return ToolSuccess({'saved': true});
+        }, effect: ToolEffect.write),
+      ],
+      authorize: (tool, _) => tool.effect == ToolEffect.write
+          ? ToolAuthorization.requireApproval
+          : ToolAuthorization.allow,
+    );
+    final first = await turn(
+      AgentRuntime(store: store, model: model),
+      workflow,
+    );
+    final second = await (await AgentRuntime(store: store, model: model).resume(
+      workflow: workflow,
+      threadId: first.threadId,
+      runId: first.runId,
+      interruptId: first.interrupt!.id,
+      expectedRevision: first.revision,
+      value: 'food',
+    )).done;
+    expect(second.status, RunStatus.suspended);
+    expect(second.interrupt!.kind, 'tool_approval');
+    expect(writes, 0);
+    final third = await (await AgentRuntime(store: store, model: model).resume(
+      workflow: workflow,
+      threadId: second.threadId,
+      runId: second.runId,
+      interruptId: second.interrupt!.id,
+      expectedRevision: second.revision,
+      value: true,
+    )).done;
+    expect(third.status, RunStatus.completed);
+    expect(writes, 1);
+    expect(
+      const ChatStateCodec()
+          .decode(third.state)
+          .messages
+          .where((message) => message.role == 'tool')
+          .map((message) => message.callId),
+      ['question', 'write'],
+    );
+  });
 
   test('artifact envelopes persist independently of the host UI', () async {
     final workflow = buildChat([
@@ -204,82 +201,79 @@ void main() {
     );
   });
 
-  test(
-    'question suspends before later write and resume completes original call once',
-    () async {
-      var writes = 0;
-      final model = ScriptedModel([
-        calls([
-          ToolCall(id: 'ask-1', name: 'ask'),
-          ToolCall(id: 'write-1', name: 'write'),
-        ]),
-        answer('Saved'),
-      ]);
-      final workflow = buildChat([
-        CallbackTool(
-          'ask',
-          (_) => ToolNeedsInput(
-            InputRequest(
-              responseSchema: ValueSchema.string(),
-              payload: {'label': 'Goal?'},
-            ),
+  test('question suspends before later write and resume completes original call once', () async {
+    var writes = 0;
+    final model = ScriptedModel([
+      calls([
+        ToolCall(id: 'ask-1', name: 'ask'),
+        ToolCall(id: 'write-1', name: 'write'),
+      ]),
+      answer('Saved'),
+    ]);
+    final workflow = buildChat([
+      CallbackTool(
+        'ask',
+        (_) => ToolNeedsInput(
+          InputRequest(
+            responseSchema: ValueSchema.string(),
+            payload: {'label': 'Goal?'},
           ),
         ),
-        CallbackTool('write', (_) {
-          writes++;
-          return ToolSuccess({'saved': true});
-        }, effect: ToolEffect.write),
-      ], authorize: (_, _) => ToolAuthorization.allow);
-      final store = MemoryCheckpointStore();
-      final paused = await turn(
-        AgentRuntime(store: store, model: model),
-        workflow,
-      );
-      expect(paused.status, RunStatus.suspended);
-      expect(writes, 0);
-      expect(
-        const ChatStateCodec()
-            .decode(paused.state)
-            .messages
-            .where((message) => message.role == 'tool'),
-        isEmpty,
-      );
-      final resumedRuntime = AgentRuntime(
-        store: store,
-        model: model,
-        limits: const RunLimits(maxModelCalls: 0, maxSteps: 1),
-      );
-      final handle = await resumedRuntime.resume(
+      ),
+      CallbackTool('write', (_) {
+        writes++;
+        return ToolSuccess({'saved': true});
+      }, effect: ToolEffect.write),
+    ], authorize: (_, _) => ToolAuthorization.allow);
+    final store = MemoryCheckpointStore();
+    final paused = await turn(
+      AgentRuntime(store: store, model: model),
+      workflow,
+    );
+    expect(paused.status, RunStatus.suspended);
+    expect(writes, 0);
+    expect(
+      const ChatStateCodec()
+          .decode(paused.state)
+          .messages
+          .where((message) => message.role == 'tool'),
+      isEmpty,
+    );
+    final resumedRuntime = AgentRuntime(
+      store: store,
+      model: model,
+      limits: const RunLimits(maxModelCalls: 0, maxSteps: 1),
+    );
+    final handle = await resumedRuntime.resume(
+      workflow: workflow,
+      threadId: 'thread',
+      runId: paused.runId,
+      interruptId: paused.interrupt!.id,
+      expectedRevision: paused.revision,
+      value: 'Strength',
+    );
+    final result = await handle.done;
+    expect(result.status, RunStatus.completed);
+    expect(writes, 1);
+    expect(result.modelCalls, 2);
+    final results = model.requests.last.messages
+        .where((message) => message.role == 'tool')
+        .toList();
+    expect(results.map((message) => message.callId), ['ask-1', 'write-1']);
+    expect(results.first.result!['response'], 'Strength');
+    await expectLater(
+      resumedRuntime.resume(
         workflow: workflow,
         threadId: 'thread',
         runId: paused.runId,
         interruptId: paused.interrupt!.id,
         expectedRevision: paused.revision,
-        value: 'Strength',
-      );
-      final result = await handle.done;
-      expect(result.status, RunStatus.completed);
-      expect(writes, 1);
-      expect(result.modelCalls, 2);
-      final results = model.requests.last.messages
-          .where((message) => message.role == 'tool')
-          .toList();
-      expect(results.map((message) => message.callId), ['ask-1', 'write-1']);
-      expect(results.first.result!['response'], 'Strength');
-      await expectLater(
-        resumedRuntime.resume(
-          workflow: workflow,
-          threadId: 'thread',
-          runId: paused.runId,
-          interruptId: paused.interrupt!.id,
-          expectedRevision: paused.revision,
-          value: 'Again',
-        ),
-        throwsA(isA<CheckpointConflict>()),
-      );
-      expect(writes, 1);
-    },
-  );
+        value: 'Again',
+      ),
+      throwsA(isA<CheckpointConflict>()),
+    );
+    expect(writes, 1);
+  });
 
   test(
     'mutation policy requires approval and declined writes do not execute',
@@ -419,47 +413,41 @@ void main() {
     expect(modelLimited.toolCalls, 1);
   });
 
-  test(
-    'native IDs reused in different model passes have distinct operation identities',
-    () async {
-      final operations = <String>[];
-      final tool = CallbackTool('lookup', (context) {
-        operations.add(context.operationId);
-        return ToolSuccess({});
-      });
-      final model = ScriptedModel([
-        calls([ToolCall(id: 'provider-local-id', name: 'lookup')]),
-        calls([ToolCall(id: 'provider-local-id', name: 'lookup')]),
-        answer('Done'),
-      ]);
-      final result = await turn(
-        AgentRuntime(store: MemoryCheckpointStore(), model: model),
-        buildChat([tool]),
-      );
-      expect(result.status, RunStatus.completed);
-      expect(operations.toSet(), hasLength(2));
-    },
-  );
+  test('native IDs reused in different model passes have distinct operation identities', () async {
+    final operations = <String>[];
+    final tool = CallbackTool('lookup', (context) {
+      operations.add(context.operationId);
+      return ToolSuccess({});
+    });
+    final model = ScriptedModel([
+      calls([ToolCall(id: 'provider-local-id', name: 'lookup')]),
+      calls([ToolCall(id: 'provider-local-id', name: 'lookup')]),
+      answer('Done'),
+    ]);
+    final result = await turn(
+      AgentRuntime(store: MemoryCheckpointStore(), model: model),
+      buildChat([tool]),
+    );
+    expect(result.status, RunStatus.completed);
+    expect(operations.toSet(), hasLength(2));
+  });
 
-  test(
-    'partial or blocked model output does not become a successful assistant message',
-    () async {
-      for (final events in [
-        <ModelEvent>[const ModelText('Partial')],
-        <ModelEvent>[ModelFinished(ModelFinishReason.blocked)],
-      ]) {
-        final result = await turn(
-          AgentRuntime(
-            store: MemoryCheckpointStore(),
-            model: ScriptedModel([events]),
-          ),
-          buildChat([]),
-        );
-        expect(result.status, RunStatus.failed);
-        expect(const ChatStateCodec().decode(result.state).messages.length, 1);
-      }
-    },
-  );
+  test('partial or blocked model output does not become a successful assistant message', () async {
+    for (final events in [
+      <ModelEvent>[const ModelText('Partial')],
+      <ModelEvent>[ModelFinished(ModelFinishReason.blocked)],
+    ]) {
+      final result = await turn(
+        AgentRuntime(
+          store: MemoryCheckpointStore(),
+          model: ScriptedModel([events]),
+        ),
+        buildChat([]),
+      );
+      expect(result.status, RunStatus.failed);
+      expect(const ChatStateCodec().decode(result.state).messages.length, 1);
+    }
+  });
 
   test(
     'provider stream errors stay failures and do not leak raw diagnostics',

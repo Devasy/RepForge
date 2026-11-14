@@ -1,10 +1,15 @@
 import 'dart:convert';
 import 'dart:async';
+
 import 'package:ai_orchestration_flutter/ai_orchestration_flutter.dart';
+
 import '../services/ai/ai_failure.dart';
+
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
+
 import '../models/models.dart';
 import '../services/interfaces/ai_service_interface.dart';
 import '../services/ai/coach_tool_service.dart';
@@ -149,12 +154,11 @@ class AiCoachViewModel extends ChangeNotifier {
   Future<void> pickImage() async {
     if (isLoading) return;
     try {
-      final result = await FilePicker.pickFiles(
+      final file = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
       );
-      if (result == null || result.files.isEmpty) return;
-      final file = result.files.first;
+      if (file == null) return;
 
       // Determine MIME type strictly from extension
       final ext = (file.extension ?? '').toLowerCase().trim();
@@ -171,15 +175,7 @@ class AiCoachViewModel extends ChangeNotifier {
       }
 
       // Check file length before reading bytes
-      int? fileLength;
-      if (file.size > 0) {
-        fileLength = file.size;
-      } else if (file.path != null) {
-        final ioFile = File(file.path!);
-        if (await ioFile.exists()) {
-          fileLength = await ioFile.length();
-        }
-      }
+      final fileLength = file.lengthSync() ?? await file.length();
 
       if (fileLength == null ||
           fileLength <= 0 ||

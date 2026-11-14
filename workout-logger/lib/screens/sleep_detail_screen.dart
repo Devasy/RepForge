@@ -4,7 +4,7 @@
 // Week / Month / Year : stacked sleep-duration bars (SleepBarsChart) with an
 // 8h goal line and workout-day highlights.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 

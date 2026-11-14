@@ -537,8 +537,7 @@ class GeminiModelProvider implements ModelProvider {
                           {'text': request.systemPrompt},
                           if (!_searchEnabled(model))
                             {
-                              'text':
-                                  'Web search is unavailable for this request. Use app tools and clearly labeled general knowledge. Do not claim to have searched or verified current sources.',
+                              'text': 'Web search is unavailable for this request. Use app tools and clearly labeled general knowledge. Do not claim to have searched or verified current sources.',
                             },
                         ],
                       },
@@ -700,9 +699,8 @@ class GeminiModelProvider implements ModelProvider {
   ]).timeout(budget);
 
   Duration? _serverDelay(String body) {
-    final match = RegExp(
-      r'(?:retryDelay"\s*:\s*"|retry in\s+)([\d.]+)s',
-    ).firstMatch(body);
+    final match = RegExp(r'(?:retryDelay"\s*:\s*"|retry in\s+)([\d.]+)s')
+        .firstMatch(body);
     final seconds = double.tryParse(match?.group(1) ?? '');
     return seconds == null || !seconds.isFinite
         ? null

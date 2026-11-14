@@ -3,7 +3,7 @@ description: Gemini REST streaming provider for reusable Dart AI workflows.
 version: 0.1.0
 publish_to: none
 environment:
-  sdk: '>=3.11.0 <4.0.0'
+  sdk: '>=3.14.0 <4.0.0'
 dependencies:
   ai_orchestration:
     path: ../ai_orchestration

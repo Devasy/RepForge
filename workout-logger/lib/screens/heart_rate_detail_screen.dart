@@ -3,7 +3,7 @@
 // Day  : ~30-min min–max HR bars + resting line for the selected day.
 // Week / Month / Year : daily/monthly min–max range bars with resting markers.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 

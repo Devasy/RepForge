@@ -1,6 +1,6 @@
 // exercise_input_section.dart — Set entry UI for WorkoutFlowScreen
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import '../../models/models.dart';
 import '../../services/settings_provider.dart';

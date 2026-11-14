@@ -5,12 +5,13 @@
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'package:hive_flutter/hive_flutter.dart';
+
 import 'services/debug_log_buffer.dart';
 import 'services/storage_service.dart';
 import 'services/sqlite_storage_service.dart';
@@ -282,8 +283,11 @@ class WorkoutLoggerApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.darkTheme,
           // Above the Navigator, so every route feeds the ambient glow.
-          builder: (context, child) =>
-              AmbientMotionScope(child: child ?? const SizedBox.shrink()),
+          // fl_chart still reads the legacy Material theme.
+          // ignore: deprecated_member_use
+          builder: (context, child) => MaterialUiCompatibilityBridge(
+            child: AmbientMotionScope(child: child ?? const SizedBox.shrink()),
+          ),
           home: const AppInitializer(),
         ),
       ),

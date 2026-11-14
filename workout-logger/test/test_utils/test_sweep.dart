@@ -1,6 +1,6 @@
 // test_sweep.dart — Parametric loop helpers to sweep through UI states efficiently.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class TestSweep {

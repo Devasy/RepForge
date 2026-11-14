@@ -5,7 +5,7 @@
 //   Step 2: Week structure (mark deload weeks, add days per week)
 //   Step 3: Exercise slots per day (sets, rep range, rest, tempo, weight%, notes)
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 

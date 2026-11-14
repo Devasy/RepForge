@@ -1,7 +1,7 @@
 // rf_question_card.dart — Reusable AI question card (option chips + custom input).
 // Used by RoutineOptimizerScreen when the AI calls ask_user_questions.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/models.dart';

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/screens/ai_coach_screen.dart';
 import 'package:repforge/services/ai/gemini_ai_service.dart';

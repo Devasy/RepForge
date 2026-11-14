@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../a2ui_node.dart';
 import '../a2ui_renderer.dart';

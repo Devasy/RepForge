@@ -1,6 +1,6 @@
 // add_custom_exercise_screen.dart — Form for creating or editing an exercise
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 

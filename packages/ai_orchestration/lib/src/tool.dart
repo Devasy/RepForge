@@ -114,11 +114,10 @@ class ToolRegistry {
 
 enum ToolAuthorization { allow, deny, requireApproval }
 
-typedef ToolPolicy =
-    FutureOr<ToolAuthorization> Function(
-      ToolDefinition tool,
-      ToolContext context,
-    );
+typedef ToolPolicy = FutureOr<ToolAuthorization> Function(
+  ToolDefinition tool,
+  ToolContext context,
+);
 
 ToolAuthorization readOnlyToolPolicy(
   ToolDefinition tool,

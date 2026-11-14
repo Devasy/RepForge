@@ -1,6 +1,6 @@
 // test_robot.dart — Fluent Page Object test automation robot for RepForge widget tests
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repforge/services/workout_provider.dart';
 import 'package:repforge/services/settings_provider.dart';

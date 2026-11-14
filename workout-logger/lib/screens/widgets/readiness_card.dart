@@ -4,7 +4,7 @@
 // so the dashboard needs no conditional logic and users without watch data
 // (or with the feature disabled) never see an empty state.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';

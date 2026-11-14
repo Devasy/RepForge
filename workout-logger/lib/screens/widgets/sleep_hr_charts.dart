@@ -7,7 +7,7 @@
 
 import 'dart:math' show min, max;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../models/sleep_hr_models.dart';
 import '../../theme/app_theme.dart';

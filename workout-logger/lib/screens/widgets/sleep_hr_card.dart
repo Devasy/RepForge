@@ -5,7 +5,7 @@
 
 import 'dart:math' show min;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/sleep_hr_models.dart';

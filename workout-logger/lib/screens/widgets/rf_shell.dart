@@ -1,6 +1,6 @@
 // rf_shell.dart — Screen chrome shared by every RepForge screen.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 

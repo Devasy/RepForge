@@ -11,7 +11,7 @@
 // widgets that the State exposes, and state-transitions are verified by
 // observing those text widgets before and after interactions.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';

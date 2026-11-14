@@ -1,6 +1,6 @@
 // rf_dialogs.dart — Reusable RepForge confirmation dialogs and floating toast notifications
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 

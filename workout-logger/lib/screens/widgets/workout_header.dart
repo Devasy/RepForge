@@ -1,7 +1,7 @@
 // workout_header.dart — Header bar for WorkoutFlowScreen
 
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../theme/app_theme.dart';
 import 'rf_widgets.dart';
 import 'rf_shell.dart';

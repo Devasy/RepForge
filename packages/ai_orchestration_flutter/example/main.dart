@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:ai_orchestration_flutter/ai_orchestration_flutter.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() => runApp(const BridgeExampleApp());
 

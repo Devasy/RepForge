@@ -5,7 +5,7 @@ import 'widgets/web_search_result_card.dart';
 // intercept, persistence) lives in RoutineOptimizerViewModel. The widget only
 // renders state, forwards user intents, and holds UI-local controllers.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';

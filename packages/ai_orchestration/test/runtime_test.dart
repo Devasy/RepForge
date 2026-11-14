@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:ai_orchestration/ai_orchestration.dart';
 import 'package:test/test.dart';
+
 import 'support.dart';
 
 void main() {
@@ -161,73 +163,70 @@ void main() {
     expect(third.state['value'], 3);
   });
 
-  test(
-    'resume validates revision, request, workflow version and response before claiming',
-    () async {
-      final store = MemoryCheckpointStore();
-      final workflow = intWorkflow(
-        WorkflowNode(
-          destinations: {'count'},
-          execute: (_, _) => NodeResult(
-            update: (value) => value,
-            transition: SuspendAt(
-              'count',
-              InputRequest(responseSchema: ValueSchema.boolean()),
-            ),
+  test('resume validates revision, request, workflow version and response before claiming', () async {
+    final store = MemoryCheckpointStore();
+    final workflow = intWorkflow(
+      WorkflowNode(
+        destinations: {'count'},
+        execute: (_, _) => NodeResult(
+          update: (value) => value,
+          transition: SuspendAt(
+            'count',
+            InputRequest(responseSchema: ValueSchema.boolean()),
           ),
         ),
-      );
-      final runtime = AgentRuntime(store: store);
-      final paused = await (await runtime.start(
-        workflow: workflow,
-        threadId: 'a',
-      )).done;
-      Future<RunHandle> resume({
-        int? revision,
-        String? id,
-        Object? value = true,
-      }) => runtime.resume(
-        workflow: workflow,
+      ),
+    );
+    final runtime = AgentRuntime(store: store);
+    final paused = await (await runtime.start(
+      workflow: workflow,
+      threadId: 'a',
+    )).done;
+    Future<RunHandle> resume({
+      int? revision,
+      String? id,
+      Object? value = true,
+    }) => runtime.resume(
+      workflow: workflow,
+      threadId: 'a',
+      runId: paused.runId,
+      interruptId: id ?? paused.interrupt!.id,
+      expectedRevision: revision ?? paused.revision,
+      value: value,
+    );
+    await expectLater(
+      resume(revision: 999),
+      throwsA(isA<CheckpointConflict>()),
+    );
+    await expectLater(
+      resume(id: 'wrong'),
+      throwsA(isA<OrchestrationException>()),
+    );
+    await expectLater(
+      resume(value: 'yes'),
+      throwsA(isA<OrchestrationException>()),
+    );
+    expect((await store.load('a'))!.revision, paused.revision);
+    final changed = Workflow(
+      id: workflow.id,
+      version: 2,
+      entryNode: workflow.entryNode,
+      codec: workflow.codec,
+      initialize: workflow.initialize,
+      nodes: workflow.nodes,
+    );
+    await expectLater(
+      runtime.resume(
+        workflow: changed,
         threadId: 'a',
         runId: paused.runId,
-        interruptId: id ?? paused.interrupt!.id,
-        expectedRevision: revision ?? paused.revision,
-        value: value,
-      );
-      await expectLater(
-        resume(revision: 999),
-        throwsA(isA<CheckpointConflict>()),
-      );
-      await expectLater(
-        resume(id: 'wrong'),
-        throwsA(isA<OrchestrationException>()),
-      );
-      await expectLater(
-        resume(value: 'yes'),
-        throwsA(isA<OrchestrationException>()),
-      );
-      expect((await store.load('a'))!.revision, paused.revision);
-      final changed = Workflow(
-        id: workflow.id,
-        version: 2,
-        entryNode: workflow.entryNode,
-        codec: workflow.codec,
-        initialize: workflow.initialize,
-        nodes: workflow.nodes,
-      );
-      await expectLater(
-        runtime.resume(
-          workflow: changed,
-          threadId: 'a',
-          runId: paused.runId,
-          interruptId: paused.interrupt!.id,
-          expectedRevision: paused.revision,
-          value: true,
-        ),
-        throwsA(isA<OrchestrationException>()),
-      );
-    },
-  );
+        interruptId: paused.interrupt!.id,
+        expectedRevision: paused.revision,
+        value: true,
+      ),
+      throwsA(isA<OrchestrationException>()),
+    );
+  });
 
   test(
     'cancellation stops a hung node and ignores its late state result',
@@ -339,9 +338,8 @@ void main() {
       ),
     );
     await expectLater(
-      AgentRuntime(
-        store: store,
-      ).recover(workflow: workflow, threadId: 'a', expectedRevision: 0),
+      AgentRuntime(store: store)
+          .recover(workflow: workflow, threadId: 'a', expectedRevision: 0),
       throwsA(isA<OrchestrationException>()),
     );
     final safe = intWorkflow(

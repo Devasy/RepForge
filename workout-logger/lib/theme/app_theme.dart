@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 // ── AppColors ──────────────────────────────────────────────────────────────
 // Single source of truth for all colour tokens. Never use hex literals in

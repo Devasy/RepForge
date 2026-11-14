@@ -1,6 +1,6 @@
 // editable_exercise_card.dart — Editable exercise card + set/drop rows for edit screen
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/models.dart';

@@ -7,7 +7,7 @@ import 'test_utils/legacy_ai_fixture.dart';
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_generative_ai/google_generative_ai.dart'
     show Content, Tool, FunctionCall;
