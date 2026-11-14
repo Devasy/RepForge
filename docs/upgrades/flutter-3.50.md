@@ -7,7 +7,7 @@ App version: `2.2.5+76`.
 
 - Flutter 3.50.0 stable, bundled Dart 3.14.0.
 - All five packages require Dart 3.14; the app pins Flutter exactly for CI and F-Droid extraction.
-- Android Gradle Plugin 9.3.3, Gradle 9.5.0 (official distribution checksum), Kotlin plugin 2.4.20, Java 17.
+- Android Gradle Plugin 9.3.3, Gradle 9.5.0 (official distribution checksum), Kotlin plugin 2.4.20. CI uses Temurin JDK 21; Android Java/Kotlin bytecode remains targeted at 17.
 - Retain Android API 37, minimum API 26, built-in Kotlin, and legacy Android DSL compatibility. Split-APK version codes use the public Android variant API.
 - App/release CI reads the Flutter pin from pubspec; orchestration CI now uses the same Flutter/Dart versions.
 
@@ -53,3 +53,13 @@ The app lockfile is retained. Newer analyzer-dependent development packages rema
 The upgraded JNI CMake file still contains the `-Wl,` pattern used by the existing CI/F-Droid build-ID patch, including its 16 KiB page-size linker flag. The release workflow retains `LDFLAGS=-Wl,--build-id=none`. This source audit does not establish byte-for-byte Linux/F-Droid reproducibility.
 
 Device behavior, iOS/macOS builds, and optional scrolling/clipping redesigns were not part of this validation.
+
+## CI follow-up
+
+- Add program-file selection, cancellation and read-failure widget tests covering the migrated picker path, without lowering Codecov thresholds.
+- Pin maintained Node 24 Actions (or composite Actions) by verified commit SHA; preserve ZIP artifacts and skip recompression of APK/AAB archives.
+- Use JDK 21 LTS for CI and keep Android bytecode at 17.
+- Keep sequential release AAB/APK compilation reuse, enable Gradle task caching, and separate manual validation concurrency from publication. Configuration caching remains disabled.
+- Avoid redundant release-branch push checks and dispatch preparation checks only after a bot version commit; retain PR, main and manual checks.
+- Cache pure-Dart package dependencies, pin Linux runners to Ubuntu 24.04, enforce the app lockfile, and verify release APK identity/version/code in PR CI.
+- The last successful pre-change publication job took 10m05s. Eleven minutes is a performance target to measure on GitHub-hosted runners, not a timeout or guaranteed SLA. Manual release-branch runs never publish or deploy. Branch-scoped caches from manual runs do not seed main's publication cache.
