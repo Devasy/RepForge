@@ -200,8 +200,6 @@ class HealthConnectService
     HealthReadType.restingHeartRate:
         HealthDataType.restingHeartRate.readPermission,
     HealthReadType.hrv: HealthDataType.heartRateVariabilityRMSSD.readPermission,
-    HealthReadType.skinTemperature:
-        HealthDataType.skinTemperatureDeltaSeries.readPermission,
   };
 
   @override
@@ -483,29 +481,8 @@ class HealthConnectService
     DateTime start,
     DateTime end,
   ) async {
-    final connector = await _getConnector();
-    if (connector == null) throw StateError('Health Connect unavailable');
-    var request = HealthDataType.skinTemperatureDeltaSeries.readInTimeRange(
-      startTime: start,
-      endTime: end,
-    );
-    final records = <SkinTemperatureDeltaSeriesRecord>[];
-    final tokens = <String>{};
-    while (true) {
-      final response = await connector
-          .readRecords(request)
-          .timeout(_queryDeadline);
-      records.addAll(response.records);
-      final next = response.nextPageRequest;
-      if (next == null) break;
-      if (next.pageToken case final String token) {
-        if (!tokens.add(token)) {
-          throw StateError('Health Connect repeated a page token.');
-        }
-      }
-      request = next;
-    }
-    return mapSkinTemperatureRecords(records);
+    // Collection is deferred in r2.2.4; retain the interface for compatibility.
+    return const [];
   }
 
   @visibleForTesting

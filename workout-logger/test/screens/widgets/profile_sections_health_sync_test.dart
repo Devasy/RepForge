@@ -30,6 +30,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sync coach data now'), findsOneWidget);
+    expect(find.textContaining('skin temperature'), findsNothing);
+    expect(find.textContaining('sleep & heart data'), findsNWidgets(2));
     await tester.tap(find.text('Sync coach data now'));
     await tester.pump();
 

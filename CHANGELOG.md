@@ -4,6 +4,17 @@ User-facing changes. Follow [the changelog format](docs/changelog-format.md).
 
 ## [Unreleased]
 
+## [2.2.4]
+
+### Changes
+
+- Defer new skin-temperature collection from Health Connect; existing saved readings remain available for Coach analysis, and existing backups remain compatible.
+- Retain existing HRV recovery and readiness insights, sleep and heart-data sync, and workout imports.
+
+### Known limitations
+
+- New Home HRV and skin-temperature graphs are deferred to a future release.
+
 ## [2.2.3]
 
 ### Features added
