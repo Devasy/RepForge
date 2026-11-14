@@ -41,7 +41,7 @@ The app lockfile is retained. Newer analyzer-dependent development packages rema
 
 ## Verification
 
-- App tests: 1,505 passed, one opt-in live Coach evaluation skipped.
+- Initial SDK-upgrade app tests: 1,505 passed, one opt-in live Coach evaluation skipped.
 - Four orchestration packages: 92 tests passed; strict analysis and formatting checks passed.
 - Release readiness for `r2.2.5` and all 15 release-script tests passed.
 - App analysis passes the existing CI policy with zero errors; 397 warning/info diagnostics remain, including legacy analyzer-plugin warnings. Deprecated framework design imports were migrated.
@@ -56,7 +56,7 @@ Device behavior, iOS/macOS builds, and optional scrolling/clipping redesigns wer
 
 ## CI follow-up
 
-- Add program-file selection, cancellation and read-failure widget tests covering the migrated picker path, without lowering Codecov thresholds.
+- Add program-file selection, cancellation, read-failure and required-field type-validation/recovery widget tests covering the changed lines, without lowering Codecov thresholds.
 - Pin maintained Node 24 Actions (or composite Actions) by verified commit SHA; preserve ZIP artifacts and skip recompression of APK/AAB archives.
 - Use JDK 21 LTS for CI and keep Android bytecode at 17.
 - Keep sequential release AAB/APK compilation reuse, enable Gradle task caching, and separate manual validation concurrency from publication. Configuration caching remains disabled.

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -11,6 +12,52 @@ import 'test_utils/test_robot.dart';
 void main() {
   const program =
       '{"name":"Picked program","totalWeeks":1,"phases":[],"weeks":[]}';
+
+  for (final invalid in [
+    ('name', 42, 'must be a string'),
+    ('totalWeeks', 'one', 'must be an integer'),
+    ('phases', <String, Object?>{}, 'must be an array'),
+  ]) {
+    testWidgets('program validation rejects invalid ${invalid.$1}', (
+      tester,
+    ) async {
+      await TestRobot(tester).pumpScreen(const ImportProgramScreen());
+      final data = jsonDecode(program) as Map<String, dynamic>;
+      data[invalid.$1] = invalid.$2;
+      await tester.enterText(find.byType(TextField), jsonEncode(data));
+      await tester.pump();
+      await tester.tap(find.text('Validate'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('"${invalid.$1}" ${invalid.$3}'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<ElevatedButton>(
+              find.widgetWithText(ElevatedButton, 'Import'),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.enterText(find.byType(TextField), program);
+      await tester.pump();
+      await tester.tap(find.text('Validate'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining(invalid.$3), findsNothing);
+      expect(
+        tester
+            .widget<ElevatedButton>(
+              find.widgetWithText(ElevatedButton, 'Import'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final scenario in ['selected', 'cancelled', 'unreadable']) {
     testWidgets('program file picker handles $scenario', (tester) async {
