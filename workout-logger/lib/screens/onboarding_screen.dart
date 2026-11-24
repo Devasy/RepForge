@@ -37,16 +37,18 @@ class _WelcomePageState extends State<WelcomePage> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit({bool skipProfile = false}) async {
     if (_saving) return;
     final name = _controller.text.trim();
-    if (name.isEmpty) return;
+    if (!skipProfile && name.isEmpty) return;
 
     setState(() => _saving = true);
     try {
       final settings = context.read<SettingsProvider>();
-      await settings.setUserGender(_gender);
-      await settings.setUserName(name);
+      if (!skipProfile) {
+        await settings.setUserGender(_gender);
+        await settings.setUserName(name);
+      }
       final version = await settings.getCurrentVersion();
       await settings.markVersionSeen(version);
       if (mounted) widget.onComplete();
@@ -124,7 +126,11 @@ class _WelcomePageState extends State<WelcomePage> {
                       height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 36),
+                  TextButton(
+                    onPressed: _saving ? null : () => _submit(skipProfile: true),
+                    child: const Text('Continue without a profile'),
+                  ),
+                  const SizedBox(height: 24),
                   Text(
                     'WHAT SHOULD WE CALL YOU?',
                     style: TextStyle(
@@ -138,7 +144,6 @@ class _WelcomePageState extends State<WelcomePage> {
                   const SizedBox(height: AppSpacing.sm),
                   TextField(
                     controller: _controller,
-                    autofocus: true,
                     textCapitalization: TextCapitalization.words,
                     style: TextStyle(
                       fontFamily: 'Geist',

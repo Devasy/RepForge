@@ -515,6 +515,12 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
   /// Log set is tapped twenty-odd times a session and exercise nav a handful,
   /// so the log action owns the width and the thumb zone. It used to be inverted.
   Widget _buildBottomNav(WorkoutProvider provider, bool isFirst, bool isLast) {
+    final settings = context.watch<SettingsProvider>();
+    final weight = settings.toDisplay(_currentWeight);
+    final amount = weight.toStringAsFixed(weight == weight.roundToDouble() ? 0 : 1);
+    final showLoad = !_isDropset &&
+        !isBodyweightExercise(provider.currentExercise?.id) &&
+        provider.currentExercise?.exerciseType != ExerciseType.timeBased;
     return RFBottomBar(
       child: Row(
         children: [
@@ -532,7 +538,8 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: GlowButton(
-              label: 'Log set',
+              key: const ValueKey('log-set'),
+              label: showLoad ? 'Log $amount ${settings.unitLabel} × $_currentReps' : 'Log set',
               icon: Icons.check_rounded,
               onPressed: _completeSet,
             ),
@@ -651,6 +658,21 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
           );
 
     provider.addSet(set);
+    final logged = provider.currentExerciseLog?.sets.lastOrNull;
+    if (logged == null) return;
+    ScaffoldMessenger.of(context)
+      ..removeCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: const Text('Set logged'),
+        action: SnackBarAction(label: 'Undo', onPressed: () {
+          if (!mounted || idx >= provider.currentExerciseLogs.length ||
+              !identical(provider.currentExerciseLogs[idx].sets.lastOrNull, logged)) return;
+          if (_isResting) _skipRest();
+          provider.goToExercise(idx);
+          provider.removeLastSet();
+          _loadLastSessionData();
+        }),
+      ));
     HapticFeedback.heavyImpact();
 
     if (currentSlot != null) _restSeconds = currentSlot.restSeconds;
@@ -773,7 +795,7 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
         if (settings.restAlertVibration && !_restWasBackgrounded) {
           unawaited(HapticFeedback.vibrate());
         }
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
           const SnackBar(
             content: Text('Rest complete — time for your next set'),
           ),

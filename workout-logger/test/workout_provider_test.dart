@@ -746,6 +746,25 @@ void main() {
         expect(mockStorage.settings[draftKey], equals(''));
       });
 
+      test('concurrent finishes and a stale draft produce one saved workout', () async {
+        provider.startWorkout(exerciseIds: const ['bench_press']);
+        provider.addSet(WorkoutSet(weight: 80, reps: 8));
+        provider.addSet(WorkoutSet(weight: 75, reps: 10));
+        await flushAsync();
+        final draft = mockStorage.settings[draftKey]!;
+        final results = await Future.wait([provider.finishWorkout(), provider.finishWorkout()]);
+        expect(results.first.id, jsonDecode(draft)['sessionId']);
+        expect(results.last.id, results.first.id);
+
+        // Simulate a process exit after the history write and before draft cleanup.
+        await mockStorage.saveSetting(draftKey, draft);
+        final restarted = WorkoutProvider(mockStorage, programManager: ProgramManager(mockStorage));
+        await restarted.init();
+        expect(restarted.hasActiveWorkout, isFalse);
+        expect(restarted.sessions.single.exercises.single.sets.map((s) => s.reps), [8, 10]);
+        expect(mockStorage.settings[draftKey], '');
+      });
+
       test('clears draft after canceling workout', () async {
         provider.startWorkout(exerciseIds: const ['bench_press']);
         provider.addSet(WorkoutSet(weight: 80, reps: 8));

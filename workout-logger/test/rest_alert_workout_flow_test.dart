@@ -65,7 +65,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Log set'));
+    await tester.tap(find.byKey(const ValueKey('log-set')));
     await tester.pump();
     await tester.pump();
     expect(calls, contains('schedule'));
@@ -85,14 +85,14 @@ void main() {
     expect(find.text('Rest complete — time for your next set'), findsOneWidget);
     expect(calls, contains('cancel'));
 
-    await tester.tap(find.text('Log set'));
+    await tester.tap(find.byKey(const ValueKey('log-set')));
     await tester.pump();
     for (var i = 0; i < 3; i++) {
       await tester.tap(find.text('−30s'));
       await tester.pump();
     }
     expect(find.byType(RestTimerView), findsNothing);
-    await tester.tap(find.text('Log set'));
+    await tester.tap(find.byKey(const ValueKey('log-set')));
     await tester.pump();
     expect(tester.widget<RestTimerView>(find.byType(RestTimerView))
         .totalSeconds, 30);

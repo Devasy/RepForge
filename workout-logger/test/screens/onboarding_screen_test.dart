@@ -17,14 +17,19 @@ void main() {
     final workout = WorkoutProvider(storage, mlService: MockMLService(), programManager: ProgramManager(storage));
     await workout.init();
 
+    var completed = false;
     await robot.pumpScreen(
-      WelcomePage(onComplete: () {}),
+      WelcomePage(onComplete: () => completed = true),
       storage: storage,
       settingsProvider: settings,
       workoutProvider: workout,
     );
 
     robot.expectVisible(WelcomePage);
-    expect(find.textContaining('RepForge'), findsWidgets);
+    await tester.tap(find.text('Continue without a profile'));
+    await tester.pumpAndSettle();
+    expect(completed, isTrue);
+    expect(settings.userName, isNull);
+    expect(settings.lastSeenVersion, isNotNull);
   });
 }
