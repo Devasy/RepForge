@@ -55,8 +55,9 @@ class HistoryManager extends ChangeNotifier {
     WorkoutSession session, {
     String? routineName,
   }) async {
-    _sessions.insert(0, session);
     await _storage.saveWorkoutSession(session);
+    _sessions.removeWhere((entry) => entry.id == session.id);
+    _sessions.insert(0, session);
 
     final exerciseIds = session.exercises.map((e) => e.exerciseId).toSet();
     onSessionsChanged?.call(exerciseIds);

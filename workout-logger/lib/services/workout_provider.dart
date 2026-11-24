@@ -140,7 +140,8 @@ class WorkoutProvider extends ChangeNotifier {
   final ProgramManager programManager;
 
   // Active workout state
-  WorkoutSession? _activeSession;
+  String? _activeSessionId;
+  Future<WorkoutSession>? _finishing;
   Routine? _activeRoutine;
   String? _activeProgramId;
   String? get activeProgramId => _activeProgramId;
@@ -162,7 +163,7 @@ class WorkoutProvider extends ChangeNotifier {
   List<Exercise> get allExercises => _allExercises;
 
   bool get hasActiveWorkout =>
-      _activeSession != null || _workoutStartTime != null;
+      _activeSessionId != null || _workoutStartTime != null;
   Routine? get activeRoutine => _activeRoutine;
   ProgramDay? get activeProgramDay => _activeProgramDay;
   ProgramWeek? get activeProgramWeek => _activeProgramWeek;
@@ -266,6 +267,7 @@ class WorkoutProvider extends ChangeNotifier {
 
     final draft = jsonEncode({
       'schemaVersion': _draftSchemaVersion,
+      'sessionId': _activeSessionId,
       'startTime': _workoutStartTime!.toIso8601String(),
       'routineId': _activeRoutine?.id,
       'programId': _activeProgramId,
@@ -376,8 +378,16 @@ class WorkoutProvider extends ChangeNotifier {
       final maxIndex = restoredLogs.isEmpty ? 0 : restoredLogs.length - 1;
 
       _draftRestoreInProgress = true;
-      _activeSession = null;
-      _workoutStartTime = DateTime.parse(startTimeRaw);
+      // Older drafts have no ID. Derive one that survives another restart.
+      final startTime = DateTime.parse(startTimeRaw);
+      final sessionId = draft['sessionId'] as String? ??
+          _uuid.v5(Namespace.url.value, 'repforge:workout:$startTimeRaw');
+      if (_sessions.any((session) => session.id == sessionId)) {
+        await _clearDraft();
+        return;
+      }
+      _activeSessionId = sessionId;
+      _workoutStartTime = startTime;
       _activeRoutine = restoredRoutine;
       _activeProgramId = draft['programId'] as String?;
       _activeProgramDay = restoredProgramDay;
@@ -735,6 +745,7 @@ class WorkoutProvider extends ChangeNotifier {
       throw WorkoutInProgressError();
     }
 
+    _activeSessionId = _uuid.v4();
     _workoutStartTime = DateTime.now();
     _activeRoutine = routine;
     _activeProgramId = programId;
@@ -900,7 +911,16 @@ class WorkoutProvider extends ChangeNotifier {
   }
 
   /// Finish workout and save
-  Future<WorkoutSession> finishWorkout({String? notes}) async {
+  Future<WorkoutSession> finishWorkout({String? notes}) {
+    return _finishing ??= _finishWorkout(notes).whenComplete(() {
+      _finishing = null;
+    });
+  }
+
+  Future<WorkoutSession> _finishWorkout(String? notes) async {
+    final id = _activeSessionId;
+    if (id == null) throw StateError('No active workout');
+    await _draftWriteQueue;
     final duration = _workoutStartTime != null
         ? DateTime.now().difference(_workoutStartTime!).inMinutes
         : 0;
@@ -911,7 +931,7 @@ class WorkoutProvider extends ChangeNotifier {
         .toList();
 
     final session = WorkoutSession(
-      id: _uuid.v4(),
+      id: id,
       date: _workoutStartTime ?? DateTime.now(),
       routineId: _activeRoutine?.id,
       programId: completedExercises.isEmpty ? null : _activeProgramId,
@@ -935,6 +955,7 @@ class WorkoutProvider extends ChangeNotifier {
       await _storage.saveWorkoutSession(session);
     }
     await _clearDraft();
+    _sessions.removeWhere((entry) => entry.id == session.id);
     _sessions.insert(0, session);
     _invalidateHistoryCache();
 
@@ -947,7 +968,7 @@ class WorkoutProvider extends ChangeNotifier {
     await _updateTargetsFromSession(session);
 
     // Clear active workout state
-    _activeSession = null;
+    _activeSessionId = null;
     _activeRoutine = null;
     _activeProgramId = null;
     _activeProgramDay = null;
@@ -962,7 +983,7 @@ class WorkoutProvider extends ChangeNotifier {
 
   /// Cancel workout without saving
   Future<void> cancelWorkout() async {
-    _activeSession = null;
+    _activeSessionId = null;
     _activeRoutine = null;
     _activeProgramId = null;
     _activeProgramDay = null;

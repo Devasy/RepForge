@@ -352,7 +352,6 @@ class _AppInitializerState extends State<AppInitializer> {
       final version = await settings.getCurrentVersion();
       final needsName = settings.userName == null || settings.userName!.isEmpty;
       final versionChanged =
-          !needsName &&
           settings.lastSeenVersion != null &&
           (compareAppVersions(
                     normalizeInstalledVersion(version),
@@ -379,14 +378,14 @@ class _AppInitializerState extends State<AppInitializer> {
       if (!mounted) return;
       setState(() {
         _initialized = true;
-        _needsNamePrompt = needsName;
+        _needsNamePrompt = needsName && settings.lastSeenVersion == null;
         _needsGenderPrompt = !needsName && settings.needsGenderSelection;
         _pendingVersion = version;
         _previousVersion = settings.lastSeenVersion;
         _versionChanged = versionChanged;
       });
 
-      if (!needsName && !_needsGenderPrompt) {
+      if (!_needsNamePrompt && !_needsGenderPrompt) {
         _finishUpgrade();
       }
     } catch (e) {

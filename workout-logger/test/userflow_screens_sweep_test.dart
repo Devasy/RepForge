@@ -178,7 +178,7 @@ void main() {
       robot.expectVisible(WorkoutFlowScreen);
 
       // Interact with set logging and rest timer
-      final logSetBtn = find.text('Log set');
+      final logSetBtn = find.byKey(const ValueKey('log-set'));
       if (logSetBtn.evaluate().isNotEmpty) {
         await tester.tap(logSetBtn);
         await tester.pumpAndSettle();

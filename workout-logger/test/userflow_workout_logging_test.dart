@@ -65,14 +65,18 @@ void main() {
       final input = tester.widget<ExerciseInputSection>(find.byType(ExerciseInputSection));
       input.onWeightChanged(10);
       await tester.pump();
-      await tester.ensureVisible(find.text('Log set'));
-      await tester.tap(find.text('Log set'));
+      await tester.ensureVisible(find.byKey(const ValueKey('log-set')));
+      await tester.tap(find.byKey(const ValueKey('log-set')));
       await tester.pump();
       final set = workoutProvider.currentExerciseLog!.sets.single;
       expect(set.loadMode, WorkoutLoadMode.weighted);
       expect(set.loadEncodingVersion, 1);
       expect(set.bodyWeightAtLog, isNotNull);
       expect(set.effectiveWeight, set.bodyWeightAtLog! + 10);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Undo'));
+      await tester.pump();
+      expect(workoutProvider.currentExerciseLog!.sets, isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
@@ -106,7 +110,7 @@ void main() {
       expect(find.text('Barbell Bench Press'), findsWidgets);
 
       // 2. Drive production flow: Tap 'Log set' to trigger RestTimerView overlay in WorkoutFlowScreen
-      final logSetBtn = find.text('Log set');
+      final logSetBtn = find.byKey(const ValueKey('log-set'));
       expect(logSetBtn, findsOneWidget);
       await tester.tap(logSetBtn);
       await tester.pumpAndSettle();
