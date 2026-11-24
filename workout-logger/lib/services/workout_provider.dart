@@ -379,13 +379,15 @@ class WorkoutProvider extends ChangeNotifier {
 
       _draftRestoreInProgress = true;
       // Older drafts have no ID. Derive one that survives another restart.
-      _activeSessionId = draft['sessionId'] as String? ?? _uuid.v5(Namespace.url.value, 'repforge:workout:$startTimeRaw');
-      if (_sessions.any((session) => session.id == _activeSessionId)) {
-        _activeSessionId = null;
+      final startTime = DateTime.parse(startTimeRaw);
+      final sessionId = draft['sessionId'] as String? ??
+          _uuid.v5(Namespace.url.value, 'repforge:workout:$startTimeRaw');
+      if (_sessions.any((session) => session.id == sessionId)) {
         await _clearDraft();
         return;
       }
-      _workoutStartTime = DateTime.parse(startTimeRaw);
+      _activeSessionId = sessionId;
+      _workoutStartTime = startTime;
       _activeRoutine = restoredRoutine;
       _activeProgramId = draft['programId'] as String?;
       _activeProgramDay = restoredProgramDay;

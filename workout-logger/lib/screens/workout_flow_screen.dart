@@ -665,8 +665,11 @@ class _WorkoutFlowScreenState extends State<WorkoutFlowScreen>
       ..showSnackBar(SnackBar(
         content: const Text('Set logged'),
         action: SnackBarAction(label: 'Undo', onPressed: () {
-          if (!mounted || idx >= provider.currentExerciseLogs.length ||
-              !identical(provider.currentExerciseLogs[idx].sets.lastOrNull, logged)) return;
+          if (!mounted ||
+              idx >= provider.currentExerciseLogs.length ||
+              !identical(provider.currentExerciseLogs[idx].sets.lastOrNull, logged)) {
+            return;
+          }
           if (_isResting) _skipRest();
           provider.goToExercise(idx);
           provider.removeLastSet();
